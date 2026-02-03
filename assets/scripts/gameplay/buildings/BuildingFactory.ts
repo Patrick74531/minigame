@@ -12,9 +12,12 @@ export class BuildingFactory {
     /**
      * 创建兵营
      */
-    public static createBarracks(parent: Node, x: number, y: number): Node {
+    /**
+     * 创建兵营
+     */
+    public static createBarracks(parent: Node, x: number, z: number): Node {
         const node = this.createCubeNode('Barracks', new Color(100, 180, 100, 255));
-        node.setPosition(x, y, 0);
+        node.setPosition(x, 0, z); // 3D 坐标：Y=0 在地面
         node.setScale(0.45, 0.45, 0.45);
         parent.addChild(node);
 

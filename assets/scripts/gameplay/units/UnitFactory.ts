@@ -18,11 +18,11 @@ export class UnitFactory {
     public static createEnemy(
         parent: Node,
         x: number,
-        y: number,
+        z: number,
         waveMultiplier: number = 1
     ): Node {
         const node = this.createCubeNode('Enemy', new Color(220, 60, 60, 255));
-        node.setPosition(x, y, 0);
+        node.setPosition(x, 0, z);
         node.setScale(0.35, 0.35, 0.35);
         parent.addChild(node);
 
@@ -41,9 +41,9 @@ export class UnitFactory {
     /**
      * 创建士兵
      */
-    public static createSoldier(parent: Node, x: number, y: number): Node {
+    public static createSoldier(parent: Node, x: number, z: number): Node {
         const node = this.createCubeNode('Soldier', new Color(60, 140, 220, 255));
-        node.setPosition(x, y, 0);
+        node.setPosition(x, 0, z);
         node.setScale(0.3, 0.3, 0.3);
         parent.addChild(node);
 
@@ -62,9 +62,9 @@ export class UnitFactory {
     /**
      * 创建英雄
      */
-    public static createHero(parent: Node, x: number, y: number): Node {
-        const node = this.createCubeNode('Hero', new Color(255, 200, 50, 255));
-        node.setPosition(x, y, 0);
+    public static createHero(parent: Node, x: number, z: number): Node {
+        const node = this.createCubeNode('Hero', new Color(255, 215, 0, 255));
+        node.setPosition(x, 0, z); // 3D: (x, 0, z)
         node.setScale(0.5, 0.5, 0.5);
         parent.addChild(node);
 

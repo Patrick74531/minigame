@@ -77,8 +77,8 @@ export class Soldier extends Unit {
         for (const enemy of enemies) {
             if (!enemy.isValid) continue;
             const dx = enemy.position.x - myPos.x;
-            const dy = enemy.position.y - myPos.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            const dz = enemy.position.z - myPos.z; // 3D
+            const dist = Math.sqrt(dx * dx + dz * dz);
             if (dist < minDist) {
                 minDist = dist;
                 nearest = enemy;
@@ -105,10 +105,10 @@ export class Soldier extends Unit {
         const myPos = this.node.position;
         const targetPos = this._target.node.position;
         const dx = targetPos.x - myPos.x;
-        const dy = targetPos.y - myPos.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        const dz = targetPos.z - myPos.z; // 3D
+        const distance = Math.sqrt(dx * dx + dz * dz);
 
-        if (distance <= this._stats.attackRange) {
+        if (distance <= this._stats.attackRange) { // e.g. 0.6
             this._state = UnitState.ATTACKING;
             return;
         }
@@ -116,13 +116,16 @@ export class Soldier extends Unit {
         // 向目标移动
         const speed = this._stats.moveSpeed / 60;
         const dirX = dx / distance;
-        const dirY = dy / distance;
+        const dirZ = dz / distance;
 
         this.node.setPosition(
             myPos.x + dirX * speed * dt,
-            myPos.y + dirY * speed * dt,
-            myPos.z
+            0,
+            myPos.z + dirZ * speed * dt
         );
+        
+        // Face target
+        this.node.lookAt(new Vec3(targetPos.x, 0, targetPos.z));
     }
 
     protected performAttack(): void {

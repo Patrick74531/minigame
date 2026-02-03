@@ -1,12 +1,15 @@
-import { _decorator, Component, Node, Label } from 'cc';
+import { _decorator, Component, Node, Input, input, EventTouch, Vec2, Vec3, PhysicsSystem, geometry, Camera } from 'cc';
 import { GameManager } from './core/managers/GameManager';
 import { EventManager } from './core/managers/EventManager';
 import { WaveManager } from './core/managers/WaveManager';
 import { HUDManager } from './ui/HUDManager';
 import { GameEvents } from './data/GameEvents';
 import { UnitFactory } from './gameplay/units/UnitFactory';
+import { UnitType } from './gameplay/units/Unit';
 import { BuildingFactory } from './gameplay/buildings/BuildingFactory';
+import { Building } from './gameplay/buildings/Building';
 import { CoinFactory } from './gameplay/economy/CoinFactory';
+import { GameConfig } from './data/GameConfig';
 import { Unit } from './gameplay/units/Unit';
 import { Hero } from './gameplay/units/Hero';
 import { UIFactory } from './ui/UIFactory';
@@ -62,7 +65,7 @@ export class GameController extends Component {
         GameManager.instance.initialize();
         WaveManager.instance.initialize(this._enemyContainer!, this.maxWaves);
         HUDManager.instance.initialize(this._uiCanvas!);
-        BuildingManager.instance.initialize(this._buildingContainer!);
+        BuildingManager.instance.initialize(this._buildingContainer!, this._soldierContainer!);
     }
 
     protected onDestroy(): void {
@@ -77,8 +80,15 @@ export class GameController extends Component {
 
         // 创建初始实体
         this._base = BuildingFactory.createBase(this._buildingContainer!, 0, 0, 100);
-        this._buildings.push(BuildingFactory.createBarracks(this._buildingContainer!, -2.5, 1));
-        this._buildings.push(BuildingFactory.createBarracks(this._buildingContainer!, 2.5, 1));
+        
+        const b1 = BuildingFactory.createBarracks(this._buildingContainer!, -2.5, 1);
+        b1.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
+        this._buildings.push(b1);
+
+        const b2 = BuildingFactory.createBarracks(this._buildingContainer!, 2.5, 1);
+        b2.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
+        this._buildings.push(b2);
+
         this._hero = UnitFactory.createHero(this._soldierContainer!, 0, -1.5);
 
         // 设置英雄引用给建造管理器
@@ -102,32 +112,8 @@ export class GameController extends Component {
         // 波次生成
         WaveManager.instance.update(dt);
 
-        // 敌人移动
-        this.updateEnemyMovement(dt);
-
-        // 士兵 AI
-        this.updateSoldierAI(dt);
-
-        // 战斗处理 (每 0.2 秒)
-        this._combatTimer += dt;
-        if (this._combatTimer >= 0.2) {
-            this._combatTimer = 0;
-            this.processCombat();
-        }
-
-        // 建筑产兵检查
-        this._buildingTimer += dt;
-        if (this._buildingTimer >= 0.5) {
-            this._buildingTimer = 0;
-            this.updateBuildingSpawn();
-        }
-
         // 金币拾取检测
-        this._coinTimer += dt;
-        if (this._coinTimer >= 0.1) {
-            this._coinTimer = 0;
-            this.updateCoinPickup();
-        }
+        this.updateCoinPickup(dt);
 
         // 建造系统更新
         BuildingManager.instance.update(dt);
@@ -147,6 +133,12 @@ export class GameController extends Component {
     // === 初始化 ===
 
     private setupContainers(): void {
+        // Prevent duplicate containers on scene/script reload
+        const old = this.node.getChildByName('GameContainer');
+        if (old) {
+            old.destroy();
+        }
+
         this._container = new Node('GameContainer');
         this.node.addChild(this._container);
 
@@ -165,10 +157,46 @@ export class GameController extends Component {
         this._uiCanvas = UIFactory.createUICanvas();
         this.node.addChild(this._uiCanvas);
         this._joystick = UIFactory.createJoystick(this._uiCanvas);
+        
+        // 初始化 HUD
+        HUDManager.instance.initialize(this._uiCanvas);
     }
 
     private setupEventListeners(): void {
-        // 直接在 update 中处理敌人移动和战斗，不需要事件监听
+        EventManager.instance.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
+        EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
+    }
+
+    private onEnemyReachedBase(data: any): void {
+        const damage = data.damage || 10;
+        this.damageBase(damage);
+    }
+
+    private onUnitDied(data: any): void {
+        if (data.unitType === UnitType.ENEMY) {
+            // Remove from manager
+            if (data.node) {
+                WaveManager.instance.removeEnemy(data.node);
+            }
+
+            // Drop Coin
+            if (data.position && this._coinContainer) {
+                const value = 5 + Math.floor(Math.random() * 5);
+                const coin = CoinFactory.createCoin(
+                    this._coinContainer,
+                    data.position.x,
+                    data.position.z, // Use Z for 3D logic
+                    value
+                );
+                this._coins.push(coin);
+            }
+            // Note: data.node is destroyed by Unit.die() -> onDeath() -> destroy()?
+            // Enemy.ts onDeath is empty now. Unit.die() emits event then onDeath().
+            // It does NOT destroy node automatically unless I call it.
+            if (data.node && data.node.isValid) {
+                 data.node.destroy();
+            }
+        }
     }
 
     // === 建造系统 ===
@@ -209,48 +237,35 @@ export class GameController extends Component {
         }
     }
 
-    // === 建筑产兵 ===
 
-    private updateBuildingSpawn(): void {
-        if (this._soldiers.length >= 15) return;
 
-        for (const building of this._buildings) {
-            if (!building.isValid || building.name !== 'Barracks') continue;
-
-            const data = (building as any).spawnData || { timer: 0 };
-            data.timer = (data.timer || 0) + 0.5;
-
-            if (data.timer >= 4) {
-                data.timer = 0;
-                const soldier = UnitFactory.createSoldier(
-                    this._soldierContainer!,
-                    building.position.x,
-                    building.position.y
-                );
-                this._soldiers.push(soldier);
-            }
-
-            (building as any).spawnData = data;
-        }
-    }
 
     // === 金币拾取 ===
 
-    private updateCoinPickup(): void {
-        if (!this._hero || !this._hero.isValid) return;
-        const heroComp = this._hero.getComponent(Hero);
-        if (!heroComp) return;
-
+    private updateCoinPickup(dt: number): void {
+        const heroComp = this._hero?.getComponent(Hero);
         const toRemove: Node[] = [];
 
         for (const coin of this._coins) {
             if (!coin.isValid) continue;
 
-            const dist = this.getDistance(this._hero, coin);
-            if (dist < 1.0) {
-                heroComp.addCoin(coin);
+            // Update Lifecycle (Animation + Auto-collect)
+            // Note: CoinFactory.updateCoin returns true if it should be destroyed (auto-collected)
+            const shouldDestroy = CoinFactory.updateCoin(coin, dt);
+            if (shouldDestroy) {
                 toRemove.push(coin);
-                HUDManager.instance.updateCoinDisplay(heroComp.coinCount);
+                coin.destroy();
+                continue;
+            }
+
+            // Check Pickup by Hero
+            if (heroComp) {
+                 const dist = this.getDistance(this._hero!, coin);
+                 if (dist < GameConfig.ECONOMY.COIN_COLLECT_RANGE) {
+                     heroComp.addCoin(coin);
+                     toRemove.push(coin); // Stop tracking, Hero takes ownership
+                     HUDManager.instance.updateCoinDisplay(heroComp.coinCount);
+                 }
             }
         }
 
@@ -262,6 +277,8 @@ export class GameController extends Component {
 
     // === 基地伤害 ===
 
+    // === 基地伤害 ===
+
     private damageBase(damage: number): void {
         if (!this._base) return;
 
@@ -269,10 +286,11 @@ export class GameController extends Component {
         if (!data) return;
 
         data.hp -= damage;
-        console.log(`[Base] ⚠️ HP: ${data.hp}/${data.maxHp}`);
+        // Update HUD
+        HUDManager.instance.updateBaseHp(data.hp, data.maxHp);
 
         if (data.hp <= 0) {
-            console.log('� 游戏结束!');
+            HUDManager.instance.updateBaseHp(0, data.maxHp);
             GameManager.instance.pause();
         }
     }
@@ -281,139 +299,8 @@ export class GameController extends Component {
 
     private getDistance(a: Node, b: Node): number {
         const dx = b.position.x - a.position.x;
-        const dy = b.position.y - a.position.y;
-        return Math.sqrt(dx * dx + dy * dy);
+        const dz = b.position.z - a.position.z; // 3D logic
+        return Math.sqrt(dx * dx + dz * dz);
     }
 
-    // === 敌人移动 ===
-
-    private updateEnemyMovement(dt: number): void {
-        const enemies = WaveManager.instance.enemies;
-        const toRemove: Node[] = [];
-
-        for (const enemy of enemies) {
-            if (!enemy.isValid) continue;
-
-            const pos = enemy.position;
-            const dist = pos.length();
-            const speed = 2.0;  // 更快的移动速度
-
-            if (dist < 0.6) {
-                toRemove.push(enemy);
-                this.damageBase(10);
-            } else {
-                const dirX = -pos.x / dist;
-                const dirY = -pos.y / dist;
-                enemy.setPosition(pos.x + dirX * speed * dt, pos.y + dirY * speed * dt, 0);
-            }
-        }
-
-        for (const enemy of toRemove) {
-            WaveManager.instance.removeEnemy(enemy);
-            enemy.destroy();
-        }
-    }
-
-    // === 士兵 AI ===
-
-    private updateSoldierAI(dt: number): void {
-        const enemies = WaveManager.instance.enemies;
-
-        for (const soldier of this._soldiers) {
-            if (!soldier.isValid) continue;
-
-            const target = this.findNearestEnemy(soldier, enemies);
-            if (!target) continue;
-
-            const pos = soldier.position;
-            const tpos = target.position;
-            const dx = tpos.x - pos.x;
-            const dy = tpos.y - pos.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            if (dist > 0.45) {
-                const speed = 3.0;  // 士兵更快
-                soldier.setPosition(
-                    pos.x + (dx / dist) * speed * dt,
-                    pos.y + (dy / dist) * speed * dt,
-                    0
-                );
-            }
-
-            (soldier as any).currentTarget = target;
-        }
-    }
-
-    private findNearestEnemy(unit: Node, enemies: Node[]): Node | null {
-        let nearest: Node | null = null;
-        let minDist = Infinity;
-
-        for (const enemy of enemies) {
-            if (!enemy.isValid) continue;
-            const dx = enemy.position.x - unit.position.x;
-            const dy = enemy.position.y - unit.position.y;
-            const dist = dx * dx + dy * dy;
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = enemy;
-            }
-        }
-        return nearest;
-    }
-
-    // === 战斗处理 ===
-
-    private processCombat(): void {
-        const enemies = WaveManager.instance.enemies;
-        const killedEnemies: Node[] = [];
-
-        for (const soldier of this._soldiers) {
-            if (!soldier.isValid) continue;
-            const target = (soldier as any).currentTarget;
-            if (!target || !target.isValid) continue;
-
-            const dist = this.getDistance(soldier, target);
-            if (dist < 0.5) {
-                this.dealDamage(target, 15, killedEnemies);
-            }
-        }
-
-        if (this._hero && this._hero.isValid) {
-            const target = this.findNearestEnemy(this._hero, enemies);
-            if (target && target.isValid) {
-                const dist = this.getDistance(this._hero, target);
-                if (dist < 1.0) {
-                    this.dealDamage(target, 30, killedEnemies);
-                }
-            }
-        }
-
-        for (const enemy of killedEnemies) {
-            this.removeEnemy(enemy);
-        }
-    }
-
-    private dealDamage(enemy: Node, damage: number, killedList: Node[]): void {
-        const unit = enemy.getComponent(Unit);
-        if (!unit) return;
-
-        unit.takeDamage(damage);
-
-        if (!unit.isAlive && !killedList.includes(enemy)) {
-            killedList.push(enemy);
-        }
-    }
-
-    private removeEnemy(enemy: Node): void {
-        WaveManager.instance.removeEnemy(enemy);
-        const value = 5 + Math.floor(Math.random() * 5);
-        const coin = CoinFactory.createCoin(
-            this._coinContainer!,
-            enemy.position.x,
-            enemy.position.y,
-            value
-        );
-        this._coins.push(coin);
-        enemy.destroy();
-    }
 }

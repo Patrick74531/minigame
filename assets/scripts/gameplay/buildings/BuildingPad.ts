@@ -216,8 +216,8 @@ export class BuildingPad extends BaseComponent {
         const heroPos = this._heroNode.position;
         const padPos = this.node.position;
         const dx = heroPos.x - padPos.x;
-        const dy = heroPos.y - padPos.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        const dz = heroPos.z - padPos.z; // Use Z for 3D ground distance
+        const dist = Math.sqrt(dx * dx + dz * dz);
 
         return dist < this.collectRadius;
     }

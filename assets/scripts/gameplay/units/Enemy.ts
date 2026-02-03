@@ -1,4 +1,4 @@
-import { _decorator, Vec2 } from 'cc';
+import { _decorator, Vec2, Vec3 } from 'cc';
 import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
 import { EventManager } from '../../core/managers/EventManager';
@@ -41,7 +41,8 @@ export class Enemy extends Unit {
         if (!this.isAlive) return;
 
         const pos = this.node.position;
-        const distToBase = Math.sqrt(pos.x * pos.x + pos.y * pos.y);
+        // 3D: Distance to base (0,0,0) on XZ plane
+        const distToBase = Math.sqrt(pos.x * pos.x + pos.z * pos.z);
 
         // 检查是否到达基地
         if (distToBase < this.ARRIVAL_DISTANCE) {
@@ -50,15 +51,22 @@ export class Enemy extends Unit {
         }
 
         // 向原点（基地）移动
-        const speed = this._stats.moveSpeed / 60; // 转换为世界单位
+        const speed = this._stats.moveSpeed / 60; // 转换为世界单位 (assuming 60fps base, or just units/sec?) moveSpeed is 100?
+        // GameConfig says moveSpeed is e.g. 2.0?
+        // UnitFactory sets moveSpeed = GameConfig.ENEMY.MOVE_SPEED * ...
+        // If config is ~100, /60 is ~1.6. Reasonable.
+        
         const dirX = -pos.x / distToBase;
-        const dirY = -pos.y / distToBase;
+        const dirZ = -pos.z / distToBase;
 
         this.node.setPosition(
             pos.x + dirX * speed * dt,
-            pos.y + dirY * speed * dt,
-            pos.z
+            0, // Y always 0
+            pos.z + dirZ * speed * dt
         );
+        
+        // Face base
+        this.node.lookAt(new Vec3(0, 0, 0));
     }
 
     /**

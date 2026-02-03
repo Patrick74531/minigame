@@ -24,6 +24,7 @@ export class HUDManager {
     private _coinLabel: Label | null = null;
     private _waveLabel: Label | null = null;
     private _buildingInfoLabel: Label | null = null;
+    private _baseHpLabel: Label | null = null;
     private _uiCanvas: Node | null = null;
 
     /**
@@ -32,8 +33,18 @@ export class HUDManager {
     public initialize(uiCanvas: Node): void {
         this._uiCanvas = uiCanvas;
         
+        // Cleanup duplicate UI nodes from previous sessions
+        uiCanvas.getChildByName('CoinDisplay')?.destroy();
+        uiCanvas.getChildByName('BaseHPLabel')?.destroy();
+        uiCanvas.getChildByName('BuildingInfo')?.destroy();
+
         // 创建金币显示
         this._coinLabel = UIFactory.createCoinDisplay(uiCanvas);
+        
+        // 创建基地 HP 显示
+        this._baseHpLabel = UIFactory.createLabel(uiCanvas, 'Base HP: 100/100', 'BaseHPLabel');
+        this._baseHpLabel.node.setPosition(0, 300); // 屏幕上方
+        this._baseHpLabel.fontSize = 24;
         
         // 创建建造点信息显示
         this.createBuildingInfoLabel(uiCanvas);
@@ -89,6 +100,21 @@ export class HUDManager {
     }
 
     /**
+     * 更新基地 HP
+     */
+    public updateBaseHp(current: number, max: number): void {
+        if (this._baseHpLabel) {
+            this._baseHpLabel.string = `Base HP: ${Math.max(0, Math.floor(current))}/${max}`;
+            // 简单的变色逻辑
+            if (current < max * 0.3) {
+                this._baseHpLabel.color = new Color(255, 50, 50, 255);
+            } else {
+                this._baseHpLabel.color = new Color(255, 255, 255, 255);
+            }
+        }
+    }
+
+    /**
      * 更新波次显示
      */
     public updateWaveDisplay(wave: number, maxWaves: number): void {
@@ -136,6 +162,7 @@ export class HUDManager {
         this._coinLabel = null;
         this._waveLabel = null;
         this._buildingInfoLabel = null;
+        this._baseHpLabel = null;
         this._uiCanvas = null;
     }
 }

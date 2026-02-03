@@ -1,4 +1,5 @@
 import { _decorator, Vec2, Node } from 'cc';
+import { UnitFactory } from '../units/UnitFactory';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { EventManager } from '../../core/managers/EventManager';
 import { PoolManager } from '../../core/managers/PoolManager';
@@ -128,16 +129,28 @@ export class Building extends BaseComponent {
             return;
         }
 
-        const soldier = PoolManager.instance.spawn(this.soldierPoolName, this._unitContainer);
+        let soldier = PoolManager.instance.spawn(this.soldierPoolName, this._unitContainer);
+        
+        // 3D 坐标系：XZ平面为地面，Y轴向上
+        const spawnOffsetX = 1.0; 
+        const spawnOffsetZ = 1.0; 
+        
+        if (!soldier) {
+            // Fallback to factory if pool empty/missing
+            soldier = UnitFactory.createSoldier(
+                this._unitContainer,
+                this.node.position.x + spawnOffsetX,
+                this.node.position.z + spawnOffsetZ
+            );
+        } else {
+             soldier.setPosition(
+                this.node.position.x + spawnOffsetX,
+                0, // 地面高度
+                this.node.position.z + spawnOffsetZ
+            );
+        }
+        
         if (!soldier) return;
-
-        // 设置士兵位置（建筑前方）
-        const spawnOffset = new Vec2(50, 0); // 后续可配置
-        soldier.setPosition(
-            this.node.position.x + spawnOffset.x,
-            this.node.position.y + spawnOffset.y,
-            0
-        );
 
         this._activeUnits++;
 

@@ -17,8 +17,10 @@ export const GameConfig = {
         INITIAL_COINS: 100,
         /** 金币飞行到HUD的时间（秒） */
         COIN_FLY_DURATION: 0.5,
-        /** 金币收集范围 */
-        COIN_COLLECT_RANGE: 50,
+        /** 金币收集范围 (3D units) */
+        COIN_COLLECT_RANGE: 2.5,
+        /** 金币自动回收时间（秒） */
+        COIN_LIFETIME: 15,
     },
 
     // === 建筑系统 ===
@@ -33,7 +35,7 @@ export const GameConfig = {
 
     // === 士兵系统 ===
     SOLDIER: {
-        /** 基础移动速度 */
+        /** 基础移动速度 (units/minute approx, divided by 60 in logic) */
         MOVE_SPEED: 100,
         /** 基础攻击力 */
         BASE_ATTACK: 10,
@@ -41,8 +43,8 @@ export const GameConfig = {
         BASE_HP: 50,
         /** 攻击间隔（秒） */
         ATTACK_INTERVAL: 1,
-        /** 攻击范围 */
-        ATTACK_RANGE: 30,
+        /** 攻击范围 (3D units) */
+        ATTACK_RANGE: 1.5,
     },
 
     // === 敌人系统 ===
@@ -56,7 +58,7 @@ export const GameConfig = {
         /** 攻击间隔（秒） */
         ATTACK_INTERVAL: 1.2,
         /** 攻击范围 */
-        ATTACK_RANGE: 25,
+        ATTACK_RANGE: 1.2,
         /** 死亡掉落金币 */
         COIN_DROP: 5,
     },
@@ -70,7 +72,7 @@ export const GameConfig = {
         /** 攻击间隔（秒） */
         ATTACK_INTERVAL: 0.8,
         /** 攻击范围 */
-        ATTACK_RANGE: 60,
+        ATTACK_RANGE: 2.5,
         /** 移动速度 */
         MOVE_SPEED: 120,
     },

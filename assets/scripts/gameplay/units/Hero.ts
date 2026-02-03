@@ -1,5 +1,6 @@
 import { _decorator, Vec2, Vec3, Node, Component } from 'cc';
 import { Unit, UnitType, UnitState } from './Unit';
+import { WaveManager } from '../../core/managers/WaveManager';
 import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass, property } = _decorator;
@@ -46,7 +47,6 @@ export class Hero extends Unit {
      * 添加金币到堆叠
      */
     public addCoin(coin: Node): void {
-        console.log(`[Hero] addCoin 被调用, 当前栈长度: ${this._coinStack.length}`);
         this._coinStack.push(coin);
         
         // 物理转移
@@ -105,12 +105,62 @@ export class Hero extends Unit {
         }
     }
 
+    protected update(dt: number): void {
+        if (!this.isAlive) return;
+
+        // 如果有输入，强制为移动状态
+        if (this._inputVector.lengthSqr() > 0.01) {
+            this._state = UnitState.MOVING;
+        } else {
+            // 否则尝试索敌
+            this.updateTargeting();
+        }
+
+        super.update(dt);
+    }
+
+    private updateTargeting(): void {
+        // 简单索敌：找最近的敌人
+        const enemies = WaveManager.instance.enemies;
+        let nearest: Node | null = null;
+        let minDist = this._stats.attackRange; // 仅攻击范围内的
+
+        const myPos = this.node.position;
+
+        for (const enemy of enemies) {
+            if (!enemy.isValid) continue;
+            const dx = enemy.position.x - myPos.x;
+            const dz = enemy.position.z - myPos.z; // 3D
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = enemy;
+            }
+        }
+
+        if (nearest) {
+            const unit = nearest.getComponent(Unit);
+            if (unit && unit.isAlive) {
+                this.setTarget(unit);
+                this._state = UnitState.ATTACKING;
+            } else {
+                this.setTarget(null);
+                this._state = UnitState.IDLE;
+            }
+        } else {
+            this.setTarget(null);
+            this._state = UnitState.IDLE;
+        }
+    }
+
     protected updateMovement(dt: number): void {
         if (!this.isAlive) return;
 
         const moveLen = this._inputVector.length();
         if (moveLen < 0.01) {
             this._state = UnitState.IDLE;
+            // updateTargeting 会接管
             return;
         }
 
@@ -118,36 +168,42 @@ export class Hero extends Unit {
         const speed = this._stats.moveSpeed / 60;
         const moveDist = speed * dt;
 
-        // 移动 (X, Y 对应 3D 场景的 X, Y)
-        // 注意：如果摄像机是斜视角的，可能需要调整 Y 的移动比例以符合直觉
-        // 但目前我们是正交顶视图或简单透视，直接映射即可
-
         const currentPos = this.node.position;
-        this.node.setPosition(
-            currentPos.x + this._inputVector.x * moveDist,
-            currentPos.y + this._inputVector.y * moveDist,
-            currentPos.z
-        );
+        // Joystick Y maps to World Z (Inverted: Up -> -Z)
+        const newX = currentPos.x + this._inputVector.x * moveDist;
+        const newZ = currentPos.z - this._inputVector.y * moveDist; // Inverted
 
-        // 简单的边界限制（防止跑出地图太远）
+        this.node.setPosition(newX, currentPos.y, newZ);
+
+        // 面向移动方向
+        if (moveLen > 0.1) {
+             // Look at target point
+             const lookTarget = new Vec3(
+                 newX + this._inputVector.x, 
+                 currentPos.y, 
+                 newZ - this._inputVector.y // Inverted
+             );
+             this.node.lookAt(lookTarget);
+        }
+
         this.clampPosition();
     }
 
     private clampPosition(): void {
         const pos = this.node.position;
         const limitX = 8; // 地图宽
-        const limitY = 6; // 地图高
+        const limitZ = 6; // 地图高 (Z axis)
 
         let newX = pos.x;
-        let newY = pos.y;
+        let newZ = pos.z;
 
         if (pos.x > limitX) newX = limitX;
         if (pos.x < -limitX) newX = -limitX;
-        if (pos.y > limitY) newY = limitY;
-        if (pos.y < -limitY) newY = -limitY;
+        if (pos.z > limitZ) newZ = limitZ;
+        if (pos.z < -limitZ) newZ = -limitZ;
 
-        if (newX !== pos.x || newY !== pos.y) {
-            this.node.setPosition(newX, newY, pos.z);
+        if (newX !== pos.x || newZ !== pos.z) {
+            this.node.setPosition(newX, pos.y, newZ);
         }
     }
 

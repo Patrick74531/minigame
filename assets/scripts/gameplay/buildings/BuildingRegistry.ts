@@ -43,7 +43,7 @@ export class BuildingRegistry {
         this.register({
             id: 'barracks',
             name: '兵营',
-            cost: 50,
+            cost: 5, // Testing cost
             buildTime: 0,
             description: '生产士兵的建筑'
         });
@@ -52,7 +52,7 @@ export class BuildingRegistry {
         this.register({
             id: 'tower',
             name: '防御塔',
-            cost: 80,
+            cost: 8, // Testing cost
             buildTime: 0,
             description: '远程攻击敌人'
         });

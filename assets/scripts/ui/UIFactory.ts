@@ -122,6 +122,26 @@ export class UIFactory {
         return label;
     }
 
+    /**
+     * 创建通用 Label
+     */
+    public static createLabel(parent: Node, text: string = "", name: string = "Label"): Label {
+        const node = new Node(name);
+        node.layer = this.UI_LAYER;
+        parent.addChild(node);
+
+        const transform = node.addComponent(UITransform);
+        // 默认居中
+        
+        const label = node.addComponent(Label);
+        label.string = text;
+        label.fontSize = 30;
+        label.lineHeight = 35;
+        label.color = Color.WHITE;
+        
+        return label;
+    }
+
     private static drawCircle(graphics: Graphics, color: Color, radius: number): void {
         graphics.clear();
         graphics.fillColor = color;

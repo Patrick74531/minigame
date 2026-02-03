@@ -13,9 +13,10 @@ export class CoinFactory {
     /**
      * 创建金币
      */
-    public static createCoin(parent: Node, x: number, y: number, value: number): Node {
+    public static createCoin(parent: Node, x: number, z: number, value: number): Node {
         const node = this.createCubeNode('Coin', new Color(255, 165, 0, 255));
-        node.setPosition(x, y, 0.3);
+        // 3D: Place at fixed height Y=0.5, using X and Z
+        node.setPosition(x, 0.5, z);
         node.setScale(0.2, 0.2, 0.2);
         parent.addChild(node);
 
@@ -24,6 +25,7 @@ export class CoinFactory {
             value: value,
             lifetime: 0,
             collected: false,
+            startY: 0.5, // Store base Y
         };
 
         return node;
@@ -41,11 +43,12 @@ export class CoinFactory {
 
         // 浮动动画
         const pos = coin.position;
-        const floatY = Math.sin(data.lifetime * 5) * 0.02;
-        coin.setPosition(pos.x, pos.y + floatY, pos.z);
+        const startY = data.startY || 0.5;
+        const floatY = Math.sin(data.lifetime * 5) * 0.1; // Larger amplitude
+        coin.setPosition(pos.x, startY + floatY, pos.z);
 
-        // 2秒后自动收集
-        if (data.lifetime >= 2) {
+        // Auto-collect after lifetime
+        if (data.lifetime >= GameConfig.ECONOMY.COIN_LIFETIME) {
             data.collected = true;
             GameManager.instance.addCoins(data.value);
             EventManager.instance.emit(GameEvents.COIN_COLLECTED, { value: data.value });

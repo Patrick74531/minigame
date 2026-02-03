@@ -2,6 +2,7 @@ import { _decorator, Node, Vec3 } from 'cc';
 import { BuildingPad } from './BuildingPad';
 import { BuildingRegistry } from './BuildingRegistry';
 import { BuildingFactory } from './BuildingFactory';
+import { Building } from './Building';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { Hero } from '../units/Hero';
@@ -32,8 +33,16 @@ export class BuildingManager {
     /**
      * 初始化建造管理器
      */
-    public initialize(buildingContainer: Node): void {
+    private _unitContainer: Node | null = null;
+
+    // ... (keep usage of _buildingContainer)
+
+    /**
+     * 初始化建造管理器
+     */
+    public initialize(buildingContainer: Node, unitContainer: Node): void {
         this._buildingContainer = buildingContainer;
+        this._unitContainer = unitContainer;
         this._pads = [];
         
         // 监听建造完成事件
@@ -120,11 +129,17 @@ export class BuildingManager {
         if (this._buildingContainer) {
             switch (data.buildingTypeId) {
                 case 'barracks':
-                    BuildingFactory.createBarracks(
+                    const buildingNode = BuildingFactory.createBarracks(
                         this._buildingContainer,
                         data.position.x,
-                        data.position.y
+                        data.position.z // 使用 Z 轴
                     );
+                    
+                    // 设置建筑依赖
+                    const buildingComp = buildingNode.getComponent(Building);
+                    if (buildingComp && this._unitContainer) {
+                        buildingComp.setUnitContainer(this._unitContainer);
+                    }
                     break;
                 // 可扩展其他建筑类型
                 default:
