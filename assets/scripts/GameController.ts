@@ -8,6 +8,9 @@ import { BuildingFactory } from './gameplay/buildings/BuildingFactory';
 import { CoinFactory } from './gameplay/economy/CoinFactory';
 import { Unit, UnitType, UnitState } from './gameplay/units/Unit';
 import { Soldier } from './gameplay/units/Soldier';
+import { Hero } from './gameplay/units/Hero';
+import { UIFactory } from './ui/UIFactory';
+import { Joystick } from './ui/Joystick';
 
 const { ccclass, property } = _decorator;
 
@@ -33,6 +36,7 @@ export class GameController extends Component {
     private _soldierContainer: Node | null = null;
     private _buildingContainer: Node | null = null;
     private _coinContainer: Node | null = null;
+    private _uiCanvas: Node | null = null;
 
     // === 实体列表 ===
     private _enemies: Node[] = [];
@@ -41,6 +45,7 @@ export class GameController extends Component {
     private _coins: Node[] = [];
     private _base: Node | null = null;
     private _hero: Node | null = null;
+    private _joystick: Joystick | null = null;
 
     // === 波次状态 ===
     private _currentWave: number = 0;
@@ -61,22 +66,20 @@ export class GameController extends Component {
 
     protected onLoad(): void {
         console.log('╔════════════════════════════════════════════════════╗');
-        console.log('║       KingShit MVP - 模块化版本                    ║');
+        console.log('║       KingShit MVP - Mobile Version                ║');
         console.log('╠════════════════════════════════════════════════════╣');
-        console.log('║  🔴 红=敌人  🔵 蓝=士兵  🟡 金=英雄               ║');
-        console.log('║  🟢 绿=兵营  🟣 紫=基地  🟠 橙=金币               ║');
-        console.log('╠════════════════════════════════════════════════════╣');
-        console.log('║  按 B 键建造兵营 (消耗 50 金币)                   ║');
+        console.log('║  🎮 使用左下角摇杆移动英雄                        ║');
         console.log('╚════════════════════════════════════════════════════╝');
 
         this.setupContainers();
-        this.setupInput();
+        this.setupUI();
+        // this.setupInput(); // 移除键盘输入
 
         GameManager.instance.initialize();
     }
 
     protected onDestroy(): void {
-        input.off(Input.EventType.KEY_DOWN, this.onKeyDown, this);
+        // input.off(Input.EventType.KEY_DOWN, this.onKeyDown, this);
         EventManager.instance.offAllByTarget(this);
     }
 
@@ -97,6 +100,9 @@ export class GameController extends Component {
 
     protected update(dt: number): void {
         if (!GameManager.instance.isPlaying) return;
+
+        // 处理输入
+        this.processInput();
 
         // 波次生成
         if (this._waveActive) {
@@ -120,7 +126,7 @@ export class GameController extends Component {
         // 战斗检测 (每帧)
         this.updateEnemyMovement(dt);
         this.updateSoldierAI(dt);
-        this.updateHeroAI(dt);
+        // this.updateHeroAI(dt); // 移除自动 AI
 
         // 战斗处理
         this._combatTimer += dt;
@@ -149,30 +155,22 @@ export class GameController extends Component {
         this._container.addChild(this._coinContainer);
     }
 
-    private setupInput(): void {
-        input.on(Input.EventType.KEY_DOWN, this.onKeyDown, this);
+    private setupUI(): void {
+        this._uiCanvas = UIFactory.createUICanvas();
+        this.node.addChild(this._uiCanvas);
+
+        this._joystick = UIFactory.createJoystick(this._uiCanvas);
     }
 
-    private onKeyDown(event: EventKeyboard): void {
-        if (event.keyCode === KeyCode.KEY_B) {
-            this.tryBuildBarracks();
+    // === 输入处理 ===
+
+    private processInput(): void {
+        if (this._joystick && this._hero) {
+            const heroComp = this._hero.getComponent(Hero);
+            if (heroComp) {
+                heroComp.setInput(this._joystick.inputVector);
+            }
         }
-    }
-
-    // === 建造 ===
-
-    private tryBuildBarracks(): void {
-        if (GameManager.instance.coins < this._barracksCost) {
-            console.log(`[Build] ❌ 金币不足! 需要 ${this._barracksCost}`);
-            return;
-        }
-
-        const x = (Math.random() - 0.5) * 6;
-        const y = (Math.random() - 0.5) * 4;
-
-        GameManager.instance.addCoins(-this._barracksCost);
-        this._buildings.push(BuildingFactory.createBarracks(this._buildingContainer!, x, y));
-        console.log(`[Build] ✅ 兵营建造完成! 剩余: ${GameManager.instance.coins}`);
     }
 
     // === 建筑产兵 ===
@@ -194,7 +192,6 @@ export class GameController extends Component {
                     building.position.y
                 );
                 this._soldiers.push(soldier);
-                console.log(`[Barracks] 🛡️ 士兵出动! (${this._soldiers.length}/15)`);
             }
 
             (building as any).spawnData = data;
@@ -342,32 +339,6 @@ export class GameController extends Component {
         }
     }
 
-    // === 英雄 AI ===
-
-    private updateHeroAI(dt: number): void {
-        if (!this._hero || !this._hero.isValid) return;
-
-        const target = this.findNearestEnemy(this._hero);
-        if (!target) return;
-
-        const pos = this._hero.position;
-        const tpos = target.position;
-        const dx = tpos.x - pos.x;
-        const dy = tpos.y - pos.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist > 0.7) {
-            const speed = 3;
-            this._hero.setPosition(
-                pos.x + (dx / dist) * speed * dt,
-                pos.y + (dy / dist) * speed * dt,
-                0
-            );
-        }
-
-        (this._hero as any).currentTarget = target;
-    }
-
     private findNearestEnemy(unit: Node): Node | null {
         let nearest: Node | null = null;
         let minDist = Infinity;
@@ -402,12 +373,19 @@ export class GameController extends Component {
             }
         }
 
-        // 英雄攻击
+        // 英雄自动攻击 (即使在移动也可以)
         if (this._hero && this._hero.isValid) {
-            const target = (this._hero as any).currentTarget;
+            // 索敌
+            const target = this.findNearestEnemy(this._hero);
+
             if (target && target.isValid) {
                 const dist = this.getDistance(this._hero, target);
-                if (dist < 0.8) {
+                const heroComp = this._hero.getComponent(Hero);
+                const range = heroComp ? heroComp.stats.attackRange / 60 : 1.0;
+
+                // 注意：Unit.ts 的 attackRange 是逻辑数值(30-60)，在3D场景中需要转换或调整
+                // 这里暂时用固定判定距离
+                if (dist < 1.0) {
                     this.dealDamage(target, 30, killedEnemies);
                 }
             }
@@ -458,19 +436,19 @@ export class GameController extends Component {
     // === 金币更新 ===
 
     private updateCoins(): void {
-        const toRemove: Node[] = [];
+        // [TODO] 金币应该由英雄拾取，暂时移除自动收集
+        // 保持浮动动画
 
         for (const coin of this._coins) {
             if (!coin.isValid) continue;
-            if (CoinFactory.updateCoin(coin, 0.1)) {
-                toRemove.push(coin);
+            // 简单的浮动
+            const data = (coin as any).coinData;
+            if (data) {
+                data.lifetime += 0.1;
+                const pos = coin.position;
+                const floatY = Math.sin(data.lifetime * 5) * 0.02;
+                coin.setPosition(pos.x, pos.y + floatY, pos.z);
             }
-        }
-
-        for (const coin of toRemove) {
-            const idx = this._coins.indexOf(coin);
-            if (idx !== -1) this._coins.splice(idx, 1);
-            coin.destroy();
         }
     }
 

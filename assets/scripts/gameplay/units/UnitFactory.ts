@@ -2,6 +2,7 @@ import { _decorator, Node, MeshRenderer, primitives, utils, Material, Color, Com
 import { Unit, UnitType, UnitStats } from './Unit';
 import { Enemy } from './Enemy';
 import { Soldier } from './Soldier';
+import { Hero } from './Hero';
 import { GameConfig } from '../../data/GameConfig';
 
 /**
@@ -67,9 +68,8 @@ export class UnitFactory {
         node.setScale(0.5, 0.5, 0.5);
         parent.addChild(node);
 
-        // 英雄使用 Soldier 组件但属性更强
-        const hero = node.addComponent(Soldier);
-        hero.unitType = UnitType.HERO;
+        // 英雄使用 Hero 组件
+        const hero = node.addComponent(Hero);
         hero.initStats({
             maxHp: GameConfig.HERO.BASE_HP,
             attack: GameConfig.HERO.BASE_ATTACK,
