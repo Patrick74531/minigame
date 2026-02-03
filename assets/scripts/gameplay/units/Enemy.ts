@@ -1,24 +1,24 @@
 import { _decorator, Vec2 } from 'cc';
 import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
-import { MathUtils } from '../../core/utils/MathUtils';
+import { EventManager } from '../../core/managers/EventManager';
+import { GameEvents } from '../../data/GameEvents';
 
 const { ccclass, property } = _decorator;
 
 /**
  * 敌人单位
- * 从地图边缘向目标（基地/英雄）移动并攻击
+ * 自动向基地（原点）移动，到达后发送事件
  */
 @ccclass('Enemy')
 export class Enemy extends Unit {
-    /** 目标位置（用于向基地移动） */
-    private _targetPosition: Vec2 = new Vec2(0, 0);
+    /** 到达基地的距离阈值 */
+    private readonly ARRIVAL_DISTANCE = 0.6;
 
     protected initialize(): void {
         super.initialize();
         this.unitType = UnitType.ENEMY;
 
-        // 应用敌人默认属性
         this.initStats({
             maxHp: GameConfig.ENEMY.BASE_HP,
             attack: GameConfig.ENEMY.BASE_ATTACK,
@@ -26,6 +26,10 @@ export class Enemy extends Unit {
             attackInterval: GameConfig.ENEMY.ATTACK_INTERVAL,
             moveSpeed: GameConfig.ENEMY.MOVE_SPEED,
         });
+        
+        // 敌人默认处于移动状态
+        this._state = UnitState.MOVING;
+        console.log(`[Enemy] 初始化完成, HP=${this._stats.currentHp}, state=${this._state}`);
     }
 
     public onSpawn(): void {
@@ -33,46 +37,43 @@ export class Enemy extends Unit {
         this._state = UnitState.MOVING;
     }
 
-    /**
-     * 设置移动目标位置
-     * @param position 目标位置
-     */
-    public setTargetPosition(position: Vec2): void {
-        this._targetPosition = position;
-        this._state = UnitState.MOVING;
-    }
-
     protected updateMovement(dt: number): void {
         if (!this.isAlive) return;
 
-        // 检查是否有攻击目标
-        if (this._target && this._target.isAlive) {
-            const distance = MathUtils.distance(this.node.position, this._target.node.position);
+        const pos = this.node.position;
+        const distToBase = Math.sqrt(pos.x * pos.x + pos.y * pos.y);
 
-            if (distance <= this._stats.attackRange) {
-                // 进入攻击状态
-                this._state = UnitState.ATTACKING;
-                return;
-            }
-
-            // 向目标移动
-            this.moveTowards(this._target.node.position.x, this._target.node.position.y, dt);
-        } else {
-            // 向目标位置移动
-            this.moveTowards(this._targetPosition.x, this._targetPosition.y, dt);
+        // 检查是否到达基地
+        if (distToBase < this.ARRIVAL_DISTANCE) {
+            this.onReachBase();
+            return;
         }
+
+        // 向原点（基地）移动
+        const speed = this._stats.moveSpeed / 60; // 转换为世界单位
+        const dirX = -pos.x / distToBase;
+        const dirY = -pos.y / distToBase;
+
+        this.node.setPosition(
+            pos.x + dirX * speed * dt,
+            pos.y + dirY * speed * dt,
+            pos.z
+        );
     }
 
-    private moveTowards(targetX: number, targetY: number, dt: number): void {
-        const currentPos = this.node.position;
-        const direction = MathUtils.direction(currentPos, { x: targetX, y: targetY, z: 0 });
-
-        const moveDistance = this._stats.moveSpeed * dt;
-        this.node.setPosition(
-            currentPos.x + direction.x * moveDistance,
-            currentPos.y + direction.y * moveDistance,
-            currentPos.z
-        );
+    /**
+     * 到达基地时调用
+     */
+    private onReachBase(): void {
+        // 发送事件通知 GameController 处理基地伤害
+        EventManager.instance.emit(GameEvents.ENEMY_REACHED_BASE, {
+            enemy: this.node,
+            damage: 10
+        });
+        
+        // 敌人到达后销毁
+        this._state = UnitState.DEAD;
+        this.node.destroy();
     }
 
     protected performAttack(): void {
@@ -81,7 +82,8 @@ export class Enemy extends Unit {
     }
 
     protected onDeath(): void {
-        // TODO: 播放死亡动画，掉落金币
-        // 暂时直接禁用节点，等待 PoolManager 回收
+        // GameController 负责处理死亡和金币掉落，这里不再发送事件
+        // 避免重复处理导致的 bug
     }
 }
+

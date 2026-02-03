@@ -1,29 +1,23 @@
-import { _decorator, Component, Node, Vec3, Label } from 'cc';
+import { _decorator, Component, Node, Label } from 'cc';
 import { GameManager } from './core/managers/GameManager';
 import { EventManager } from './core/managers/EventManager';
+import { WaveManager } from './core/managers/WaveManager';
+import { HUDManager } from './ui/HUDManager';
 import { GameEvents } from './data/GameEvents';
-import { GameConfig } from './data/GameConfig';
 import { UnitFactory } from './gameplay/units/UnitFactory';
 import { BuildingFactory } from './gameplay/buildings/BuildingFactory';
 import { CoinFactory } from './gameplay/economy/CoinFactory';
-import { Unit, UnitType, UnitState } from './gameplay/units/Unit';
-import { Soldier } from './gameplay/units/Soldier';
+import { Unit } from './gameplay/units/Unit';
 import { Hero } from './gameplay/units/Hero';
 import { UIFactory } from './ui/UIFactory';
 import { Joystick } from './ui/Joystick';
 
 const { ccclass, property } = _decorator;
 
-interface WaveConfig {
-    waveNumber: number;
-    enemyCount: number;
-    spawnInterval: number;
-    hpMultiplier: number;
-}
-
 /**
- * 游戏主控制器 (模块化版本)
+ * 游戏主控制器 (组件化版本)
  * 职责: 协调各子系统，不包含具体业务逻辑
+ * 目标: ~150 行
  */
 @ccclass('GameController')
 export class GameController extends Component {
@@ -38,8 +32,7 @@ export class GameController extends Component {
     private _coinContainer: Node | null = null;
     private _uiCanvas: Node | null = null;
 
-    // === 实体列表 ===
-    private _enemies: Node[] = [];
+    // === 实体 ===
     private _soldiers: Node[] = [];
     private _buildings: Node[] = [];
     private _coins: Node[] = [];
@@ -47,40 +40,32 @@ export class GameController extends Component {
     private _hero: Node | null = null;
     private _joystick: Joystick | null = null;
 
-    // === 波次状态 ===
-    private _currentWave: number = 0;
-    private _waveActive: boolean = false;
-    private _enemiesSpawned: number = 0;
-    private _enemySpawnTimer: number = 0;
-    private _waveConfig: WaveConfig | null = null;
-
-    // === 更新计时器 ===
+    // === 计时器 ===
     private _buildingTimer: number = 0;
-    private _coinTimer: number = 0;
     private _combatTimer: number = 0;
-
-    // === 建造成本 ===
-    private _barracksCost: number = 50;
+    private _coinTimer: number = 0;
 
     // === 生命周期 ===
 
     protected onLoad(): void {
         console.log('╔════════════════════════════════════════════════════╗');
-        console.log('║       KingShit MVP - Mobile Version                ║');
-        console.log('╠════════════════════════════════════════════════════╣');
-        console.log('║  🎮 使用左下角摇杆移动英雄                        ║');
+        console.log('║       KingShit MVP - Modular Version               ║');
         console.log('╚════════════════════════════════════════════════════╝');
 
         this.setupContainers();
         this.setupUI();
-        // this.setupInput(); // 移除键盘输入
+        this.setupEventListeners();
 
+        // 初始化 Managers
         GameManager.instance.initialize();
+        WaveManager.instance.initialize(this._enemyContainer!, this.maxWaves);
+        HUDManager.instance.initialize(this._uiCanvas!);
     }
 
     protected onDestroy(): void {
-        // input.off(Input.EventType.KEY_DOWN, this.onKeyDown, this);
         EventManager.instance.offAllByTarget(this);
+        WaveManager.instance.cleanup();
+        HUDManager.instance.cleanup();
     }
 
     protected start(): void {
@@ -95,47 +80,55 @@ export class GameController extends Component {
         console.log(`[Game] 💰 初始金币: ${GameManager.instance.coins}`);
 
         // 开始第一波
-        this.scheduleOnce(() => this.startWave(1), 2);
+        this.scheduleOnce(() => WaveManager.instance.startWave(1), 2);
     }
 
     protected update(dt: number): void {
         if (!GameManager.instance.isPlaying) return;
 
-        // 处理输入
+        // 输入处理
         this.processInput();
 
         // 波次生成
-        if (this._waveActive) {
-            this.updateWaveSpawning(dt);
+        WaveManager.instance.update(dt);
+
+        // 敌人移动
+        this.updateEnemyMovement(dt);
+
+        // 士兵 AI
+        this.updateSoldierAI(dt);
+
+        // 战斗处理 (每 0.2 秒)
+        this._combatTimer += dt;
+        if (this._combatTimer >= 0.2) {
+            this._combatTimer = 0;
+            this.processCombat();
         }
 
-        // 建筑产兵 (每 0.5 秒检查一次)
+        // 建筑产兵检查
         this._buildingTimer += dt;
         if (this._buildingTimer >= 0.5) {
             this._buildingTimer = 0;
             this.updateBuildingSpawn();
         }
 
-        // 金币更新
+        // 金币拾取检测
         this._coinTimer += dt;
         if (this._coinTimer >= 0.1) {
             this._coinTimer = 0;
-            this.updateCoins();
+            this.updateCoinPickup();
         }
 
-        // 战斗检测 (每帧)
-        this.updateEnemyMovement(dt);
-        this.updateSoldierAI(dt);
-        // this.updateHeroAI(dt); // 移除自动 AI
-
-        // 战斗处理
-        this._combatTimer += dt;
-        if (this._combatTimer >= 0.1) {
-            this._combatTimer = 0;
-            this.processCombat();
-        }
-
-        this.checkWaveComplete();
+        // 波次完成检查
+        WaveManager.instance.checkWaveComplete((bonus) => {
+            GameManager.instance.addCoins(bonus);
+            if (WaveManager.instance.hasMoreWaves()) {
+                const nextWave = WaveManager.instance.currentWave + 1;
+                this.scheduleOnce(() => WaveManager.instance.startWave(nextWave), 3);
+            } else {
+                console.log('🎉🎉🎉 通关! 🎉🎉🎉');
+            }
+        });
     }
 
     // === 初始化 ===
@@ -155,14 +148,14 @@ export class GameController extends Component {
         this._container.addChild(this._coinContainer);
     }
 
-    private _coinLabel: Label | null = null;
-
     private setupUI(): void {
         this._uiCanvas = UIFactory.createUICanvas();
         this.node.addChild(this._uiCanvas);
-
         this._joystick = UIFactory.createJoystick(this._uiCanvas);
-        this._coinLabel = UIFactory.createCoinDisplay(this._uiCanvas);
+    }
+
+    private setupEventListeners(): void {
+        // 直接在 update 中处理敌人移动和战斗，不需要事件监听
     }
 
     // === 输入处理 ===
@@ -201,103 +194,33 @@ export class GameController extends Component {
         }
     }
 
-    // === 波次系统 ===
+    // === 金币拾取 ===
 
-    private startWave(waveNumber: number): void {
-        this._currentWave = waveNumber;
-        this._waveActive = true;
-        this._enemiesSpawned = 0;
-        this._enemySpawnTimer = 0;
+    private updateCoinPickup(): void {
+        if (!this._hero || !this._hero.isValid) return;
+        const heroComp = this._hero.getComponent(Hero);
+        if (!heroComp) return;
 
-        this._waveConfig = {
-            waveNumber,
-            enemyCount: 5 + waveNumber * 2,
-            spawnInterval: Math.max(0.8, 2.5 - waveNumber * 0.15),
-            hpMultiplier: 1 + (waveNumber - 1) * 0.3,
-        };
-
-        console.log('═══════════════════════════════════════');
-        console.log(`🌊 第 ${waveNumber} 波! 敌人: ${this._waveConfig.enemyCount}`);
-        console.log('═══════════════════════════════════════');
-    }
-
-    private updateWaveSpawning(dt: number): void {
-        if (!this._waveConfig) return;
-
-        this._enemySpawnTimer += dt;
-        if (
-            this._enemySpawnTimer >= this._waveConfig.spawnInterval &&
-            this._enemiesSpawned < this._waveConfig.enemyCount
-        ) {
-            this._enemySpawnTimer = 0;
-            this.spawnEnemy();
-            this._enemiesSpawned++;
-        }
-
-        if (this._enemiesSpawned >= this._waveConfig.enemyCount) {
-            this._waveActive = false;
-        }
-    }
-
-    private spawnEnemy(): void {
-        const pos = this.getEdgePosition();
-        const enemy = UnitFactory.createEnemy(
-            this._enemyContainer!,
-            pos.x,
-            pos.y,
-            this._waveConfig?.hpMultiplier || 1
-        );
-        this._enemies.push(enemy);
-    }
-
-    private checkWaveComplete(): void {
-        if (this._waveActive || this._enemies.length > 0 || !this._waveConfig) return;
-
-        const bonus = this._currentWave * 25;
-        GameManager.instance.addCoins(bonus);
-        console.log(`✅ 第 ${this._currentWave} 波完成! +${bonus} 金币`);
-
-        this._waveConfig = null;
-
-        if (this._currentWave < this.maxWaves) {
-            this.scheduleOnce(() => this.startWave(this._currentWave + 1), 3);
-        } else {
-            console.log('🎉🎉🎉 通关! 🎉🎉🎉');
-        }
-    }
-
-    // === 敌人移动 ===
-
-    private updateEnemyMovement(dt: number): void {
         const toRemove: Node[] = [];
 
-        for (const enemy of this._enemies) {
-            if (!enemy.isValid) continue;
+        for (const coin of this._coins) {
+            if (!coin.isValid) continue;
 
-            const enemyComp = enemy.getComponent(Unit);
-            if (!enemyComp || !enemyComp.isAlive) {
-                toRemove.push(enemy);
-                continue;
-            }
-
-            // 向基地移动
-            const pos = enemy.position;
-            const dist = pos.length();
-            const speed = enemyComp.stats.moveSpeed / 60; // 转换为 3D 单位
-
-            if (dist < 0.6) {
-                toRemove.push(enemy);
-                this.damageBase(10);
-            } else {
-                const dir = new Vec3(-pos.x / dist, -pos.y / dist, 0);
-                enemy.setPosition(pos.x + dir.x * speed * dt, pos.y + dir.y * speed * dt, 0);
+            const dist = this.getDistance(this._hero, coin);
+            if (dist < 1.0) {
+                heroComp.addCoin(coin);
+                toRemove.push(coin);
+                HUDManager.instance.updateCoinDisplay(heroComp.coinCount);
             }
         }
 
-        for (const enemy of toRemove) {
-            this.removeEnemy(enemy, false);
+        for (const coin of toRemove) {
+            const idx = this._coins.indexOf(coin);
+            if (idx !== -1) this._coins.splice(idx, 1);
         }
     }
+
+    // === 基地伤害 ===
 
     private damageBase(damage: number): void {
         if (!this._base) return;
@@ -309,18 +232,57 @@ export class GameController extends Component {
         console.log(`[Base] ⚠️ HP: ${data.hp}/${data.maxHp}`);
 
         if (data.hp <= 0) {
-            console.log('💀 游戏结束!');
+            console.log('� 游戏结束!');
             GameManager.instance.pause();
+        }
+    }
+
+    // === 工具方法 ===
+
+    private getDistance(a: Node, b: Node): number {
+        const dx = b.position.x - a.position.x;
+        const dy = b.position.y - a.position.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // === 敌人移动 ===
+
+    private updateEnemyMovement(dt: number): void {
+        const enemies = WaveManager.instance.enemies;
+        const toRemove: Node[] = [];
+
+        for (const enemy of enemies) {
+            if (!enemy.isValid) continue;
+
+            const pos = enemy.position;
+            const dist = pos.length();
+            const speed = 2.0;  // 更快的移动速度
+
+            if (dist < 0.6) {
+                toRemove.push(enemy);
+                this.damageBase(10);
+            } else {
+                const dirX = -pos.x / dist;
+                const dirY = -pos.y / dist;
+                enemy.setPosition(pos.x + dirX * speed * dt, pos.y + dirY * speed * dt, 0);
+            }
+        }
+
+        for (const enemy of toRemove) {
+            WaveManager.instance.removeEnemy(enemy);
+            enemy.destroy();
         }
     }
 
     // === 士兵 AI ===
 
     private updateSoldierAI(dt: number): void {
+        const enemies = WaveManager.instance.enemies;
+
         for (const soldier of this._soldiers) {
             if (!soldier.isValid) continue;
 
-            const target = this.findNearestEnemy(soldier);
+            const target = this.findNearestEnemy(soldier, enemies);
             if (!target) continue;
 
             const pos = soldier.position;
@@ -330,7 +292,7 @@ export class GameController extends Component {
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist > 0.45) {
-                const speed = 2.5;
+                const speed = 3.0;  // 士兵更快
                 soldier.setPosition(
                     pos.x + (dx / dist) * speed * dt,
                     pos.y + (dy / dist) * speed * dt,
@@ -342,11 +304,11 @@ export class GameController extends Component {
         }
     }
 
-    private findNearestEnemy(unit: Node): Node | null {
+    private findNearestEnemy(unit: Node, enemies: Node[]): Node | null {
         let nearest: Node | null = null;
         let minDist = Infinity;
 
-        for (const enemy of this._enemies) {
+        for (const enemy of enemies) {
             if (!enemy.isValid) continue;
             const dx = enemy.position.x - unit.position.x;
             const dy = enemy.position.y - unit.position.y;
@@ -362,9 +324,9 @@ export class GameController extends Component {
     // === 战斗处理 ===
 
     private processCombat(): void {
+        const enemies = WaveManager.instance.enemies;
         const killedEnemies: Node[] = [];
 
-        // 士兵攻击
         for (const soldier of this._soldiers) {
             if (!soldier.isValid) continue;
             const target = (soldier as any).currentTarget;
@@ -376,27 +338,18 @@ export class GameController extends Component {
             }
         }
 
-        // 英雄自动攻击 (即使在移动也可以)
         if (this._hero && this._hero.isValid) {
-            // 索敌
-            const target = this.findNearestEnemy(this._hero);
-
+            const target = this.findNearestEnemy(this._hero, enemies);
             if (target && target.isValid) {
                 const dist = this.getDistance(this._hero, target);
-                const heroComp = this._hero.getComponent(Hero);
-                const range = heroComp ? heroComp.stats.attackRange / 60 : 1.0;
-
-                // 注意：Unit.ts 的 attackRange 是逻辑数值(30-60)，在3D场景中需要转换或调整
-                // 这里暂时用固定判定距离
                 if (dist < 1.0) {
                     this.dealDamage(target, 30, killedEnemies);
                 }
             }
         }
 
-        // 处理死亡敌人
         for (const enemy of killedEnemies) {
-            this.removeEnemy(enemy, true);
+            this.removeEnemy(enemy);
         }
     }
 
@@ -408,92 +361,19 @@ export class GameController extends Component {
 
         if (!unit.isAlive && !killedList.includes(enemy)) {
             killedList.push(enemy);
-            console.log('[Combat] ⚔️ 击败敌人!');
         }
     }
 
-    private getDistance(a: Node, b: Node): number {
-        const dx = b.position.x - a.position.x;
-        const dy = b.position.y - a.position.y;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-
-    private removeEnemy(enemy: Node, giveReward: boolean): void {
-        const idx = this._enemies.indexOf(enemy);
-        if (idx !== -1) {
-            this._enemies.splice(idx, 1);
-            if (giveReward) {
-                const value = 5 + Math.floor(Math.random() * 5);
-                const coin = CoinFactory.createCoin(
-                    this._coinContainer!,
-                    enemy.position.x,
-                    enemy.position.y,
-                    value
-                );
-                this._coins.push(coin);
-            }
-        }
+    private removeEnemy(enemy: Node): void {
+        WaveManager.instance.removeEnemy(enemy);
+        const value = 5 + Math.floor(Math.random() * 5);
+        const coin = CoinFactory.createCoin(
+            this._coinContainer!,
+            enemy.position.x,
+            enemy.position.y,
+            value
+        );
+        this._coins.push(coin);
         enemy.destroy();
-    }
-
-    // === 金币更新 ===
-
-    private updateCoins(): void {
-        const toRemove: Node[] = [];
-
-        for (const coin of this._coins) {
-            if (!coin.isValid) continue;
-
-            // 简单的浮动动画
-            const data = (coin as any).coinData;
-            if (data) {
-                data.lifetime += 0.1;
-                const pos = coin.position;
-                const floatY = Math.sin(data.lifetime * 5) * 0.02;
-                coin.setPosition(pos.x, pos.y + floatY, pos.z);
-            }
-
-            // [NEW] 拾取检测
-            if (this._hero && this._hero.isValid) {
-                const dist = this.getDistance(this._hero, coin);
-                if (dist < 1.0) { // 拾取范围
-                    const heroComp = this._hero.getComponent(Hero);
-                    if (heroComp) {
-                        heroComp.addCoin(coin);
-                        toRemove.push(coin);
-                        
-                        // 更新 UI
-                        console.log(`[Pickup] 💰 拾取金币! 当前携带: ${heroComp.coinCount}`);
-                        if (this._coinLabel) {
-                            this._coinLabel.string = `Coins: ${heroComp.coinCount}`;
-                        }
-                        continue; 
-                    }
-                }
-            }
-        }
-
-        // 仅从控制器列表中移除被拾取的金币，不销毁
-        for (const coin of toRemove) {
-            const idx = this._coins.indexOf(coin);
-            if (idx !== -1) this._coins.splice(idx, 1);
-        }
-    }
-
-    // === 工具方法 ===
-
-    private getEdgePosition(): { x: number; y: number } {
-        const range = 6;
-        const side = Math.floor(Math.random() * 4);
-        switch (side) {
-            case 0:
-                return { x: Math.random() * range * 2 - range, y: range + 1 };
-            case 1:
-                return { x: Math.random() * range * 2 - range, y: -range - 1 };
-            case 2:
-                return { x: -range - 1, y: Math.random() * range * 2 - range };
-            default:
-                return { x: range + 1, y: Math.random() * range * 2 - range };
-        }
     }
 }

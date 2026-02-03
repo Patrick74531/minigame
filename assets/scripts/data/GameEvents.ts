@@ -24,6 +24,10 @@ export const GameEvents = {
     UNIT_DIED: 'UNIT_DIED',
     /** 单位受伤 { node: Node, damage: number, currentHp: number } */
     UNIT_DAMAGED: 'UNIT_DAMAGED',
+    /** 敌人被击杀 { enemy: Node, position: Vec3 } */
+    ENEMY_KILLED: 'ENEMY_KILLED',
+    /** 敌人到达基地 { enemy: Node, damage: number } */
+    ENEMY_REACHED_BASE: 'ENEMY_REACHED_BASE',
 
     // === 波次系统 ===
     /** 波次开始 { waveIndex: number, enemyCount: number } */
