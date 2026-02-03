@@ -8,26 +8,17 @@ import {
     utils,
     Material,
     Color,
-    Label,
-    Canvas,
-    UITransform,
-    Widget,
-    view,
-    Camera,
 } from 'cc';
 import { GameManager } from './core/managers/GameManager';
-import { EventManager } from './core/managers/EventManager';
-import { GameEvents } from './data/GameEvents';
 
 const { ccclass, property } = _decorator;
 
 /**
- * 完整 MVP 测试控制器
- * 包含敌人、士兵、战斗、HUD
+ * MVP 测试控制器 (无 Canvas 版本)
+ * 只使用 3D 立方体，确保可见
  */
 @ccclass('TestGameController')
 export class TestGameController extends Component {
-    // === 配置 ===
     @property
     public enemySpawnInterval: number = 2;
 
@@ -40,20 +31,11 @@ export class TestGameController extends Component {
     @property
     public maxSoldiers: number = 5;
 
-    // === 内部状态 ===
     private _enemyTimer: number = 0;
     private _soldierTimer: number = 0;
     private _enemies: Node[] = [];
     private _soldiers: Node[] = [];
     private _container: Node | null = null;
-
-    // HUD
-    private _hudCanvas: Node | null = null;
-    private _coinLabel: Label | null = null;
-    private _waveLabel: Label | null = null;
-    private _enemyLabel: Label | null = null;
-
-    // === 生命周期 ===
 
     protected onLoad(): void {
         console.log('╔════════════════════════════════════╗');
@@ -64,15 +46,13 @@ export class TestGameController extends Component {
         this.node.addChild(this._container);
 
         GameManager.instance.initialize();
-        this.createHUD();
-        this.registerEvents();
     }
 
     protected start(): void {
         GameManager.instance.startGame();
-        console.log(`[Game] 初始金币: ${GameManager.instance.coins}`);
+        console.log(`[Game] 💰 初始金币: ${GameManager.instance.coins}`);
+        console.log('[Game] 🔴 红色 = 敌人 | 🔵 蓝色 = 士兵');
 
-        // 立即生成第一个敌人和士兵
         this.spawnEnemy();
         this.spawnSoldier();
     }
@@ -89,111 +69,33 @@ export class TestGameController extends Component {
 
         // 生成士兵
         this._soldierTimer += dt;
-        if (
-            this._soldierTimer >= this.soldierSpawnInterval &&
-            this._soldiers.length < this.maxSoldiers
-        ) {
+        if (this._soldierTimer >= this.soldierSpawnInterval && this._soldiers.length < this.maxSoldiers) {
             this._soldierTimer = 0;
             this.spawnSoldier();
         }
 
-        // 更新单位
         this.updateEnemies(dt);
         this.updateSoldiers(dt);
         this.checkCombat();
     }
 
-    protected onDestroy(): void {
-        EventManager.instance.offAllByTarget(this);
-    }
-
-    // === HUD ===
-
-    private createHUD(): void {
-        // 创建 Canvas
-        this._hudCanvas = new Node('HUDCanvas');
-        this.node.addChild(this._hudCanvas);
-
-        const canvas = this._hudCanvas.addComponent(Canvas);
-        const canvasTransform = this._hudCanvas.addComponent(UITransform);
-        const size = view.getVisibleSize();
-        canvasTransform.setContentSize(size.width, size.height);
-
-        // 创建 2D 摄像机
-        const camNode = new Node('HUDCamera');
-        this._hudCanvas.addChild(camNode);
-        const cam = camNode.addComponent(Camera);
-        cam.projection = Camera.ProjectionType.ORTHO;
-        cam.orthoHeight = size.height / 2;
-        cam.priority = 1;
-
-        // 创建标签容器
-        const labelContainer = new Node('Labels');
-        this._hudCanvas.addChild(labelContainer);
-        const lcTransform = labelContainer.addComponent(UITransform);
-        lcTransform.setContentSize(size.width, size.height);
-
-        // 金币标签
-        this._coinLabel = this.createLabel('💰 100', -size.width / 2 + 100, size.height / 2 - 30);
-        labelContainer.addChild(this._coinLabel.node);
-
-        // 波次标签
-        this._waveLabel = this.createLabel('🌊 Wave 1', 0, size.height / 2 - 30);
-        labelContainer.addChild(this._waveLabel.node);
-
-        // 敌人数量标签
-        this._enemyLabel = this.createLabel('👾 0', size.width / 2 - 100, size.height / 2 - 30);
-        labelContainer.addChild(this._enemyLabel.node);
-
-        this.updateHUD();
-    }
-
-    private createLabel(text: string, x: number, y: number): Label {
-        const node = new Node('Label');
-        const transform = node.addComponent(UITransform);
-        transform.setContentSize(200, 40);
-
-        const label = node.addComponent(Label);
-        label.string = text;
-        label.fontSize = 24;
-        label.color = new Color(255, 255, 255, 255);
-
-        node.setPosition(x, y, 0);
-        return label;
-    }
-
-    private updateHUD(): void {
-        if (this._coinLabel) {
-            this._coinLabel.string = `💰 ${GameManager.instance.coins}`;
-        }
-        if (this._enemyLabel) {
-            this._enemyLabel.string = `👾 ${this._enemies.length}`;
-        }
-    }
-
-    private registerEvents(): void {
-        EventManager.instance.on(GameEvents.COIN_CHANGED, this.updateHUD, this);
-    }
-
-    // === 敌人系统 ===
+    // === 敌人 ===
 
     private spawnEnemy(): void {
         if (!this._container) return;
 
-        const enemy = this.createCube('Enemy', new Color(220, 60, 60, 255)); // 红色
+        const enemy = this.createCube('Enemy', new Color(220, 60, 60, 255));
         const pos = this.getEdgePosition();
         enemy.setPosition(pos.x, pos.y, 0);
         enemy.setScale(0.4, 0.4, 0.4);
 
-        // 添加生命值数据
         (enemy as any).hp = 30;
         (enemy as any).speed = 1.5 + Math.random() * 0.5;
 
         this._container.addChild(enemy);
         this._enemies.push(enemy);
 
-        console.log(`[Enemy] 👾 敌人出现! 总数: ${this._enemies.length}`);
-        this.updateHUD();
+        console.log(`[Enemy] 👾 敌人出现! (${this._enemies.length}只)`);
     }
 
     private updateEnemies(dt: number): void {
@@ -207,11 +109,9 @@ export class TestGameController extends Component {
             const speed = (enemy as any).speed || 1.5;
 
             if (dist < 0.5) {
-                // 敌人到达基地，游戏损失生命
                 toRemove.push(enemy);
                 console.log('[Enemy] ⚠️ 敌人突破防线!');
             } else {
-                // 向中心移动
                 const dir = new Vec3(-pos.x / dist, -pos.y / dist, 0);
                 enemy.setPosition(pos.x + dir.x * speed * dt, pos.y + dir.y * speed * dt, 0);
             }
@@ -233,19 +133,17 @@ export class TestGameController extends Component {
             }
             enemy.destroy();
         }
-        this.updateHUD();
     }
 
-    // === 士兵系统 ===
+    // === 士兵 ===
 
     private spawnSoldier(): void {
         if (!this._container) return;
 
-        const soldier = this.createCube('Soldier', new Color(60, 140, 220, 255)); // 蓝色
+        const soldier = this.createCube('Soldier', new Color(60, 140, 220, 255));
         soldier.setPosition(0, 0, 0);
         soldier.setScale(0.35, 0.35, 0.35);
 
-        // 添加数据
         (soldier as any).damage = 10;
         (soldier as any).speed = 2.5;
         (soldier as any).target = null;
@@ -253,7 +151,7 @@ export class TestGameController extends Component {
         this._container.addChild(soldier);
         this._soldiers.push(soldier);
 
-        console.log(`[Soldier] 🛡️ 士兵出动! 总数: ${this._soldiers.length}`);
+        console.log(`[Soldier] 🛡️ 士兵出动! (${this._soldiers.length}个)`);
     }
 
     private updateSoldiers(dt: number): void {
@@ -268,11 +166,9 @@ export class TestGameController extends Component {
             const dx = targetPos.x - pos.x;
             const dy = targetPos.y - pos.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
-
             const speed = (soldier as any).speed || 2.5;
 
             if (dist > 0.6) {
-                // 移向目标
                 soldier.setPosition(
                     pos.x + (dx / dist) * speed * dt,
                     pos.y + (dy / dist) * speed * dt,
@@ -298,11 +194,10 @@ export class TestGameController extends Component {
                 nearest = enemy;
             }
         }
-
         return nearest;
     }
 
-    // === 战斗系统 ===
+    // === 战斗 ===
 
     private checkCombat(): void {
         const killedEnemies: Node[] = [];
@@ -318,7 +213,6 @@ export class TestGameController extends Component {
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist < 0.6) {
-                // 攻击敌人
                 const damage = (soldier as any).damage || 10;
                 (target as any).hp -= damage;
 
@@ -332,7 +226,7 @@ export class TestGameController extends Component {
         this.removeEnemies(killedEnemies, true);
     }
 
-    // === 工具方法 ===
+    // === 工具 ===
 
     private createCube(name: string, color: Color): Node {
         const node = new Node(name);
@@ -350,7 +244,7 @@ export class TestGameController extends Component {
     }
 
     private getEdgePosition(): { x: number; y: number } {
-        const range = 6;
+        const range = 5;
         const side = Math.floor(Math.random() * 4);
         switch (side) {
             case 0:
