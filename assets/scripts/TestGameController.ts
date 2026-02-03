@@ -3,21 +3,26 @@ import {
     Component,
     Node,
     Vec3,
-    Graphics,
+    SpriteRenderer,
     Color,
-    UITransform,
-    Canvas,
-    Camera,
-    Widget,
-    view,
+    Sprite,
+    SpriteFrame,
+    Texture2D,
+    ImageAsset,
+    resources,
+    MeshRenderer,
+    primitives,
+    utils,
+    Material,
+    gfx,
 } from 'cc';
 import { GameManager } from './core/managers/GameManager';
 
 const { ccclass, property } = _decorator;
 
 /**
- * 简化版 2D 测试控制器
- * 自动创建 Canvas 和 2D Camera，无需任何手动配置
+ * 测试控制器 - 使用 3D 方块作为测试对象
+ * 不需要 Canvas，直接在 3D 场景中渲染可见
  */
 @ccclass('TestGameController')
 export class TestGameController extends Component {
@@ -32,145 +37,132 @@ export class TestGameController extends Component {
 
     private _spawnTimer: number = 0;
     private _enemyCount: number = 0;
-    private _canvas: Node | null = null;
-    private _enemyContainer: Node | null = null;
+    private _container: Node | null = null;
+    private _enemies: Node[] = [];
 
     protected onLoad(): void {
-        console.log('[TestGame] ========== 游戏启动 ==========');
+        console.log('========================================');
+        console.log('[TestGame] 游戏启动!');
+        console.log('========================================');
 
-        // 创建 2D Canvas (这是 2D 渲染的关键!)
-        this._canvas = this.createCanvas();
-
-        // 创建敌人容器（在 Canvas 下）
-        this._enemyContainer = new Node('EnemyContainer');
-        this._canvas.addChild(this._enemyContainer);
+        // 创建容器
+        this._container = new Node('Container');
+        this.node.addChild(this._container);
 
         // 初始化游戏管理器
         GameManager.instance.initialize();
-
-        console.log('[TestGame] Canvas 和容器创建完成');
     }
 
     protected start(): void {
         if (this.autoStart) {
             GameManager.instance.startGame();
-            console.log(`[TestGame] 游戏开始! 初始金币: ${GameManager.instance.coins}`);
-            console.log('[TestGame] 等待敌人生成...');
+            console.log(`[TestGame] 初始金币: ${GameManager.instance.coins}`);
+
+            // 立即生成第一个敌人
+            this.spawnTestEnemy();
         }
     }
 
     protected update(dt: number): void {
         if (!GameManager.instance.isPlaying) return;
 
+        // 定时生成敌人
         this._spawnTimer += dt;
         if (this._spawnTimer >= this.spawnInterval && this._enemyCount < this.maxEnemies) {
             this._spawnTimer = 0;
             this.spawnTestEnemy();
         }
+
+        // 更新所有敌人的移动
+        this.updateEnemies(dt);
     }
 
     /**
-     * 创建 2D Canvas (必需，否则 UI 元素不会显示)
-     */
-    private createCanvas(): Node {
-        const canvasNode = new Node('GameCanvas');
-        this.node.addChild(canvasNode);
-
-        // 添加 Canvas 组件
-        const canvas = canvasNode.addComponent(Canvas);
-
-        // 添加 UITransform
-        const uiTransform = canvasNode.addComponent(UITransform);
-        const visibleSize = view.getVisibleSize();
-        uiTransform.setContentSize(visibleSize.width, visibleSize.height);
-
-        // 创建 2D 摄像机
-        const cameraNode = new Node('Camera2D');
-        canvasNode.addChild(cameraNode);
-        const camera = cameraNode.addComponent(Camera);
-        camera.projection = Camera.ProjectionType.ORTHO;
-        camera.orthoHeight = visibleSize.height / 2;
-
-        console.log(`[TestGame] Canvas 尺寸: ${visibleSize.width} x ${visibleSize.height}`);
-
-        return canvasNode;
-    }
-
-    /**
-     * 生成测试敌人（红色方块）
+     * 生成测试敌人（使用 3D Cube）
      */
     private spawnTestEnemy(): void {
-        if (!this._enemyContainer) return;
+        if (!this._container) return;
 
+        // 创建 3D 立方体
         const enemy = new Node(`Enemy_${this._enemyCount}`);
-        this._enemyContainer.addChild(enemy);
+        this._container.addChild(enemy);
 
-        // UITransform (设置大小)
-        const uiTransform = enemy.addComponent(UITransform);
-        uiTransform.setContentSize(50, 50);
+        // 添加 MeshRenderer 并使用内置立方体
+        const renderer = enemy.addComponent(MeshRenderer);
 
-        // Graphics (绘制红色方块)
-        const graphics = enemy.addComponent(Graphics);
-        graphics.fillColor = new Color(220, 60, 60, 255); // 红色
-        graphics.rect(-25, -25, 50, 50);
-        graphics.fill();
+        // 使用内置的 box primitive
+        renderer.mesh = utils.MeshUtils.createMesh(primitives.box({ width: 1, height: 1, length: 1 }));
 
-        // 设置随机边缘位置
+        // 设置材质颜色为红色
+        const material = new Material();
+        material.initialize({
+            effectName: 'builtin-unlit',
+            defines: {},
+            states: {},
+        });
+        material.setProperty('mainColor', new Color(220, 60, 60, 255));
+        renderer.material = material;
+
+        // 设置位置 (在 3D 空间中)
         const pos = this.getRandomEdgePosition();
         enemy.setPosition(pos.x, pos.y, 0);
+        enemy.setScale(0.5, 0.5, 0.5);
 
+        this._enemies.push(enemy);
         this._enemyCount++;
-        console.log(
-            `[TestGame] 👾 敌人 #${this._enemyCount} 出现! 位置: (${pos.x.toFixed(0)}, ${pos.y.toFixed(0)})`
-        );
 
-        // 移动到中心
-        this.moveEnemyToCenter(enemy);
+        console.log(`[TestGame] 👾 敌人 #${this._enemyCount} 出现!`);
     }
 
     private getRandomEdgePosition(): { x: number; y: number } {
-        const w = 400;
-        const h = 300;
+        // 在 3D 空间中，使用较小的范围
+        const range = 5;
         const side = Math.floor(Math.random() * 4);
 
         switch (side) {
             case 0:
-                return { x: Math.random() * w - w / 2, y: h / 2 + 40 };
+                return { x: Math.random() * range * 2 - range, y: range + 1 };
             case 1:
-                return { x: Math.random() * w - w / 2, y: -h / 2 - 40 };
+                return { x: Math.random() * range * 2 - range, y: -range - 1 };
             case 2:
-                return { x: -w / 2 - 40, y: Math.random() * h - h / 2 };
+                return { x: -range - 1, y: Math.random() * range * 2 - range };
             default:
-                return { x: w / 2 + 40, y: Math.random() * h - h / 2 };
+                return { x: range + 1, y: Math.random() * range * 2 - range };
         }
     }
 
-    private moveEnemyToCenter(enemy: Node): void {
-        const speed = 80;
-        let active = true;
+    private updateEnemies(dt: number): void {
+        const speed = 2;
+        const toRemove: Node[] = [];
 
-        const moveUpdate = (dt: number) => {
-            if (!active || !enemy.isValid) return;
+        for (const enemy of this._enemies) {
+            if (!enemy.isValid) continue;
 
             const pos = enemy.position;
             const dist = Math.sqrt(pos.x * pos.x + pos.y * pos.y);
 
-            if (dist < 30) {
-                active = false;
+            if (dist < 0.5) {
+                // 到达中心
+                toRemove.push(enemy);
                 console.log(`[TestGame] 💰 敌人被击败! +5 金币`);
                 GameManager.instance.addCoins(5);
                 console.log(`[TestGame] 当前金币: ${GameManager.instance.coins}`);
-                enemy.destroy();
-                this._enemyCount--;
-                return;
+            } else {
+                // 向中心移动
+                const dirX = -pos.x / dist;
+                const dirY = -pos.y / dist;
+                enemy.setPosition(pos.x + dirX * speed * dt, pos.y + dirY * speed * dt, 0);
             }
+        }
 
-            // 向中心移动
-            const dirX = -pos.x / dist;
-            const dirY = -pos.y / dist;
-            enemy.setPosition(pos.x + dirX * speed * dt, pos.y + dirY * speed * dt, 0);
-        };
-
-        this.schedule(moveUpdate, 0);
+        // 移除到达中心的敌人
+        for (const enemy of toRemove) {
+            const idx = this._enemies.indexOf(enemy);
+            if (idx !== -1) {
+                this._enemies.splice(idx, 1);
+                this._enemyCount--;
+            }
+            enemy.destroy();
+        }
     }
 }
