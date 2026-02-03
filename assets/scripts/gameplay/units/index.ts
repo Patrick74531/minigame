@@ -4,3 +4,4 @@
 export { Unit, UnitType, UnitState, UnitStats } from './Unit';
 export { Enemy } from './Enemy';
 export { Soldier } from './Soldier';
+export { UnitFactory } from './UnitFactory';
