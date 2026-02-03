@@ -75,48 +75,11 @@ export class BuildingManager {
     /**
      * 每帧更新
      */
+    /**
+     * 每帧更新
+     */
     public update(dt: number): void {
-        if (!this._heroNode || !this._heroNode.isValid) return;
-
-        this._collectTimer += dt;
-        if (this._collectTimer < 0.1) return;
-        this._collectTimer = 0;
-
-        const heroComp = this._heroNode.getComponent(Hero);
-        if (!heroComp) return;
-
-        let nearestPad: BuildingPad | null = null;
-
-        // 检查每个建造点
-        for (const pad of this._pads) {
-            if (!pad.node.isValid) continue;
-            if (pad.isComplete) continue;
-
-            // 检查英雄是否在范围内
-            if (pad.checkHeroInRange()) {
-                nearestPad = pad;
-                
-                // 尝试收集金币
-                const collected = pad.tryCollectCoin(heroComp.coinCount);
-                if (collected > 0) {
-                    heroComp.removeCoin(collected);
-                    // 更新 HUD
-                    HUDManager.instance.updateCoinDisplay(heroComp.coinCount);
-                }
-            }
-        }
-
-        // 更新 HUD 建造点信息
-        if (nearestPad) {
-            console.log(`[BuildingManager] 显示建造信息: ${nearestPad.buildingName}`);
-            HUDManager.instance.showBuildingInfo(
-                nearestPad.buildingName,
-                nearestPad.requiredCoins,
-                nearestPad.collectedCoins
-            );
-        } else {
-            HUDManager.instance.hideBuildingInfo();
-        }
+        // Logic moved to BuildingPad.onTriggerStay (Physics System)
     }
 
     /**

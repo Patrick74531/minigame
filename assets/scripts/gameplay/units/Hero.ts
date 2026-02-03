@@ -1,7 +1,9 @@
-import { _decorator, Vec2, Vec3, Node, Component } from 'cc';
+import { _decorator, Vec2, Vec3, Node, Component, RigidBody, CapsuleCollider, ITriggerEvent, PhysicsSystem } from 'cc';
 import { Unit, UnitType, UnitState } from './Unit';
 import { WaveManager } from '../../core/managers/WaveManager';
 import { GameConfig } from '../../data/GameConfig';
+import { Coin } from '../economy/Coin';
+import { HUDManager } from '../../ui/HUDManager';
 
 const { ccclass, property } = _decorator;
 
@@ -26,10 +28,50 @@ export class Hero extends Unit {
             moveSpeed: GameConfig.HERO.MOVE_SPEED,
         });
         
-        // 创建金币挂载点 - 在 initialize 中创建，确保已有 node
+        // 创建金币挂载点
         this._coinContainer = new Node('CoinStack');
         this.node.addChild(this._coinContainer);
         this._coinContainer.setPosition(0, 1.2, 0); // 头顶位置
+
+        // Physics Setup
+        let rb = this.node.getComponent(RigidBody);
+        if (!rb) {
+            rb = this.node.addComponent(RigidBody);
+            rb.type = RigidBody.Type.KINEMATIC; // Kinematic allows manual pos control
+        }
+
+        let col = this.node.getComponent(CapsuleCollider);
+        if (!col) {
+            col = this.node.addComponent(CapsuleCollider);
+            col.cylinderHeight = 1.0;
+            col.radius = 0.3;
+            col.center = new Vec3(0, 0.75, 0);
+            col.isTrigger = true; // Use Trigger for interactions to avoid physical blocking
+        }
+        
+        // Groups: Hero (1<<0)
+        col.setGroup(1 << 0);
+        col.setMask((1 << 1) | (1 << 2)); // Collide with Coin(1<<1) and Pad(1<<2) (if needed) and Default
+    }
+
+    protected start(): void {
+        const col = this.node.getComponent(CapsuleCollider);
+        if (col) {
+            col.on('onTriggerEnter', this.onTriggerEnter, this);
+        }
+    }
+
+    private onTriggerEnter(event: ITriggerEvent): void {
+        const otherNode = event.otherCollider.node;
+        
+        // Check Coin
+        const coin = otherNode.getComponent(Coin);
+        if (coin) {
+            this.addCoin(otherNode);
+            // Commercial Grade: Disable logic but keep visual
+            coin.onPickup(); 
+            HUDManager.instance.updateCoinDisplay(this.coinCount);
+        }
     }
 
     // === 金币堆叠系统 ===
@@ -191,8 +233,9 @@ export class Hero extends Unit {
 
     private clampPosition(): void {
         const pos = this.node.position;
-        const limitX = 8; // 地图宽
-        const limitZ = 6; // 地图高 (Z axis)
+        // Widened limits to prevent "invisible wall" feel
+        const limitX = 25; 
+        const limitZ = 25; 
 
         let newX = pos.x;
         let newZ = pos.z;

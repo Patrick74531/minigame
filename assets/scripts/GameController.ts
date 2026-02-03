@@ -66,6 +66,10 @@ export class GameController extends Component {
         WaveManager.instance.initialize(this._enemyContainer!, this.maxWaves);
         HUDManager.instance.initialize(this._uiCanvas!);
         BuildingManager.instance.initialize(this._buildingContainer!, this._soldierContainer!);
+
+        // 启用物理系统
+        PhysicsSystem.instance.enable = true;
+        // PhysicsSystem.instance.debugDrawFlags = PhysicsSystem.DebugDrawFlags.SHOW_ALL_COLLIDER; // For Debug
     }
 
     protected onDestroy(): void {
@@ -112,8 +116,8 @@ export class GameController extends Component {
         // 波次生成
         WaveManager.instance.update(dt);
 
-        // 金币拾取检测
-        this.updateCoinPickup(dt);
+        // 金币拾取检测 (Physics System handles this now)
+        // this.updateCoinPickup(dt);
 
         // 建造系统更新
         BuildingManager.instance.update(dt);
@@ -182,13 +186,12 @@ export class GameController extends Component {
             // Drop Coin
             if (data.position && this._coinContainer) {
                 const value = 5 + Math.floor(Math.random() * 5);
-                const coin = CoinFactory.createCoin(
+                CoinFactory.createCoin(
                     this._coinContainer,
                     data.position.x,
                     data.position.z, // Use Z for 3D logic
                     value
                 );
-                this._coins.push(coin);
             }
             // Note: data.node is destroyed by Unit.die() -> onDeath() -> destroy()?
             // Enemy.ts onDeath is empty now. Unit.die() emits event then onDeath().
@@ -213,9 +216,10 @@ export class GameController extends Component {
         for (const pos of padPositions) {
             const padNode = new Node(`BuildingPad_${pos.type}`);
             this._buildingContainer!.addChild(padNode);
-            padNode.setPosition(pos.x, pos.y, 0);
+            // Map y in config to z in world space for top-down view
+            padNode.setPosition(pos.x, 0, pos.y);
 
-            console.log(`[GameController] 创建建造点: type=${pos.type}, pos=(${pos.x}, ${pos.y}, 0)`);
+            console.log(`[GameController] 创建建造点: type=${pos.type}, pos=(${pos.x}, 0, ${pos.y})`);
 
             const pad = padNode.addComponent(BuildingPad);
             pad.buildingTypeId = pos.type;
@@ -237,43 +241,8 @@ export class GameController extends Component {
         }
     }
 
-
-
-
-    // === 金币拾取 ===
-
-    private updateCoinPickup(dt: number): void {
-        const heroComp = this._hero?.getComponent(Hero);
-        const toRemove: Node[] = [];
-
-        for (const coin of this._coins) {
-            if (!coin.isValid) continue;
-
-            // Update Lifecycle (Animation + Auto-collect)
-            // Note: CoinFactory.updateCoin returns true if it should be destroyed (auto-collected)
-            const shouldDestroy = CoinFactory.updateCoin(coin, dt);
-            if (shouldDestroy) {
-                toRemove.push(coin);
-                coin.destroy();
-                continue;
-            }
-
-            // Check Pickup by Hero
-            if (heroComp) {
-                 const dist = this.getDistance(this._hero!, coin);
-                 if (dist < GameConfig.ECONOMY.COIN_COLLECT_RANGE) {
-                     heroComp.addCoin(coin);
-                     toRemove.push(coin); // Stop tracking, Hero takes ownership
-                     HUDManager.instance.updateCoinDisplay(heroComp.coinCount);
-                 }
-            }
-        }
-
-        for (const coin of toRemove) {
-            const idx = this._coins.indexOf(coin);
-            if (idx !== -1) this._coins.splice(idx, 1);
-        }
-    }
+    // === 金币拾取 (Removed) ===
+    // Physics System handles this via Coin.onTriggerEnter or Hero.onTriggerEnter
 
     // === 基地伤害 ===
 

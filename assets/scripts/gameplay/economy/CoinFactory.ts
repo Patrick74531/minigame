@@ -1,8 +1,9 @@
-import { _decorator, Node, MeshRenderer, primitives, utils, Material, Color, Vec3 } from 'cc';
+import { _decorator, Node, MeshRenderer, primitives, utils, Material, Color, Vec3, BoxCollider } from 'cc';
 import { GameManager } from '../../core/managers/GameManager';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { GameConfig } from '../../data/GameConfig';
+import { Coin } from './Coin';
 
 /**
  * 金币工厂和管理
@@ -15,48 +16,25 @@ export class CoinFactory {
      */
     public static createCoin(parent: Node, x: number, z: number, value: number): Node {
         const node = this.createCubeNode('Coin', new Color(255, 165, 0, 255));
-        // 3D: Place at fixed height Y=0.5, using X and Z
         node.setPosition(x, 0.5, z);
-        node.setScale(0.2, 0.2, 0.2);
+        node.setScale(0.3, 0.3, 0.3); // Slightly larger for visibility
         parent.addChild(node);
 
-        // 存储金币数据
-        (node as any).coinData = {
-            value: value,
-            lifetime: 0,
-            collected: false,
-            startY: 0.5, // Store base Y
-        };
+        // Physics: Trigger for Pickup
+        const collider = node.addComponent(BoxCollider);
+        collider.isTrigger = true;
+        // Set Group to COIN (1 << 1)
+        collider.setGroup(1 << 1); 
+        collider.setMask((1 << 0) | (1 << 1)); // Collide with Default (Hero usually 1<<0)
+
+        // Logic Component
+        const coinComp = node.addComponent(Coin);
+        coinComp.value = value;
 
         return node;
     }
 
-    /**
-     * 更新金币 (浮动动画 + 自动收集)
-     * @returns 是否应该销毁
-     */
-    public static updateCoin(coin: Node, dt: number): boolean {
-        const data = (coin as any).coinData;
-        if (!data || data.collected) return true;
-
-        data.lifetime += dt;
-
-        // 浮动动画
-        const pos = coin.position;
-        const startY = data.startY || 0.5;
-        const floatY = Math.sin(data.lifetime * 5) * 0.1; // Larger amplitude
-        coin.setPosition(pos.x, startY + floatY, pos.z);
-
-        // Auto-collect after lifetime
-        if (data.lifetime >= GameConfig.ECONOMY.COIN_LIFETIME) {
-            data.collected = true;
-            GameManager.instance.addCoins(data.value);
-            EventManager.instance.emit(GameEvents.COIN_COLLECTED, { value: data.value });
-            return true;
-        }
-
-        return false;
-    }
+    // Removed updateCoin (Handled by Coin component)
 
     /**
      * 创建 3D 立方体节点

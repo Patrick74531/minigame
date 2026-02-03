@@ -1,8 +1,10 @@
-import { _decorator, Node, Color, MeshRenderer, primitives, utils, Material, Label, UITransform, Billboard, RenderRoot2D, Layers } from 'cc';
+import { _decorator, Node, Color, MeshRenderer, primitives, utils, Material, Label, UITransform, Billboard, RenderRoot2D, Layers, BoxCollider, ITriggerEvent, Vec3, RigidBody } from 'cc';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { BuildingRegistry, BuildingTypeConfig } from './BuildingRegistry';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
+import { HUDManager } from '../../ui/HUDManager';
+import { Hero } from '../units/Hero';
 
 const { ccclass, property } = _decorator;
 
@@ -80,10 +82,17 @@ export class BuildingPad extends BaseComponent {
         // 初始化逻辑保留为空，延迟到 start 执行，确保属性已被赋值
     }
 
+    // === Physics Implementation ===
+
+    // Flag to track hero presence
+    private _heroInArea: boolean = false;
+    private _heroRef: Hero | null = null;
+
     protected start(): void {
+        this.setupPhysics();
+
+        // Previous start logic
         console.log(`[BuildingPad] start() \u88ab\u8c03\u7528, buildingTypeId=${this.buildingTypeId}`);
-        
-        // 获取建筑配置
         const config = BuildingRegistry.instance.get(this.buildingTypeId);
         this._config = config ?? null;
         if (!this._config) {
@@ -91,135 +100,178 @@ export class BuildingPad extends BaseComponent {
             return;
         }
 
-        // 创建视觉元素
         this.createVisuals();
-
         console.log(`[BuildingPad] 初始化: ${this._config.name}, 需要 ${this._config.cost} 金币`);
     }
 
-    protected cleanup(): void {
-        if (this._padMaterial) {
-            this._padMaterial.destroy();
-            this._padMaterial = null;
+    private setupPhysics(): void {
+        // Add RigidBody (Static) - Required for consistent Trigger events in some engines
+        let rb = this.node.getComponent(RigidBody);
+        if (!rb) {
+            rb = this.node.addComponent(RigidBody);
+            rb.type = RigidBody.Type.STATIC;
+        }
+
+        let col = this.node.getComponent(BoxCollider);
+        if (!col) {
+            col = this.node.addComponent(BoxCollider);
+        }
+        
+        // Force update properties even if component existed (e.g. from Prefab)
+        col.isTrigger = true;
+        // Tall box to catch Hero jumping or slight Y offsets
+        col.center = new Vec3(0, 2.5, 0); 
+        col.size = new Vec3(this.collectRadius, 5.0, this.collectRadius);
+        
+        col.setGroup(1 << 2); // BUILDING_PAD
+        col.setMask(1 << 0); // Collide with HERO
+        
+        col.on('onTriggerEnter', this.onTriggerEnter, this);
+        col.on('onTriggerExit', this.onTriggerExit, this);
+        
+        console.log(`[BuildingPad] Physics Setup Complete. Collider Size: ${col.size}, Trigger: ${col.isTrigger}`);
+    }
+
+    /**
+     * Physics Event: Player enters pad
+     */
+    private onTriggerEnter(event: ITriggerEvent): void {
+        const otherNode = event.otherCollider.node;
+        console.log(`[BuildingPad] OnTriggerEnter: this=${this.node.name}, other=${otherNode.name}, group=${event.otherCollider.getGroup()}`);
+        console.log(`[BuildingPad] Scale: ${this.node.getWorldScale()}`);
+
+        let hero = otherNode.getComponent(Hero);
+        if (!hero) {
+            // Fallback for circular dependency issues
+            console.warn('[BuildingPad] Hero class check failed, trying string "Hero"');
+            hero = otherNode.getComponent('Hero') as Hero;
+        }
+
+        if (hero) {
+            console.log('[BuildingPad] Hero Component Found!');
+            this._heroInArea = true;
+            this._heroRef = hero;
+            
+            // Show Info - Use imported HUDManager directly
+            if (HUDManager.instance) {
+                 HUDManager.instance.showBuildingInfo(
+                    this.buildingName,
+                    this.requiredCoins,
+                    this.collectedCoins
+                );
+            }
+        } else {
+            console.log('[BuildingPad] Not a Hero component');
         }
     }
+
+    /**
+     * Physics Event: Player exits pad
+     */
+    private onTriggerExit(event: ITriggerEvent): void {
+        const otherNode = event.otherCollider.node;
+        const hero = otherNode.getComponent(Hero);
+        if (hero) {
+            this._heroInArea = false;
+            this._heroRef = null;
+            
+            // Hide Info
+            if (HUDManager.instance) {
+                HUDManager.instance.hideBuildingInfo();
+            }
+        }
+    }
+
+    /**
+     * Standard Update Loop for Interaction
+     */
+    protected update(dt: number): void {
+        if (this._heroInArea && this._heroRef && this._state === BuildingPadState.WAITING) {
+            // Check if hero still valid
+            if (!this._heroRef.node || !this._heroRef.node.isValid) {
+                this._heroInArea = false;
+                this._heroRef = null;
+                return;
+            }
+
+            // Perform Collection (throttled by collect timer or frame)
+            if (this._heroRef.coinCount > 0) {
+                 const collected = this.tryCollectCoin(this._heroRef.coinCount);
+                 if (collected > 0) {
+                      this._heroRef.removeCoin(collected);
+                      
+                      // Update HUD periodically or on change
+                      if (HUDManager.instance) {
+                          HUDManager.instance.updateCoinDisplay(this._heroRef.coinCount);
+                      }
+                 }
+            }
+        }
+    }
+
+    // Removed checkHeroInRange (Logic moved to Physics Trigger)
 
     /**
      * 创建视觉元素（圆盘和数字）
      */
     private createVisuals(): void {
-        // 1. 创建建造点底座 (使用简单的 Box，与 BuildingFactory 相同的方式)
         const padNode = new Node('PadVisual');
         this.node.addChild(padNode);
         
-        console.log(`[BuildingPad] 创建视觉节点: ${this._config?.name}`);
-        
-        // 添加 MeshRenderer
         const renderer = padNode.addComponent(MeshRenderer);
-        
-        // 使用 Box 而不是 Cylinder，确保可见
-        // 使用 Box，调整为扁平状躺在地面上 (XZ 平面)
-        // Y 轴是垂直高度，所以 height 应该很小
         renderer.mesh = utils.MeshUtils.createMesh(
             primitives.box({ width: 1.2, height: 0.1, length: 1.2 })
         );
 
-        // 创建材质（完全复制 BuildingFactory 的做法）
         this._padMaterial = new Material();
         this._padMaterial.initialize({ effectName: 'builtin-unlit' });
-        // 亮黄色，确保明显
         this._padMaterial.setProperty('mainColor', new Color(255, 200, 0, 255)); 
 
         renderer.material = this._padMaterial;
-
-        // 位置设置：稍微抬高 y 避免与地面 Z-fighting
         padNode.setPosition(0, 0.05, 0);
-        
-        console.log(`[BuildingPad] 视觉节点创建完成，位置: ${padNode.position.toString()}`);
 
-        // 2. 创建数字标签 (使用 RenderRoot2D)
         const labelRoot = new Node('LabelRoot');
         this.node.addChild(labelRoot);
-        
-        // 关键1：添加 RenderRoot2D 组件
         labelRoot.addComponent(RenderRoot2D);
-        
-        // 关键2：添加 Billboard，确保始终面向摄像机
         labelRoot.addComponent(Billboard);
         
-        // 创建 Label 节点
         const labelNode = new Node('CostLabel');
         labelRoot.addChild(labelNode);
+        labelNode.layer = 1;
 
-        // 关键3：设置 Layer 为 DEFAULT (1)，这样主摄像机才能看到它！不要设为 UI_2D
-        // Cocos Creator 3.x 默认 3D 场景层是 DEFAULT
-        labelNode.layer = 1; // Layers.Enum.DEFAULT
-
-        // 添加 UITransform
         const uiTransform = labelNode.addComponent(UITransform);
-        uiTransform.setContentSize(400, 200); // 足够大的画布
+        uiTransform.setContentSize(400, 200);
 
-        // 添加 Label
         this._label = labelNode.addComponent(Label);
         this._label.string = `${this.requiredCoins}`;
         this._label.fontSize = 80; 
         this._label.lineHeight = 80;
-        this._label.color = new Color(0, 0, 0, 255); // 黑色字体
+        this._label.color = new Color(0, 0, 0, 255);
         this._label.isBold = true;
         this._label.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._label.verticalAlign = Label.VerticalAlign.CENTER;
-        this._label.overflow = Label.Overflow.NONE;
-        
-        // 关键4：调整缩放。UI 单位是像素，3D 单位是米。
-        // 0.01 缩放意味着 100px = 1米。
+
         labelRoot.setScale(0.015, 0.015, 0.015);
-        
-        // 抬高一点
         labelRoot.setPosition(0, 0.6, 0);
-        
     }
 
-    /**
-     * 更新显示
-     */
     private updateDisplay(): void {
         if (this._label) {
             const remaining = this.requiredCoins - this._collectedCoins;
             this._label.string = `${remaining}`;
             
-            // 根据进度改变颜色
             if (this.progress >= 1) {
-                this._label.color = new Color(0, 255, 0, 255); // 绿色
+                this._label.color = new Color(0, 255, 0, 255);
             } else if (this.progress >= 0.5) {
-                this._label.color = new Color(255, 255, 0, 255); // 黄色
+                this._label.color = new Color(255, 255, 0, 255);
             } else {
-                this._label.color = new Color(255, 215, 0, 255); // 金色
+                this._label.color = new Color(255, 215, 0, 255);
             }
         }
     }
 
-    // === 公共方法 ===
-
-    /**
-     * 设置英雄节点引用（由 GameController 设置）
-     */
     public setHeroNode(hero: Node): void {
         this._heroNode = hero;
-    }
-
-    /**
-     * 检测英雄是否在范围内
-     */
-    public checkHeroInRange(): boolean {
-        if (!this._heroNode || !this._heroNode.isValid) return false;
-
-        const heroPos = this._heroNode.position;
-        const padPos = this.node.position;
-        const dx = heroPos.x - padPos.x;
-        const dz = heroPos.z - padPos.z; // Use Z for 3D ground distance
-        const dist = Math.sqrt(dx * dx + dz * dz);
-
-        return dist < this.collectRadius;
     }
 
     /**
