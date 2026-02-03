@@ -1,9 +1,8 @@
-import { _decorator, Component, Sprite, Color, UITransform, Vec3 } from 'cc';
-import { BaseComponent } from './core/base/BaseComponent';
-import { EventManager } from './core/managers/EventManager';
-import { GameEvents } from './data/GameEvents';
-import { GameConfig } from './data/GameConfig';
-import { IPoolable } from './core/managers/PoolManager';
+import { _decorator, Component } from 'cc';
+import { BaseComponent } from '../../core/base/BaseComponent';
+import { EventManager } from '../../core/managers/EventManager';
+import { GameEvents } from '../../data/GameEvents';
+import { IPoolable } from '../../core/managers/PoolManager';
 
 const { ccclass, property } = _decorator;
 
