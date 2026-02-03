@@ -1,0 +1,6 @@
+/**
+ * 管理器导出
+ */
+export { EventManager } from './EventManager';
+export { PoolManager, IPoolable } from './PoolManager';
+export { GameManager, GameState } from './GameManager';

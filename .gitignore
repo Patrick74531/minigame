@@ -1,0 +1,36 @@
+# Cocos Creator Generated
+library/
+local/
+temp/
+build/
+profiles/
+
+# Dependencies
+node_modules/
+
+# IDE
+.idea/
+*.iml
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build outputs
+dist/
+*.aab
+*.apk
+*.ipa
+
+# Sensitive files
+*.keystore
+*.jks
+.env
+.env.local
