@@ -251,7 +251,7 @@
   },
   {
     "__type__": "cc.Node",
-    "_name": "testgame",
+    "_name": "GameRoot",
     "_objFlags": 0,
     "__editorExtras__": {},
     "_parent": {
@@ -292,10 +292,10 @@
       "y": 0,
       "z": 0
     },
-    "_id": "bb9ySlCxVC2qsbAchLUZW8"
+    "_id": "6fEmwqvFFI57c6dypKlLT1"
   },
   {
-    "__type__": "79d99dxgbtDFZBsjIPB2M3y",
+    "__type__": "7d60biIc3ZEkoDwVeZm+wL5",
     "_name": "",
     "_objFlags": 0,
     "__editorExtras__": {},
@@ -304,10 +304,8 @@
     },
     "_enabled": true,
     "__prefab": null,
-    "autoStart": true,
-    "spawnInterval": 2,
-    "maxEnemies": 10,
-    "_id": "e3VgoPUjhNAo3e9VNNFrti"
+    "maxWaves": 10,
+    "_id": "12ohYVX7RBx5kjmIpxFiEf"
   },
   {
     "__type__": "cc.SceneGlobals",
