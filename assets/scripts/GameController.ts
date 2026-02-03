@@ -11,6 +11,8 @@ import { Unit } from './gameplay/units/Unit';
 import { Hero } from './gameplay/units/Hero';
 import { UIFactory } from './ui/UIFactory';
 import { Joystick } from './ui/Joystick';
+import { BuildingManager } from './gameplay/buildings/BuildingManager';
+import { BuildingPad } from './gameplay/buildings/BuildingPad';
 
 const { ccclass, property } = _decorator;
 
@@ -60,12 +62,14 @@ export class GameController extends Component {
         GameManager.instance.initialize();
         WaveManager.instance.initialize(this._enemyContainer!, this.maxWaves);
         HUDManager.instance.initialize(this._uiCanvas!);
+        BuildingManager.instance.initialize(this._buildingContainer!);
     }
 
     protected onDestroy(): void {
         EventManager.instance.offAllByTarget(this);
         WaveManager.instance.cleanup();
         HUDManager.instance.cleanup();
+        BuildingManager.instance.cleanup();
     }
 
     protected start(): void {
@@ -76,6 +80,12 @@ export class GameController extends Component {
         this._buildings.push(BuildingFactory.createBarracks(this._buildingContainer!, -2.5, 1));
         this._buildings.push(BuildingFactory.createBarracks(this._buildingContainer!, 2.5, 1));
         this._hero = UnitFactory.createHero(this._soldierContainer!, 0, -1.5);
+
+        // 设置英雄引用给建造管理器
+        BuildingManager.instance.setHeroNode(this._hero);
+
+        // 创建建造点
+        this.createBuildingPads();
 
         console.log(`[Game] 💰 初始金币: ${GameManager.instance.coins}`);
 
@@ -119,6 +129,9 @@ export class GameController extends Component {
             this.updateCoinPickup();
         }
 
+        // 建造系统更新
+        BuildingManager.instance.update(dt);
+
         // 波次完成检查
         WaveManager.instance.checkWaveComplete((bonus) => {
             GameManager.instance.addCoins(bonus);
@@ -156,6 +169,33 @@ export class GameController extends Component {
 
     private setupEventListeners(): void {
         // 直接在 update 中处理敌人移动和战斗，不需要事件监听
+    }
+
+    // === 建造系统 ===
+
+    private createBuildingPads(): void {
+        // 创建几个建造点
+        const padPositions = [
+            { x: -4, y: 3, type: 'barracks' },
+            { x: 4, y: 3, type: 'barracks' },
+            { x: -4, y: -3, type: 'tower' },
+            { x: 4, y: -3, type: 'tower' },
+        ];
+
+        for (const pos of padPositions) {
+            const padNode = new Node(`BuildingPad_${pos.type}`);
+            this._buildingContainer!.addChild(padNode);
+            padNode.setPosition(pos.x, pos.y, 0);
+
+            console.log(`[GameController] 创建建造点: type=${pos.type}, pos=(${pos.x}, ${pos.y}, 0)`);
+
+            const pad = padNode.addComponent(BuildingPad);
+            pad.buildingTypeId = pos.type;
+
+            BuildingManager.instance.registerPad(pad);
+        }
+
+        console.log(`[GameController] 创建了 ${padPositions.length} 个建造点, 父节点: ${this._buildingContainer!.name}`);
     }
 
     // === 输入处理 ===

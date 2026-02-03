@@ -52,6 +52,10 @@ export const GameEvents = {
     HERO_ATTACK: 'HERO_ATTACK',
     /** 英雄技能使用 { skillId: string } */
     HERO_SKILL_USED: 'HERO_SKILL_USED',
+
+    // === 建造系统 ===
+    /** 建筑建造完成 { padNode: Node, buildingTypeId: string, position: Vec3 } */
+    BUILDING_CONSTRUCTED: 'BUILDING_CONSTRUCTED',
 } as const;
 
 /** 事件名称类型 */

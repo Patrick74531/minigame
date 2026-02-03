@@ -1,7 +1,10 @@
-import { _decorator, Node, Label } from 'cc';
+import { _decorator, Node, Label, Color, UITransform, Widget } from 'cc';
 import { EventManager } from '../core/managers/EventManager';
 import { GameEvents } from '../data/GameEvents';
 import { UIFactory } from './UIFactory';
+
+// UI_2D Layer
+const UI_LAYER = 33554432;
 
 /**
  * HUD 管理器
@@ -20,18 +23,52 @@ export class HUDManager {
     // === UI 元素 ===
     private _coinLabel: Label | null = null;
     private _waveLabel: Label | null = null;
+    private _buildingInfoLabel: Label | null = null;
+    private _uiCanvas: Node | null = null;
 
     /**
      * 初始化 HUD
      */
     public initialize(uiCanvas: Node): void {
+        this._uiCanvas = uiCanvas;
+        
         // 创建金币显示
         this._coinLabel = UIFactory.createCoinDisplay(uiCanvas);
+        
+        // 创建建造点信息显示
+        this.createBuildingInfoLabel(uiCanvas);
         
         console.log('[HUDManager] 初始化完成');
         
         // 监听事件
         this.setupEventListeners();
+    }
+
+    /**
+     * 创建建造点信息标签
+     */
+    private createBuildingInfoLabel(parent: Node): void {
+        const node = new Node('BuildingInfo');
+        node.layer = UI_LAYER;
+        parent.addChild(node);
+
+        const transform = node.addComponent(UITransform);
+        transform.setAnchorPoint(0.5, 0); // 锚点设为底部中心
+        
+        const widget = node.addComponent(Widget);
+        widget.isAlignBottom = true;
+        widget.isAlignHorizontalCenter = true;
+        widget.bottom = 150;
+
+        this._buildingInfoLabel = node.addComponent(Label);
+        this._buildingInfoLabel.string = "";
+        this._buildingInfoLabel.fontSize = 36;
+        this._buildingInfoLabel.lineHeight = 40;
+        this._buildingInfoLabel.color = new Color(255, 255, 255, 255); // 白色
+        this._buildingInfoLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        
+        // 默认隐藏
+        node.active = false;
     }
 
     private setupEventListeners(): void {
@@ -60,6 +97,25 @@ export class HUDManager {
         }
     }
 
+    /**
+     * 显示建造点信息
+     */
+    public showBuildingInfo(buildingName: string, requiredCoins: number, collectedCoins: number): void {
+        if (this._buildingInfoLabel) {
+            this._buildingInfoLabel.string = `${buildingName}: ${collectedCoins}/${requiredCoins} 金币`;
+            this._buildingInfoLabel.node.active = true;
+        }
+    }
+
+    /**
+     * 隐藏建造点信息
+     */
+    public hideBuildingInfo(): void {
+        if (this._buildingInfoLabel) {
+            this._buildingInfoLabel.node.active = false;
+        }
+    }
+
     // === 事件处理 ===
 
     private onWaveStart(data: { wave: number }): void {
@@ -79,5 +135,7 @@ export class HUDManager {
         EventManager.instance.offAllByTarget(this);
         this._coinLabel = null;
         this._waveLabel = null;
+        this._buildingInfoLabel = null;
+        this._uiCanvas = null;
     }
 }

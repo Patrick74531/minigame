@@ -68,15 +68,21 @@ export class Hero extends Unit {
 
     /**
      * 移除栈顶金币（用于消费）
+     * @param count 要移除的金币数量，默认为 1
+     * @returns 实际移除的金币数量
      */
-    public removeCoin(): Node | null {
-        if (this._coinStack.length === 0) return null;
+    public removeCoin(count: number = 1): number {
+        let removed = 0;
+        const toRemove = Math.min(count, this._coinStack.length);
         
-        const coin = this._coinStack.pop();
-        if (coin) {
-            coin.removeFromParent();
+        for (let i = 0; i < toRemove; i++) {
+            const coin = this._coinStack.pop();
+            if (coin) {
+                coin.destroy();
+                removed++;
+            }
         }
-        return coin || null;
+        return removed;
     }
 
     public get coinCount(): number {
