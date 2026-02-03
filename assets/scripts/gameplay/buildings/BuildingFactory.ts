@@ -1,5 +1,6 @@
 import { _decorator, Node, MeshRenderer, primitives, utils, Material, Color } from 'cc';
 import { Building, BuildingType } from './Building';
+import { Tower } from './Tower';
 import { GameConfig } from '../../data/GameConfig';
 
 /**
@@ -72,6 +73,36 @@ export class BuildingFactory {
         }
 
         renderer.material = material;
+        return node;
+    }
+
+    /**
+     * 清理材质缓存
+     */
+    /**
+     * 创建防御塔
+     */
+    public static createTower(parent: Node, x: number, z: number): Node {
+        // 红色/黄色区分防御塔
+        const node = this.createCubeNode('Tower', new Color(220, 220, 60, 255)); // Yellow
+        node.setPosition(x, 0, z);
+        node.setScale(0.4, 0.8, 0.4); // Taller, thinner
+        parent.addChild(node);
+
+        const tower = node.addComponent(Tower);
+        tower.setConfig({
+            type: BuildingType.TOWER,
+            hp: 300,
+            // Towers don't spawn soldiers, so these values might be ignored or used differently
+            spawnInterval: 0, 
+            maxUnits: 0,
+        });
+        
+        // Custom Tower Config
+        tower.attackRange = 25; // Increased range
+        tower.attackDamage = 25;
+        tower.attackInterval = 0.5; // Faster attack
+
         return node;
     }
 

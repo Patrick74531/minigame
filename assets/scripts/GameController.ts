@@ -93,6 +93,10 @@ export class GameController extends Component {
         b2.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
         this._buildings.push(b2);
 
+        // Test Tower
+        const t1 = BuildingFactory.createTower(this._buildingContainer!, 0, 3);
+        this._buildings.push(t1);
+
         this._hero = UnitFactory.createHero(this._soldierContainer!, 0, -1.5);
 
         // 设置英雄引用给建造管理器

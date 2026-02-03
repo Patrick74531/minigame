@@ -1,4 +1,4 @@
-import { _decorator, Node, MeshRenderer, primitives, utils, Material, Color, Component } from 'cc';
+import { _decorator, Node, MeshRenderer, primitives, utils, Material, Color, Component, RigidBody, BoxCollider, Vec3 } from 'cc';
 import { Unit, UnitType, UnitStats } from './Unit';
 import { Enemy } from './Enemy';
 import { Soldier } from './Soldier';
@@ -27,6 +27,18 @@ export class UnitFactory {
         parent.addChild(node);
 
         const enemy = node.addComponent(Enemy);
+        
+        // Physics Setup
+        const rb = node.addComponent(RigidBody);
+        rb.type = RigidBody.Type.KINEMATIC; // Move manually
+        rb.group = 1 << 3; // GROUP_ENEMY (Assuming 3, need to standardize groups later)
+        
+        const col = node.addComponent(BoxCollider);
+        col.size = new Vec3(1, 1, 1);
+        col.isTrigger = true; 
+        col.setGroup(1 << 3); // ENEMY
+        col.setMask((1 << 4) | (1 << 0)); // Collide with BULLET(4) and DEFAULT(0)
+        
         enemy.initStats({
             maxHp: GameConfig.ENEMY.BASE_HP * waveMultiplier,
             attack: GameConfig.ENEMY.BASE_ATTACK,

@@ -95,15 +95,22 @@ export class BuildingManager {
                     const buildingNode = BuildingFactory.createBarracks(
                         this._buildingContainer,
                         data.position.x,
-                        data.position.z // 使用 Z 轴
+                        data.position.z 
                     );
                     
-                    // 设置建筑依赖
                     const buildingComp = buildingNode.getComponent(Building);
                     if (buildingComp && this._unitContainer) {
                         buildingComp.setUnitContainer(this._unitContainer);
                     }
                     break;
+
+                case 'tower':
+                     BuildingFactory.createTower(
+                        this._buildingContainer,
+                        data.position.x,
+                        data.position.z
+                     );
+                     break;
                 // 可扩展其他建筑类型
                 default:
                     console.log(`[BuildingManager] 未实现的建筑类型: ${data.buildingTypeId}`);

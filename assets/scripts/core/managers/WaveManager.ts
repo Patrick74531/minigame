@@ -41,7 +41,7 @@ export class WaveManager {
 
     // === 初始化 ===
 
-    public initialize(enemyContainer: Node, maxWaves: number = 10): void {
+    public initialize(enemyContainer: Node, maxWaves: number = 999): void {
         this._enemyContainer = enemyContainer;
         this._maxWaves = maxWaves;
         this._enemies = [];
@@ -74,8 +74,8 @@ export class WaveManager {
 
         this._waveConfig = {
             waveNumber,
-            enemyCount: 5 + waveNumber * 2,
-            spawnInterval: Math.max(0.8, 2.5 - waveNumber * 0.15),
+            enemyCount: 50 + waveNumber * 10, // Increased for testing
+            spawnInterval: 0.5, // Faster spawn
             hpMultiplier: 1 + (waveNumber - 1) * 0.3,
         };
 
