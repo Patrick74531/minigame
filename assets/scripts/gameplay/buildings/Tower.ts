@@ -1,4 +1,4 @@
-import { _decorator, Node, Vec3, Color, MeshRenderer, primitives, utils, Material, Component, tween, Tween } from 'cc';
+import { _decorator, Node, Vec3, Color, MeshRenderer, primitives, utils, Material, Component, tween, Tween, MotionStreak, Texture2D, resources } from 'cc';
 import { Building } from './Building';
 import { WaveManager } from '../../core/managers/WaveManager';
 import { Bullet } from '../combat/Bullet';
@@ -94,6 +94,22 @@ export class Tower extends Building {
         return nearest;
     }
 
+    private _bulletTexture: Texture2D | null = null;
+
+    protected start(): void {
+        // super.start(); // BaseComponent likely doesn't have start, safer to omit unless confirmed
+        
+        // Load Bullet Texture for Motion Streak
+        resources.load('textures/glow', Texture2D, (err, texture) => {
+            if (err) {
+                console.warn('[Tower] Failed to load glow texture (ignore if using primitive):', err);
+                return;
+            }
+            this._bulletTexture = texture;
+            console.log('[Tower] Glow texture loaded successfully');
+        });
+    }
+
     private shoot(target: Node): void {
         console.log(`[Tower] Shooting at ${target.name}`);
         
@@ -111,25 +127,38 @@ export class Tower extends Building {
         const bulletNode = new Node('Bullet');
         
         // Add to parent (Buildings container)
-        // Ideally we should have a separate bullet container to avoid cluttering hierarchy
         if (this.node.parent) {
              this.node.parent.addChild(bulletNode);
         } else {
-             this.node.addChild(bulletNode); // Fallback
+             this.node.addChild(bulletNode);
         }
 
-        // Position at top of tower
         bulletNode.setPosition(this.node.position.x, 1.5, this.node.position.z);
+        // console.log(`[Tower] Spawned bullet at ${bulletNode.position}`);
         
-        // Visuals
+        // 1. Visuals: Glowing Sphere
         const renderer = bulletNode.addComponent(MeshRenderer);
         renderer.mesh = utils.MeshUtils.createMesh(
-            primitives.sphere({ radius: 0.5 }) // Bigger for debug
+            primitives.box({ width: 0.2, height: 0.2, length: 0.2 }) // Smaller Cube
         );
         const material = new Material();
         material.initialize({ effectName: 'builtin-unlit' });
-        material.setProperty('mainColor', new Color(255, 0, 0, 255));
+        // High brightness RED for glow effect
+        material.setProperty('mainColor', new Color(255, 50, 50, 255)); 
         renderer.material = material;
+
+        // 2. Trail: Motion Streak
+        if (this._bulletTexture) {
+            const streak = bulletNode.addComponent(MotionStreak);
+            streak.fadeTime = 0.5;      
+            streak.minSeg = 1;          
+            streak.stroke = 0.6;        
+            streak.color = new Color(255, 0, 0, 255); 
+            streak.texture = this._bulletTexture;
+            streak.fastMode = true;
+        } else {
+             console.warn('[Tower] No texture for trail, skipping streak');
+        }
 
         // Logic
         const bullet = bulletNode.addComponent(Bullet);

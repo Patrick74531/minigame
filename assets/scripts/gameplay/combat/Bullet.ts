@@ -30,6 +30,9 @@ export class Bullet extends BaseComponent {
         console.log('[Bullet] Created/Initialized');
         this._lifetime = 0;
         
+        // Force Layer to Default (1 << 0)
+        this.node.layer = 1 << 0;
+
         // Ensure properties
         let rb = this.node.getComponent(RigidBody);
         if (!rb) {
@@ -50,8 +53,17 @@ export class Bullet extends BaseComponent {
         col.on('onTriggerEnter', this.onTriggerEnter, this);
     }
 
+    private _logTimer: number = 0;
+
     protected update(dt: number): void {
         this._lifetime += dt;
+        this._logTimer += dt;
+
+        if (this._logTimer > 1.0) {
+            this._logTimer = 0;
+            console.log(`[Bullet] Alive at: ${this.node.position} | Scale: ${this.node.scale}`);
+        }
+
         if (this._lifetime > this._maxLifetime) {
             this.node.destroy();
             return;
@@ -89,14 +101,18 @@ export class Bullet extends BaseComponent {
     }
 
     private onTriggerEnter(event: ITriggerEvent): void {
+        // Prevent instant collision on spawn
+        if (this._lifetime < 0.1) return;
+
         const other = event.otherCollider.node;
+        // console.warn(`[Bullet] TRIGGER with ${other.name} (Layer: ${other.layer})`);
         
         // Check if unit
         const unit = other.getComponent(Unit);
         if (unit && (unit.unitType === UnitType.ENEMY)) {
             unit.takeDamage(this.damage);
             this.createHitEffect();
-            this.node.destroy();
+            this.node.destroy(); 
         }
     }
     
