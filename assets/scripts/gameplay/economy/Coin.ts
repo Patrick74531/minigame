@@ -48,14 +48,15 @@ export class Coin extends BaseComponent implements IPoolable {
 
     // === 更新循环 ===
 
+    // === 更新循环 ===
+    
     protected update(dt: number): void {
-        if (this._isCollecting) return;
-
-        // 自动收集计时
-        this._collectTimer += dt;
-        if (this._collectTimer >= this.autoCollectDelay) {
-            this.collect();
-        }
+        // [MODIFIED] 移除自动收集，由 Hero 碰撞触发
+        // if (this._isCollecting) return;
+        // this._collectTimer += dt;
+        // if (this._collectTimer >= this.autoCollectDelay) {
+        //     this.collect();
+        // }
     }
 
     // === 收集逻辑 ===

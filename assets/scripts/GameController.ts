@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, Vec3, input, Input, EventKeyboard, KeyCode } from 'cc';
+import { _decorator, Component, Node, Vec3, Label } from 'cc';
 import { GameManager } from './core/managers/GameManager';
 import { EventManager } from './core/managers/EventManager';
 import { GameEvents } from './data/GameEvents';
@@ -155,11 +155,14 @@ export class GameController extends Component {
         this._container.addChild(this._coinContainer);
     }
 
+    private _coinLabel: Label | null = null;
+
     private setupUI(): void {
         this._uiCanvas = UIFactory.createUICanvas();
         this.node.addChild(this._uiCanvas);
 
         this._joystick = UIFactory.createJoystick(this._uiCanvas);
+        this._coinLabel = UIFactory.createCoinDisplay(this._uiCanvas);
     }
 
     // === 输入处理 ===
@@ -436,12 +439,12 @@ export class GameController extends Component {
     // === 金币更新 ===
 
     private updateCoins(): void {
-        // [TODO] 金币应该由英雄拾取，暂时移除自动收集
-        // 保持浮动动画
+        const toRemove: Node[] = [];
 
         for (const coin of this._coins) {
             if (!coin.isValid) continue;
-            // 简单的浮动
+
+            // 简单的浮动动画
             const data = (coin as any).coinData;
             if (data) {
                 data.lifetime += 0.1;
@@ -449,6 +452,31 @@ export class GameController extends Component {
                 const floatY = Math.sin(data.lifetime * 5) * 0.02;
                 coin.setPosition(pos.x, pos.y + floatY, pos.z);
             }
+
+            // [NEW] 拾取检测
+            if (this._hero && this._hero.isValid) {
+                const dist = this.getDistance(this._hero, coin);
+                if (dist < 1.0) { // 拾取范围
+                    const heroComp = this._hero.getComponent(Hero);
+                    if (heroComp) {
+                        heroComp.addCoin(coin);
+                        toRemove.push(coin);
+                        
+                        // 更新 UI
+                        console.log(`[Pickup] 💰 拾取金币! 当前携带: ${heroComp.coinCount}`);
+                        if (this._coinLabel) {
+                            this._coinLabel.string = `Coins: ${heroComp.coinCount}`;
+                        }
+                        continue; 
+                    }
+                }
+            }
+        }
+
+        // 仅从控制器列表中移除被拾取的金币，不销毁
+        for (const coin of toRemove) {
+            const idx = this._coins.indexOf(coin);
+            if (idx !== -1) this._coins.splice(idx, 1);
         }
     }
 

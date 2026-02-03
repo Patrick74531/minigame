@@ -1,4 +1,4 @@
-import { _decorator, Vec2, Vec3 } from 'cc';
+import { _decorator, Vec2, Vec3, Node, Component } from 'cc';
 import { Unit, UnitType, UnitState } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
 
@@ -24,14 +24,67 @@ export class Hero extends Unit {
             attackInterval: GameConfig.HERO.ATTACK_INTERVAL,
             moveSpeed: GameConfig.HERO.MOVE_SPEED,
         });
+        
+        // 创建金币挂载点 - 在 initialize 中创建，确保已有 node
+        this._coinContainer = new Node('CoinStack');
+        this.node.addChild(this._coinContainer);
+        this._coinContainer.setPosition(0, 1.2, 0); // 头顶位置
     }
+
+    // === 金币堆叠系统 ===
+    private _coinStack: Node[] = [];
+    private _coinContainer: Node | null = null;
 
     public onSpawn(): void {
         super.onSpawn();
         this._state = UnitState.IDLE;
         this._inputVector.set(0, 0);
+        this._coinStack = []; // 重置金币栈
     }
 
+    /**
+     * 添加金币到堆叠
+     */
+    public addCoin(coin: Node): void {
+        console.log(`[Hero] addCoin 被调用, 当前栈长度: ${this._coinStack.length}`);
+        this._coinStack.push(coin);
+        
+        // 物理转移
+        coin.removeFromParent();
+        this._coinContainer!.addChild(coin);
+        
+        // 禁用金币组件逻辑
+        const coinComp = coin.getComponent('Coin') as Component;
+        if (coinComp) coinComp.enabled = false;
+
+        // 重置变换
+        coin.setPosition(0, this._coinStack.length * 0.1, 0); // 每个金币高 0.1
+        coin.setRotationFromEuler(0, Math.random() * 360, 0); // 随机旋转增加自然感
+        coin.setScale(0.5, 0.5, 0.5); // 稍微缩小一点
+        
+        // 停止之前的任何动画
+        // (Coin 组件逻辑应该在被 pickup 后停止，或者被 GameController 移除后停止更新)
+    }
+
+    /**
+     * 移除栈顶金币（用于消费）
+     */
+    public removeCoin(): Node | null {
+        if (this._coinStack.length === 0) return null;
+        
+        const coin = this._coinStack.pop();
+        if (coin) {
+            coin.removeFromParent();
+        }
+        return coin || null;
+    }
+
+    public get coinCount(): number {
+        return this._coinStack.length;
+    }
+
+    // === 现有方法 ===
+    
     /**
      * 设置移动输入
      * @param input 输入向量
