@@ -217,11 +217,22 @@ export class GameController extends Component {
         const padPositions = [
             { x: -4, y: 3, type: 'barracks' },
             { x: 4, y: 3, type: 'barracks' },
-            { x: -4, y: -3, type: 'tower' },
+            { x: -4, y: -3, type: 'frost_tower' }, // New Frost Tower
             { x: 4, y: -3, type: 'tower' },
         ];
 
         for (const pos of padPositions) {
+            // TEST: Pre-spawn Frost Tower
+            if (pos.type === 'frost_tower') {
+                 BuildingFactory.createFrostTower(
+                    this._buildingContainer!,
+                    pos.x,
+                    pos.y
+                 );
+                 console.log(`[GameController] Pre-spawned Frost Tower at (${pos.x}, 0, ${pos.y})`);
+                 continue; // Skip creating pad
+            }
+
             const padNode = new Node(`BuildingPad_${pos.type}`);
             this._buildingContainer!.addChild(padNode);
             // Map y in config to z in world space for top-down view

@@ -111,6 +111,13 @@ export class BuildingManager {
                         data.position.z
                      );
                      break;
+                case 'frost_tower':
+                     BuildingFactory.createFrostTower(
+                        this._buildingContainer,
+                        data.position.x,
+                        data.position.z
+                     );
+                     break;
                 // 可扩展其他建筑类型
                 default:
                     console.log(`[BuildingManager] 未实现的建筑类型: ${data.buildingTypeId}`);

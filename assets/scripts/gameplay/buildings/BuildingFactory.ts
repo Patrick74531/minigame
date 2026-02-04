@@ -107,6 +107,37 @@ export class BuildingFactory {
     }
 
     /**
+     * 创建冰霜塔 (AOE Slow)
+     */
+    public static createFrostTower(parent: Node, x: number, z: number): Node {
+        const node = this.createCubeNode('FrostTower', new Color(60, 100, 220, 255)); // Blue
+        node.setPosition(x, 0, z);
+        node.setScale(0.4, 0.8, 0.4);
+        parent.addChild(node);
+
+        const tower = node.addComponent(Tower);
+        tower.setConfig({
+            type: BuildingType.TOWER,
+            hp: 300,
+            spawnInterval: 0, 
+            maxUnits: 0,
+        });
+        
+        // Frost Config (Low Damage, AOE Slow)
+        tower.attackRange = 22;
+        tower.attackDamage = 5; // Low Damage
+        tower.attackInterval = 0.8;
+        
+        // Bullet Visuals & Effects
+        tower.bulletColor = new Color(0, 150, 255, 255); // Cyan/Blue Glow
+        tower.bulletExplosionRadius = 2.5; // AOE
+        tower.bulletSlowPercent = 0.5; // 50% Slow
+        tower.bulletSlowDuration = 2.0;
+
+        return node;
+    }
+
+    /**
      * 清理材质缓存
      */
     public static clearCache(): void {

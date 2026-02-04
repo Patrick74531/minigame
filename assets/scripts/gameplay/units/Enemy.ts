@@ -51,10 +51,7 @@ export class Enemy extends Unit {
         }
 
         // 向原点（基地）移动
-        const speed = this._stats.moveSpeed / 60; // 转换为世界单位 (assuming 60fps base, or just units/sec?) moveSpeed is 100?
-        // GameConfig says moveSpeed is e.g. 2.0?
-        // UnitFactory sets moveSpeed = GameConfig.ENEMY.MOVE_SPEED * ...
-        // If config is ~100, /60 is ~1.6. Reasonable.
+        const speed = this.moveSpeed / 60; // Use Getter for modified speed
         
         const dirX = -pos.x / distToBase;
         const dirZ = -pos.z / distToBase;

@@ -45,7 +45,42 @@ export class WaveManager {
         this._enemyContainer = enemyContainer;
         this._enemies = [];
         this._currentWave = 0;
+        
+        // Listen for AOE impacts
+        EventManager.instance.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
+        
         console.log('[WaveManager] 初始化完成 (Infinite Mode)');
+    }
+
+    private onApplyAoE(data: { center: any, radius: number, damage: number, slowPercent: number, slowDuration: number }): void {
+        const radiusSqr = data.radius * data.radius;
+        const center = data.center;
+
+        // Iterate all active enemies
+        for (const enemy of this._enemies) {
+            if (!enemy.isValid) continue;
+
+             // Check distance
+            const dx = enemy.position.x - center.x;
+            const dz = enemy.position.z - center.z;
+            const distSqr = dx * dx + dz * dz;
+
+            if (distSqr <= radiusSqr) {
+                const unit = enemy.getComponent(UnitFactory.UnitClass || 'Unit') as any; // Dynamic type if needed or import Unit
+                // Better: just getComponent('Unit') or better yet, we imported UnitFactory... maybe Unit too?
+                // Unit is imported in UnitFactory? 
+                // Let's rely on getComponent with string or class if available.
+                const u = enemy.getComponent('Unit') as any; 
+                
+                if (u && u.isAlive) {
+                    u.takeDamage(data.damage);
+                    if (data.slowPercent > 0) {
+                        u.applySlow(data.slowPercent, data.slowDuration);
+                    }
+                }
+            }
+        }
+        console.log(`[WaveManager] AOE Applied to ${this._enemies.length} potential targets.`);
     }
 
     // === 公共接口 ===

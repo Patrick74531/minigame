@@ -57,6 +57,15 @@ export class BuildingRegistry {
             description: '远程攻击敌人'
         });
 
+        // 冰霜塔 - 减速
+        this.register({
+            id: 'frost_tower',
+            name: '冰霜塔',
+            cost: 12, 
+            buildTime: 0,
+            description: '范围减速'
+        });
+
         // 农场 - 产生金币
         this.register({
             id: 'farm',

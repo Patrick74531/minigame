@@ -56,6 +56,10 @@ export const GameEvents = {
     // === 建造系统 ===
     /** 建筑建造完成 { padNode: Node, buildingTypeId: string, position: Vec3 } */
     BUILDING_CONSTRUCTED: 'BUILDING_CONSTRUCTED',
+
+    // === 技能/特效系统 ===
+    /** 应用AOE效果 { center: Vec3, radius: number, damage: number, slowPercent: number, slowDuration: number } */
+    APPLY_AOE_EFFECT: 'APPLY_AOE_EFFECT',
 } as const;
 
 /** 事件名称类型 */

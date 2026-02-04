@@ -24,6 +24,16 @@ export class Tower extends Building {
     @property
     public projectileSpeed: number = 15;
 
+    // === Special Abilities ===
+    @property
+    public bulletColor: Color = new Color(255, 50, 50, 255); // Default Red
+    @property
+    public bulletSlowPercent: number = 0;
+    @property
+    public bulletExplosionRadius: number = 0;
+    @property
+    public bulletSlowDuration: number = 0;
+
     private _attackTimer: number = 0;
     private _target: Node | null = null;
     
@@ -143,8 +153,8 @@ export class Tower extends Building {
         );
         const material = new Material();
         material.initialize({ effectName: 'builtin-unlit' });
-        // High brightness RED for glow effect
-        material.setProperty('mainColor', new Color(255, 50, 50, 255)); 
+        // Use custom color
+        material.setProperty('mainColor', this.bulletColor); 
         renderer.material = material;
 
         // 2. Trail: Motion Streak
@@ -153,7 +163,7 @@ export class Tower extends Building {
             streak.fadeTime = 0.5;      
             streak.minSeg = 1;          
             streak.stroke = 0.6;        
-            streak.color = new Color(255, 0, 0, 255); 
+            streak.color = this.bulletColor; // Match bullet color
             streak.texture = this._bulletTexture;
             streak.fastMode = true;
         } else {
@@ -164,6 +174,12 @@ export class Tower extends Building {
         const bullet = bulletNode.addComponent(Bullet);
         bullet.damage = this.attackDamage;
         bullet.speed = this.projectileSpeed;
+        
+        // Special Stats
+        bullet.slowPercent = this.bulletSlowPercent;
+        bullet.explosionRadius = this.bulletExplosionRadius;
+        bullet.slowDuration = this.bulletSlowDuration;
+
         bullet.setTarget(target);
     }
     

@@ -1,6 +1,8 @@
 import { _decorator, Component, Node, Vec3, BoxCollider, ITriggerEvent, RigidBody } from 'cc';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { Unit, UnitType } from '../units/Unit';
+import { EventManager } from '../../core/managers/EventManager';
+import { GameEvents } from '../../data/GameEvents';
 
 const { ccclass, property } = _decorator;
 
@@ -20,6 +22,11 @@ export class Bullet extends BaseComponent {
     private _velocity: Vec3 = new Vec3();
     private _lifetime: number = 0;
     private _maxLifetime: number = 3; 
+
+    // === Special Properties ===
+    public explosionRadius: number = 0; // > 0 means AOE
+    public slowPercent: number = 0;     // > 0 means Slow Effect
+    public slowDuration: number = 0;
 
     public setTarget(target: Node): void {
         this._target = target;
@@ -105,14 +112,36 @@ export class Bullet extends BaseComponent {
         if (this._lifetime < 0.1) return;
 
         const other = event.otherCollider.node;
-        // console.warn(`[Bullet] TRIGGER with ${other.name} (Layer: ${other.layer})`);
-        
-        // Check if unit
+
+        // Check if unit (Direct Hit)
         const unit = other.getComponent(Unit);
+        
         if (unit && (unit.unitType === UnitType.ENEMY)) {
-            unit.takeDamage(this.damage);
+            
+            // 1. AOE Logic
+            if (this.explosionRadius > 0) {
+                // Decoupled: Emit event for Manager to handle
+                EventManager.instance.emit(GameEvents.APPLY_AOE_EFFECT, {
+                    center: this.node.position.clone(),
+                    radius: this.explosionRadius,
+                    damage: this.damage,
+                    slowPercent: this.slowPercent,
+                    slowDuration: this.slowDuration
+                });
+            } else {
+                // Single Target
+                this.applyDamage(unit);
+            }
+
             this.createHitEffect();
             this.node.destroy(); 
+        }
+    }
+
+    private applyDamage(unit: Unit): void {
+        unit.takeDamage(this.damage);
+        if (this.slowPercent > 0) {
+            unit.applySlow(this.slowPercent, this.slowDuration);
         }
     }
     

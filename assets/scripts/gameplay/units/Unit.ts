@@ -55,8 +55,16 @@ export class Unit extends BaseComponent implements IPoolable {
 
     // === 访问器 ===
 
+    protected _speedModifier: number = 1.0;
+    protected _slowTimer: number = 0;
+
     public get stats(): UnitStats {
         return this._stats;
+    }
+    
+    // Effective speed
+    public get moveSpeed(): number {
+        return this._stats.moveSpeed * this._speedModifier;
     }
 
     public get state(): UnitState {
@@ -186,8 +194,30 @@ export class Unit extends BaseComponent implements IPoolable {
 
     // === 更新循环 ===
 
+    // === Status Effects ===
+
+    public applySlow(percent: number, duration: number): void {
+        this._speedModifier = 1.0 - percent; // e.g. 0.4 slow = 0.6 speed
+        this._slowTimer = duration;
+        // console.log(`[Unit] Slowed! Mod: ${this._speedModifier}`);
+    }
+
+    private updateStatusEffects(dt: number): void {
+        if (this._slowTimer > 0) {
+            this._slowTimer -= dt;
+            if (this._slowTimer <= 0) {
+                this._speedModifier = 1.0;
+                // console.log(`[Unit] Slow ended.`);
+            }
+        }
+    }
+
+    // === 更新循环 ===
+
     protected update(dt: number): void {
         if (!this.isAlive) return;
+
+        this.updateStatusEffects(dt);
 
         switch (this._state) {
             case UnitState.MOVING:
