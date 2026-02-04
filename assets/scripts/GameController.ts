@@ -81,48 +81,35 @@ export class GameController extends Component {
     }
 
     protected start(): void {
-        console.log('[GameController] start() called');
-        try {
-            GameManager.instance.startGame();
+        GameManager.instance.startGame();
 
-            // 创建初始实体
-            console.log('[GameController] Creating Base...');
-            this._base = BuildingFactory.createBase(this._buildingContainer!, 0, 0, 100);
-            
-            console.log('[GameController] Creating Barracks 1...');
-            const b1 = BuildingFactory.createBarracks(this._buildingContainer!, -2.5, 1);
-            b1.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
-            this._buildings.push(b1);
+        // 创建初始实体
+        this._base = BuildingFactory.createBase(this._buildingContainer!, 0, 0, 100);
+        
+        const b1 = BuildingFactory.createBarracks(this._buildingContainer!, -2.5, 1);
+        b1.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
+        this._buildings.push(b1);
 
-            console.log('[GameController] Creating Barracks 2...');
-            const b2 = BuildingFactory.createBarracks(this._buildingContainer!, 2.5, 1);
-            b2.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
-            this._buildings.push(b2);
+        const b2 = BuildingFactory.createBarracks(this._buildingContainer!, 2.5, 1);
+        b2.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
+        this._buildings.push(b2);
 
-            // Test Tower
-            console.log('[GameController] Creating Test Tower...');
-            const t1 = BuildingFactory.createTower(this._buildingContainer!, 0, 3);
-            this._buildings.push(t1);
+        // Test Tower
+        const t1 = BuildingFactory.createTower(this._buildingContainer!, 0, 3);
+        this._buildings.push(t1);
 
-            console.log('[GameController] Creating Hero...');
-            this._hero = UnitFactory.createHero(this._soldierContainer!, 0, -1.5);
+        this._hero = UnitFactory.createHero(this._soldierContainer!, 0, -1.5);
 
-            // 设置英雄引用给建造管理器
-            BuildingManager.instance.setHeroNode(this._hero);
+        // 设置英雄引用给建造管理器
+        BuildingManager.instance.setHeroNode(this._hero);
 
-            // 创建建造点
-            console.log('[GameController] Creating Building Pads...');
-            this.createBuildingPads();
+        // 创建建造点
+        this.createBuildingPads();
 
-            console.log(`[Game] 💰 初始金币: ${GameManager.instance.coins}`);
+        console.log(`[Game] 💰 初始金币: ${GameManager.instance.coins}`);
 
-            // 开始第一波
-            this.scheduleOnce(() => WaveManager.instance.startWave(1), 2);
-            
-            console.log('[GameController] start() completed successfully');
-        } catch (error) {
-            console.error('[GameController] CRASH in start():', error);
-        }
+        // 开始第一波
+        this.scheduleOnce(() => WaveManager.instance.startWave(1), 2);
     }
 
     protected update(dt: number): void {

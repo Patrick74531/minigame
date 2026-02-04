@@ -1,4 +1,4 @@
-import { _decorator, Node, ParticleSystem, Texture2D, Asset, resources, Material, Color, MeshRenderer, primitives, utils, Vec3, Billboard, Graphics, Tween, tween } from 'cc';
+import { _decorator, Node, ParticleSystem, Texture2D, Asset, resources, Material, Color, MeshRenderer, primitives, utils, Vec3, Billboard, Graphics, Tween, tween, Quat } from 'cc';
 import { VisualEffect } from './VisualEffect';
 
 /**
@@ -190,15 +190,16 @@ export class EffectFactory {
         // Cleanup Graphics attempt
         g.destroy();
         
-        // New Strategy: Cylinder Mesh scaled and rotated
-        this.createLightningSegment(node, new Vec3(0,0,0), localEnd);
+        // Create segments connecting all points
+        for (let i = 0; i < points.length - 1; i++) {
+            this.createLightningSegment(node, points[i], points[i + 1]);
+        }
 
         // Auto destroy
         const effect = node.addComponent(VisualEffect);
-        effect.duration = 0.2; // Flash
+        effect.duration = 0.3; // Slightly longer duration
         
-        // Beams fade out (scale Y/Width down)
-        // tween(node).to(0.2, { scale: new Vec3(0, 0, 0)}).start(); 
+        // No global tween on root, handled in segments or just quick destroy
     }
 
     private static createLightningSegment(parent: Node, start: Vec3, end: Vec3): void {
@@ -206,24 +207,25 @@ export class EffectFactory {
         parent.addChild(seg);
         
         const renderer = seg.addComponent(MeshRenderer);
-        renderer.mesh = utils.MeshUtils.createMesh(primitives.cylinder({ radiusTop: 0.1, radiusBottom: 0.1, height: 1 }));
+        renderer.mesh = utils.MeshUtils.createMesh(primitives.box());
+        
         const material = new Material();
         material.initialize({ effectName: 'builtin-unlit' });
-        material.setProperty('mainColor', new Color(180, 80, 255, 255));
+        // Brighter Purple
+        material.setProperty('mainColor', new Color(200, 100, 255, 255));
         
-        // Additive
-        material.passes[0].blendState.targets[0].blend = true;
-        material.passes[0].blendState.targets[0].blendSrc = 2;
-        material.passes[0].blendState.targets[0].blendDst = 1;
-        
+        // Optimize: Use cached material if possible, but for now new is fine
+        if (material.passes && material.passes.length > 0) {
+            const pass = material.passes[0];
+            const target = pass.blendState.targets[0];
+            target.blend = true;
+            target.blendSrc = 2; // SRC_ALPHA
+            target.blendDst = 1; // ONE
+        }
         renderer.material = material;
         
-        // Transform
-        // Cylinder default is Y-up. We need to rotate it to point from Start to End.
-        
-        const dir = new Vec3();
-        Vec3.subtract(dir, end, start);
-        const length = dir.length();
+        // Geometric Maths to align Box Z-axis from Start to End
+        const length = Vec3.distance(start, end);
         
         // Position: Midpoint
         const mid = new Vec3();
@@ -231,26 +233,62 @@ export class EffectFactory {
         mid.multiplyScalar(0.5);
         seg.setPosition(mid);
         
-        // Scale: Y = length
-        seg.setScale(0.5, length, 0.5);
+        // Scale: Thin box, length equal to distance
+        // Box is 1x1x1. We scale Z to length.
+        seg.setScale(0.15, 0.15, length); // Thicker (0.15) for visibility
         
-        // Rotation: LookAt (Trickier with Y-up cylinder)
-        // Cocos properties are Z-forward. 
-        // We want the Cylinder's Y-axis to align with 'dir'.
+        // Rotation: lookAt
+        // We want the box's Z axis (FORWARD) to point to 'end' from 'start'.
+        // But lookAt rotates the node's FORWARD (-Z usually in Cocos) to target.
+        // If we want +Z to point to target, we might need adjustments or lookAt(target) then rotate?
+        // Let's rely on standard lookAt and scale Z. 
+        // Note: Cocos lookAt usually points -Z to target. So if we scale Z, it might be backwards? 
+        // Box is symmetric so backwards is fine.
         
-        // Simple hack: Look at the Target. 3D rotates Z to target.
-        // We'll rotate the node so Z points to target, then rotate mesh 90 deg?
-        // Or just use LookAt and know the Cylinder is wrong way?
+        // Convert 'end' to local space of 'parent' (which is 'node', at startPos WORLD)
+        // Wait, 'start' and 'end' passed here ARE in 'parent's local space (relative to startPos).
+        // BUT lookAt takes a WORLD TARGET usually? No, Node.lookAt takes world position in 3.x.
+        // We need the world position of 'end' to use lookAt correctly?
+        // Actually, parent is at World Start. 'start' arg is roughly 0,0,0 (or previous point). 'end' is next point.
+        // seg.setPosition(mid) puts it at local mid.
+        // To rotate correctly, we need vector direction.
         
-        // Better: Use a thin Box instead of Cylinder, scaled along Z.
-        // Box default is 1x1x1.
-        renderer.mesh = utils.MeshUtils.createMesh(primitives.box());
-        seg.lookAt(end); // Z-axis points to end.
-        seg.setScale(0.1, 0.1, length); // Scale Z to length
+        // Manual Quat is safer than lookAt with hierarchy mixups
+        // Direction: end - start
         
-        // Tween width out
+        // Workaround: Use lookAt with a temporary world pos calculation?
+        // Or just compute Quat. fromViewUp?
+        
+        // Simple approach:
+        // seg position is local.
+        // We want to look at 'end' in local space? No API for local lookAt easily.
+        // Let's use Quat.fromViewUp
+        
+        // Direction vector
+        const dir = new Vec3();
+        Vec3.subtract(dir, end, start);
+        dir.normalize();
+        
+        if (dir.lengthSqr() > 0.001) {
+             const qt = new Quat();
+             // Rotate Z (0,0,1) to align with dir
+             Quat.fromViewUp(qt, dir.normalize(), Vec3.UP); 
+             // fromViewUp creates rotation looking in 'dir'. 
+             // Default forward is -Z. We want +Z to be length? Or -Z?
+             // Box is symmetric.
+             seg.setRotation(qt);
+        }
+
+        // Tween Fade Out
+        tween(renderer.material)
+             // .to(0.3, { property: ... }) - accessing color property needs specific API or pass
+             // changing opacity on unlit color:
+             .call(() => {}) // Placeholder
+             .start();
+
+        // Scale down width over time
         tween(seg)
-            .to(0.2, { scale: new Vec3(0, 0, length) })
+            .to(0.25, { scale: new Vec3(0, 0, length) })
             .start();
     }
 }
