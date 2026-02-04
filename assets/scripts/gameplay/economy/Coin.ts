@@ -4,7 +4,7 @@ import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { IPoolable } from '../../core/managers/PoolManager';
 import { Action, tween, Tween } from 'cc'; // Removed unused imports or keep if needed, but adding GameManager
-import { GameManager } from '../../core/managers/GameManager';
+// import { GameManager } from '../../core/managers/GameManager';
 import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass, property } = _decorator;
@@ -33,25 +33,34 @@ export class Coin extends BaseComponent implements IPoolable {
         // Cleanup if needed
     }
 
+    // Static reference to avoid circular dependency with GameManager
+    public static HeroNode: Node | null = null;
+    
+    // ...
+
     protected start(): void {
         this._initialPos.set(this.node.position);
         this.startY = this.node.position.y;
+
+        // Ensure collider is Trigger
+        const col = this.getComponent(BoxCollider);
+        if (col) col.isTrigger = true;
     }
 
     protected update(dt: number): void {
         if (this._isCollecting) return;
 
         // Magnet Logic
-        const hero = GameManager.instance.hero;
+        const hero = Coin.HeroNode;
         let isAttracted = false;
 
-        if (hero) {
+        if (hero && hero.isValid) {
             // Using world position for accurate distance regardless of hierarchy
             const heroPos = hero.worldPosition;
             const myPos = this.node.worldPosition;
             const dist = Vec3.distance(heroPos, myPos);
 
-            if (dist < 1.5) { // Magnet Radius (Reduced from 5.0)
+            if (dist < 2.5) { // Magnet Radius
                 isAttracted = true;
                 
                 // Move towards hero
@@ -80,34 +89,12 @@ export class Coin extends BaseComponent implements IPoolable {
             }
 
             // Floating Animation
-            // y = startY + sin(t)
             const floatY = Math.sin(this._lifetime * 5) * 0.1;
             this.node.setPosition(this.node.position.x, this.startY + floatY, this.node.position.z);
         }
     }
 
-    // === IPoolable ===
-
-    public onSpawn(): void {
-        this.initialize();
-        this.node.active = true;
-        // Reset position logic handled in Factory or start()
-        this._initialPos.set(this.node.position);
-        this.startY = this.node.position.y;
-    }
-
-    public onDespawn(): void {
-        this._isCollecting = false;
-    }
-
-    // === 逻辑 ===
-
-    /**
-     * 自动回收（超时）
-     */
-    private autoCollect(): void {
-        this.collect(true);
-    }
+    // ...
 
     /**
      * 被英雄拾取
@@ -120,8 +107,9 @@ export class Coin extends BaseComponent implements IPoolable {
         const rb = this.getComponent(BoxCollider);
         if (rb) rb.enabled = false;
         
-        // Ensure lifecycle callbacks are stopped
+        // Stop all animations/tweens
         this.unscheduleAllCallbacks();
+        Tween.stopAllByTarget(this.node);
     }
 
     /**
