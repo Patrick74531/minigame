@@ -1,4 +1,4 @@
-import { _decorator, Vec2, Vec3, Node, Component, RigidBody, CapsuleCollider, ITriggerEvent, PhysicsSystem } from 'cc';
+import { _decorator, Vec2, Vec3, Node, Component, RigidBody, CapsuleCollider, ITriggerEvent, PhysicsSystem, geometry } from 'cc';
 import { Unit, UnitType, UnitState } from './Unit';
 import { GameManager } from '../../core/managers/GameManager';
 import { WaveManager } from '../../core/managers/WaveManager';
@@ -229,26 +229,76 @@ export class Hero extends Unit {
             return;
         }
 
-        // Restore direct position control
-        // Note: speed in GameConfig is low (e.g. 6.0), so * dt makes sense for movement per frame
         const speed = this._stats.moveSpeed;
         
-        // Joystick Up (Y=1) should be World Forward (-Z)
+        // Desired movement in World Space
+        // Joystick Up (Y=1) is World Forward (-Z)
         const dx = this._inputVector.x * speed * dt;
         const dz = -this._inputVector.y * speed * dt;
 
-        const currentPos = this.node.position;
-        // Directly set position (Kinematic style)
-        // Note: This bypasses physics collision blocking unless we use sweep, 
-        // but it restores the "moving" ability for sure.
-        this.node.setPosition(currentPos.x + dx, currentPos.y, currentPos.z + dz);
+        const currentPos = this.node.position.clone();
+        const targetPos = new Vec3(currentPos.x + dx, currentPos.y, currentPos.z + dz);
+        
+        // Basic movement direction for sweep
+        const moveVec = new Vec3(dx, 0, dz);
+        const moveDist = moveVec.length();
+
+        if (moveDist < 0.001) return;
+
+        // Perform Sweep Test
+        // limit Y to avoid floor sticking if we are slightly inside
+        const col = this.node.getComponent(CapsuleCollider);
+        const radius = col ? col.radius : 0.3;
+        const centerY = col ? col.center.y : 0.75;
+
+        // Origin should be the center of the capsule for the sphere sweep
+        const sweepOrigin = new Vec3(currentPos.x, currentPos.y + centerY, currentPos.z);
+        
+        // Ray for sweep
+        const ray = new geometry.Ray();
+        Vec3.copy(ray.o, sweepOrigin);
+        Vec3.normalize(ray.d, moveVec);
+
+        // Sweep
+        // mask: default (0xffffffff) or specific group?
+        // Let's use default for now, can refine if we hit triggers
+        const mask = 0xffffffff; 
+        const maxDist = moveDist + 0.1; // Check slightly further
+
+        let finalX = targetPos.x;
+        let finalZ = targetPos.z;
+
+        if (PhysicsSystem.instance.sweepSphereClosest(ray, radius, mask, maxDist, false)) {
+            const result = PhysicsSystem.instance.sweepSphereClosestResult;
+            
+            // If we hit something (Physical Obstacle, since queryTrigger is false)
+            if (result.collider) {
+                // Determine if it's a wall or floor
+                // Floor normal is usually (0, 1, 0)
+                if (Math.abs(result.hitNormal.y) < 0.5) {
+                    // It's a wall/obstacle (normal is mostly horizontal)
+                    
+                    // Simple slide: Remove velocity component along normal
+                    // V_new = V - (V . N) * N
+                    const dot = Vec3.dot(moveVec, result.hitNormal);
+                    const slideVec = moveVec.clone().subtract(result.hitNormal.clone().multiplyScalar(dot));
+                    
+                    // Apply slide
+                    finalX = currentPos.x + slideVec.x;
+                    finalZ = currentPos.z + slideVec.z;
+                }
+            }
+        }
+
+        // Apply Position
+        this.node.setPosition(finalX, currentPos.y, finalZ); // Keep Y strictly constant
 
         // Face movement
         if (moveLen > 0.1) {
              const lookTarget = new Vec3(
-                 currentPos.x + dx, 
+                 finalX + dx, // Look at "desired" direction slightly better feel
                  currentPos.y, 
-                 currentPos.z + dz 
+                 finalZ + dz 
              );
              this.node.lookAt(lookTarget);
         }

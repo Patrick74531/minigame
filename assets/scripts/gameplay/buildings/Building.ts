@@ -1,4 +1,4 @@
-import { _decorator, Vec2, Node } from 'cc';
+import { _decorator, Vec2, Node, RigidBody, BoxCollider, Vec3 } from 'cc';
 import { UnitFactory } from '../units/UnitFactory';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { EventManager } from '../../core/managers/EventManager';
@@ -74,8 +74,31 @@ export class Building extends BaseComponent {
         this._activeUnits = 0;
         this._spawnTimer = 0;
 
-        // 注册单位死亡事件
+        // Register Unit Died Event
         EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
+        
+        // Setup Physics (Obstacle)
+        this.setupPhysics();
+    }
+
+    private setupPhysics(): void {
+        let rb = this.node.getComponent(RigidBody);
+        if (!rb) {
+            rb = this.node.addComponent(RigidBody);
+            rb.type = RigidBody.Type.STATIC;
+        }
+
+        let col = this.node.getComponent(BoxCollider);
+        if (!col) {
+            col = this.node.addComponent(BoxCollider);
+        }
+        col.isTrigger = false; // Physical Obstacle
+        col.size = new Vec3(1, 2, 1); // Standard Building Size (Approx)
+        col.center = new Vec3(0, 1, 0);
+        
+        // Ensure it blocks Hero
+        col.setGroup(1 << 0); // DEFAULT (Walls etc)
+        col.setMask(0xffffffff);
     }
 
     protected cleanup(): void {
