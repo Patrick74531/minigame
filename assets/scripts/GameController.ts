@@ -74,7 +74,12 @@ export class GameController extends Component {
 
         // 初始化 Managers
         GameManager.instance.initialize();
-        WaveManager.instance.initialize(this._enemyContainer!);
+        // WaveManager initialized in Start() when Base is ready, 
+        // OR pass null/placeholder here first if needed.
+        // Let's comment out here and do full init in start, OR split init.
+        // Ideally: Set container in onLoad, Set Base in Start.
+        // For now, let's keep it robust.
+        // WaveManager.instance.initialize(this._enemyContainer!); // Removed, moved to start
         HUDManager.instance.initialize(this._uiCanvas!);
         BuildingManager.instance.initialize(this._buildingContainer!, this._soldierContainer!);
 
@@ -100,21 +105,21 @@ export class GameController extends Component {
         }
 
         // 创建初始实体
-        this._base = BuildingFactory.createBase(this._buildingContainer!, 0, 0, 100);
-        
-        // Restore initial buildings for testing
-        // const b1 = BuildingFactory.createBarracks(this._buildingContainer!, -3, 3);
-        // b1.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
-        // this._buildings.push(b1);
-        
-        // const t1 = BuildingFactory.createTower(this._buildingContainer!, 3, 3);
-        // this._buildings.push(t1);
+        // 创建初始实体
+        // Spawn at Top-Left Area (Index 5,5 corresponds to roughly -9 in World space)
+        const spawnX = -9;
+        const spawnZ = -9;
 
-        // Spawn Hero at (1, 1) which matches the MapGenerator center (safe zone)
-        // Previous (0, -2) was between tiles and caused physics ejection
-        // Spawn Hero at (1, 1) which matches the MapGenerator center (safe zone)
-        // Previous (0, -2) was between tiles and caused physics ejection
-        this._hero = UnitFactory.createHero(this._soldierContainer!, 1, 1);
+        this._base = BuildingFactory.createBase(this._buildingContainer!, spawnX, spawnZ, 100);
+        
+        // Spawn Hero slightly offset from base
+        this._hero = UnitFactory.createHero(this._soldierContainer!, spawnX + 2, spawnZ + 2);
+
+        // Initialize WaveManager with Base
+        // Note: We initialized WaveManager in onLoad without base. 
+        // We should explicitly set it or re-initialize logic.
+        // Let's call a setter or re-init if allowed. Or just set it here.
+        WaveManager.instance.initialize(this._enemyContainer!, this._base);
 
         // Setup Camera Follow
         const mainCamera = this.node.scene.getComponentInChildren(Camera);
@@ -122,12 +127,12 @@ export class GameController extends Component {
             let follow = mainCamera.node.getComponent(CameraFollow);
             if (!follow) {
                 follow = mainCamera.node.addComponent(CameraFollow);
-                // Set default offset based on current view relative to (1, 1) or just hardcode a good one
-                // Current camera likely at specific pos.
-                // Let's rely on CameraFollow default (0, 10, 10) or set one that matches current look
-                follow.offset = new Vec3(0, 10, 8); // Closer view (Zoomed continuously)
+                // Adjust offset for isometric view
+                follow.offset = new Vec3(0, 10, 8); 
             }
             follow.target = this._hero;
+            // Force snap to new start position immediately
+            follow.snap(); 
         } else {
             console.warn('[GameController] Main Camera not found!');
         }
@@ -253,12 +258,16 @@ export class GameController extends Component {
     // === 建造系统 ===
 
     private createBuildingPads(): void {
-        // 创建几个建造点
+        // Spawn Base Position Reference (Top-Left Area)
+        const bx = -9; 
+        const by = -9;
+
+        // 创建几个建造点 (Relative to Base)
         const padPositions = [
-            { x: -4, y: 3, type: 'barracks' },
-            { x: 4, y: 3, type: 'lightning_tower' }, // Changed from barracks to test lightning
-            { x: -4, y: -3, type: 'frost_tower' },
-            { x: 4, y: -3, type: 'tower' },
+            { x: bx - 4, y: by + 3, type: 'barracks' },
+            { x: bx + 4, y: by + 3, type: 'lightning_tower' }, 
+            { x: bx - 4, y: by - 3, type: 'frost_tower' },
+            { x: bx + 4, y: by - 3, type: 'tower' },
         ];
 
         for (const pos of padPositions) {

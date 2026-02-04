@@ -37,9 +37,9 @@ export class BuildingFactory {
     /**
      * 创建基地
      */
-    public static createBase(parent: Node, x: number, y: number, hp: number = 100): Node {
+    public static createBase(parent: Node, x: number, z: number, hp: number = 100): Node {
         const node = this.createCubeNode('Base', new Color(150, 100, 200, 255));
-        node.setPosition(x, y, 0);
+        node.setPosition(x, 0, z); // Fix: use Z for depth, Y=0 for floor
         node.setScale(0.8, 0.8, 0.8);
         parent.addChild(node);
 

@@ -19,6 +19,7 @@ export class UnitFactory {
         parent: Node,
         x: number,
         z: number,
+        targetPos: Vec3,
         waveMultiplier: number = 1
     ): Node {
         const node = this.createCubeNode('Enemy', new Color(220, 60, 60, 255));
@@ -50,6 +51,9 @@ export class UnitFactory {
             attackInterval: GameConfig.ENEMY.ATTACK_INTERVAL,
             moveSpeed: GameConfig.ENEMY.MOVE_SPEED * (1 + (waveMultiplier - 1) * 0.1),
         });
+        
+        // Set Target
+        enemy.setTarget(targetPos);
 
         return node;
     }

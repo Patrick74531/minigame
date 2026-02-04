@@ -37,45 +37,50 @@ export class Enemy extends Unit {
         this._state = UnitState.MOVING;
     }
 
+    // Target position (Base)
+    private _targetPos: Vec3 = new Vec3(0, 0, 0);
+
+    public setTarget(target: Vec3): void {
+        this._targetPos.set(target);
+    }
+
     protected updateMovement(dt: number): void {
         if (!this.isAlive) return;
 
         const pos = this.node.position;
-        // 3D: Distance to base (0,0,0) on XZ plane
-        const distToBase = Math.sqrt(pos.x * pos.x + pos.z * pos.z);
+        // 3D: Distance to target on XZ plane
+        const dx = this._targetPos.x - pos.x;
+        const dz = this._targetPos.z - pos.z;
+        const distToTarget = Math.sqrt(dx * dx + dz * dz);
 
         // 检查是否到达基地
-        if (distToBase < this.ARRIVAL_DISTANCE) {
+        if (distToTarget < this.ARRIVAL_DISTANCE) {
             this.onReachBase();
             return;
         }
 
-        // 向原点（基地）移动
-        const speed = this.moveSpeed; // Config speed matches physics units/sec now
+        // 向目标移动
+        const speed = this.moveSpeed; 
         
-        const dirX = -pos.x / distToBase;
-        const dirZ = -pos.z / distToBase;
+        const dirX = dx / distToTarget;
+        const dirZ = dz / distToTarget;
 
-        const rb = this.node.getComponent('cc.RigidBody') as any; // Type casting or use logic
-        // Use RigidBody directly if imported, else try generic
-        // To be safe let's assume getComponent(RigidBody)
-        // Since I can't guarantee import of RigidBody here without adding it, let's assume it's available or add import logic if needed. 
-        // But to keep it simple and safe:
+        const rb = this.node.getComponent('cc.RigidBody') as any; 
         
         // Use the component if available
         if (this.node.getComponent('cc.RigidBody')) {
              (this.node.getComponent('cc.RigidBody') as any).setLinearVelocity(new Vec3(dirX * speed, 0, dirZ * speed));
         } else {
-            // Fallback (shouldn't happen with factory update)
+            // Fallback
              this.node.setPosition(
-                pos.x + dirX * speed * dt, // If no physics, manual but might fail collisions
-                0.5, // keep height
+                pos.x + dirX * speed * dt, 
+                0.5, 
                 pos.z + dirZ * speed * dt
             );
         }
         
-        // Face base
-        this.node.lookAt(new Vec3(0, 0, 0));
+        // Face target
+        this.node.lookAt(new Vec3(this._targetPos.x, 0.5, this._targetPos.z));
     }
 
     /**

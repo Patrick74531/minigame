@@ -41,8 +41,10 @@ export class WaveManager {
 
     // === 初始化 ===
 
-    public initialize(enemyContainer: Node): void {
+    private _baseNode: Node | null = null;
+    public initialize(enemyContainer: Node, baseNode: Node): void {
         this._enemyContainer = enemyContainer;
+        this._baseNode = baseNode;
         this._enemies = [];
         this._currentWave = 0;
         
@@ -190,6 +192,7 @@ export class WaveManager {
             this._enemyContainer,
             pos.x,
             pos.y,
+            this._baseNode ? this._baseNode.position : new Vec3(0, 0, 0), // Base Position
             this._waveConfig?.hpMultiplier || 1
         );
         this._enemies.push(enemy);
