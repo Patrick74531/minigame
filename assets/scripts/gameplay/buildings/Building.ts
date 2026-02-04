@@ -1,5 +1,4 @@
 import { _decorator, Vec2, Node, RigidBody, BoxCollider, Vec3 } from 'cc';
-import { UnitFactory } from '../units/UnitFactory';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameManager } from '../../core/managers/GameManager';
@@ -7,6 +6,7 @@ import { PoolManager } from '../../core/managers/PoolManager';
 import { GameEvents } from '../../data/GameEvents';
 import { GameConfig } from '../../data/GameConfig';
 import { HealthBar } from '../../ui/HealthBar';
+import { IAttackable } from '../../core/interfaces/IAttackable';
 
 const { ccclass, property } = _decorator;
 
@@ -15,6 +15,7 @@ export enum BuildingType {
     BARRACKS = 'barracks', // 兵营
     TOWER = 'tower', // 防御塔（后续扩展）
     WALL = 'wall', // 墙
+    BASE = 'base', // 基地
 }
 
 /** 建筑配置 */
@@ -32,7 +33,7 @@ export interface BuildingConfig {
  * 可放置在地图上，定期产生士兵
  */
 @ccclass('Building')
-export class Building extends BaseComponent {
+export class Building extends BaseComponent implements IAttackable {
     @property
     public buildingType: BuildingType = BuildingType.BARRACKS;
 
@@ -182,12 +183,9 @@ export class Building extends BaseComponent {
         const spawnOffsetZ = 1.0;
 
         if (!soldier) {
-            // Fallback to factory if pool empty/missing
-            soldier = UnitFactory.createSoldier(
-                this._unitContainer,
-                this.node.position.x + spawnOffsetX,
-                this.node.position.z + spawnOffsetZ
-            );
+            console.warn(`[Building] Failed to spawn soldier from pool: ${this.soldierPoolName}`);
+            // Fallback removed to avoid circular dependency (Building -> UnitFactory -> Enemy -> Building)
+            return;
         } else {
             soldier.setPosition(
                 this.node.position.x + spawnOffsetX,
@@ -208,11 +206,15 @@ export class Building extends BaseComponent {
 
     // === 伤害处理 ===
 
+    public getWorldPosition(): Vec3 {
+        return this.node.worldPosition;
+    }
+
     /**
      * 受到伤害
      * @param damage 伤害值
      */
-    public takeDamage(damage: number): void {
+    public takeDamage(damage: number, _attacker?: any): void {
         if (!this.isAlive) return;
 
         this.currentHp = Math.max(0, this.currentHp - damage);

@@ -3,6 +3,8 @@ import { BaseComponent } from '../../core/base/BaseComponent';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { IPoolable } from '../../core/managers/PoolManager';
+import { IAttackable } from '../../core/interfaces/IAttackable';
+import { Vec3 } from 'cc';
 
 const { ccclass, property } = _decorator;
 
@@ -36,7 +38,7 @@ export interface UnitStats {
  * 所有战斗单位（士兵、敌人、英雄）的基类
  */
 @ccclass('Unit')
-export class Unit extends BaseComponent implements IPoolable {
+export class Unit extends BaseComponent implements IPoolable, IAttackable {
     @property
     public unitType: UnitType = UnitType.SOLDIER;
 
@@ -50,7 +52,7 @@ export class Unit extends BaseComponent implements IPoolable {
     };
 
     protected _state: UnitState = UnitState.IDLE;
-    protected _target: Unit | null = null;
+    protected _target: IAttackable | null = null;
     protected _attackTimer: number = 0;
 
     // === 访问器 ===
@@ -75,8 +77,14 @@ export class Unit extends BaseComponent implements IPoolable {
         return this._stats.currentHp > 0 && this._state !== UnitState.DEAD;
     }
 
-    public get target(): Unit | null {
+    public get target(): IAttackable | null {
         return this._target;
+    }
+
+    // === IAttackable Implementation ===
+    
+    public getWorldPosition(): Vec3 {
+        return this.node.worldPosition;
     }
 
     // === 生命周期 ===
@@ -115,7 +123,7 @@ export class Unit extends BaseComponent implements IPoolable {
      * 设置目标
      * @param target 目标单位
      */
-    public setTarget(target: Unit | null): void {
+    public setTarget(target: IAttackable | null): void {
         this._target = target;
     }
 
@@ -124,7 +132,7 @@ export class Unit extends BaseComponent implements IPoolable {
      * @param damage 伤害值
      * @param attacker 攻击者
      */
-    public takeDamage(damage: number, _attacker?: Unit): void {
+    public takeDamage(damage: number, _attacker?: any): void {
         if (!this.isAlive) return;
 
         this._stats.currentHp = Math.max(0, this._stats.currentHp - damage);

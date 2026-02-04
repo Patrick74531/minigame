@@ -3,6 +3,7 @@ import { Building, BuildingType } from './Building';
 import { Tower } from './Tower';
 import { GameConfig } from '../../data/GameConfig';
 import { BuildingRegistry } from './BuildingRegistry';
+import { Base } from './Base';
 
 /**
  * 建筑工厂
@@ -37,17 +38,19 @@ export class BuildingFactory {
     /**
      * 创建基地
      */
-    public static createBase(parent: Node, x: number, z: number, hp: number = 100): Node {
+    public static createBase(parent: Node, x: number, z: number, hp: number = 500): Node {
         const node = this.createCubeNode('Base', new Color(150, 100, 200, 255));
-        node.setPosition(x, 0, z); // Fix: use Z for depth, Y=0 for floor
+        node.setPosition(x, 0, z);
         node.setScale(0.8, 0.8, 0.8);
         parent.addChild(node);
 
-        // 存储基地数据
-        (node as any).baseData = {
+        const base = node.addComponent(Base);
+        base.setConfig({
+            type: BuildingType.BASE,
             hp: hp,
-            maxHp: hp,
-        };
+            spawnInterval: 0,
+            maxUnits: 0,
+        });
 
         return node;
     }

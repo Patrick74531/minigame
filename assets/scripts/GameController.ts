@@ -21,6 +21,7 @@ import { UnitFactory } from './gameplay/units/UnitFactory';
 import { UnitType } from './gameplay/units/Unit';
 import { BuildingFactory } from './gameplay/buildings/BuildingFactory';
 import { Building } from './gameplay/buildings/Building';
+import { Base } from './gameplay/buildings/Base';
 import { CoinFactory } from './gameplay/economy/CoinFactory';
 import { GameConfig } from './data/GameConfig';
 import { Unit } from './gameplay/units/Unit';
@@ -332,21 +333,12 @@ export class GameController extends Component {
 
     // === 基地伤害 ===
 
-    // === 基地伤害 ===
-
     private damageBase(damage: number): void {
         if (!this._base) return;
 
-        const data = (this._base as any).baseData;
-        if (!data) return;
-
-        data.hp -= damage;
-        // Update HUD
-        HUDManager.instance.updateBaseHp(data.hp, data.maxHp);
-
-        if (data.hp <= 0) {
-            HUDManager.instance.updateBaseHp(0, data.maxHp);
-            GameManager.instance.pauseGame();
+        const baseComp = this._base.getComponent(Base);
+        if (baseComp && baseComp.isAlive) {
+            baseComp.takeDamage(damage);
         }
     }
 
