@@ -9,6 +9,7 @@ import { Unit } from '../../gameplay/units/Unit';
  *
  * NOTE: 当前项目内还有 gameplay/combat/CombatSystem。
  * 若新增战斗逻辑，请优先统一到一个系统，避免双实现分叉。
+ * 建议通过 CombatService 获取当前实现。
  */
 export class CombatManager {
     private static _instance: CombatManager | null = null;

@@ -32,6 +32,9 @@ import { BuildingManager } from './gameplay/buildings/BuildingManager';
 import { BuildingPad } from './gameplay/buildings/BuildingPad';
 import { EffectManager } from './core/managers/EffectManager';
 import { MapGenerator } from './gameplay/map/MapGenerator';
+import { ServiceRegistry } from './core/managers/ServiceRegistry';
+import { PoolManager } from './core/managers/PoolManager';
+import { WaveService } from './core/managers/WaveService';
 
 const { ccclass, property } = _decorator;
 
@@ -100,13 +103,26 @@ export class GameController extends Component {
 
         // 启用物理系统
         PhysicsSystem.instance.enable = true;
+
+        // Register core services for decoupled access
+        // NOTE: Use ServiceRegistry.get(...) for new code to reduce hard dependencies.
+        ServiceRegistry.register('EventManager', EventManager.instance);
+        ServiceRegistry.register('GameManager', GameManager.instance);
+        ServiceRegistry.register('HUDManager', HUDManager.instance);
+        ServiceRegistry.register('BuildingManager', BuildingManager.instance);
+        ServiceRegistry.register('EffectManager', EffectManager.instance);
+        ServiceRegistry.register('WaveManager', WaveManager.instance);
+        ServiceRegistry.register('WaveService', WaveService.instance);
+        ServiceRegistry.register('PoolManager', PoolManager.instance);
     }
 
     protected onDestroy(): void {
         EventManager.instance.offAllByTarget(this);
+        GameManager.instance.cleanup();
         WaveManager.instance.cleanup();
         HUDManager.instance.cleanup();
         BuildingManager.instance.cleanup();
+        EffectManager.instance.cleanup();
     }
 
     protected start(): void {
@@ -122,13 +138,17 @@ export class GameController extends Component {
         // 创建初始实体
         // 创建初始实体
         // Spawn at Top-Left Area (Index 5,5 corresponds to roughly -9 in World space)
-        const spawnX = -9;
-        const spawnZ = -9;
+        const spawnX = GameConfig.MAP.BASE_SPAWN.x;
+        const spawnZ = GameConfig.MAP.BASE_SPAWN.z;
 
         this._base = BuildingFactory.createBase(this._buildingContainer!, spawnX, spawnZ, 100);
 
         // Spawn Hero slightly offset from base
-        this._hero = UnitFactory.createHero(this._soldierContainer!, spawnX + 2, spawnZ + 2);
+        this._hero = UnitFactory.createHero(
+            this._soldierContainer!,
+            spawnX + GameConfig.MAP.HERO_SPAWN_OFFSET.x,
+            spawnZ + GameConfig.MAP.HERO_SPAWN_OFFSET.z
+        );
 
         // Initialize WaveManager with Base
         // Note: We initialized WaveManager in onLoad without base.
@@ -275,37 +295,24 @@ export class GameController extends Component {
     // === 建造系统 ===
 
     private createBuildingPads(): void {
-        // Spawn Base Position Reference (Top-Left Area)
-        const bx = -9;
-        const by = -9;
-
-        // 创建几个建造点 (Relative to Base)
-        const padPositions = [
-            { x: bx - 4, y: by + 3, type: 'barracks' },
-            { x: bx + 4, y: by + 3, type: 'lightning_tower' },
-            { x: bx - 4, y: by - 3, type: 'frost_tower' },
-            { x: bx + 4, y: by - 3, type: 'tower' },
-            // Add Walls around base or in front
-            { x: bx, y: by + 6, type: 'wall' },
-            { x: bx - 2, y: by + 6, type: 'wall' },
-            { x: bx + 2, y: by + 6, type: 'wall' },
-        ];
+        // 建造点配置集中在 GameConfig，避免硬编码
+        const padPositions = GameConfig.BUILDING.PADS;
 
         for (const pos of padPositions) {
             // TEST: Pre-spawn Frost Tower or Lightning Tower
             if (pos.type === 'frost_tower' || pos.type === 'lightning_tower') {
-                BuildingFactory.createBuilding(this._buildingContainer!, pos.x, pos.y, pos.type);
-                console.log(`[GameController] Pre-spawned ${pos.type} at (${pos.x}, 0, ${pos.y})`);
+                BuildingFactory.createBuilding(this._buildingContainer!, pos.x, pos.z, pos.type);
+                console.log(`[GameController] Pre-spawned ${pos.type} at (${pos.x}, 0, ${pos.z})`);
                 continue; // Skip creating pad
             }
 
             const padNode = new Node(`BuildingPad_${pos.type}`);
             this._buildingContainer!.addChild(padNode);
             // Map y in config to z in world space for top-down view
-            padNode.setPosition(pos.x, 0, pos.y);
+            padNode.setPosition(pos.x, 0, pos.z);
 
             console.log(
-                `[GameController] 创建建造点: type=${pos.type}, pos=(${pos.x}, 0, ${pos.y})`
+                `[GameController] 创建建造点: type=${pos.type}, pos=(${pos.x}, 0, ${pos.z})`
             );
 
             const pad = padNode.addComponent(BuildingPad);

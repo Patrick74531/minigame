@@ -32,9 +32,9 @@ export const GameEvents = {
     ENEMY_REACHED_BASE: 'ENEMY_REACHED_BASE',
 
     // === 波次系统 ===
-    /** 波次开始 { waveIndex: number, enemyCount: number } */
+    /** 波次开始 { wave?: number, waveIndex?: number, enemyCount?: number } */
     WAVE_START: 'WAVE_START',
-    /** 波次完成 { waveIndex: number } */
+    /** 波次完成 { wave?: number, waveIndex?: number, bonus?: number } */
     WAVE_COMPLETE: 'WAVE_COMPLETE',
     /** 所有波次完成 */
     ALL_WAVES_COMPLETE: 'ALL_WAVES_COMPLETE',

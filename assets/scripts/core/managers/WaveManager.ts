@@ -3,6 +3,8 @@ import { EventManager } from './EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { UnitFactory } from '../../gameplay/units/UnitFactory';
 import { Unit } from '../../gameplay/units/Unit';
+import { WaveService } from './WaveService';
+import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass } = _decorator;
 
@@ -54,6 +56,14 @@ export class WaveManager {
 
         // Listen for AOE impacts
         EventManager.instance.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
+        WaveService.instance.registerProvider({
+            id: 'core',
+            priority: 0,
+            getSnapshot: () => ({
+                currentWave: this._currentWave,
+                enemiesAlive: this._enemies.length,
+            }),
+        });
 
         console.log('[WaveManager] 初始化完成 (Infinite Mode)');
     }
@@ -115,13 +125,17 @@ export class WaveManager {
         this._enemySpawnTimer = 0;
 
         // Roguelike Scaling Logic
-        const count = 5 + waveNumber * 2;
-        const hpMult = 1 + (waveNumber - 1) * 0.5;
+        const infinite = GameConfig.WAVE.INFINITE;
+        const count = infinite.BASE_COUNT + waveNumber * infinite.COUNT_PER_WAVE;
+        const hpMult = infinite.BASE_HP_MULT + (waveNumber - 1) * infinite.HP_MULT_PER_WAVE;
 
         this._waveConfig = {
             waveNumber,
             enemyCount: count,
-            spawnInterval: Math.max(0.2, 0.8 - waveNumber * 0.05),
+            spawnInterval: Math.max(
+                infinite.MIN_SPAWN_INTERVAL,
+                infinite.BASE_SPAWN_INTERVAL - waveNumber * infinite.SPAWN_INTERVAL_DECAY_PER_WAVE
+            ),
             hpMultiplier: hpMult,
         };
 
@@ -129,7 +143,11 @@ export class WaveManager {
         console.log(`🌊 第 ${waveNumber} 波! 敌人: ${this._waveConfig.enemyCount}`);
         console.log('═══════════════════════════════════════');
 
-        EventManager.instance.emit(GameEvents.WAVE_START, { wave: waveNumber });
+        EventManager.instance.emit(GameEvents.WAVE_START, {
+            wave: waveNumber,
+            waveIndex: waveNumber - 1,
+            enemyCount: this._waveConfig.enemyCount,
+        });
     }
 
     /**
@@ -159,11 +177,12 @@ export class WaveManager {
     public checkWaveComplete(onComplete: (bonus: number) => void): void {
         if (this._waveActive || this._enemies.length > 0 || !this._waveConfig) return;
 
-        const bonus = this._currentWave * 25;
+        const bonus = this._currentWave * GameConfig.WAVE.INFINITE.BONUS_PER_WAVE;
         console.log(`✅ 第 ${this._currentWave} 波完成! +${bonus} 金币`);
 
         EventManager.instance.emit(GameEvents.WAVE_COMPLETE, {
             wave: this._currentWave,
+            waveIndex: this._currentWave - 1,
             bonus,
         });
 
@@ -224,6 +243,7 @@ export class WaveManager {
      */
     public cleanup(): void {
         EventManager.instance.off(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
+        WaveService.instance.unregisterProvider('core');
         this._enemies = [];
         this._waveConfig = null;
         this._waveActive = false;

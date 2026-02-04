@@ -5,6 +5,7 @@ import { PoolManager } from '../../core/managers/PoolManager';
 import { GameEvents } from '../../data/GameEvents';
 import { GameConfig } from '../../data/GameConfig';
 import { Enemy } from '../units/Enemy';
+import { WaveService } from '../../core/managers/WaveService';
 
 /** 波次配置 */
 export interface WaveConfig {
@@ -85,6 +86,16 @@ export class WaveManager extends Singleton<WaveManager>() {
 
         // 注册事件
         EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
+        WaveService.instance.registerProvider({
+            id: 'gameplay',
+            priority: 10,
+            isReady: () => this._waves.length > 0,
+            getSnapshot: () => ({
+                currentWave: this._currentWaveIndex + 1,
+                totalWaves: this._waves.length,
+                enemiesAlive: this._enemiesAlive,
+            }),
+        });
     }
 
     /**
@@ -133,6 +144,7 @@ export class WaveManager extends Singleton<WaveManager>() {
         this._spawnTimer = 0;
 
         EventManager.instance.emit(GameEvents.WAVE_START, {
+            wave: wave.index + 1,
             waveIndex: wave.index,
             enemyCount: wave.enemyCount,
         });
@@ -201,6 +213,7 @@ export class WaveManager extends Singleton<WaveManager>() {
         this._isWaveActive = false;
 
         EventManager.instance.emit(GameEvents.WAVE_COMPLETE, {
+            wave: this._currentWaveIndex + 1,
             waveIndex: this._currentWaveIndex,
         });
 
@@ -223,6 +236,7 @@ export class WaveManager extends Singleton<WaveManager>() {
      */
     public cleanup(): void {
         EventManager.instance.offAllByTarget(this);
+        WaveService.instance.unregisterProvider('gameplay');
         this._waves = [];
         this._currentWaveIndex = 0;
         this._isWaveActive = false;

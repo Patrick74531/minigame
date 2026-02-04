@@ -14,7 +14,7 @@ const { ccclass, property } = _decorator;
  * 包含动画、生命周期管理和物理触发
  */
 @ccclass('Coin')
-export class Coin extends BaseComponent {
+export class Coin extends BaseComponent implements IPoolable {
     @property
     public value: number = 5;
 
@@ -37,6 +37,20 @@ export class Coin extends BaseComponent {
     public static HeroNode: Node | null = null;
 
     // ...
+
+    public onSpawn(): void {
+        // NOTE: For pooled coins, ensure state reset.
+        this._isCollecting = false;
+        this._lifetime = 0;
+        this.enabled = true;
+
+        const col = this.getComponent(BoxCollider);
+        if (col) col.enabled = true;
+    }
+
+    public onDespawn(): void {
+        this._isCollecting = false;
+    }
 
     protected start(): void {
         this._initialPos.set(this.node.position);

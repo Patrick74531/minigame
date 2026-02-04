@@ -13,6 +13,14 @@ export const GameConfig = {
         TIME_SCALE: 1,
     },
 
+    // === 关卡/生成点 ===
+    MAP: {
+        /** 基地出生点 (World XZ) */
+        BASE_SPAWN: { x: -9, z: -9 },
+        /** 英雄相对基地的偏移 */
+        HERO_SPAWN_OFFSET: { x: 2, z: 2 },
+    },
+
     // === 经济系统 ===
     ECONOMY: {
         /** 初始金币 */
@@ -33,6 +41,19 @@ export const GameConfig = {
         MAX_SOLDIERS_PER_BARRACKS: 10,
         /** 建筑血量 */
         BASE_HP: 500,
+        /**
+         * 初始建造点配置 (World XZ)
+         * NOTE: 扩展新建造点请优先修改此处，避免在 GameController 中硬编码。
+         */
+        PADS: [
+            { x: -13, z: -6, type: 'barracks' },
+            { x: -5, z: -6, type: 'lightning_tower' },
+            { x: -13, z: -12, type: 'frost_tower' },
+            { x: -5, z: -12, type: 'tower' },
+            { x: -9, z: -3, type: 'wall' },
+            { x: -11, z: -3, type: 'wall' },
+            { x: -7, z: -3, type: 'wall' },
+        ],
     },
 
     // === 士兵系统 ===
@@ -87,6 +108,20 @@ export const GameConfig = {
         SPAWN_INTERVAL: 0.5,
         /** 每波难度递增系数 */
         DIFFICULTY_MULTIPLIER: 1.1,
+        /**
+         * 无限波次模式参数
+         * NOTE: 仅用于 core/managers/WaveManager (Infinite Mode)。
+         */
+        INFINITE: {
+            BASE_COUNT: 5,
+            COUNT_PER_WAVE: 2,
+            BASE_HP_MULT: 1,
+            HP_MULT_PER_WAVE: 0.5,
+            BASE_SPAWN_INTERVAL: 0.8,
+            SPAWN_INTERVAL_DECAY_PER_WAVE: 0.05,
+            MIN_SPAWN_INTERVAL: 0.2,
+            BONUS_PER_WAVE: 25,
+        },
     },
 
     // === 对象池 ===

@@ -5,6 +5,7 @@ import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { EffectFactory } from '../effects/EffectFactory';
 import { WaveManager } from '../../core/managers/WaveManager';
+import { IPoolable } from '../../core/managers/PoolManager';
 
 const { ccclass, property } = _decorator;
 
@@ -13,7 +14,7 @@ const { ccclass, property } = _decorator;
  * 追踪目标，造成伤害
  */
 @ccclass('Bullet')
-export class Bullet extends BaseComponent {
+export class Bullet extends BaseComponent implements IPoolable {
     @property
     public speed: number = 5; // Slower for debug
 
@@ -36,6 +37,20 @@ export class Bullet extends BaseComponent {
     public setTarget(target: Node): void {
         this._target = target;
         this.updateVelocity();
+    }
+
+    public onSpawn(): void {
+        // NOTE: For pooled bullets, ensure clean state on reuse.
+        this._lifetime = 0;
+        this._logTimer = 0;
+        this._target = null;
+        this._velocity.set(0, 0, 0);
+    }
+
+    public onDespawn(): void {
+        // NOTE: Clear references to avoid leaking targets between pooled instances.
+        this._target = null;
+        this._velocity.set(0, 0, 0);
     }
 
     protected initialize(): void {

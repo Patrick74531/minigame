@@ -2,6 +2,7 @@ import { _decorator, Component } from 'cc';
 import { Soldier } from '../units/Soldier';
 import { Enemy } from '../units/Enemy';
 import { MathUtils } from '../../core/utils/MathUtils';
+import { CombatService, CombatProvider } from '../../core/managers/CombatService';
 
 const { ccclass, property } = _decorator;
 
@@ -13,7 +14,7 @@ const { ccclass, property } = _decorator;
  * NOTE: 与 core/managers/CombatManager 功能重叠，建议后续统一入口。
  */
 @ccclass('CombatSystem')
-export class CombatSystem extends Component {
+export class CombatSystem extends Component implements CombatProvider {
     /** 所有活跃的敌人 */
     private _enemies: Enemy[] = [];
 
@@ -27,6 +28,17 @@ export class CombatSystem extends Component {
     private _targetCheckTimer: number = 0;
 
     // === 生命周期 ===
+
+    protected onLoad(): void {
+        // Register this implementation for new callers (no behavior change for existing code)
+        CombatService.setProvider(this);
+    }
+
+    protected onDestroy(): void {
+        if (CombatService.provider === this) {
+            CombatService.setProvider(null);
+        }
+    }
 
     protected update(dt: number): void {
         this._targetCheckTimer += dt;

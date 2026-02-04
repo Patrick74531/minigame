@@ -3,8 +3,7 @@ import { BaseComponent } from '../core/base/BaseComponent';
 import { EventManager } from '../core/managers/EventManager';
 import { GameManager } from '../core/managers/GameManager';
 import { GameEvents } from '../data/GameEvents';
-import { WaveManager as CoreWaveManager } from '../core/managers/WaveManager';
-import { WaveManager as GameplayWaveManager } from '../gameplay/wave/WaveManager';
+import { WaveService } from '../core/managers/WaveService';
 
 const { ccclass, property } = _decorator;
 
@@ -12,8 +11,8 @@ const { ccclass, property } = _decorator;
  * HUD 界面控制器
  * 显示金币、波次、分数等信息
  *
- * NOTE: HUD 读取波次信息时，优先兼容“核心/玩法”两套 WaveManager。
- * 新增或替换波次系统时，请同步更新 getWaveSnapshot()。
+ * NOTE: HUD 通过 WaveService 获取快照，避免直接依赖某个 WaveManager。
+ * 若新增波次系统，请注册到 WaveService。
  */
 @ccclass('HUD')
 export class HUD extends BaseComponent {
@@ -61,7 +60,7 @@ export class HUD extends BaseComponent {
 
     private updateWaveLabel(): void {
         if (this.waveLabel) {
-            const snapshot = this.getWaveSnapshot();
+            const snapshot = WaveService.instance.getSnapshot();
             if (snapshot.totalWaves && snapshot.totalWaves > 0) {
                 this.waveLabel.string = `🌊 Wave ${snapshot.currentWave}/${snapshot.totalWaves}`;
             } else {
@@ -78,7 +77,7 @@ export class HUD extends BaseComponent {
 
     private updateEnemyCountLabel(): void {
         if (this.enemyCountLabel) {
-            const snapshot = this.getWaveSnapshot();
+            const snapshot = WaveService.instance.getSnapshot();
             const count = snapshot.enemiesAlive ?? 0;
             this.enemyCountLabel.string = `👾 ${count}`;
         }
@@ -105,28 +104,4 @@ export class HUD extends BaseComponent {
         }
     }
 
-    private getWaveSnapshot(): {
-        currentWave: number;
-        totalWaves?: number;
-        enemiesAlive?: number;
-    } {
-        // Prefer gameplay WaveManager if it is actively configured.
-        if (typeof GameplayWaveManager.hasInstance === 'function' && GameplayWaveManager.hasInstance()) {
-            const wm = GameplayWaveManager.instance;
-            if (wm.totalWaves > 0) {
-                return {
-                    currentWave: wm.currentWaveIndex + 1,
-                    totalWaves: wm.totalWaves,
-                    enemiesAlive: wm.enemiesAlive,
-                };
-            }
-        }
-
-        // Fallback to core WaveManager (infinite wave mode)
-        const core = CoreWaveManager.instance;
-        return {
-            currentWave: core.currentWave || 0,
-            enemiesAlive: core.enemies.length,
-        };
-    }
 }
