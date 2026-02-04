@@ -1,10 +1,11 @@
-import { _decorator, Vec2, Vec3, Node, Component, RigidBody, CapsuleCollider, ITriggerEvent, PhysicsSystem, geometry } from 'cc';
+import { _decorator, Vec2, Vec3, Node, Component, RigidBody, CapsuleCollider, ITriggerEvent, PhysicsSystem, geometry, Color } from 'cc';
 import { Unit, UnitType, UnitState } from './Unit';
 import { GameManager } from '../../core/managers/GameManager';
 import { WaveManager } from '../../core/managers/WaveManager';
 import { GameConfig } from '../../data/GameConfig';
 import { Coin } from '../economy/Coin';
 import { HUDManager } from '../../ui/HUDManager';
+import { RangedWeapon } from '../combat/weapons/RangedWeapon';
 
 const { ccclass, property } = _decorator;
 
@@ -16,6 +17,8 @@ const { ccclass, property } = _decorator;
 export class Hero extends Unit {
     // 移动输入向量 (x, y) -1 ~ 1
     private _inputVector: Vec2 = new Vec2(0, 0);
+
+    private _weapon: RangedWeapon | null = null;
 
     public onDespawn(): void {
         if (GameManager.instance.hero === this.node) {
@@ -36,6 +39,14 @@ export class Hero extends Unit {
             moveSpeed: GameConfig.HERO.MOVE_SPEED,
         });
         
+        // Initialize Weapon
+        this._weapon = this.node.addComponent(RangedWeapon);
+        this._weapon.damage = this._stats.attack;
+        this._weapon.range = this._stats.attackRange;
+        this._weapon.attackInterval = this._stats.attackInterval;
+        this._weapon.projectileSpeed = 20; // Fast bullets for hero
+        this._weapon.projectileColor = new Color(0, 255, 255, 255); // Cyan for Hero
+
         // 创建金币挂载点
         this._coinContainer = new Node('CoinStack');
         this.node.addChild(this._coinContainer);
@@ -188,6 +199,8 @@ export class Hero extends Unit {
     private updateTargeting(): void {
         // 简单索敌：找最近的敌人
         const enemies = WaveManager.instance.enemies;
+        // console.log(`[Hero] Targeting check. Enemies: ${enemies.length}`); // Verbose log
+
         let nearest: Node | null = null;
         let minDist = this._stats.attackRange; // 仅攻击范围内的
 
@@ -208,6 +221,9 @@ export class Hero extends Unit {
         if (nearest) {
             const unit = nearest.getComponent(Unit);
             if (unit && unit.isAlive) {
+                if (this._state !== UnitState.ATTACKING) {
+                     console.log(`[Hero] Found target: ${nearest.name} at dist: ${minDist.toFixed(2)}`);
+                }
                 this.setTarget(unit);
                 this._state = UnitState.ATTACKING;
             } else {
@@ -215,6 +231,9 @@ export class Hero extends Unit {
                 this._state = UnitState.IDLE;
             }
         } else {
+            if (this._state === UnitState.ATTACKING) {
+                // console.log(`[Hero] Lost target.`);
+            }
             this.setTarget(null);
             this._state = UnitState.IDLE;
         }
@@ -326,11 +345,11 @@ export class Hero extends Unit {
     }
 
     protected performAttack(): void {
-        // 英雄自动攻击附近的敌人 (Passive)
-        // 具体的索敌逻辑可以在 UpdateAttack 中实现
+        // Use Weapon System
         if (!this._target || !this._target.isAlive) return;
 
-        // 只有当敌人真的很近时才攻击
-        this._target.takeDamage(this._stats.attack, this);
+        if (this._weapon) {
+            this._weapon.tryAttack(this._target.node);
+        }
     }
 }
