@@ -17,6 +17,7 @@ import { Joystick } from './ui/Joystick';
 import { BuildingManager } from './gameplay/buildings/BuildingManager';
 import { BuildingPad } from './gameplay/buildings/BuildingPad';
 import { EffectManager } from './core/managers/EffectManager';
+import { MapGenerator } from './gameplay/map/MapGenerator';
 
 const { ccclass, property } = _decorator;
 
@@ -52,6 +53,9 @@ export class GameController extends Component {
     private _coinTimer: number = 0;
 
     // === 生命周期 ===
+    
+    // Map Generator
+    private _mapGenerator: MapGenerator | null = null;
 
     protected onLoad(): void {
         console.log('╔════════════════════════════════════════════════════╗');
@@ -61,6 +65,11 @@ export class GameController extends Component {
         this.setupContainers();
         this.setupUI();
         this.setupEventListeners();
+        
+        // Setup Map Generator
+        const mapNode = new Node('MapGenerator');
+        this._container?.addChild(mapNode);
+        this._mapGenerator = mapNode.addComponent(MapGenerator);
 
         // 初始化 Managers
         GameManager.instance.initialize();
@@ -70,7 +79,6 @@ export class GameController extends Component {
 
         // 启用物理系统
         PhysicsSystem.instance.enable = true;
-        // PhysicsSystem.instance.debugDrawFlags = PhysicsSystem.DebugDrawFlags.SHOW_ALL_COLLIDER; // For Debug
     }
 
     protected onDestroy(): void {
@@ -82,29 +90,34 @@ export class GameController extends Component {
 
     protected start(): void {
         GameManager.instance.startGame();
+        
+        // Generate Map
+        if (this._mapGenerator) {
+            // this._mapGenerator.generateTestMap();
+            // this._mapGenerator.generateFromImage('cyberpunk_map');
+            this._mapGenerator.generateProceduralMap();
+        }
 
         // 创建初始实体
         this._base = BuildingFactory.createBase(this._buildingContainer!, 0, 0, 100);
         
-        const b1 = BuildingFactory.createBarracks(this._buildingContainer!, -2.5, 1);
-        b1.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
-        this._buildings.push(b1);
+        // Restore initial buildings for testing
+        // const b1 = BuildingFactory.createBarracks(this._buildingContainer!, -3, 3);
+        // b1.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
+        // this._buildings.push(b1);
+        
+        // const t1 = BuildingFactory.createTower(this._buildingContainer!, 3, 3);
+        // this._buildings.push(t1);
 
-        const b2 = BuildingFactory.createBarracks(this._buildingContainer!, 2.5, 1);
-        b2.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
-        this._buildings.push(b2);
-
-        // Test Tower
-        const t1 = BuildingFactory.createTower(this._buildingContainer!, 0, 3);
-        this._buildings.push(t1);
-
-        this._hero = UnitFactory.createHero(this._soldierContainer!, 0, -1.5);
+        // Spawn Hero at (1, 1) which matches the MapGenerator center (safe zone)
+        // Previous (0, -2) was between tiles and caused physics ejection
+        this._hero = UnitFactory.createHero(this._soldierContainer!, 1, 1);
 
         // 设置英雄引用给建造管理器
         BuildingManager.instance.setHeroNode(this._hero);
 
-        // 创建建造点
-        this.createBuildingPads();
+        // 创建建造点 - Restore this
+        this.createBuildingPads(); 
 
         console.log(`[Game] 💰 初始金币: ${GameManager.instance.coins}`);
 

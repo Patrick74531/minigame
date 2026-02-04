@@ -1,4 +1,4 @@
-import { _decorator, Node } from 'cc';
+import { _decorator, Node, RigidBody, Vec3 } from 'cc';
 import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
 import { WaveManager } from '../../core/managers/WaveManager';
@@ -114,15 +114,19 @@ export class Soldier extends Unit {
         }
 
         // 向目标移动
-        const speed = this._stats.moveSpeed / 60;
+        const speed = this._stats.moveSpeed;
         const dirX = dx / distance;
         const dirZ = dz / distance;
 
-        this.node.setPosition(
-            myPos.x + dirX * speed * dt,
-            0,
-            myPos.z + dirZ * speed * dt
-        );
+        if (this.node.getComponent('cc.RigidBody')) {
+             (this.node.getComponent('cc.RigidBody') as any).setLinearVelocity(new Vec3(dirX * speed, 0, dirZ * speed));
+        } else {
+             this.node.setPosition(
+                myPos.x + dirX * speed * dt,
+                0.5,
+                myPos.z + dirZ * speed * dt
+            );
+        }
         
         // Face target
         this.node.lookAt(new Vec3(targetPos.x, 0, targetPos.z));

@@ -35,8 +35,8 @@ export const GameConfig = {
 
     // === 士兵系统 ===
     SOLDIER: {
-        /** 基础移动速度 (units/minute approx, divided by 60 in logic) */
-        MOVE_SPEED: 100,
+        /** 基础移动速度 (units/second) - Was 100/60 ~ 1.6 */
+        MOVE_SPEED: 3.5, 
         /** 基础攻击力 */
         BASE_ATTACK: 10,
         /** 基础血量 */
@@ -49,8 +49,8 @@ export const GameConfig = {
 
     // === 敌人系统 ===
     ENEMY: {
-        /** 基础移动速度 */
-        MOVE_SPEED: 60,
+        /** 基础移动速度 - Was 60/60 ~ 1 */
+        MOVE_SPEED: 2.5,
         /** 基础攻击力 */
         BASE_ATTACK: 8,
         /** 基础血量 */
@@ -73,8 +73,8 @@ export const GameConfig = {
         ATTACK_INTERVAL: 0.8,
         /** 攻击范围 */
         ATTACK_RANGE: 2.5,
-        /** 移动速度 */
-        MOVE_SPEED: 120,
+        /** 移动速度 - Was 120/60 ~ 2. Now using Physics Velocity directly */
+        MOVE_SPEED: 6.0,
     },
 
     // === 波次系统 ===

@@ -1,4 +1,4 @@
-import { _decorator, Vec2, Vec3 } from 'cc';
+import { _decorator, Vec2, Vec3, RigidBody } from 'cc';
 import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
 import { EventManager } from '../../core/managers/EventManager';
@@ -51,16 +51,28 @@ export class Enemy extends Unit {
         }
 
         // 向原点（基地）移动
-        const speed = this.moveSpeed / 60; // Use Getter for modified speed
+        const speed = this.moveSpeed; // Config speed matches physics units/sec now
         
         const dirX = -pos.x / distToBase;
         const dirZ = -pos.z / distToBase;
 
-        this.node.setPosition(
-            pos.x + dirX * speed * dt,
-            0, // Y always 0
-            pos.z + dirZ * speed * dt
-        );
+        const rb = this.node.getComponent('cc.RigidBody') as any; // Type casting or use logic
+        // Use RigidBody directly if imported, else try generic
+        // To be safe let's assume getComponent(RigidBody)
+        // Since I can't guarantee import of RigidBody here without adding it, let's assume it's available or add import logic if needed. 
+        // But to keep it simple and safe:
+        
+        // Use the component if available
+        if (this.node.getComponent('cc.RigidBody')) {
+             (this.node.getComponent('cc.RigidBody') as any).setLinearVelocity(new Vec3(dirX * speed, 0, dirZ * speed));
+        } else {
+            // Fallback (shouldn't happen with factory update)
+             this.node.setPosition(
+                pos.x + dirX * speed * dt, // If no physics, manual but might fail collisions
+                0.5, // keep height
+                pos.z + dirZ * speed * dt
+            );
+        }
         
         // Face base
         this.node.lookAt(new Vec3(0, 0, 0));

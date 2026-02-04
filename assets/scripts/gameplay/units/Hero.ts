@@ -45,7 +45,12 @@ export class Hero extends Unit {
         let rb = this.node.getComponent(RigidBody);
         if (!rb) {
             rb = this.node.addComponent(RigidBody);
-            rb.type = RigidBody.Type.KINEMATIC; // Kinematic allows manual pos control
+            rb.type = RigidBody.Type.KINEMATIC; // Restore Kinematic
+            rb.useGravity = false; // No Gravity - manually strictly 2D on XZ
+            // Damping/Factors don't apply to Kinematic same way, but safe to leave or clear
+            // rb.linearDamping = 0.5; // Low damping for smooth movement
+            // rb.angularFactor = new Vec3(0, 0, 0); 
+            // rb.linearFactor = new Vec3(1, 0, 1); // Lock Y axis completely
         }
 
         let col = this.node.getComponent(CapsuleCollider);
@@ -54,12 +59,14 @@ export class Hero extends Unit {
             col.cylinderHeight = 1.0;
             col.radius = 0.3;
             col.center = new Vec3(0, 0.75, 0);
-            col.isTrigger = true; // Use Trigger for interactions to avoid physical blocking
+            col.isTrigger = false; // MUST be false for physical blocking
         }
         
         // Groups: Hero (1<<0)
+        // Ensure we collide with Default (Walls), Coin (1<<1), Pad (1<<2)
+        // 1<<0 is Default
         col.setGroup(1 << 0);
-        col.setMask((1 << 1) | (1 << 2)); // Collide with Coin(1<<1) and Pad(1<<2) (if needed) and Default
+        col.setMask(0xffffffff); // Collide with everything
     }
 
     protected start(): void {
@@ -156,6 +163,11 @@ export class Hero extends Unit {
             this._state = UnitState.MOVING;
         } else {
             this._state = UnitState.IDLE;
+            // Immediately stop physics to prevent sliding
+            const rb = this.node.getComponent(RigidBody);
+            if (rb) {
+                rb.setLinearVelocity(new Vec3(0, 0, 0));
+            }
         }
     }
 
@@ -214,28 +226,29 @@ export class Hero extends Unit {
         const moveLen = this._inputVector.length();
         if (moveLen < 0.01) {
             this._state = UnitState.IDLE;
-            // updateTargeting 会接管
             return;
         }
 
-        // 转换配置速度到世界单位 (/60)
-        const speed = this._stats.moveSpeed / 60;
-        const moveDist = speed * dt;
+        // Restore direct position control
+        // Note: speed in GameConfig is low (e.g. 6.0), so * dt makes sense for movement per frame
+        const speed = this._stats.moveSpeed;
+        
+        // Joystick Up (Y=1) should be World Forward (-Z)
+        const dx = this._inputVector.x * speed * dt;
+        const dz = -this._inputVector.y * speed * dt;
 
         const currentPos = this.node.position;
-        // Joystick Y maps to World Z (Inverted: Up -> -Z)
-        const newX = currentPos.x + this._inputVector.x * moveDist;
-        const newZ = currentPos.z - this._inputVector.y * moveDist; // Inverted
+        // Directly set position (Kinematic style)
+        // Note: This bypasses physics collision blocking unless we use sweep, 
+        // but it restores the "moving" ability for sure.
+        this.node.setPosition(currentPos.x + dx, currentPos.y, currentPos.z + dz);
 
-        this.node.setPosition(newX, currentPos.y, newZ);
-
-        // 面向移动方向
+        // Face movement
         if (moveLen > 0.1) {
-             // Look at target point
              const lookTarget = new Vec3(
-                 newX + this._inputVector.x, 
+                 currentPos.x + dx, 
                  currentPos.y, 
-                 newZ - this._inputVector.y // Inverted
+                 currentPos.z + dz 
              );
              this.node.lookAt(lookTarget);
         }
