@@ -78,10 +78,6 @@ export class BuildingPad extends BaseComponent {
         return this._collectedCoins;
     }
 
-    public get collectedCoins(): number {
-        return this._collectedCoins;
-    }
-
     // requiredCoins getter replaced by dynamic version below
 
     public get progress(): number {

@@ -93,7 +93,6 @@ export class GameController extends Component {
         // Ideally: Set container in onLoad, Set Base in Start.
         // For now, let's keep it robust.
         // WaveManager.instance.initialize(this._enemyContainer!); // Removed, moved to start
-        HUDManager.instance.initialize(this._uiCanvas!);
         BuildingManager.instance.initialize(this._buildingContainer!, this._soldierContainer!);
 
         // 启用物理系统

@@ -149,11 +149,6 @@ export class BuildingManager {
             this
         );
         EventManager.instance.off(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
-        EventManager.instance.off(
-            GameEvents.BUILDING_CONSTRUCTED,
-            this.onBuildingConstructed,
-            this
-        );
         this._pads = [];
         this._activeBuildings = [];
     }

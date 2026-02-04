@@ -2,6 +2,7 @@ import { _decorator, Node } from 'cc';
 import { Singleton } from '../base/Singleton';
 import { EventManager } from './EventManager';
 import { GameEvents } from '../../data/GameEvents';
+import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass, property } = _decorator;
 
@@ -70,8 +71,6 @@ export class GameManager extends Singleton<GameManager>() {
         this._gameState = GameState.LOADING;
         this._coins = 0;
         this._score = 0;
-        this._score = 0;
-        this._currentWave = 0;
         this._currentWave = 0;
         this.hero = null;
         this.activeBuildings = [];
@@ -89,7 +88,7 @@ export class GameManager extends Singleton<GameManager>() {
         }
 
         this._gameState = GameState.PLAYING;
-        this._coins = 100; // 初始金币，后续从 GameConfig 读取
+        this._coins = GameConfig.ECONOMY.INITIAL_COINS;
 
         EventManager.instance.emit(GameEvents.GAME_START);
     }

@@ -1,7 +1,8 @@
-import { _decorator, Node } from 'cc';
+import { _decorator, Node, Vec3 } from 'cc';
 import { EventManager } from './EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { UnitFactory } from '../../gameplay/units/UnitFactory';
+import { Unit } from '../../gameplay/units/Unit';
 
 const { ccclass } = _decorator;
 
@@ -74,11 +75,7 @@ export class WaveManager {
             const distSqr = dx * dx + dz * dz;
 
             if (distSqr <= radiusSqr) {
-                const unit = enemy.getComponent(UnitFactory.UnitClass || 'Unit') as any; // Dynamic type if needed or import Unit
-                // Better: just getComponent('Unit') or better yet, we imported UnitFactory... maybe Unit too?
-                // Unit is imported in UnitFactory?
-                // Let's rely on getComponent with string or class if available.
-                const u = enemy.getComponent('Unit') as any;
+                const u = enemy.getComponent(Unit);
 
                 if (u && u.isAlive) {
                     u.takeDamage(data.damage);
@@ -223,6 +220,7 @@ export class WaveManager {
      * 清理
      */
     public cleanup(): void {
+        EventManager.instance.off(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
         this._enemies = [];
         this._waveConfig = null;
         this._waveActive = false;

@@ -1,4 +1,4 @@
-import { Node, Prefab, instantiate, NodePool } from 'cc';
+import { Node, Prefab, instantiate, NodePool, Component } from 'cc';
 import { Singleton } from '../base/Singleton';
 
 /**
@@ -90,11 +90,7 @@ export class PoolManager extends Singleton<PoolManager>() {
             node.parent = parent;
         }
 
-        // 调用 onSpawn 生命周期
-        const poolable = node.getComponent('IPoolable') as unknown as IPoolable;
-        if (poolable && typeof poolable.onSpawn === 'function') {
-            poolable.onSpawn();
-        }
+        this.invokePoolableLifecycle(node, 'onSpawn');
 
         node.active = true;
         return node;
@@ -113,11 +109,7 @@ export class PoolManager extends Singleton<PoolManager>() {
             return;
         }
 
-        // 调用 onDespawn 生命周期
-        const poolable = node.getComponent('IPoolable') as unknown as IPoolable;
-        if (poolable && typeof poolable.onDespawn === 'function') {
-            poolable.onDespawn();
-        }
+        this.invokePoolableLifecycle(node, 'onDespawn');
 
         node.active = false;
         node.parent = null;
@@ -151,6 +143,18 @@ export class PoolManager extends Singleton<PoolManager>() {
             config.pool.clear();
         });
         this._pools.clear();
+    }
+
+    private invokePoolableLifecycle(node: Node, method: 'onSpawn' | 'onDespawn'): void {
+        // Interfaces don't exist at runtime; check components by method presence.
+        const components = node.getComponents(Component);
+        for (const comp of components) {
+            const poolable = comp as unknown as IPoolable;
+            const fn = poolable[method];
+            if (typeof fn === 'function') {
+                fn.call(poolable);
+            }
+        }
     }
 
     /**

@@ -125,7 +125,7 @@ export class Coin extends BaseComponent {
             // Auto collect gives money to global?
             // For now, let's assume it just gives it.
             EventManager.instance.emit(GameEvents.COIN_COLLECTED, {
-                value: this.value,
+                amount: this.value,
             });
         }
 
