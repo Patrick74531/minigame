@@ -16,6 +16,7 @@ import {
     Vec3,
     RigidBody,
 } from 'cc';
+import { Building } from './Building';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { BuildingRegistry, BuildingTypeConfig } from './BuildingRegistry';
 import { EventManager } from '../../core/managers/EventManager';
@@ -31,7 +32,8 @@ const { ccclass, property } = _decorator;
 export enum BuildingPadState {
     WAITING, // 等待金币
     BUILDING, // 建造中
-    COMPLETE, // 建造完成
+    COMPLETE, // 建造完成 (Transient)
+    UPGRADING, // 升级中
 }
 
 /**
@@ -76,9 +78,11 @@ export class BuildingPad extends BaseComponent {
         return this._collectedCoins;
     }
 
-    public get requiredCoins(): number {
-        return this._config?.cost ?? 0;
+    public get collectedCoins(): number {
+        return this._collectedCoins;
     }
+
+    // requiredCoins getter replaced by dynamic version below
 
     public get progress(): number {
         if (this.requiredCoins === 0) return 0;
@@ -160,33 +164,25 @@ export class BuildingPad extends BaseComponent {
      */
     private onTriggerEnter(event: ITriggerEvent): void {
         const otherNode = event.otherCollider.node;
-        console.log(
-            `[BuildingPad] OnTriggerEnter: this=${this.node.name}, other=${otherNode.name}, group=${event.otherCollider.getGroup()}`
-        );
-        console.log(`[BuildingPad] Scale: ${this.node.getWorldScale()}`);
 
         let hero = otherNode.getComponent(Hero);
         if (!hero) {
-            // Fallback for circular dependency issues
-            console.warn('[BuildingPad] Hero class check failed, trying string "Hero"');
             hero = otherNode.getComponent('Hero') as Hero;
         }
 
         if (hero) {
-            console.log('[BuildingPad] Hero Component Found!');
             this._heroInArea = true;
             this._heroRef = hero;
 
-            // Show Info - Use imported HUDManager directly
+            // Show Info
             if (HUDManager.instance) {
+                const title = this._state === BuildingPadState.UPGRADING ? `升级 ${this.buildingName} (Lv ${this._associatedBuilding?.level || 1} -> ${(this._associatedBuilding?.level || 1) + 1})` : `建造 ${this.buildingName}`;
                 HUDManager.instance.showBuildingInfo(
-                    this.buildingName,
+                    title,
                     this.requiredCoins,
                     this.collectedCoins
                 );
             }
-        } else {
-            console.log('[BuildingPad] Not a Hero component');
         }
     }
 
@@ -211,7 +207,12 @@ export class BuildingPad extends BaseComponent {
      * Standard Update Loop for Interaction
      */
     protected update(dt: number): void {
-        if (this._heroInArea && this._heroRef && this._state === BuildingPadState.WAITING) {
+        if (this._heroInArea && this._heroRef) {
+            // Check state
+            if (this._state !== BuildingPadState.WAITING && this._state !== BuildingPadState.UPGRADING) {
+                return;
+            }
+
             // Check if hero still valid
             if (!this._heroRef.node || !this._heroRef.node.isValid) {
                 this._heroInArea = false;
@@ -219,7 +220,7 @@ export class BuildingPad extends BaseComponent {
                 return;
             }
 
-            // Perform Collection (throttled by collect timer or frame)
+            // Perform Collection
             if (this._heroRef.coinCount > 0) {
                 const collected = this.tryCollectCoin(this._heroRef.coinCount);
                 if (collected > 0) {
@@ -228,12 +229,14 @@ export class BuildingPad extends BaseComponent {
                     // Update HUD periodically or on change
                     if (HUDManager.instance) {
                         HUDManager.instance.updateCoinDisplay(this._heroRef.coinCount);
+                        // Update building info too as coins change
+                        const title = this._state === BuildingPadState.UPGRADING ? `升级 ${this.buildingName} (Lv ${this._associatedBuilding?.level || 1} -> ${(this._associatedBuilding?.level || 1) + 1})` : `建造 ${this.buildingName}`;
+                        HUDManager.instance.showBuildingInfo(title, this.requiredCoins, this.collectedCoins);
                     }
                 }
             }
         }
     }
-
     // Removed checkHeroInRange (Logic moved to Physics Trigger)
 
     /**
@@ -300,12 +303,65 @@ export class BuildingPad extends BaseComponent {
     }
 
     /**
+     * 关联的建筑实例
+     */
+    private _associatedBuilding: Building | null = null;
+    private _nextUpgradeCost: number = 0;
+
+    /**
+     * 建筑创建时的回调
+     */
+    public onBuildingCreated(building: Building): void {
+        this._associatedBuilding = building;
+        
+        // Calculate next upgrade cost
+        // Use base cost from config directly
+        const baseCost = this._config?.cost ?? 0;
+        
+        let costMult = 1.5;
+        if (this._config && this._config.upgrades && this._config.upgrades.costMultiplier) {
+            costMult = this._config.upgrades.costMultiplier;
+        }
+        
+        this._nextUpgradeCost = Math.ceil(baseCost * costMult); 
+        
+        // Change state AFTER calculation
+        this._state = BuildingPadState.UPGRADING;
+        
+        // Reset collection for upgrade
+        this._collectedCoins = 0;
+        
+        // Update Label to show nothing or "Upgrade"
+        this.updateDisplay();
+        
+        console.log(`[BuildingPad] Entered Upgrade Mode. Base: ${baseCost}, Next Cost: ${this._nextUpgradeCost}`);
+    }
+
+    public get requiredCoins(): number {
+        if (this._state === BuildingPadState.UPGRADING) {
+            return this._nextUpgradeCost;
+        }
+        return this._config?.cost ?? 0;
+    }
+
+    /**
      * 尝试从英雄收集金币
      * @param heroCoins 英雄当前持有的金币数
      * @returns 实际收集的金币数
      */
     public tryCollectCoin(heroCoins: number): number {
-        if (this._state !== BuildingPadState.WAITING) return 0;
+        if (this._state !== BuildingPadState.WAITING && this._state !== BuildingPadState.UPGRADING) return 0;
+        
+        // If Max Level, stop collecting
+        if (this._state === BuildingPadState.UPGRADING && this._associatedBuilding) {
+            const maxLvl = this._associatedBuilding.maxLevel;
+            if (this._associatedBuilding.level >= maxLvl) {
+                // Max Level Reached
+                if (this._label) this._label.string = "MAX";
+                return 0;
+            }
+        }
+
         if (heroCoins <= 0) return 0;
 
         const needed = this.requiredCoins - this._collectedCoins;
@@ -315,9 +371,13 @@ export class BuildingPad extends BaseComponent {
             this._collectedCoins += toCollect;
             this.updateDisplay();
 
-            // 检查是否建造完成
+            // 检查是否建造/升级完成
             if (this.isComplete) {
-                this.onBuildComplete();
+                if (this._state === BuildingPadState.WAITING) {
+                    this.onBuildComplete();
+                } else if (this._state === BuildingPadState.UPGRADING) {
+                    this.onUpgradeComplete();
+                }
             }
         }
 
@@ -328,7 +388,7 @@ export class BuildingPad extends BaseComponent {
      * 建造完成
      */
     private onBuildComplete(): void {
-        this._state = BuildingPadState.COMPLETE;
+        this._state = BuildingPadState.COMPLETE; // Transient state before Manager calls onBuildingCreated
 
         console.log(`[BuildingPad] 建造完成: ${this._config?.name}`);
 
@@ -338,6 +398,39 @@ export class BuildingPad extends BaseComponent {
             buildingTypeId: this.buildingTypeId,
             position: this.node.position.clone(),
         });
+        
+        // Note: Manager will call onBuildingCreated(), setting state to UPGRADING
+    }
+    
+    private onUpgradeComplete(): void {
+        if (!this._associatedBuilding) return;
+        
+        // Perform Upgrade
+        this._associatedBuilding.upgrade();
+        
+        // Calculate NEXT cost
+        // Simple scaling: Current Upgrade Cost * Multiplier
+        let costMult = 1.5;
+        if (this._config && this._config.upgrades && this._config.upgrades.costMultiplier) {
+            costMult = this._config.upgrades.costMultiplier;
+        }
+        this._nextUpgradeCost = Math.ceil(this._nextUpgradeCost * costMult);
+        
+        // Reset
+        this._collectedCoins = 0;
+        this.updateDisplay();
+        
+        // Check Max Level
+         const maxLvl = this._associatedBuilding.maxLevel;
+        if (this._associatedBuilding.level >= maxLvl) {
+            console.log('[BuildingPad] Max Level Reached.');
+            if (this._label) {
+                this._label.string = "MAX";
+                this._label.color = Color.RED;
+            }
+            // Logic to disable collider or visuals? 
+            // For now keep it simple.
+        }
     }
 
     /**

@@ -42,6 +42,12 @@ export class Building extends BaseComponent implements IAttackable {
 
     @property
     public currentHp: number = 500;
+    
+    @property
+    public level: number = 1;
+
+    public maxLevel: number = 3;
+    public statMultiplier: number = 1.2;
 
     @property
     public spawnInterval: number = 3;
@@ -142,6 +148,36 @@ export class Building extends BaseComponent implements IAttackable {
         if (config.spawnInterval !== undefined) this.spawnInterval = config.spawnInterval;
         if (config.maxUnits !== undefined) this.maxUnits = config.maxUnits;
         if (config.soldierPoolName !== undefined) this.soldierPoolName = config.soldierPoolName;
+        
+        // Upgrade Config
+        // Note: In real app, pass upgrade config here or fetch from Registry in Building.ts
+    }
+
+    /**
+     * 升级建筑
+     */
+    public upgrade(): void {
+        const oldHp = this.maxHp;
+        this.level++;
+        
+        // Scale Stats
+        this.maxHp = Math.floor(this.maxHp * this.statMultiplier);
+        this.spawnInterval = Math.max(0.5, this.spawnInterval / 1.1); // Spawns 10% faster per level?
+        
+        // Heal to full (bonus)
+        this.currentHp = this.maxHp;
+        
+        if (this._healthBar) {
+            this._healthBar.updateHealth(this.currentHp, this.maxHp);
+        }
+        
+        console.log(`[Building] Upgraded to Level ${this.level}. HP: ${oldHp} -> ${this.maxHp}`);
+        
+        // Effect?
+        EventManager.instance.emit(GameEvents.BUILDING_CONSTRUCTED, {
+             padNode: this.node, // Reuse event or new event?
+             // Let's rely on Manager or Pad to show effect
+        });
     }
 
     /**

@@ -49,6 +49,13 @@ export interface BuildingTypeConfig {
         chainCount?: number;
         chainRange?: number;
     };
+
+    /** 升级配置 */
+    upgrades?: {
+        maxLevel?: number; // default 3
+        costMultiplier?: number; // default 1.5
+        statMultiplier?: number; // default 1.2
+    };
 }
 
 /**
@@ -88,6 +95,11 @@ export class BuildingRegistry {
             features: {
                 spawnInterval: 5, // GameConfig.BUILDING.SPAWN_INTERVAL
                 maxUnits: 3, // GameConfig.BUILDING.MAX_SOLDIERS_PER_BARRACKS
+            },
+            upgrades: {
+                maxLevel: 3,
+                costMultiplier: 1.5,
+                statMultiplier: 1.2,
             },
         });
 

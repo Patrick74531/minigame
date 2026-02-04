@@ -95,6 +95,13 @@ export class BuildingManager {
     }): void {
         console.log(`[BuildingManager] 建造完成: ${data.buildingTypeId}`);
 
+        // Find the Pad Component
+        const pad = data.padNode.getComponent(BuildingPad);
+        if (!pad) {
+            console.error('[BuildingManager] Pad component missing on constructed event node');
+            return;
+        }
+
         // 根据建筑类型创建建筑
         if (this._buildingContainer) {
             const buildingNode = BuildingFactory.createBuilding(
@@ -113,18 +120,23 @@ export class BuildingManager {
                 const buildingComp = buildingNode.getComponent(Building);
                 if (buildingComp) {
                     this._activeBuildings.push(buildingComp);
+                    
+                    // Link Building back to Pad for upgrades
+                    pad.onBuildingCreated(buildingComp);
                 }
             }
         }
 
-        // 销毁建造点
-        data.padNode.destroy();
+        // DO NOT Destroy Pad. It persists for upgrades.
+        // data.padNode.destroy();
 
-        // 从列表中移除
+        // DO NOT Remove from list.
+        /*
         const idx = this._pads.findIndex(p => p.node === data.padNode);
         if (idx !== -1) {
             this._pads.splice(idx, 1);
         }
+        */
     }
 
     /**
