@@ -268,6 +268,10 @@ export class GameController extends Component {
             { x: bx + 4, y: by + 3, type: 'lightning_tower' }, 
             { x: bx - 4, y: by - 3, type: 'frost_tower' },
             { x: bx + 4, y: by - 3, type: 'tower' },
+            // Add Walls around base or in front
+            { x: bx, y: by + 6, type: 'wall' },
+            { x: bx - 2, y: by + 6, type: 'wall' },
+            { x: bx + 2, y: by + 6, type: 'wall' },
         ];
 
         for (const pos of padPositions) {

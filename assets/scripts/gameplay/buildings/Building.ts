@@ -2,9 +2,11 @@ import { _decorator, Vec2, Node, RigidBody, BoxCollider, Vec3 } from 'cc';
 import { UnitFactory } from '../units/UnitFactory';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { EventManager } from '../../core/managers/EventManager';
+import { GameManager } from '../../core/managers/GameManager';
 import { PoolManager } from '../../core/managers/PoolManager';
 import { GameEvents } from '../../data/GameEvents';
 import { GameConfig } from '../../data/GameConfig';
+import { HealthBar } from '../../ui/HealthBar';
 
 const { ccclass, property } = _decorator;
 
@@ -12,6 +14,7 @@ const { ccclass, property } = _decorator;
 export enum BuildingType {
     BARRACKS = 'barracks', // 兵营
     TOWER = 'tower', // 防御塔（后续扩展）
+    WALL = 'wall', // 墙
 }
 
 /** 建筑配置 */
@@ -57,6 +60,9 @@ export class Building extends BaseComponent {
     /** 产兵父节点 */
     private _unitContainer: Node | null = null;
 
+    /** 血条组件 */
+    private _healthBar: HealthBar | null = null;
+
     // === 访问器 ===
 
     public get isAlive(): boolean {
@@ -79,6 +85,23 @@ export class Building extends BaseComponent {
         
         // Setup Physics (Obstacle)
         this.setupPhysics();
+
+        // Setup Health Bar
+        this.setupHealthBar();
+
+        if (GameManager.instance) {
+            GameManager.instance.activeBuildings.push(this.node);
+        }
+    }
+
+    private setupHealthBar(): void {
+        this._healthBar = this.node.addComponent(HealthBar);
+        // Optional: Custom configurations based on building type
+        if (this.buildingType === BuildingType.WALL) {
+            this._healthBar.yOffset = 2.0;
+        } else {
+            this._healthBar.yOffset = 3.0;
+        }
     }
 
     private setupPhysics(): void {
@@ -194,15 +217,29 @@ export class Building extends BaseComponent {
 
         this.currentHp = Math.max(0, this.currentHp - damage);
 
+        if (this._healthBar) {
+            this._healthBar.updateHealth(this.currentHp, this.maxHp);
+        }
+
         if (this.currentHp <= 0) {
             this.onDestroyed();
         }
     }
 
-    private onDestroyed(): void {
+    protected onDestroyed(): void {
+        // Unregister from global list
+        if (GameManager.instance) {
+            const idx = GameManager.instance.activeBuildings.indexOf(this.node);
+            if (idx !== -1) {
+                GameManager.instance.activeBuildings.splice(idx, 1);
+            }
+        }
+        
         EventManager.instance.emit(GameEvents.BUILDING_DESTROYED, {
             buildingId: this.node.uuid,
+            building: this 
         });
+
 
         // TODO: 播放销毁动画
         this.node.active = false;

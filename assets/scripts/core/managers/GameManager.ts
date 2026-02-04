@@ -35,6 +35,9 @@ export class GameManager extends Singleton<GameManager>() {
     // Public reference to Hero for global access (e.g. Magnet logic)
     public hero: Node | null = null;
 
+    // Active Buildings List (Stores Nodes to avoid circular deps)
+    public activeBuildings: Node[] = [];
+
     // === 状态访问器 ===
 
     public get gameState(): GameState {
@@ -69,7 +72,9 @@ export class GameManager extends Singleton<GameManager>() {
         this._score = 0;
         this._score = 0;
         this._currentWave = 0;
+        this._currentWave = 0;
         this.hero = null;
+        this.activeBuildings = [];
 
         this.registerEvents();
     }

@@ -178,6 +178,22 @@ export class BuildingRegistry {
             features: {} // TODO: Income logic
         });
 
+        // 墙 - 阻挡敌人
+        this.register({
+            id: 'wall',
+            name: '坚固城墙',
+            cost: 5,
+            buildTime: 0,
+            description: '阻挡敌人进攻，拥有高额生命值',
+            role: 'building',
+            visual: {
+                colorHex: '#808080', // Gray
+                scale: { x: 0.8, y: 0.8, z: 0.8 }
+            },
+            stats: { hp: 1000 },
+            features: {}
+        });
+
         console.log('[BuildingRegistry] 注册了', this._types.size, '种建筑类型');
     }
 

@@ -19,6 +19,7 @@ export class BuildingManager {
     private static _instance: BuildingManager | null = null;
 
     private _pads: BuildingPad[] = [];
+    private _activeBuildings: Building[] = [];
     private _heroNode: Node | null = null;
     private _buildingContainer: Node | null = null;
     private _collectTimer: number = 0;
@@ -46,7 +47,9 @@ export class BuildingManager {
         this._pads = [];
         
         // 监听建造完成事件
+        // 监听建造完成事件
         EventManager.instance.on(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
+        EventManager.instance.on(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
 
         console.log('[BuildingManager] 初始化完成');
     }
@@ -100,6 +103,11 @@ export class BuildingManager {
 
             if (!buildingNode) {
                  console.error(`[BuildingManager] Failed to create building for type: ${data.buildingTypeId}`);
+            } else {
+                const buildingComp = buildingNode.getComponent(Building);
+                if (buildingComp) {
+                    this._activeBuildings.push(buildingComp);
+                }
             }
         }
 
@@ -118,7 +126,21 @@ export class BuildingManager {
      */
     public cleanup(): void {
         EventManager.instance.off(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
+        EventManager.instance.off(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
+        EventManager.instance.off(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
         this._pads = [];
+        this._activeBuildings = [];
+    }
+
+    public get activeBuildings(): Building[] {
+        return this._activeBuildings;
+    }
+    
+    public unregisterBuilding(building: Building): void {
+        const idx = this._activeBuildings.indexOf(building);
+        if (idx !== -1) {
+            this._activeBuildings.splice(idx, 1);
+        }
     }
 
     /**
