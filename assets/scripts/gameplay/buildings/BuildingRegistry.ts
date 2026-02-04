@@ -61,6 +61,9 @@ export interface BuildingTypeConfig {
 /**
  * 建筑类型注册表
  * 存储所有建筑类型的配置，可扩展添加新类型
+ *
+ * NOTE: 新建筑请先在此注册，再由 BuildingFactory 读取配置生成。
+ * 避免在 GameController 或其他系统中硬编码建筑属性。
  */
 @ccclass('BuildingRegistry')
 export class BuildingRegistry {

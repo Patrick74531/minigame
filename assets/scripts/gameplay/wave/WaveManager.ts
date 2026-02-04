@@ -23,6 +23,10 @@ export interface WaveConfig {
 /**
  * 波次管理器
  * 管理敌人波次的生成
+ *
+ * NOTE: 该版本主要用于“配置波次”模式/旧 HUD。
+ * 若新增核心玩法，请优先对 core/managers/WaveManager 进行扩展，
+ * 并在需要时通过 UI 适配层读取数据。
  */
 export class WaveManager extends Singleton<WaveManager>() {
     private _waves: WaveConfig[] = [];

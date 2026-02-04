@@ -39,6 +39,9 @@ const { ccclass, property } = _decorator;
  * 游戏主控制器 (组件化版本)
  * 职责: 协调各子系统，不包含具体业务逻辑
  * 目标: ~150 行
+ *
+ * NOTE: 扩展新系统时，尽量保持此处只做“装配/编排”。
+ * 业务逻辑应放在对应的 Manager/Registry/Component 中，避免这里膨胀。
  */
 @ccclass('GameController')
 export class GameController extends Component {

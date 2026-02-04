@@ -9,6 +9,8 @@ const { ccclass, property } = _decorator;
  * 战斗系统
  * 管理单位之间的战斗和目标分配
  * 挂载到场景中的战斗管理节点
+ *
+ * NOTE: 与 core/managers/CombatManager 功能重叠，建议后续统一入口。
  */
 @ccclass('CombatSystem')
 export class CombatSystem extends Component {

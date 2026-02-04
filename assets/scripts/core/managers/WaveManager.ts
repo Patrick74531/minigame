@@ -19,6 +19,9 @@ export interface WaveConfig {
 /**
  * 波次管理器
  * 负责敌人波次的生成和管理
+ *
+ * NOTE: 当前由 GameController 驱动（无限波模式）。
+ * 项目内仍存在 gameplay/wave/WaveManager（配置波次版），后续应统一入口。
  */
 export class WaveManager {
     private static _instance: WaveManager | null = null;

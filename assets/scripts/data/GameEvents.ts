@@ -1,3 +1,5 @@
+import type { Node, Vec2, Vec3 } from 'cc';
+
 /**
  * 游戏事件名常量
  * 集中管理所有事件名称，避免硬编码字符串
@@ -64,3 +66,42 @@ export const GameEvents = {
 
 /** 事件名称类型 */
 export type GameEventName = (typeof GameEvents)[keyof typeof GameEvents];
+
+/**
+ * 事件负载类型映射
+ * NOTE: 新增或变更事件时，请同时更新此处，保持事件负载一致性。
+ * 这里允许字段为 optional，以兼容当前不同调用方的载荷结构。
+ */
+export type GameEventPayloads = {
+    [GameEvents.COIN_COLLECTED]: { amount: number; position?: Vec3 };
+    [GameEvents.COIN_CHANGED]: { current: number; delta: number };
+    [GameEvents.BUILDING_PLACED]: { buildingType: string; position: Vec2 };
+    [GameEvents.BUILDING_UPGRADED]: { buildingId: string; level: number };
+    [GameEvents.BUILDING_DESTROYED]: { buildingId: string; building?: unknown };
+    [GameEvents.UNIT_SPAWNED]: { unitType: string; node: Node };
+    [GameEvents.UNIT_DIED]: { unitType: string; node: Node; position?: Vec3 };
+    [GameEvents.UNIT_DAMAGED]: { node: Node; damage: number; currentHp: number };
+    [GameEvents.ENEMY_KILLED]: { enemy: Node; position?: Vec3 };
+    [GameEvents.ENEMY_REACHED_BASE]: { enemy: Node; damage: number };
+    [GameEvents.WAVE_START]: { wave?: number; waveIndex?: number; enemyCount?: number };
+    [GameEvents.WAVE_COMPLETE]: { wave?: number; waveIndex?: number; bonus?: number };
+    [GameEvents.ALL_WAVES_COMPLETE]: void;
+    [GameEvents.GAME_START]: void;
+    [GameEvents.GAME_PAUSE]: void;
+    [GameEvents.GAME_RESUME]: void;
+    [GameEvents.GAME_OVER]: { victory: boolean };
+    [GameEvents.HERO_ATTACK]: { target: Node };
+    [GameEvents.HERO_SKILL_USED]: { skillId: string };
+    [GameEvents.BUILDING_CONSTRUCTED]: {
+        padNode: Node;
+        buildingTypeId?: string;
+        position?: Vec3;
+    };
+    [GameEvents.APPLY_AOE_EFFECT]: {
+        center: Vec3;
+        radius: number;
+        damage: number;
+        slowPercent: number;
+        slowDuration: number;
+    };
+};

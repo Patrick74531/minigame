@@ -6,6 +6,9 @@ import { Unit } from '../../gameplay/units/Unit';
 /**
  * 战斗管理器
  * 负责战斗检测、伤害计算
+ *
+ * NOTE: 当前项目内还有 gameplay/combat/CombatSystem。
+ * 若新增战斗逻辑，请优先统一到一个系统，避免双实现分叉。
  */
 export class CombatManager {
     private static _instance: CombatManager | null = null;

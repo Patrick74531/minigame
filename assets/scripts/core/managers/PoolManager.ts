@@ -23,6 +23,9 @@ interface PoolConfig {
  * 对象池管理器
  * 管理游戏对象的复用，避免频繁创建销毁带来的性能问题
  *
+ * NOTE: 需要重置状态的组件请实现 onSpawn/onDespawn。
+ * 这里通过组件方法名判断，不依赖接口运行时类型。
+ *
  * @example
  * // 注册预制体池
  * PoolManager.instance.registerPool('enemy_slime', slimePrefab, 20);

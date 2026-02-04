@@ -1,7 +1,11 @@
 import { Singleton } from '../base/Singleton';
+import type { GameEventName, GameEventPayloads } from '../../data/GameEvents';
 
 /** 事件回调函数类型 */
 type EventCallback = (...args: any[]) => void;
+
+// NOTE: Set to true only during development if you want stricter event payload checks.
+const ENABLE_EVENT_VALIDATION = false;
 
 /** 事件监听器信息 */
 interface EventListener {
@@ -33,6 +37,11 @@ export class EventManager extends Singleton<EventManager>() {
      * @param callback 回调函数
      * @param target 回调绑定的目标对象
      */
+    public on<K extends GameEventName>(
+        eventName: K,
+        callback: (payload: GameEventPayloads[K]) => void,
+        target?: unknown
+    ): void;
     public on(eventName: string, callback: EventCallback, target?: unknown): void {
         this.addListener(eventName, callback, target, false);
     }
@@ -43,6 +52,11 @@ export class EventManager extends Singleton<EventManager>() {
      * @param callback 回调函数
      * @param target 回调绑定的目标对象
      */
+    public once<K extends GameEventName>(
+        eventName: K,
+        callback: (payload: GameEventPayloads[K]) => void,
+        target?: unknown
+    ): void;
     public once(eventName: string, callback: EventCallback, target?: unknown): void {
         this.addListener(eventName, callback, target, true);
     }
@@ -53,6 +67,11 @@ export class EventManager extends Singleton<EventManager>() {
      * @param callback 回调函数
      * @param target 回调绑定的目标对象
      */
+    public off<K extends GameEventName>(
+        eventName: K,
+        callback: (payload: GameEventPayloads[K]) => void,
+        target?: unknown
+    ): void;
     public off(eventName: string, callback: EventCallback, target?: unknown): void {
         const listeners = this._listeners.get(eventName);
         if (!listeners) return;
@@ -91,7 +110,11 @@ export class EventManager extends Singleton<EventManager>() {
      * @param eventName 事件名称
      * @param args 传递给回调的参数
      */
+    public emit<K extends GameEventName>(eventName: K, payload?: GameEventPayloads[K]): void;
     public emit(eventName: string, ...args: unknown[]): void {
+        if (ENABLE_EVENT_VALIDATION) {
+            this.validatePayload(eventName, args);
+        }
         const listeners = this._listeners.get(eventName);
         if (!listeners) return;
 
@@ -114,6 +137,13 @@ export class EventManager extends Singleton<EventManager>() {
         // 移除一次性监听器
         for (const listener of oneTimeListeners) {
             this.off(eventName, listener.callback, listener.target);
+        }
+    }
+
+    private validatePayload(eventName: string, args: unknown[]): void {
+        // NOTE: Minimal dev-only checks. Keep runtime overhead low.
+        if (args.length > 1) {
+            console.warn(`[EventManager] Event "${eventName}" has multiple args; prefer a single payload object.`);
         }
     }
 
