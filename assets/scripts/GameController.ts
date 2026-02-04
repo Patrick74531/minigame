@@ -16,6 +16,7 @@ import { UIFactory } from './ui/UIFactory';
 import { Joystick } from './ui/Joystick';
 import { BuildingManager } from './gameplay/buildings/BuildingManager';
 import { BuildingPad } from './gameplay/buildings/BuildingPad';
+import { EffectManager } from './core/managers/EffectManager';
 
 const { ccclass, property } = _decorator;
 
@@ -158,6 +159,13 @@ export class GameController extends Component {
         this._container.addChild(this._soldierContainer);
         this._container.addChild(this._buildingContainer);
         this._container.addChild(this._coinContainer);
+        
+        // Effects Container (Overlay)
+        const effectContainer = new Node('Effects');
+        this._container.addChild(effectContainer);
+        
+        // Init Effect Manager
+        EffectManager.instance.initialize(effectContainer);
     }
 
     private setupUI(): void {
