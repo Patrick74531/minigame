@@ -63,7 +63,7 @@ export class GameController extends Component {
 
         // 初始化 Managers
         GameManager.instance.initialize();
-        WaveManager.instance.initialize(this._enemyContainer!, this.maxWaves);
+        WaveManager.instance.initialize(this._enemyContainer!);
         HUDManager.instance.initialize(this._uiCanvas!);
         BuildingManager.instance.initialize(this._buildingContainer!, this._soldierContainer!);
 
@@ -129,12 +129,11 @@ export class GameController extends Component {
         // 波次完成检查
         WaveManager.instance.checkWaveComplete((bonus) => {
             GameManager.instance.addCoins(bonus);
-            if (WaveManager.instance.hasMoreWaves()) {
-                const nextWave = WaveManager.instance.currentWave + 1;
-                this.scheduleOnce(() => WaveManager.instance.startWave(nextWave), 3);
-            } else {
-                console.log('🎉🎉🎉 通关! 🎉🎉🎉');
-            }
+            
+            // Loop forever
+            const nextWave = WaveManager.instance.currentWave + 1;
+            console.log(`[Game] Wave ${WaveManager.instance.currentWave} Complete. Next Wave: ${nextWave}`);
+            this.scheduleOnce(() => WaveManager.instance.startWave(nextWave), 3);
         });
     }
 
@@ -178,6 +177,11 @@ export class GameController extends Component {
     private onEnemyReachedBase(data: any): void {
         const damage = data.damage || 10;
         this.damageBase(damage);
+
+        // Fix: Remove from WaveManager so wave can complete
+        if (data.enemy) {
+            WaveManager.instance.removeEnemy(data.enemy);
+        }
     }
 
     private onUnitDied(data: any): void {

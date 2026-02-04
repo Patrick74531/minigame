@@ -41,12 +41,11 @@ export class WaveManager {
 
     // === 初始化 ===
 
-    public initialize(enemyContainer: Node, maxWaves: number = 999): void {
+    public initialize(enemyContainer: Node): void {
         this._enemyContainer = enemyContainer;
-        this._maxWaves = maxWaves;
         this._enemies = [];
         this._currentWave = 0;
-        console.log('[WaveManager] 初始化完成');
+        console.log('[WaveManager] 初始化完成 (Infinite Mode)');
     }
 
     // === 公共接口 ===
@@ -72,11 +71,15 @@ export class WaveManager {
         this._enemiesSpawned = 0;
         this._enemySpawnTimer = 0;
 
+        // Roguelike Scaling Logic
+        const count = 5 + waveNumber * 2;
+        const hpMult = 1 + (waveNumber - 1) * 0.5;
+
         this._waveConfig = {
             waveNumber,
-            enemyCount: 50 + waveNumber * 10, // Increased for testing
-            spawnInterval: 0.5, // Faster spawn
-            hpMultiplier: 1 + (waveNumber - 1) * 0.3,
+            enemyCount: count,
+            spawnInterval: Math.max(0.2, 0.8 - waveNumber * 0.05),
+            hpMultiplier: hpMult,
         };
 
         console.log('═══════════════════════════════════════');
@@ -129,7 +132,7 @@ export class WaveManager {
      * 是否还有更多波次
      */
     public hasMoreWaves(): boolean {
-        return this._currentWave < this._maxWaves;
+        return true; // Infinite
     }
 
     /**

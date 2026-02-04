@@ -37,6 +37,7 @@ export class HUDManager {
         uiCanvas.getChildByName('CoinDisplay')?.destroy();
         uiCanvas.getChildByName('BaseHPLabel')?.destroy();
         uiCanvas.getChildByName('BuildingInfo')?.destroy();
+        uiCanvas.getChildByName('WaveLabel')?.destroy();
 
         // 创建金币显示
         this._coinLabel = UIFactory.createCoinDisplay(uiCanvas);
@@ -48,6 +49,12 @@ export class HUDManager {
         
         // 创建建造点信息显示
         this.createBuildingInfoLabel(uiCanvas);
+
+        // 创建波次显示 (Top Left)
+        this._waveLabel = UIFactory.createLabel(uiCanvas, 'Wave: 1', 'WaveLabel');
+        this._waveLabel.node.setPosition(-350, 300); // Top Left
+        this._waveLabel.fontSize = 30;
+        this._waveLabel.color = new Color(255, 215, 0, 255); // Gold color
         
         console.log('[HUDManager] 初始化完成');
         
@@ -117,9 +124,9 @@ export class HUDManager {
     /**
      * 更新波次显示
      */
-    public updateWaveDisplay(wave: number, maxWaves: number): void {
+    public updateWaveDisplay(wave: number): void {
         if (this._waveLabel) {
-            this._waveLabel.string = `Wave: ${wave}/${maxWaves}`;
+            this._waveLabel.string = `Wave: ${wave}`;
         }
     }
 
@@ -145,8 +152,8 @@ export class HUDManager {
     // === 事件处理 ===
 
     private onWaveStart(data: { wave: number }): void {
-        // 可以在这里显示波次开始的提示
         console.log(`[HUD] 波次 ${data.wave} 开始`);
+        this.updateWaveDisplay(data.wave);
     }
 
     private onWaveComplete(data: { wave: number; bonus: number }): void {
