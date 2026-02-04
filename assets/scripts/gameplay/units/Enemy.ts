@@ -54,7 +54,7 @@ export class Enemy extends Unit {
         }
     }
 
-    public setTarget(target: Vec3): void {
+    public setTargetPosition(target: Vec3): void {
         this._targetPos.set(target);
     }
 

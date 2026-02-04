@@ -1,9 +1,9 @@
-import { _decorator, Component, Vec3, BoxCollider } from 'cc';
+import { _decorator, Component, Vec3, BoxCollider, Node } from 'cc';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { IPoolable } from '../../core/managers/PoolManager';
-import { Action, tween, Tween } from 'cc'; // Removed unused imports or keep if needed, but adding GameManager
+import { tween, Tween } from 'cc';
 // import { GameManager } from '../../core/managers/GameManager';
 import { GameConfig } from '../../data/GameConfig';
 
@@ -14,7 +14,7 @@ const { ccclass, property } = _decorator;
  * 包含动画、生命周期管理和物理触发
  */
 @ccclass('Coin')
-export class Coin extends BaseComponent implements IPoolable {
+export class Coin extends BaseComponent {
     @property
     public value: number = 5;
 

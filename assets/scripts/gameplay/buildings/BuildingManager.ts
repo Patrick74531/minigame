@@ -163,4 +163,8 @@ export class BuildingManager {
     public get pads(): BuildingPad[] {
         return this._pads;
     }
+
+    private onBuildingDestroyed(data: { building: Building }): void {
+        this.unregisterBuilding(data.building);
+    }
 }

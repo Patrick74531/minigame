@@ -1,4 +1,4 @@
-import { _decorator } from 'cc';
+import { _decorator, Node } from 'cc';
 import { Singleton } from '../base/Singleton';
 import { EventManager } from './EventManager';
 import { GameEvents } from '../../data/GameEvents';

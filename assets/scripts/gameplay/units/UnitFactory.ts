@@ -64,7 +64,7 @@ export class UnitFactory {
         });
 
         // Set Target
-        enemy.setTarget(targetPos);
+        enemy.setTargetPosition(targetPos);
 
         return node;
     }

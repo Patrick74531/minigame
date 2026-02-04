@@ -1,4 +1,4 @@
-import { Node, Vec2 } from 'cc';
+import { Node, Vec2, Vec3 } from 'cc';
 import { Singleton } from '../../core/base/Singleton';
 import { EventManager } from '../../core/managers/EventManager';
 import { PoolManager } from '../../core/managers/PoolManager';
@@ -57,6 +57,10 @@ export class WaveManager extends Singleton<WaveManager>() {
 
     public get totalWaves(): number {
         return this._waves.length;
+    }
+
+    public get enemies(): Node[] {
+        return this._enemyContainer ? this._enemyContainer.children : [];
     }
 
     // === 初始化 ===
@@ -171,7 +175,7 @@ export class WaveManager extends Singleton<WaveManager>() {
         // 设置敌人目标和属性
         const enemyComponent = enemy.getComponent(Enemy);
         if (enemyComponent) {
-            enemyComponent.setTargetPosition(this._targetPosition);
+            enemyComponent.setTargetPosition(new Vec3(this._targetPosition.x, 0, this._targetPosition.y));
 
             // 应用难度系数
             enemyComponent.initStats({

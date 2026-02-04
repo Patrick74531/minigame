@@ -1,5 +1,6 @@
 import { _decorator, Component } from 'cc';
 import { Soldier } from '../units/Soldier';
+import { Enemy } from '../units/Enemy';
 import { MathUtils } from '../../core/utils/MathUtils';
 
 const { ccclass, property } = _decorator;
@@ -40,7 +41,7 @@ export class CombatSystem extends Component {
      * 注册敌人
      */
     public registerEnemy(enemy: Enemy): void {
-        if (!this._enemies.includes(enemy)) {
+        if (this._enemies.indexOf(enemy) === -1) {
             this._enemies.push(enemy);
         }
     }
@@ -59,7 +60,7 @@ export class CombatSystem extends Component {
      * 注册士兵
      */
     public registerSoldier(soldier: Soldier): void {
-        if (!this._soldiers.includes(soldier)) {
+        if (this._soldiers.indexOf(soldier) === -1) {
             this._soldiers.push(soldier);
         }
     }
@@ -89,7 +90,7 @@ export class CombatSystem extends Component {
             if (!soldier.target || !soldier.target.isAlive) {
                 const nearestEnemy = this.findNearestEnemy(soldier);
                 if (nearestEnemy) {
-                    soldier.chase(nearestEnemy);
+                    soldier.setTarget(nearestEnemy);
                 }
             }
         }
@@ -127,7 +128,8 @@ export class CombatSystem extends Component {
         for (const enemy of this._enemies) {
             if (!enemy.isAlive) continue;
 
-            const distance = MathUtils.distanceSquared(position, enemy.node.position);
+            // Cast to any to bypass generic object vs Vec2 strictness if simple, or use Vec2
+            const distance = MathUtils.distanceSquared(position as any, enemy.node.position);
 
             if (distance <= rangeSquared && distance < minDistance) {
                 minDistance = distance;

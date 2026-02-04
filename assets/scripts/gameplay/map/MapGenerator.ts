@@ -211,7 +211,7 @@ export class MapGenerator extends Component {
             // For primitive box(1,1,1), default collider size(1,1,1) matches perfectly.
 
             // Allow physics interactions
-            collider.group = 1; // Default
+            collider.setGroup(1); // Default
         }
 
         // Simple Instancing / Material reuse

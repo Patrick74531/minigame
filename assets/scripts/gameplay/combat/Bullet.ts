@@ -30,6 +30,9 @@ export class Bullet extends BaseComponent {
     public slowPercent: number = 0; // > 0 means Slow Effect
     public slowDuration: number = 0;
 
+    public chainCount: number = 0;
+    public chainRange: number = 0;
+
     public setTarget(target: Node): void {
         this._target = target;
         this.updateVelocity();
@@ -155,11 +158,13 @@ export class Bullet extends BaseComponent {
             this.chainCount--;
 
             // Visual Trail/Zap
-            EffectFactory.createLightningBolt(
-                this.node.parent,
-                this.node.position,
-                nextTarget.position
-            );
+            if (this.node.parent) {
+                EffectFactory.createLightningBolt(
+                    this.node.parent,
+                    this.node.position,
+                    nextTarget.position
+                );
+            }
 
             // Increase speed for bounce to make it look snappier
             this.speed *= 1.5;
