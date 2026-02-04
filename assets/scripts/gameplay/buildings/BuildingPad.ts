@@ -228,7 +228,7 @@ export class BuildingPad extends BaseComponent {
         this._padMaterial.setProperty('mainColor', new Color(255, 200, 0, 255)); 
 
         renderer.material = this._padMaterial;
-        padNode.setPosition(0, 0.05, 0);
+        padNode.setPosition(0, 0.16, 0);
 
         const labelRoot = new Node('LabelRoot');
         this.node.addChild(labelRoot);

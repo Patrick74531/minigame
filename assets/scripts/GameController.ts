@@ -1,4 +1,5 @@
 import { _decorator, Component, Node, Input, input, EventTouch, Vec2, Vec3, PhysicsSystem, geometry, Camera } from 'cc';
+import { CameraFollow } from './core/camera/CameraFollow';
 import { GameManager } from './core/managers/GameManager';
 import { EventManager } from './core/managers/EventManager';
 import { WaveManager } from './core/managers/WaveManager';
@@ -111,7 +112,25 @@ export class GameController extends Component {
 
         // Spawn Hero at (1, 1) which matches the MapGenerator center (safe zone)
         // Previous (0, -2) was between tiles and caused physics ejection
+        // Spawn Hero at (1, 1) which matches the MapGenerator center (safe zone)
+        // Previous (0, -2) was between tiles and caused physics ejection
         this._hero = UnitFactory.createHero(this._soldierContainer!, 1, 1);
+
+        // Setup Camera Follow
+        const mainCamera = this.node.scene.getComponentInChildren(Camera);
+        if (mainCamera) {
+            let follow = mainCamera.node.getComponent(CameraFollow);
+            if (!follow) {
+                follow = mainCamera.node.addComponent(CameraFollow);
+                // Set default offset based on current view relative to (1, 1) or just hardcode a good one
+                // Current camera likely at specific pos.
+                // Let's rely on CameraFollow default (0, 10, 10) or set one that matches current look
+                follow.offset = new Vec3(0, 10, 8); // Closer view (Zoomed continuously)
+            }
+            follow.target = this._hero;
+        } else {
+            console.warn('[GameController] Main Camera not found!');
+        }
 
         // 设置英雄引用给建造管理器
         BuildingManager.instance.setHeroNode(this._hero);
