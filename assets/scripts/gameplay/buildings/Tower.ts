@@ -34,6 +34,11 @@ export class Tower extends Building {
     @property
     public bulletSlowDuration: number = 0;
 
+    @property
+    public chainCount: number = 0;
+    @property
+    public chainRange: number = 0;
+
     private _attackTimer: number = 0;
     private _target: Node | null = null;
     
@@ -179,6 +184,10 @@ export class Tower extends Building {
         bullet.slowPercent = this.bulletSlowPercent;
         bullet.explosionRadius = this.bulletExplosionRadius;
         bullet.slowDuration = this.bulletSlowDuration;
+        
+        // Chain Lightning
+        bullet.chainCount = this.chainCount;
+        bullet.chainRange = this.chainRange;
 
         bullet.setTarget(target);
     }

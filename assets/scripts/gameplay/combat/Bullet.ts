@@ -3,6 +3,8 @@ import { BaseComponent } from '../../core/base/BaseComponent';
 import { Unit, UnitType } from '../units/Unit';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
+import { EffectFactory } from '../effects/EffectFactory';
+import { WaveManager } from '../../core/managers/WaveManager';
 
 const { ccclass, property } = _decorator;
 
@@ -133,9 +135,71 @@ export class Bullet extends BaseComponent {
                 this.applyDamage(unit);
             }
 
+            // 2. Chain Logic (Bounce)
+            if (this.chainCount > 0 && this.chainRange > 0) {
+                this.handleChainBounce(unit.node); 
+                // Do NOT destroy bullet if bouncing
+                return; 
+            }
+
             this.createHitEffect();
             this.node.destroy(); 
         }
+    }
+
+    private handleChainBounce(currentHitNode: Node): void {
+        // Find nearest enemy excluding current one
+        const nextTarget = this.findNextChainTarget(currentHitNode);
+        
+        if (nextTarget) {
+            console.log(`[Bullet] Chaining to ${nextTarget.name}. Remaining: ${this.chainCount}`);
+            this.chainCount--;
+            
+            // Visual Trail/Zap
+            EffectFactory.createLightningBolt(this.node.parent, this.node.position, nextTarget.position);
+
+            // Increase speed for bounce to make it look snappier
+            this.speed *= 1.5;
+
+            // Update Target
+            this._target = nextTarget;
+            this.updateVelocity();
+            
+            // Reset lifetime so it doesn't expire mid-bounce
+            this._lifetime = 0; 
+            
+            // Apply reduced damage on bounce? (Optional)
+            this.damage = Math.floor(this.damage * 0.8); 
+        } else {
+            // No target found, chain ends
+            this.createHitEffect();
+            this.node.destroy();
+        }
+    }
+
+    private findNextChainTarget(excludeNode: Node): Node | null {
+        // const { WaveManager } = require('../../core/managers/WaveManager'); 
+        const enemies = WaveManager.instance.enemies;
+        let nearest: Node | null = null;
+        let minMsg = this.chainRange * this.chainRange;
+
+        const myPos = this.node.position;
+
+        for (const enemy of enemies) {
+            if (!enemy.isValid || enemy === excludeNode) continue;
+            const unit = enemy.getComponent(Unit);
+            if (!unit || !unit.isAlive) continue;
+
+            const dx = enemy.position.x - myPos.x;
+            const dz = enemy.position.z - myPos.z;
+            const distSqr = dx * dx + dz * dz;
+
+            if (distSqr < minMsg) {
+                minMsg = distSqr;
+                nearest = enemy;
+            }
+        }
+        return nearest;
     }
 
     private applyDamage(unit: Unit): void {

@@ -193,6 +193,10 @@ export class BuildingFactory {
                  if (config.features.bulletExplosionRadius) tower.bulletExplosionRadius = config.features.bulletExplosionRadius;
                  if (config.features.bulletSlowPercent) tower.bulletSlowPercent = config.features.bulletSlowPercent;
                  if (config.features.bulletSlowDuration) tower.bulletSlowDuration = config.features.bulletSlowDuration;
+                 
+                 // Chain Lightning
+                 if (config.features.chainCount) tower.chainCount = config.features.chainCount;
+                 if (config.features.chainRange) tower.chainRange = config.features.chainRange;
              }
          }
 

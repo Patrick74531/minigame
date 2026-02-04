@@ -44,6 +44,10 @@ export interface BuildingTypeConfig {
         bulletExplosionRadius?: number;
         bulletSlowPercent?: number;
         bulletSlowDuration?: number;
+        
+        // Chain Lightning
+        chainCount?: number;
+        chainRange?: number;
     };
 }
 
@@ -130,6 +134,31 @@ export class BuildingRegistry {
                 bulletExplosionRadius: 2.5,
                 bulletSlowPercent: 0.5,
                 bulletSlowDuration: 2.0
+            }
+        });
+
+        // 闪电塔 - 连锁攻击
+        this.register({
+            id: 'lightning_tower',
+            name: '闪电塔',
+            cost: 15,
+            buildTime: 0,
+            description: '攻击并在敌人间弹射',
+            role: 'tower',
+            visual: {
+                colorHex: '#800080', // Purple
+                scale: { x: 0.4, y: 0.8, z: 0.4 }
+            },
+            stats: {
+                hp: 250,
+                attackRange: 20,
+                attackDamage: 15, // Damage per hit
+                attackInterval: 1.0
+            },
+            features: {
+                chainCount: 3,
+                chainRange: 8,
+                bulletColorHex: '#A020F0'
             }
         });
 

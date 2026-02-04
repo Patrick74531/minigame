@@ -81,35 +81,48 @@ export class GameController extends Component {
     }
 
     protected start(): void {
-        GameManager.instance.startGame();
+        console.log('[GameController] start() called');
+        try {
+            GameManager.instance.startGame();
 
-        // 创建初始实体
-        this._base = BuildingFactory.createBase(this._buildingContainer!, 0, 0, 100);
-        
-        const b1 = BuildingFactory.createBarracks(this._buildingContainer!, -2.5, 1);
-        b1.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
-        this._buildings.push(b1);
+            // 创建初始实体
+            console.log('[GameController] Creating Base...');
+            this._base = BuildingFactory.createBase(this._buildingContainer!, 0, 0, 100);
+            
+            console.log('[GameController] Creating Barracks 1...');
+            const b1 = BuildingFactory.createBarracks(this._buildingContainer!, -2.5, 1);
+            b1.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
+            this._buildings.push(b1);
 
-        const b2 = BuildingFactory.createBarracks(this._buildingContainer!, 2.5, 1);
-        b2.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
-        this._buildings.push(b2);
+            console.log('[GameController] Creating Barracks 2...');
+            const b2 = BuildingFactory.createBarracks(this._buildingContainer!, 2.5, 1);
+            b2.getComponent(Building)?.setUnitContainer(this._soldierContainer!);
+            this._buildings.push(b2);
 
-        // Test Tower
-        const t1 = BuildingFactory.createTower(this._buildingContainer!, 0, 3);
-        this._buildings.push(t1);
+            // Test Tower
+            console.log('[GameController] Creating Test Tower...');
+            const t1 = BuildingFactory.createTower(this._buildingContainer!, 0, 3);
+            this._buildings.push(t1);
 
-        this._hero = UnitFactory.createHero(this._soldierContainer!, 0, -1.5);
+            console.log('[GameController] Creating Hero...');
+            this._hero = UnitFactory.createHero(this._soldierContainer!, 0, -1.5);
 
-        // 设置英雄引用给建造管理器
-        BuildingManager.instance.setHeroNode(this._hero);
+            // 设置英雄引用给建造管理器
+            BuildingManager.instance.setHeroNode(this._hero);
 
-        // 创建建造点
-        this.createBuildingPads();
+            // 创建建造点
+            console.log('[GameController] Creating Building Pads...');
+            this.createBuildingPads();
 
-        console.log(`[Game] 💰 初始金币: ${GameManager.instance.coins}`);
+            console.log(`[Game] 💰 初始金币: ${GameManager.instance.coins}`);
 
-        // 开始第一波
-        this.scheduleOnce(() => WaveManager.instance.startWave(1), 2);
+            // 开始第一波
+            this.scheduleOnce(() => WaveManager.instance.startWave(1), 2);
+            
+            console.log('[GameController] start() completed successfully');
+        } catch (error) {
+            console.error('[GameController] CRASH in start():', error);
+        }
     }
 
     protected update(dt: number): void {
@@ -224,20 +237,21 @@ export class GameController extends Component {
         // 创建几个建造点
         const padPositions = [
             { x: -4, y: 3, type: 'barracks' },
-            { x: 4, y: 3, type: 'barracks' },
-            { x: -4, y: -3, type: 'frost_tower' }, // New Frost Tower
+            { x: 4, y: 3, type: 'lightning_tower' }, // Changed from barracks to test lightning
+            { x: -4, y: -3, type: 'frost_tower' },
             { x: 4, y: -3, type: 'tower' },
         ];
 
         for (const pos of padPositions) {
-            // TEST: Pre-spawn Frost Tower
-            if (pos.type === 'frost_tower') {
-                 BuildingFactory.createFrostTower(
+            // TEST: Pre-spawn Frost Tower or Lightning Tower
+            if (pos.type === 'frost_tower' || pos.type === 'lightning_tower') {
+                 BuildingFactory.createBuilding(
                     this._buildingContainer!,
                     pos.x,
-                    pos.y
+                    pos.y,
+                    pos.type
                  );
-                 console.log(`[GameController] Pre-spawned Frost Tower at (${pos.x}, 0, ${pos.y})`);
+                 console.log(`[GameController] Pre-spawned ${pos.type} at (${pos.x}, 0, ${pos.y})`);
                  continue; // Skip creating pad
             }
 
