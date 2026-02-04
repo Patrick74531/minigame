@@ -1,5 +1,6 @@
 import { _decorator, Vec2, Vec3, Node, Component, RigidBody, CapsuleCollider, ITriggerEvent, PhysicsSystem } from 'cc';
 import { Unit, UnitType, UnitState } from './Unit';
+import { GameManager } from '../../core/managers/GameManager';
 import { WaveManager } from '../../core/managers/WaveManager';
 import { GameConfig } from '../../data/GameConfig';
 import { Coin } from '../economy/Coin';
@@ -15,6 +16,13 @@ const { ccclass, property } = _decorator;
 export class Hero extends Unit {
     // 移动输入向量 (x, y) -1 ~ 1
     private _inputVector: Vec2 = new Vec2(0, 0);
+
+    public onDespawn(): void {
+        if (GameManager.instance.hero === this.node) {
+            GameManager.instance.hero = null;
+        }
+        super.onDespawn();
+    }
 
     protected initialize(): void {
         super.initialize();
@@ -55,6 +63,9 @@ export class Hero extends Unit {
     }
 
     protected start(): void {
+        // Ensure we are registered even if onSpawn wasn't called (e.g. initial creation)
+        GameManager.instance.hero = this.node;
+
         const col = this.node.getComponent(CapsuleCollider);
         if (col) {
             col.on('onTriggerEnter', this.onTriggerEnter, this);
@@ -83,6 +94,7 @@ export class Hero extends Unit {
         this._state = UnitState.IDLE;
         this._inputVector.set(0, 0);
         this._coinStack = []; // 重置金币栈
+        GameManager.instance.hero = this.node;
     }
 
     /**

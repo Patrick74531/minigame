@@ -3,6 +3,8 @@ import { BaseComponent } from '../../core/base/BaseComponent';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { IPoolable } from '../../core/managers/PoolManager';
+import { Action, tween, Tween } from 'cc'; // Removed unused imports or keep if needed, but adding GameManager
+import { GameManager } from '../../core/managers/GameManager';
 import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass, property } = _decorator;
@@ -39,18 +41,49 @@ export class Coin extends BaseComponent implements IPoolable {
     protected update(dt: number): void {
         if (this._isCollecting) return;
 
-        this._lifetime += dt;
+        // Magnet Logic
+        const hero = GameManager.instance.hero;
+        let isAttracted = false;
 
-        // Life Cycle
-        if (this._lifetime >= GameConfig.ECONOMY.COIN_LIFETIME) {
-            this.autoCollect();
-            return;
+        if (hero) {
+            // Using world position for accurate distance regardless of hierarchy
+            const heroPos = hero.worldPosition;
+            const myPos = this.node.worldPosition;
+            const dist = Vec3.distance(heroPos, myPos);
+
+            if (dist < 1.5) { // Magnet Radius (Reduced from 5.0)
+                isAttracted = true;
+                
+                // Move towards hero
+                const direction = new Vec3();
+                Vec3.subtract(direction, heroPos, myPos);
+                // Aim slightly higher (center of body)
+                direction.y += 0.5; 
+                direction.normalize();
+
+                const speed = 15.0; // Magnet Speed
+                const moveStep = direction.multiplyScalar(speed * dt);
+                
+                const newPos = new Vec3();
+                Vec3.add(newPos, myPos, moveStep);
+                this.node.setWorldPosition(newPos);
+            }
         }
 
-        // Floating Animation
-        // y = startY + sin(t)
-        const floatY = Math.sin(this._lifetime * 5) * 0.1;
-        this.node.setPosition(this.node.position.x, this.startY + floatY, this.node.position.z);
+        if (!isAttracted) {
+            this._lifetime += dt;
+
+            // Life Cycle
+            if (this._lifetime >= GameConfig.ECONOMY.COIN_LIFETIME) {
+                this.autoCollect();
+                return;
+            }
+
+            // Floating Animation
+            // y = startY + sin(t)
+            const floatY = Math.sin(this._lifetime * 5) * 0.1;
+            this.node.setPosition(this.node.position.x, this.startY + floatY, this.node.position.z);
+        }
     }
 
     // === IPoolable ===
