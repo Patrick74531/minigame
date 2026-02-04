@@ -16,7 +16,7 @@ const { ccclass, property } = _decorator;
 export class Enemy extends Unit {
     /** Distance to Base to trigger "Reached Base" logic */
     private readonly ARRIVAL_DISTANCE = 0.6;
-    
+
     // Target position (Base)
     private _targetPos: Vec3 = new Vec3(0, 0, 0);
 
@@ -34,7 +34,7 @@ export class Enemy extends Unit {
             attackInterval: GameConfig.ENEMY.ATTACK_INTERVAL,
             moveSpeed: GameConfig.ENEMY.MOVE_SPEED,
         });
-        
+
         this._state = UnitState.MOVING;
         this.setupPhysics();
     }
@@ -86,17 +86,13 @@ export class Enemy extends Unit {
         }
 
         // Move towards Base
-        const speed = this.moveSpeed; 
+        const speed = this.moveSpeed;
         const dirX = dx / distToTarget;
         const dirZ = dz / distToTarget;
 
         // Simple movement (Kinematic or manual)
-        this.node.setPosition(
-            pos.x + dirX * speed * dt, 
-            0.5, 
-            pos.z + dirZ * speed * dt
-        );
-        
+        this.node.setPosition(pos.x + dirX * speed * dt, 0.5, pos.z + dirZ * speed * dt);
+
         // Face target
         this.node.lookAt(new Vec3(this._targetPos.x, 0.5, this._targetPos.z));
     }
@@ -106,14 +102,14 @@ export class Enemy extends Unit {
     }
 
     private onCollisionStay(event: ICollisionEvent): void {
-         if (!this._blockedTarget) {
-             this.checkCollision(event);
-         }
+        if (!this._blockedTarget) {
+            this.checkCollision(event);
+        }
     }
 
     private checkCollision(event: ICollisionEvent): void {
         const other = event.otherCollider;
-        
+
         // Check if it's a Building (Wall)
         const building = other.node.getComponent(Building);
         if (building && building.isAlive) {
@@ -140,9 +136,9 @@ export class Enemy extends Unit {
     private onReachBase(): void {
         EventManager.instance.emit(GameEvents.ENEMY_REACHED_BASE, {
             enemy: this.node,
-            damage: 10
+            damage: 10,
         });
-        
+
         this._state = UnitState.DEAD;
         this.node.destroy();
     }
@@ -152,8 +148,8 @@ export class Enemy extends Unit {
         if (this._blockedTarget && this._blockedTarget.isAlive) {
             this._blockedTarget.takeDamage(this._stats.attack);
         } else if (this._target && this._target.isAlive) {
-             // Default Unit Attack (if fighting soldiers)
-             this._target.takeDamage(this._stats.attack, this);
+            // Default Unit Attack (if fighting soldiers)
+            this._target.takeDamage(this._stats.attack, this);
         } else {
             // Nothing to attack
             this._state = UnitState.MOVING;
@@ -161,7 +157,7 @@ export class Enemy extends Unit {
     }
 
     // === Aggro Logic ===
-    
+
     private readonly AGGRO_RANGE = 2.5;
     private _scanTimer: number = 0;
 
@@ -171,7 +167,8 @@ export class Enemy extends Unit {
 
         // Scan for buildings periodically
         this._scanTimer += dt;
-        if (this._scanTimer >= 0.2) { // 5 times a second
+        if (this._scanTimer >= 0.2) {
+            // 5 times a second
             this._scanTimer = 0;
             this.scanForBuildings();
         }
@@ -190,7 +187,7 @@ export class Enemy extends Unit {
         // Use GameManager (Cycle-free storage of active building nodes)
         // Ensure GameManager is imported
         if (!GameManager.instance) return;
-        
+
         const buildingNodes = GameManager.instance.activeBuildings;
         if (!buildingNodes || buildingNodes.length === 0) return;
 

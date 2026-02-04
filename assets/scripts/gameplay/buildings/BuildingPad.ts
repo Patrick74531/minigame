@@ -1,4 +1,21 @@
-import { _decorator, Node, Color, MeshRenderer, primitives, utils, Material, Label, UITransform, Billboard, RenderRoot2D, Layers, BoxCollider, ITriggerEvent, Vec3, RigidBody } from 'cc';
+import {
+    _decorator,
+    Node,
+    Color,
+    MeshRenderer,
+    primitives,
+    utils,
+    Material,
+    Label,
+    UITransform,
+    Billboard,
+    RenderRoot2D,
+    Layers,
+    BoxCollider,
+    ITriggerEvent,
+    Vec3,
+    RigidBody,
+} from 'cc';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { BuildingRegistry, BuildingTypeConfig } from './BuildingRegistry';
 import { EventManager } from '../../core/managers/EventManager';
@@ -12,9 +29,9 @@ const { ccclass, property } = _decorator;
  * 建造点状态
  */
 export enum BuildingPadState {
-    WAITING,    // 等待金币
-    BUILDING,   // 建造中
-    COMPLETE    // 建造完成
+    WAITING, // 等待金币
+    BUILDING, // 建造中
+    COMPLETE, // 建造完成
 }
 
 /**
@@ -92,11 +109,15 @@ export class BuildingPad extends BaseComponent {
         this.setupPhysics();
 
         // Previous start logic
-        console.log(`[BuildingPad] start() \u88ab\u8c03\u7528, buildingTypeId=${this.buildingTypeId}`);
+        console.log(
+            `[BuildingPad] start() \u88ab\u8c03\u7528, buildingTypeId=${this.buildingTypeId}`
+        );
         const config = BuildingRegistry.instance.get(this.buildingTypeId);
         this._config = config ?? null;
         if (!this._config) {
-            console.error(`[BuildingPad] \u672a\u627e\u5230\u5efa\u7b51\u7c7b\u578b: ${this.buildingTypeId}`);
+            console.error(
+                `[BuildingPad] \u672a\u627e\u5230\u5efa\u7b51\u7c7b\u578b: ${this.buildingTypeId}`
+            );
             return;
         }
 
@@ -116,20 +137,22 @@ export class BuildingPad extends BaseComponent {
         if (!col) {
             col = this.node.addComponent(BoxCollider);
         }
-        
+
         // Force update properties even if component existed (e.g. from Prefab)
         col.isTrigger = true;
         // Tall box to catch Hero jumping or slight Y offsets
-        col.center = new Vec3(0, 2.5, 0); 
+        col.center = new Vec3(0, 2.5, 0);
         col.size = new Vec3(this.collectRadius, 5.0, this.collectRadius);
-        
+
         col.setGroup(1 << 2); // BUILDING_PAD
         col.setMask(1 << 0); // Collide with HERO
-        
+
         col.on('onTriggerEnter', this.onTriggerEnter, this);
         col.on('onTriggerExit', this.onTriggerExit, this);
-        
-        console.log(`[BuildingPad] Physics Setup Complete. Collider Size: ${col.size}, Trigger: ${col.isTrigger}`);
+
+        console.log(
+            `[BuildingPad] Physics Setup Complete. Collider Size: ${col.size}, Trigger: ${col.isTrigger}`
+        );
     }
 
     /**
@@ -137,7 +160,9 @@ export class BuildingPad extends BaseComponent {
      */
     private onTriggerEnter(event: ITriggerEvent): void {
         const otherNode = event.otherCollider.node;
-        console.log(`[BuildingPad] OnTriggerEnter: this=${this.node.name}, other=${otherNode.name}, group=${event.otherCollider.getGroup()}`);
+        console.log(
+            `[BuildingPad] OnTriggerEnter: this=${this.node.name}, other=${otherNode.name}, group=${event.otherCollider.getGroup()}`
+        );
         console.log(`[BuildingPad] Scale: ${this.node.getWorldScale()}`);
 
         let hero = otherNode.getComponent(Hero);
@@ -151,10 +176,10 @@ export class BuildingPad extends BaseComponent {
             console.log('[BuildingPad] Hero Component Found!');
             this._heroInArea = true;
             this._heroRef = hero;
-            
+
             // Show Info - Use imported HUDManager directly
             if (HUDManager.instance) {
-                 HUDManager.instance.showBuildingInfo(
+                HUDManager.instance.showBuildingInfo(
                     this.buildingName,
                     this.requiredCoins,
                     this.collectedCoins
@@ -174,7 +199,7 @@ export class BuildingPad extends BaseComponent {
         if (hero) {
             this._heroInArea = false;
             this._heroRef = null;
-            
+
             // Hide Info
             if (HUDManager.instance) {
                 HUDManager.instance.hideBuildingInfo();
@@ -196,15 +221,15 @@ export class BuildingPad extends BaseComponent {
 
             // Perform Collection (throttled by collect timer or frame)
             if (this._heroRef.coinCount > 0) {
-                 const collected = this.tryCollectCoin(this._heroRef.coinCount);
-                 if (collected > 0) {
-                      this._heroRef.removeCoin(collected);
-                      
-                      // Update HUD periodically or on change
-                      if (HUDManager.instance) {
-                          HUDManager.instance.updateCoinDisplay(this._heroRef.coinCount);
-                      }
-                 }
+                const collected = this.tryCollectCoin(this._heroRef.coinCount);
+                if (collected > 0) {
+                    this._heroRef.removeCoin(collected);
+
+                    // Update HUD periodically or on change
+                    if (HUDManager.instance) {
+                        HUDManager.instance.updateCoinDisplay(this._heroRef.coinCount);
+                    }
+                }
             }
         }
     }
@@ -217,7 +242,7 @@ export class BuildingPad extends BaseComponent {
     private createVisuals(): void {
         const padNode = new Node('PadVisual');
         this.node.addChild(padNode);
-        
+
         const renderer = padNode.addComponent(MeshRenderer);
         renderer.mesh = utils.MeshUtils.createMesh(
             primitives.box({ width: 1.2, height: 0.1, length: 1.2 })
@@ -225,7 +250,7 @@ export class BuildingPad extends BaseComponent {
 
         this._padMaterial = new Material();
         this._padMaterial.initialize({ effectName: 'builtin-unlit' });
-        this._padMaterial.setProperty('mainColor', new Color(255, 200, 0, 255)); 
+        this._padMaterial.setProperty('mainColor', new Color(255, 200, 0, 255));
 
         renderer.material = this._padMaterial;
         padNode.setPosition(0, 0.16, 0);
@@ -234,7 +259,7 @@ export class BuildingPad extends BaseComponent {
         this.node.addChild(labelRoot);
         labelRoot.addComponent(RenderRoot2D);
         labelRoot.addComponent(Billboard);
-        
+
         const labelNode = new Node('CostLabel');
         labelRoot.addChild(labelNode);
         labelNode.layer = 1;
@@ -244,7 +269,7 @@ export class BuildingPad extends BaseComponent {
 
         this._label = labelNode.addComponent(Label);
         this._label.string = `${this.requiredCoins}`;
-        this._label.fontSize = 80; 
+        this._label.fontSize = 80;
         this._label.lineHeight = 80;
         this._label.color = new Color(0, 0, 0, 255);
         this._label.isBold = true;
@@ -259,7 +284,7 @@ export class BuildingPad extends BaseComponent {
         if (this._label) {
             const remaining = this.requiredCoins - this._collectedCoins;
             this._label.string = `${remaining}`;
-            
+
             if (this.progress >= 1) {
                 this._label.color = new Color(0, 255, 0, 255);
             } else if (this.progress >= 0.5) {
@@ -304,14 +329,14 @@ export class BuildingPad extends BaseComponent {
      */
     private onBuildComplete(): void {
         this._state = BuildingPadState.COMPLETE;
-        
+
         console.log(`[BuildingPad] 建造完成: ${this._config?.name}`);
 
         // 发送建造完成事件
         EventManager.instance.emit(GameEvents.BUILDING_CONSTRUCTED, {
             padNode: this.node,
             buildingTypeId: this.buildingTypeId,
-            position: this.node.position.clone()
+            position: this.node.position.clone(),
         });
     }
 

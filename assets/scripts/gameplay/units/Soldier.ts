@@ -14,7 +14,7 @@ export class Soldier extends Unit {
     /** 索敌间隔（秒）*/
     private readonly SEEK_INTERVAL = 0.5;
     private _seekTimer: number = 0;
-    
+
     /** 当前追踪的敌人节点（外部可读取） */
     public currentTarget: Node | null = null;
 
@@ -108,7 +108,8 @@ export class Soldier extends Unit {
         const dz = targetPos.z - myPos.z; // 3D
         const distance = Math.sqrt(dx * dx + dz * dz);
 
-        if (distance <= this._stats.attackRange) { // e.g. 0.6
+        if (distance <= this._stats.attackRange) {
+            // e.g. 0.6
             this._state = UnitState.ATTACKING;
             return;
         }
@@ -119,15 +120,13 @@ export class Soldier extends Unit {
         const dirZ = dz / distance;
 
         if (this.node.getComponent('cc.RigidBody')) {
-             (this.node.getComponent('cc.RigidBody') as any).setLinearVelocity(new Vec3(dirX * speed, 0, dirZ * speed));
-        } else {
-             this.node.setPosition(
-                myPos.x + dirX * speed * dt,
-                0.5,
-                myPos.z + dirZ * speed * dt
+            (this.node.getComponent('cc.RigidBody') as any).setLinearVelocity(
+                new Vec3(dirX * speed, 0, dirZ * speed)
             );
+        } else {
+            this.node.setPosition(myPos.x + dirX * speed * dt, 0.5, myPos.z + dirZ * speed * dt);
         }
-        
+
         // Face target
         this.node.lookAt(new Vec3(targetPos.x, 0, targetPos.z));
     }
@@ -141,4 +140,3 @@ export class Soldier extends Unit {
         this.currentTarget = null;
     }
 }
-

@@ -28,7 +28,7 @@ export class StackVisualizer extends Component {
         if (!this.container) {
             this.container = new Node('StackContainer');
             this.node.addChild(this.container);
-            this.container.setPosition(0, 1.2, 0); 
+            this.container.setPosition(0, 1.2, 0);
         }
 
         // Visual logic extracted from Hero.ts
@@ -37,7 +37,7 @@ export class StackVisualizer extends Component {
 
         // Calculate Position
         const targetPos = new Vec3(0, this._stack.length * this.itemHeight, 0);
-        
+
         // Immediate set + random rot
         item.setPosition(targetPos);
         item.setRotationFromEuler(0, Math.random() * 360, 0);

@@ -23,11 +23,11 @@ export class Bullet extends BaseComponent {
     private _target: Node | null = null;
     private _velocity: Vec3 = new Vec3();
     private _lifetime: number = 0;
-    private _maxLifetime: number = 3; 
+    private _maxLifetime: number = 3;
 
     // === Special Properties ===
     public explosionRadius: number = 0; // > 0 means AOE
-    public slowPercent: number = 0;     // > 0 means Slow Effect
+    public slowPercent: number = 0; // > 0 means Slow Effect
     public slowDuration: number = 0;
 
     public setTarget(target: Node): void {
@@ -38,7 +38,7 @@ export class Bullet extends BaseComponent {
     protected initialize(): void {
         console.log('[Bullet] Created/Initialized');
         this._lifetime = 0;
-        
+
         // Force Layer to Default (1 << 0)
         this.node.layer = 1 << 0;
 
@@ -56,9 +56,9 @@ export class Bullet extends BaseComponent {
             col.isTrigger = true;
             col.size = new Vec3(0.5, 0.5, 0.5);
         }
-        col.setGroup(1 << 4); 
-        col.setMask(1 << 3);  
-        
+        col.setGroup(1 << 4);
+        col.setMask(1 << 3);
+
         col.on('onTriggerEnter', this.onTriggerEnter, this);
     }
 
@@ -81,8 +81,8 @@ export class Bullet extends BaseComponent {
         if (this._target && this._target.isValid) {
             this.updateVelocity();
         } else if (this._velocity.lengthSqr() < 0.001) {
-             this.node.destroy();
-             return;
+            this.node.destroy();
+            return;
         }
 
         const currentPos = this.node.position.clone();
@@ -90,20 +90,20 @@ export class Bullet extends BaseComponent {
         Vec3.multiplyScalar(move, this._velocity, dt);
         Vec3.add(currentPos, currentPos, move);
         this.node.setPosition(currentPos);
-        
+
         // Face direction
         if (this._velocity.lengthSqr() > 0.1) {
-             const lookAtPos = currentPos.clone().add(this._velocity);
-             this.node.lookAt(lookAtPos);
+            const lookAtPos = currentPos.clone().add(this._velocity);
+            this.node.lookAt(lookAtPos);
         }
     }
 
     private updateVelocity(): void {
         if (!this._target) return;
-        
+
         const myPos = this.node.position;
         const targetPos = this._target.position;
-        
+
         // Direction
         Vec3.subtract(this._velocity, targetPos, myPos);
         this._velocity.normalize().multiplyScalar(this.speed);
@@ -117,9 +117,8 @@ export class Bullet extends BaseComponent {
 
         // Check if unit (Direct Hit)
         const unit = other.getComponent(Unit);
-        
-        if (unit && (unit.unitType === UnitType.ENEMY)) {
-            
+
+        if (unit && unit.unitType === UnitType.ENEMY) {
             // 1. AOE Logic
             if (this.explosionRadius > 0) {
                 // Decoupled: Emit event for Manager to handle
@@ -128,7 +127,7 @@ export class Bullet extends BaseComponent {
                     radius: this.explosionRadius,
                     damage: this.damage,
                     slowPercent: this.slowPercent,
-                    slowDuration: this.slowDuration
+                    slowDuration: this.slowDuration,
                 });
             } else {
                 // Single Target
@@ -137,26 +136,30 @@ export class Bullet extends BaseComponent {
 
             // 2. Chain Logic (Bounce)
             if (this.chainCount > 0 && this.chainRange > 0) {
-                this.handleChainBounce(unit.node); 
+                this.handleChainBounce(unit.node);
                 // Do NOT destroy bullet if bouncing
-                return; 
+                return;
             }
 
             this.createHitEffect();
-            this.node.destroy(); 
+            this.node.destroy();
         }
     }
 
     private handleChainBounce(currentHitNode: Node): void {
         // Find nearest enemy excluding current one
         const nextTarget = this.findNextChainTarget(currentHitNode);
-        
+
         if (nextTarget) {
             console.log(`[Bullet] Chaining to ${nextTarget.name}. Remaining: ${this.chainCount}`);
             this.chainCount--;
-            
+
             // Visual Trail/Zap
-            EffectFactory.createLightningBolt(this.node.parent, this.node.position, nextTarget.position);
+            EffectFactory.createLightningBolt(
+                this.node.parent,
+                this.node.position,
+                nextTarget.position
+            );
 
             // Increase speed for bounce to make it look snappier
             this.speed *= 1.5;
@@ -164,12 +167,12 @@ export class Bullet extends BaseComponent {
             // Update Target
             this._target = nextTarget;
             this.updateVelocity();
-            
+
             // Reset lifetime so it doesn't expire mid-bounce
-            this._lifetime = 0; 
-            
+            this._lifetime = 0;
+
             // Apply reduced damage on bounce? (Optional)
-            this.damage = Math.floor(this.damage * 0.8); 
+            this.damage = Math.floor(this.damage * 0.8);
         } else {
             // No target found, chain ends
             this.createHitEffect();
@@ -178,7 +181,7 @@ export class Bullet extends BaseComponent {
     }
 
     private findNextChainTarget(excludeNode: Node): Node | null {
-        // const { WaveManager } = require('../../core/managers/WaveManager'); 
+        // const { WaveManager } = require('../../core/managers/WaveManager');
         const enemies = WaveManager.instance.enemies;
         let nearest: Node | null = null;
         let minMsg = this.chainRange * this.chainRange;
@@ -208,7 +211,7 @@ export class Bullet extends BaseComponent {
             unit.applySlow(this.slowPercent, this.slowDuration);
         }
     }
-    
+
     private createHitEffect(): void {
         // TODO: Particle effect
     }

@@ -27,9 +27,9 @@ export abstract class Weapon extends Component {
 
     public tryAttack(target: Node): boolean {
         if (!this.isReady) return false;
-        
+
         // Optional: Check range again here
-        
+
         this.onAttack(target);
         this._cooldownTimer = this.attackInterval;
         return true;

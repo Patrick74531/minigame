@@ -36,7 +36,7 @@ export const GameConfig = {
     // === 士兵系统 ===
     SOLDIER: {
         /** 基础移动速度 (units/second) - Was 100/60 ~ 1.6 */
-        MOVE_SPEED: 3.5, 
+        MOVE_SPEED: 3.5,
         /** 基础攻击力 */
         BASE_ATTACK: 10,
         /** 基础血量 */

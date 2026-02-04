@@ -1,8 +1,17 @@
-import { _decorator, Node, MeshRenderer, primitives, utils, Material, Color, Vec3, BoxCollider } from 'cc';
-import { GameManager } from '../../core/managers/GameManager';
-import { EventManager } from '../../core/managers/EventManager';
-import { GameEvents } from '../../data/GameEvents';
-import { GameConfig } from '../../data/GameConfig';
+import {
+    _decorator,
+    Node,
+    MeshRenderer,
+    primitives,
+    utils,
+    Material,
+    Color,
+    BoxCollider,
+} from 'cc';
+// import { GameManager } from '../../core/managers/GameManager';
+// import { EventManager } from '../../core/managers/EventManager';
+// import { GameEvents } from '../../data/GameEvents';
+// import { GameConfig } from '../../data/GameConfig';
 import { Coin } from './Coin';
 
 /**
@@ -24,7 +33,7 @@ export class CoinFactory {
         const collider = node.addComponent(BoxCollider);
         collider.isTrigger = true;
         // Set Group to COIN (1 << 1)
-        collider.setGroup(1 << 1); 
+        collider.setGroup(1 << 1);
         collider.setMask((1 << 0) | (1 << 1)); // Collide with Default (Hero usually 1<<0)
 
         // Logic Component

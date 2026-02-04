@@ -1,4 +1,4 @@
-import { _decorator, Node, Color, Vec3 } from 'cc';
+import { _decorator, Node, Color } from 'cc';
 import { Weapon } from '../Weapon';
 import { BulletFactory } from '../BulletFactory';
 

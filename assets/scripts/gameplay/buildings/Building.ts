@@ -82,7 +82,7 @@ export class Building extends BaseComponent {
 
         // Register Unit Died Event
         EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
-        
+
         // Setup Physics (Obstacle)
         this.setupPhysics();
 
@@ -118,7 +118,7 @@ export class Building extends BaseComponent {
         col.isTrigger = false; // Physical Obstacle
         col.size = new Vec3(1, 2, 1); // Standard Building Size (Approx)
         col.center = new Vec3(0, 1, 0);
-        
+
         // Ensure it blocks Hero
         col.setGroup(1 << 0); // DEFAULT (Walls etc)
         col.setMask(0xffffffff);
@@ -176,11 +176,11 @@ export class Building extends BaseComponent {
         }
 
         let soldier = PoolManager.instance.spawn(this.soldierPoolName, this._unitContainer);
-        
+
         // 3D 坐标系：XZ平面为地面，Y轴向上
-        const spawnOffsetX = 1.0; 
-        const spawnOffsetZ = 1.0; 
-        
+        const spawnOffsetX = 1.0;
+        const spawnOffsetZ = 1.0;
+
         if (!soldier) {
             // Fallback to factory if pool empty/missing
             soldier = UnitFactory.createSoldier(
@@ -189,13 +189,13 @@ export class Building extends BaseComponent {
                 this.node.position.z + spawnOffsetZ
             );
         } else {
-             soldier.setPosition(
+            soldier.setPosition(
                 this.node.position.x + spawnOffsetX,
                 0, // 地面高度
                 this.node.position.z + spawnOffsetZ
             );
         }
-        
+
         if (!soldier) return;
 
         this._activeUnits++;
@@ -234,12 +234,11 @@ export class Building extends BaseComponent {
                 GameManager.instance.activeBuildings.splice(idx, 1);
             }
         }
-        
+
         EventManager.instance.emit(GameEvents.BUILDING_DESTROYED, {
             buildingId: this.node.uuid,
-            building: this 
+            building: this,
         });
-
 
         // TODO: 播放销毁动画
         this.node.active = false;

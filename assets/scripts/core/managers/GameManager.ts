@@ -31,7 +31,7 @@ export class GameManager extends Singleton<GameManager>() {
     private _coins: number = 0;
     private _score: number = 0;
     private _currentWave: number = 0;
-    
+
     // Public reference to Hero for global access (e.g. Magnet logic)
     public hero: Node | null = null;
 

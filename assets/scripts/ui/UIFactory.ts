@@ -1,5 +1,4 @@
 import {
-    _decorator,
     Node,
     UITransform,
     Color,
@@ -9,10 +8,7 @@ import {
     view,
     Widget,
     Graphics,
-    Layers,
-    Vec3,
     Label,
-    Font,
 } from 'cc';
 import { Joystick } from './Joystick';
 
@@ -21,14 +17,13 @@ import { Joystick } from './Joystick';
  * 负责创建 UI 界面元素
  */
 export class UIFactory {
-    
     // UI_2D Layer
     private static readonly UI_LAYER = 33554432;
 
     public static createUICanvas(): Node {
         const node = new Node('UICanvas');
         node.layer = this.UI_LAYER;
-        
+
         const canvas = node.addComponent(Canvas);
         const transform = node.addComponent(UITransform);
         transform.setContentSize(1280, 720); // 必须设置尺寸，否则 Widget 子节点无法对齐
@@ -90,7 +85,7 @@ export class UIFactory {
         joystick.background = bgNode;
         joystick.maxRadius = 80;
 
-        const transform = joystickNode.addComponent(UITransform); // 必须有 UITransform
+        joystickNode.addComponent(UITransform); // 必须有 UITransform
 
         return joystick;
     }
@@ -105,7 +100,7 @@ export class UIFactory {
 
         const transform = node.addComponent(UITransform);
         transform.setAnchorPoint(1, 1); // 锚点设为右上角
-        
+
         const widget = node.addComponent(Widget);
         widget.isAlignTop = true;
         widget.isAlignRight = true;
@@ -113,7 +108,7 @@ export class UIFactory {
         widget.right = 150;
 
         const label = node.addComponent(Label);
-        label.string = "Coins: 0";
+        label.string = 'Coins: 0';
         label.fontSize = 40;
         label.lineHeight = 50;
         label.color = new Color(255, 215, 0, 255); // 金色
@@ -125,20 +120,20 @@ export class UIFactory {
     /**
      * 创建通用 Label
      */
-    public static createLabel(parent: Node, text: string = "", name: string = "Label"): Label {
+    public static createLabel(parent: Node, text: string = '', name: string = 'Label'): Label {
         const node = new Node(name);
         node.layer = this.UI_LAYER;
         parent.addChild(node);
 
-        const transform = node.addComponent(UITransform);
+        node.addComponent(UITransform);
         // 默认居中
-        
+
         const label = node.addComponent(Label);
         label.string = text;
         label.fontSize = 30;
         label.lineHeight = 35;
         label.color = Color.WHITE;
-        
+
         return label;
     }
 

@@ -45,7 +45,7 @@ export class BuildingManager {
         this._buildingContainer = buildingContainer;
         this._unitContainer = unitContainer;
         this._pads = [];
-        
+
         // 监听建造完成事件
         // 监听建造完成事件
         EventManager.instance.on(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
@@ -88,7 +88,11 @@ export class BuildingManager {
     /**
      * 建造完成处理
      */
-    private onBuildingConstructed(data: { padNode: Node; buildingTypeId: string; position: Vec3 }): void {
+    private onBuildingConstructed(data: {
+        padNode: Node;
+        buildingTypeId: string;
+        position: Vec3;
+    }): void {
         console.log(`[BuildingManager] 建造完成: ${data.buildingTypeId}`);
 
         // 根据建筑类型创建建筑
@@ -102,7 +106,9 @@ export class BuildingManager {
             );
 
             if (!buildingNode) {
-                 console.error(`[BuildingManager] Failed to create building for type: ${data.buildingTypeId}`);
+                console.error(
+                    `[BuildingManager] Failed to create building for type: ${data.buildingTypeId}`
+                );
             } else {
                 const buildingComp = buildingNode.getComponent(Building);
                 if (buildingComp) {
@@ -125,9 +131,17 @@ export class BuildingManager {
      * 清理
      */
     public cleanup(): void {
-        EventManager.instance.off(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
+        EventManager.instance.off(
+            GameEvents.BUILDING_CONSTRUCTED,
+            this.onBuildingConstructed,
+            this
+        );
         EventManager.instance.off(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
-        EventManager.instance.off(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
+        EventManager.instance.off(
+            GameEvents.BUILDING_CONSTRUCTED,
+            this.onBuildingConstructed,
+            this
+        );
         this._pads = [];
         this._activeBuildings = [];
     }
@@ -135,7 +149,7 @@ export class BuildingManager {
     public get activeBuildings(): Building[] {
         return this._activeBuildings;
     }
-    
+
     public unregisterBuilding(building: Building): void {
         const idx = this._activeBuildings.indexOf(building);
         if (idx !== -1) {

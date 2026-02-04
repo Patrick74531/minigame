@@ -1,9 +1,6 @@
-import { _decorator, Component, Node, Collider2D, Contact2DType, IPhysics2DContact } from 'cc';
-import { Unit, UnitType } from '../units/Unit';
-import { Enemy } from '../units/Enemy';
+import { _decorator, Component } from 'cc';
 import { Soldier } from '../units/Soldier';
 import { MathUtils } from '../../core/utils/MathUtils';
-import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass, property } = _decorator;
 

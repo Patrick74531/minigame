@@ -35,7 +35,13 @@ export class EffectManager {
         EventManager.instance.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
     }
 
-    private onApplyAoE(data: { center: Vec3, radius: number, damage: number, slowPercent: number, slowDuration: number }): void {
+    private onApplyAoE(data: {
+        center: Vec3;
+        radius: number;
+        damage: number;
+        slowPercent: number;
+        slowDuration: number;
+    }): void {
         if (!this._container) return;
 
         // Determine Effect Type based on data

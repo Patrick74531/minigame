@@ -1,4 +1,18 @@
-import { _decorator, Node, Prefab, instantiate, Vec3, Color, MeshRenderer, primitives, utils, Material, Texture2D, resources, MotionStreak } from 'cc';
+import {
+    _decorator,
+    Node,
+    Prefab,
+    instantiate,
+    Vec3,
+    Color,
+    MeshRenderer,
+    primitives,
+    utils,
+    Material,
+    Texture2D,
+    resources,
+    MotionStreak,
+} from 'cc';
 import { Bullet } from './Bullet';
 import { PoolManager } from '../../core/managers/PoolManager';
 
@@ -6,13 +20,12 @@ const { ccclass, property } = _decorator;
 
 @ccclass('BulletFactory')
 export class BulletFactory {
-
     private static _bulletPrefab: Prefab | null = null;
     private static _fallbackTexture: Texture2D | null = null;
 
     public static initialize(): void {
         // Preload resources if needed
-         resources.load('textures/glow', Texture2D, (err, texture) => {
+        resources.load('textures/glow', Texture2D, (err, texture) => {
             if (!err) {
                 this._fallbackTexture = texture;
             }
@@ -24,10 +37,10 @@ export class BulletFactory {
      */
     public static createBullet(parent: Node, position: Vec3, target: Node, stats: any): Node {
         // Use PoolManager "Bullet" pool
-        // Note: We might need to register the pool first. 
+        // Note: We might need to register the pool first.
         // For MVP, if PoolManager doesn't have it, we can just instantiate manually or register lazy.
         // Let's assume we use a simple "Bullet" pool name.
-        
+
         let node = PoolManager.instance.spawn('Bullet', parent);
         if (!node) {
             // Pool not ready or empty auto-spawn logic failing?
@@ -39,13 +52,13 @@ export class BulletFactory {
 
         node.setPosition(position);
         node.active = true;
-        
+
         // Setup Visuals (Color)
         const renderer = node.getComponent(MeshRenderer);
         if (renderer && renderer.material) {
             renderer.material.setProperty('mainColor', stats.color || Color.YELLOW);
         }
-        
+
         const streak = node.getComponent(MotionStreak);
         if (streak) {
             streak.color = stats.color || Color.YELLOW;
@@ -62,7 +75,7 @@ export class BulletFactory {
 
         bullet.speed = stats.speed || 15;
         bullet.damage = stats.damage || 10;
-        
+
         // Extended Stats
         bullet.explosionRadius = stats.explosionRadius || 0;
         bullet.slowPercent = stats.slowPercent || 0;
@@ -80,7 +93,7 @@ export class BulletFactory {
      */
     private static createBulletNode(): Node {
         const node = new Node('Bullet');
-        
+
         // Visuals
         const renderer = node.addComponent(MeshRenderer);
         renderer.mesh = utils.MeshUtils.createMesh(
@@ -99,14 +112,14 @@ export class BulletFactory {
 
         // Logic
         node.addComponent(Bullet);
-        
+
         // Physics logic is inside Bullet.initialize() which is called by addComponent
-        
+
         // We can manually register this pool if we want to recycle these specific nodes
         // But for now, let's just return the node.
         // To use PoolManager properly, we should register a Prefab.
         // Since we are creating code-based nodes, we can just implement IPoolable on Bullet and handle reset.
-        
+
         return node;
     }
 }

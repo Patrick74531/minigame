@@ -1,7 +1,7 @@
 import { Singleton } from '../base/Singleton';
 
 /** 事件回调函数类型 */
-type EventCallback = (...args: unknown[]) => void;
+type EventCallback = (...args: any[]) => void;
 
 /** 事件监听器信息 */
 interface EventListener {

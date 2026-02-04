@@ -35,5 +35,5 @@ export function Singleton<T>() {
         }
     }
 
-    return SingletonClass as new () => T;
+    return SingletonClass;
 }

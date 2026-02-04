@@ -61,7 +61,7 @@ export class Unit extends BaseComponent implements IPoolable {
     public get stats(): UnitStats {
         return this._stats;
     }
-    
+
     // Effective speed
     public get moveSpeed(): number {
         return this._stats.moveSpeed * this._speedModifier;

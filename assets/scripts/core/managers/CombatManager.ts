@@ -18,8 +18,8 @@ export class CombatManager {
     }
 
     // === 配置 ===
-    private readonly MELEE_RANGE = 0.5;  // 近战攻击范围
-    private readonly HERO_RANGE = 1.0;   // 英雄攻击范围
+    private readonly MELEE_RANGE = 0.5; // 近战攻击范围
+    private readonly HERO_RANGE = 1.0; // 英雄攻击范围
 
     /**
      * 计算两个节点之间的距离
@@ -52,7 +52,7 @@ export class CombatManager {
      * 处理士兵战斗
      */
     public processSoldierCombat(
-        soldiers: Node[], 
+        soldiers: Node[],
         enemies: Node[],
         onEnemyKilled: (enemy: Node) => void
     ): void {

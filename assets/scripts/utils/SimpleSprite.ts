@@ -1,17 +1,4 @@
-import {
-    _decorator,
-    Component,
-    Node,
-    Sprite,
-    Color,
-    UITransform,
-    SpriteFrame,
-    Texture2D,
-    ImageAsset,
-    resources,
-    Graphics,
-    Vec3,
-} from 'cc';
+import { _decorator, Component, Color, UITransform, Graphics } from 'cc';
 
 const { ccclass, property, executeInEditMode } = _decorator;
 

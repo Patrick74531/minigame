@@ -1,4 +1,16 @@
-import { _decorator, Component, Node, Input, input, EventTouch, Vec2, Vec3, PhysicsSystem, geometry, Camera } from 'cc';
+import {
+    _decorator,
+    Component,
+    Node,
+    Input,
+    input,
+    EventTouch,
+    Vec2,
+    Vec3,
+    PhysicsSystem,
+    geometry,
+    Camera,
+} from 'cc';
 import { CameraFollow } from './core/camera/CameraFollow';
 import { GameManager } from './core/managers/GameManager';
 import { EventManager } from './core/managers/EventManager';
@@ -54,7 +66,7 @@ export class GameController extends Component {
     private _coinTimer: number = 0;
 
     // === 生命周期 ===
-    
+
     // Map Generator
     private _mapGenerator: MapGenerator | null = null;
 
@@ -66,7 +78,7 @@ export class GameController extends Component {
         this.setupContainers();
         this.setupUI();
         this.setupEventListeners();
-        
+
         // Setup Map Generator
         const mapNode = new Node('MapGenerator');
         this._container?.addChild(mapNode);
@@ -74,7 +86,7 @@ export class GameController extends Component {
 
         // 初始化 Managers
         GameManager.instance.initialize();
-        // WaveManager initialized in Start() when Base is ready, 
+        // WaveManager initialized in Start() when Base is ready,
         // OR pass null/placeholder here first if needed.
         // Let's comment out here and do full init in start, OR split init.
         // Ideally: Set container in onLoad, Set Base in Start.
@@ -96,7 +108,7 @@ export class GameController extends Component {
 
     protected start(): void {
         GameManager.instance.startGame();
-        
+
         // Generate Map
         if (this._mapGenerator) {
             // this._mapGenerator.generateTestMap();
@@ -111,12 +123,12 @@ export class GameController extends Component {
         const spawnZ = -9;
 
         this._base = BuildingFactory.createBase(this._buildingContainer!, spawnX, spawnZ, 100);
-        
+
         // Spawn Hero slightly offset from base
         this._hero = UnitFactory.createHero(this._soldierContainer!, spawnX + 2, spawnZ + 2);
 
         // Initialize WaveManager with Base
-        // Note: We initialized WaveManager in onLoad without base. 
+        // Note: We initialized WaveManager in onLoad without base.
         // We should explicitly set it or re-initialize logic.
         // Let's call a setter or re-init if allowed. Or just set it here.
         WaveManager.instance.initialize(this._enemyContainer!, this._base);
@@ -128,11 +140,11 @@ export class GameController extends Component {
             if (!follow) {
                 follow = mainCamera.node.addComponent(CameraFollow);
                 // Adjust offset for isometric view
-                follow.offset = new Vec3(0, 10, 8); 
+                follow.offset = new Vec3(0, 10, 8);
             }
             follow.target = this._hero;
             // Force snap to new start position immediately
-            follow.snap(); 
+            follow.snap();
         } else {
             console.warn('[GameController] Main Camera not found!');
         }
@@ -141,7 +153,7 @@ export class GameController extends Component {
         BuildingManager.instance.setHeroNode(this._hero);
 
         // 创建建造点 - Restore this
-        this.createBuildingPads(); 
+        this.createBuildingPads();
 
         console.log(`[Game] 💰 初始金币: ${GameManager.instance.coins}`);
 
@@ -165,12 +177,14 @@ export class GameController extends Component {
         BuildingManager.instance.update(dt);
 
         // 波次完成检查
-        WaveManager.instance.checkWaveComplete((bonus) => {
+        WaveManager.instance.checkWaveComplete(bonus => {
             GameManager.instance.addCoins(bonus);
-            
+
             // Loop forever
             const nextWave = WaveManager.instance.currentWave + 1;
-            console.log(`[Game] Wave ${WaveManager.instance.currentWave} Complete. Next Wave: ${nextWave}`);
+            console.log(
+                `[Game] Wave ${WaveManager.instance.currentWave} Complete. Next Wave: ${nextWave}`
+            );
             this.scheduleOnce(() => WaveManager.instance.startWave(nextWave), 3);
         });
     }
@@ -196,11 +210,11 @@ export class GameController extends Component {
         this._container.addChild(this._soldierContainer);
         this._container.addChild(this._buildingContainer);
         this._container.addChild(this._coinContainer);
-        
+
         // Effects Container (Overlay)
         const effectContainer = new Node('Effects');
         this._container.addChild(effectContainer);
-        
+
         // Init Effect Manager
         EffectManager.instance.initialize(effectContainer);
     }
@@ -209,7 +223,7 @@ export class GameController extends Component {
         this._uiCanvas = UIFactory.createUICanvas();
         this.node.addChild(this._uiCanvas);
         this._joystick = UIFactory.createJoystick(this._uiCanvas);
-        
+
         // 初始化 HUD
         HUDManager.instance.initialize(this._uiCanvas);
     }
@@ -250,7 +264,7 @@ export class GameController extends Component {
             // Enemy.ts onDeath is empty now. Unit.die() emits event then onDeath().
             // It does NOT destroy node automatically unless I call it.
             if (data.node && data.node.isValid) {
-                 data.node.destroy();
+                data.node.destroy();
             }
         }
     }
@@ -259,13 +273,13 @@ export class GameController extends Component {
 
     private createBuildingPads(): void {
         // Spawn Base Position Reference (Top-Left Area)
-        const bx = -9; 
+        const bx = -9;
         const by = -9;
 
         // 创建几个建造点 (Relative to Base)
         const padPositions = [
             { x: bx - 4, y: by + 3, type: 'barracks' },
-            { x: bx + 4, y: by + 3, type: 'lightning_tower' }, 
+            { x: bx + 4, y: by + 3, type: 'lightning_tower' },
             { x: bx - 4, y: by - 3, type: 'frost_tower' },
             { x: bx + 4, y: by - 3, type: 'tower' },
             // Add Walls around base or in front
@@ -277,14 +291,9 @@ export class GameController extends Component {
         for (const pos of padPositions) {
             // TEST: Pre-spawn Frost Tower or Lightning Tower
             if (pos.type === 'frost_tower' || pos.type === 'lightning_tower') {
-                 BuildingFactory.createBuilding(
-                    this._buildingContainer!,
-                    pos.x,
-                    pos.y,
-                    pos.type
-                 );
-                 console.log(`[GameController] Pre-spawned ${pos.type} at (${pos.x}, 0, ${pos.y})`);
-                 continue; // Skip creating pad
+                BuildingFactory.createBuilding(this._buildingContainer!, pos.x, pos.y, pos.type);
+                console.log(`[GameController] Pre-spawned ${pos.type} at (${pos.x}, 0, ${pos.y})`);
+                continue; // Skip creating pad
             }
 
             const padNode = new Node(`BuildingPad_${pos.type}`);
@@ -292,7 +301,9 @@ export class GameController extends Component {
             // Map y in config to z in world space for top-down view
             padNode.setPosition(pos.x, 0, pos.y);
 
-            console.log(`[GameController] 创建建造点: type=${pos.type}, pos=(${pos.x}, 0, ${pos.y})`);
+            console.log(
+                `[GameController] 创建建造点: type=${pos.type}, pos=(${pos.x}, 0, ${pos.y})`
+            );
 
             const pad = padNode.addComponent(BuildingPad);
             pad.buildingTypeId = pos.type;
@@ -300,7 +311,9 @@ export class GameController extends Component {
             BuildingManager.instance.registerPad(pad);
         }
 
-        console.log(`[GameController] 创建了 ${padPositions.length} 个建造点, 父节点: ${this._buildingContainer!.name}`);
+        console.log(
+            `[GameController] 创建了 ${padPositions.length} 个建造点, 父节点: ${this._buildingContainer!.name}`
+        );
     }
 
     // === 输入处理 ===
@@ -333,7 +346,7 @@ export class GameController extends Component {
 
         if (data.hp <= 0) {
             HUDManager.instance.updateBaseHp(0, data.maxHp);
-            GameManager.instance.pause();
+            GameManager.instance.pauseGame();
         }
     }
 
@@ -344,5 +357,4 @@ export class GameController extends Component {
         const dz = b.position.z - a.position.z; // 3D logic
         return Math.sqrt(dx * dx + dz * dz);
     }
-
 }

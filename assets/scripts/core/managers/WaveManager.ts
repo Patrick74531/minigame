@@ -47,14 +47,20 @@ export class WaveManager {
         this._baseNode = baseNode;
         this._enemies = [];
         this._currentWave = 0;
-        
+
         // Listen for AOE impacts
         EventManager.instance.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
-        
+
         console.log('[WaveManager] 初始化完成 (Infinite Mode)');
     }
 
-    private onApplyAoE(data: { center: any, radius: number, damage: number, slowPercent: number, slowDuration: number }): void {
+    private onApplyAoE(data: {
+        center: any;
+        radius: number;
+        damage: number;
+        slowPercent: number;
+        slowDuration: number;
+    }): void {
         const radiusSqr = data.radius * data.radius;
         const center = data.center;
 
@@ -62,7 +68,7 @@ export class WaveManager {
         for (const enemy of this._enemies) {
             if (!enemy.isValid) continue;
 
-             // Check distance
+            // Check distance
             const dx = enemy.position.x - center.x;
             const dz = enemy.position.z - center.z;
             const distSqr = dx * dx + dz * dz;
@@ -70,10 +76,10 @@ export class WaveManager {
             if (distSqr <= radiusSqr) {
                 const unit = enemy.getComponent(UnitFactory.UnitClass || 'Unit') as any; // Dynamic type if needed or import Unit
                 // Better: just getComponent('Unit') or better yet, we imported UnitFactory... maybe Unit too?
-                // Unit is imported in UnitFactory? 
+                // Unit is imported in UnitFactory?
                 // Let's rely on getComponent with string or class if available.
-                const u = enemy.getComponent('Unit') as any; 
-                
+                const u = enemy.getComponent('Unit') as any;
+
                 if (u && u.isAlive) {
                     u.takeDamage(data.damage);
                     if (data.slowPercent > 0) {
@@ -156,9 +162,9 @@ export class WaveManager {
         const bonus = this._currentWave * 25;
         console.log(`✅ 第 ${this._currentWave} 波完成! +${bonus} 金币`);
 
-        EventManager.instance.emit(GameEvents.WAVE_COMPLETE, { 
-            wave: this._currentWave, 
-            bonus 
+        EventManager.instance.emit(GameEvents.WAVE_COMPLETE, {
+            wave: this._currentWave,
+            bonus,
         });
 
         this._waveConfig = null;

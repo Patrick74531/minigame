@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, Tween, tween, Vec3, UIOps } from 'cc';
+import { _decorator, Node, tween, Vec3 } from 'cc';
 import { BaseComponent } from '../../core/base/BaseComponent';
 
 const { ccclass, property } = _decorator;
@@ -36,7 +36,11 @@ export class VisualEffect extends BaseComponent {
     public playScaleAnim(targetScale: number, duration: number): void {
         this.node.setScale(0.1, 0.1, 0.1);
         tween(this.node)
-            .to(duration, { scale: new Vec3(targetScale, targetScale, targetScale) }, { easing: 'quartOut' })
+            .to(
+                duration,
+                { scale: new Vec3(targetScale, targetScale, targetScale) },
+                { easing: 'quartOut' }
+            )
             .to(0.3, { scale: new Vec3(0, 0, 0) }) // Shrink out
             .start();
     }

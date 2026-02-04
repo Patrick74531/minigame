@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, UITransform, Color, Billboard, RenderRoot2D, Graphics } from 'cc';
+import { _decorator, Component, Node, Color, Billboard, RenderRoot2D, Graphics } from 'cc';
 
 const { ccclass, property } = _decorator;
 
@@ -8,7 +8,6 @@ const { ccclass, property } = _decorator;
  */
 @ccclass('HealthBar')
 export class HealthBar extends Component {
-
     @property
     public width: number = 100;
 
@@ -30,7 +29,7 @@ export class HealthBar extends Component {
         const root = new Node('HealthBarRoot');
         this.node.addChild(root);
         root.setPosition(0, this.yOffset, 0);
-        
+
         // Billboard
         root.addComponent(RenderRoot2D);
         root.addComponent(Billboard);
@@ -41,7 +40,7 @@ export class HealthBar extends Component {
         root.addChild(bgNode);
         this._bgGraphics = bgNode.addComponent(Graphics);
         this._bgGraphics.fillColor = new Color(50, 0, 0, 255);
-        this._bgGraphics.rect(-this.width/2, -this.height/2, this.width, this.height);
+        this._bgGraphics.rect(-this.width / 2, -this.height / 2, this.width, this.height);
         this._bgGraphics.fill();
 
         // Foreground (Green)
@@ -51,9 +50,9 @@ export class HealthBar extends Component {
         this._fgGraphics.fillColor = new Color(0, 255, 0, 255);
         this._fgGraphics.rect(0, 0, this.width, this.height); // Draw 0 to width, handle offset in node
         this._fgGraphics.fill();
-        
+
         // Offset FG node to start at left edge
-        fgNode.setPosition(-this.width/2, -this.height/2, 0);
+        fgNode.setPosition(-this.width / 2, -this.height / 2, 0);
     }
 
     public updateHealth(current: number, max: number): void {
@@ -61,16 +60,16 @@ export class HealthBar extends Component {
 
         const ratio = Math.max(0, Math.min(1, current / max));
         this._fgGraphics.node.setScale(ratio, 1, 1);
-        
+
         // Color change? Green -> Yellow -> Red
         if (ratio > 0.5) {
-             this._fgGraphics.fillColor = new Color(0, 255, 0, 255);
+            this._fgGraphics.fillColor = new Color(0, 255, 0, 255);
         } else if (ratio > 0.2) {
-             this._fgGraphics.fillColor = new Color(255, 255, 0, 255);
+            this._fgGraphics.fillColor = new Color(255, 255, 0, 255);
         } else {
-             this._fgGraphics.fillColor = new Color(255, 0, 0, 255);
+            this._fgGraphics.fillColor = new Color(255, 0, 0, 255);
         }
-        
+
         // Re-fill to apply color change
         this._fgGraphics.clear();
         this._fgGraphics.rect(0, 0, this.width, this.height);

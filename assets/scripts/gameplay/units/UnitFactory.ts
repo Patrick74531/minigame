@@ -1,5 +1,16 @@
-import { _decorator, Node, MeshRenderer, primitives, utils, Material, Color, Component, RigidBody, BoxCollider, Vec3 } from 'cc';
-import { Unit, UnitType, UnitStats } from './Unit';
+import {
+    _decorator,
+    Node,
+    MeshRenderer,
+    primitives,
+    utils,
+    Material,
+    Color,
+    Component,
+    RigidBody,
+    BoxCollider,
+    Vec3,
+} from 'cc';
 import { Enemy } from './Enemy';
 import { Soldier } from './Soldier';
 import { Hero } from './Hero';
@@ -28,7 +39,7 @@ export class UnitFactory {
         parent.addChild(node);
 
         const enemy = node.addComponent(Enemy);
-        
+
         // Physics Setup
         const rb = node.addComponent(RigidBody);
         rb.type = RigidBody.Type.DYNAMIC; // Dynamic for physics movement
@@ -37,13 +48,13 @@ export class UnitFactory {
         rb.angularFactor = new Vec3(0, 0, 0); // Lock rotation
         rb.linearFactor = new Vec3(1, 0, 1);
         rb.group = 1 << 3; // GROUP_ENEMY
-        
+
         const col = node.addComponent(BoxCollider);
         col.size = new Vec3(1, 1, 1);
         col.isTrigger = false; // Solid for collision
         col.setGroup(1 << 3); // ENEMY
         col.setMask(0xffffffff); // Collide with all
-        
+
         enemy.initStats({
             maxHp: GameConfig.ENEMY.BASE_HP * waveMultiplier,
             attack: GameConfig.ENEMY.BASE_ATTACK,
@@ -51,7 +62,7 @@ export class UnitFactory {
             attackInterval: GameConfig.ENEMY.ATTACK_INTERVAL,
             moveSpeed: GameConfig.ENEMY.MOVE_SPEED * (1 + (waveMultiplier - 1) * 0.1),
         });
-        
+
         // Set Target
         enemy.setTarget(targetPos);
 
@@ -69,14 +80,14 @@ export class UnitFactory {
 
         // Physics for Soldier
         const rb = node.addComponent(RigidBody);
-        rb.type = RigidBody.Type.DYNAMIC; 
+        rb.type = RigidBody.Type.DYNAMIC;
         rb.useGravity = false;
         rb.linearDamping = 0.5;
-        rb.angularFactor = new Vec3(0, 0, 0); 
+        rb.angularFactor = new Vec3(0, 0, 0);
         rb.linearFactor = new Vec3(1, 0, 1); // Lock Y
         // Group? Let's say Soldier is layer 5 or just Default(0) for now if not defined
         // Using Default (1<<0) is fine for now
-        
+
         const col = node.addComponent(BoxCollider);
         col.size = new Vec3(1, 1, 1);
         col.isTrigger = false;
@@ -103,10 +114,10 @@ export class UnitFactory {
 
         // 英雄使用 Hero 组件
         const hero = node.addComponent(Hero);
-        // Physics logic moved to Hero component initialize usually, 
+        // Physics logic moved to Hero component initialize usually,
         // but if we add it here, we must ensure it matches.
         // Let's rely on Hero.ts initialize or configure it here nicely.
-        // Actually UnitFactory previously didn't add RB to Hero! 
+        // Actually UnitFactory previously didn't add RB to Hero!
         // Wait, looking at previous view_file of UnitFactory...
         // It DID NOT add RB to Hero in the original code I viewed in step 300!
         // It only added RB to Enemy and Soldier.
@@ -115,7 +126,7 @@ export class UnitFactory {
         // Step 304 diff shows createHero UNCHANGED except position.
         // So UnitFactory DOES NOT add RB to Hero. Hero.ts adds it.
         // So I should only change spawn height here.
-        
+
         hero.initStats({
             maxHp: GameConfig.HERO.BASE_HP,
             attack: GameConfig.HERO.BASE_ATTACK,

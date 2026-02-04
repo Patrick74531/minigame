@@ -1,4 +1,4 @@
-import { _decorator, Component, Vec3, BoxCollider, ITriggerEvent } from 'cc';
+import { _decorator, Component, Vec3, BoxCollider } from 'cc';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
@@ -35,7 +35,7 @@ export class Coin extends BaseComponent implements IPoolable {
 
     // Static reference to avoid circular dependency with GameManager
     public static HeroNode: Node | null = null;
-    
+
     // ...
 
     protected start(): void {
@@ -60,19 +60,20 @@ export class Coin extends BaseComponent implements IPoolable {
             const myPos = this.node.worldPosition;
             const dist = Vec3.distance(heroPos, myPos);
 
-            if (dist < 2.5) { // Magnet Radius
+            if (dist < 2.5) {
+                // Magnet Radius
                 isAttracted = true;
-                
+
                 // Move towards hero
                 const direction = new Vec3();
                 Vec3.subtract(direction, heroPos, myPos);
                 // Aim slightly higher (center of body)
-                direction.y += 0.5; 
+                direction.y += 0.5;
                 direction.normalize();
 
                 const speed = 15.0; // Magnet Speed
                 const moveStep = direction.multiplyScalar(speed * dt);
-                
+
                 const newPos = new Vec3();
                 Vec3.add(newPos, myPos, moveStep);
                 this.node.setWorldPosition(newPos);
@@ -84,7 +85,7 @@ export class Coin extends BaseComponent implements IPoolable {
 
             // Life Cycle
             if (this._lifetime >= GameConfig.ECONOMY.COIN_LIFETIME) {
-                this.autoCollect();
+                this.collect(true);
                 return;
             }
 
@@ -102,11 +103,11 @@ export class Coin extends BaseComponent implements IPoolable {
     public onPickup(): void {
         this._isCollecting = true;
         this.enabled = false; // Disable Logic
-        
+
         // Disable Physics
         const rb = this.getComponent(BoxCollider);
         if (rb) rb.enabled = false;
-        
+
         // Stop all animations/tweens
         this.unscheduleAllCallbacks();
         Tween.stopAllByTarget(this.node);
@@ -127,7 +128,7 @@ export class Coin extends BaseComponent implements IPoolable {
                 value: this.value,
             });
         }
-        
+
         this.node.destroy();
     }
 }

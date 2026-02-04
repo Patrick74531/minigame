@@ -95,10 +95,10 @@ export class BuildingFactory {
             type: BuildingType.TOWER,
             hp: 300,
             // Towers don't spawn soldiers, so these values might be ignored or used differently
-            spawnInterval: 0, 
+            spawnInterval: 0,
             maxUnits: 0,
         });
-        
+
         // Custom Tower Config
         tower.attackRange = 25; // Increased range
         tower.attackDamage = 25;
@@ -120,15 +120,15 @@ export class BuildingFactory {
         tower.setConfig({
             type: BuildingType.TOWER,
             hp: 300,
-            spawnInterval: 0, 
+            spawnInterval: 0,
             maxUnits: 0,
         });
-        
+
         // Frost Config (Low Damage, AOE Slow)
         tower.attackRange = 22;
         tower.attackDamage = 5; // Low Damage
         tower.attackInterval = 0.8;
-        
+
         // Bullet Visuals & Effects
         tower.bulletColor = new Color(0, 150, 255, 255); // Cyan/Blue Glow
         tower.bulletExplosionRadius = 2.5; // AOE
@@ -141,66 +141,75 @@ export class BuildingFactory {
     /**
      * Generic Building Creator (Data-Driven)
      */
-    public static createBuilding(parent: Node, x: number, z: number, buildingId: string, unitContainer?: Node): Node | null {
-         const config = BuildingRegistry.instance.get(buildingId);
-         if (!config) {
-             console.error(`[BuildingFactory] Unknown building ID: ${buildingId}`);
-             return null;
-         }
+    public static createBuilding(
+        parent: Node,
+        x: number,
+        z: number,
+        buildingId: string,
+        unitContainer?: Node
+    ): Node | null {
+        const config = BuildingRegistry.instance.get(buildingId);
+        if (!config) {
+            console.error(`[BuildingFactory] Unknown building ID: ${buildingId}`);
+            return null;
+        }
 
-         // 1. Visuals
-         const colorHex = config.visual?.colorHex || '#FFFFFF';
-         const color = new Color().fromHEX(colorHex);
-         const node = this.createCubeNode(config.name, color);
-         node.setPosition(x, 0, z);
-         const scale = config.visual?.scale || { x: 1, y: 1, z: 1 };
-         node.setScale(scale.x, scale.y, scale.z);
-         parent.addChild(node);
+        // 1. Visuals
+        const colorHex = config.visual?.colorHex || '#FFFFFF';
+        const color = new Color().fromHEX(colorHex);
+        const node = this.createCubeNode(config.name, color);
+        node.setPosition(x, 0, z);
+        const scale = config.visual?.scale || { x: 1, y: 1, z: 1 };
+        node.setScale(scale.x, scale.y, scale.z);
+        parent.addChild(node);
 
-         // 2. Component Logic
-         if (config.role === 'barracks' || config.role === 'building') {
-             const building = node.addComponent(Building);
-             building.setConfig({
-                 type: BuildingType.BARRACKS, // TODO: Map role to enum if needed
-                 hp: config.stats?.hp || 100,
-                 spawnInterval: config.features?.spawnInterval || 10,
-                 maxUnits: config.features?.maxUnits || 5,
-             });
-             if (unitContainer) {
-                 building.setUnitContainer(unitContainer);
-             }
-         } else if (config.role === 'tower') {
-             const tower = node.addComponent(Tower);
-             tower.setConfig({
-                 type: BuildingType.TOWER,
-                 hp: config.stats?.hp || 300,
-                 spawnInterval: 0,
-                 maxUnits: 0
-             });
-             
-             // Apply stats
-             if (config.stats) {
-                 if (config.stats.attackRange) tower.attackRange = config.stats.attackRange;
-                 if (config.stats.attackDamage) tower.attackDamage = config.stats.attackDamage;
-                 if (config.stats.attackInterval) tower.attackInterval = config.stats.attackInterval;
-             }
+        // 2. Component Logic
+        if (config.role === 'barracks' || config.role === 'building') {
+            const building = node.addComponent(Building);
+            building.setConfig({
+                type: BuildingType.BARRACKS, // TODO: Map role to enum if needed
+                hp: config.stats?.hp || 100,
+                spawnInterval: config.features?.spawnInterval || 10,
+                maxUnits: config.features?.maxUnits || 5,
+            });
+            if (unitContainer) {
+                building.setUnitContainer(unitContainer);
+            }
+        } else if (config.role === 'tower') {
+            const tower = node.addComponent(Tower);
+            tower.setConfig({
+                type: BuildingType.TOWER,
+                hp: config.stats?.hp || 300,
+                spawnInterval: 0,
+                maxUnits: 0,
+            });
 
-             // Apply features
-             if (config.features) {
-                 if (config.features.bulletColorHex) {
-                     tower.bulletColor = new Color().fromHEX(config.features.bulletColorHex);
-                 }
-                 if (config.features.bulletExplosionRadius) tower.bulletExplosionRadius = config.features.bulletExplosionRadius;
-                 if (config.features.bulletSlowPercent) tower.bulletSlowPercent = config.features.bulletSlowPercent;
-                 if (config.features.bulletSlowDuration) tower.bulletSlowDuration = config.features.bulletSlowDuration;
-                 
-                 // Chain Lightning
-                 if (config.features.chainCount) tower.chainCount = config.features.chainCount;
-                 if (config.features.chainRange) tower.chainRange = config.features.chainRange;
-             }
-         }
+            // Apply stats
+            if (config.stats) {
+                if (config.stats.attackRange) tower.attackRange = config.stats.attackRange;
+                if (config.stats.attackDamage) tower.attackDamage = config.stats.attackDamage;
+                if (config.stats.attackInterval) tower.attackInterval = config.stats.attackInterval;
+            }
 
-         return node;
+            // Apply features
+            if (config.features) {
+                if (config.features.bulletColorHex) {
+                    tower.bulletColor = new Color().fromHEX(config.features.bulletColorHex);
+                }
+                if (config.features.bulletExplosionRadius)
+                    tower.bulletExplosionRadius = config.features.bulletExplosionRadius;
+                if (config.features.bulletSlowPercent)
+                    tower.bulletSlowPercent = config.features.bulletSlowPercent;
+                if (config.features.bulletSlowDuration)
+                    tower.bulletSlowDuration = config.features.bulletSlowDuration;
+
+                // Chain Lightning
+                if (config.features.chainCount) tower.chainCount = config.features.chainCount;
+                if (config.features.chainRange) tower.chainRange = config.features.chainRange;
+            }
+        }
+
+        return node;
     }
 
     /**

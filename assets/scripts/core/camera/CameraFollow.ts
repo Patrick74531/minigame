@@ -37,8 +37,8 @@ export class CameraFollow extends Component {
         Vec3.add(desiredPos, this.target.position, this.offset);
 
         const currentPos = this.node.position;
-        const t = this.smoothSpeed; 
-        
+        const t = this.smoothSpeed;
+
         // Manual Lerp for clarity
         const finalX = currentPos.x + (desiredPos.x - currentPos.x) * t;
         const finalY = currentPos.y + (desiredPos.y - currentPos.y) * t;
@@ -56,7 +56,7 @@ export class CameraFollow extends Component {
             const desired = new Vec3();
             Vec3.add(desired, this.target.position, this.offset);
             this.node.setPosition(desired);
-            
+
             // Set Rotation (Look at target)
             this.node.lookAt(this.target.position);
         }

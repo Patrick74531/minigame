@@ -1,4 +1,16 @@
-import { _decorator, Vec2, Vec3, Node, Component, RigidBody, CapsuleCollider, ITriggerEvent, PhysicsSystem, geometry, Color } from 'cc';
+import {
+    _decorator,
+    Vec2,
+    Vec3,
+    Node,
+    Component,
+    RigidBody,
+    CapsuleCollider,
+    ITriggerEvent,
+    PhysicsSystem,
+    geometry,
+    Color,
+} from 'cc';
 import { Unit, UnitType, UnitState } from './Unit';
 import { GameManager } from '../../core/managers/GameManager';
 import { WaveManager } from '../../core/managers/WaveManager';
@@ -42,7 +54,7 @@ export class Hero extends Unit {
             attackInterval: GameConfig.HERO.ATTACK_INTERVAL,
             moveSpeed: GameConfig.HERO.MOVE_SPEED,
         });
-        
+
         // Initialize Components
         this._weapon = this.node.getComponent(RangedWeapon);
         if (!this._weapon) {
@@ -50,8 +62,8 @@ export class Hero extends Unit {
             this._weapon.damage = this._stats.attack;
             this._weapon.range = this._stats.attackRange;
             this._weapon.attackInterval = this._stats.attackInterval;
-            this._weapon.projectileSpeed = 20; 
-            this._weapon.projectileColor = new Color(0, 255, 255, 255); 
+            this._weapon.projectileSpeed = 20;
+            this._weapon.projectileColor = new Color(0, 255, 255, 255);
         }
 
         this._mover = this.node.getComponent(CharacterMover);
@@ -70,8 +82,8 @@ export class Hero extends Unit {
         let rb = this.node.getComponent(RigidBody);
         if (!rb) {
             rb = this.node.addComponent(RigidBody);
-            rb.type = RigidBody.Type.KINEMATIC; 
-            rb.useGravity = false; 
+            rb.type = RigidBody.Type.KINEMATIC;
+            rb.useGravity = false;
         }
 
         let col = this.node.getComponent(CapsuleCollider);
@@ -80,9 +92,9 @@ export class Hero extends Unit {
             col.cylinderHeight = 1.0;
             col.radius = 0.3;
             col.center = new Vec3(0, 0.75, 0);
-            col.isTrigger = false; 
+            col.isTrigger = false;
         }
-        
+
         col.setGroup(1 << 0);
         col.setMask(0xffffffff);
     }
@@ -99,12 +111,12 @@ export class Hero extends Unit {
 
     private onTriggerEnter(event: ITriggerEvent): void {
         const otherNode = event.otherCollider.node;
-        
+
         // Check Coin
         const coin = otherNode.getComponent(Coin);
         if (coin) {
             this.addCoin(otherNode);
-            coin.onPickup(); 
+            coin.onPickup();
             HUDManager.instance.updateCoinDisplay(this.coinCount);
         }
     }
@@ -123,7 +135,7 @@ export class Hero extends Unit {
         if (this._stackVisualizer) {
             this._stackVisualizer.addToStack(coin);
         }
-        
+
         // Disable coin logic
         const coinComp = coin.getComponent('Coin') as Component;
         if (coinComp) coinComp.enabled = false;
@@ -137,7 +149,7 @@ export class Hero extends Unit {
 
         let removed = 0;
         const toRemove = Math.min(count, this._stackVisualizer.count);
-        
+
         for (let i = 0; i < toRemove; i++) {
             const coin = this._stackVisualizer.popFromStack();
             if (coin) {
@@ -186,7 +198,7 @@ export class Hero extends Unit {
             const dx = enemy.position.x - myPos.x;
             const dz = enemy.position.z - myPos.z;
             const dist = Math.sqrt(dx * dx + dz * dz);
-            
+
             if (dist < minDist) {
                 minDist = dist;
                 nearest = enemy;
@@ -197,7 +209,7 @@ export class Hero extends Unit {
             const unit = nearest.getComponent(Unit);
             if (unit && unit.isAlive) {
                 if (this._state !== UnitState.ATTACKING) {
-                     // console.log(`[Hero] Targeting ${nearest.name}`);
+                    // console.log(`[Hero] Targeting ${nearest.name}`);
                 }
                 this.setTarget(unit);
                 this._state = UnitState.ATTACKING;

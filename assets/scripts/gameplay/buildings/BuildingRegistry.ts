@@ -16,12 +16,12 @@ export interface BuildingTypeConfig {
     buildTime: number;
     /** 描述 */
     description: string;
-    
+
     // --- V2 Architecture Extensions ---
     /** 视觉配置 */
     visual?: {
         colorHex: string; // e.g. '#FF0000'
-        scale: { x: number, y: number, z: number };
+        scale: { x: number; y: number; z: number };
     };
 
     /** 核心角色类型 */
@@ -44,7 +44,7 @@ export interface BuildingTypeConfig {
         bulletExplosionRadius?: number;
         bulletSlowPercent?: number;
         bulletSlowDuration?: number;
-        
+
         // Chain Lightning
         chainCount?: number;
         chainRange?: number;
@@ -82,13 +82,13 @@ export class BuildingRegistry {
             role: 'barracks',
             visual: {
                 colorHex: '#64B464', // Green
-                scale: { x: 0.45, y: 0.45, z: 0.45 }
+                scale: { x: 0.45, y: 0.45, z: 0.45 },
             },
             stats: { hp: 100 },
             features: {
                 spawnInterval: 5, // GameConfig.BUILDING.SPAWN_INTERVAL
-                maxUnits: 3 // GameConfig.BUILDING.MAX_SOLDIERS_PER_BARRACKS
-            }
+                maxUnits: 3, // GameConfig.BUILDING.MAX_SOLDIERS_PER_BARRACKS
+            },
         });
 
         // 防御塔 - 远程攻击
@@ -101,40 +101,40 @@ export class BuildingRegistry {
             role: 'tower',
             visual: {
                 colorHex: '#DCDC3C', // Yellow
-                scale: { x: 0.4, y: 0.8, z: 0.4 }
+                scale: { x: 0.4, y: 0.8, z: 0.4 },
             },
             stats: {
                 hp: 300,
                 attackRange: 25,
                 attackDamage: 25,
-                attackInterval: 0.5
-            }
+                attackInterval: 0.5,
+            },
         });
 
         // 冰霜塔 - 减速
         this.register({
             id: 'frost_tower',
             name: '冰霜塔',
-            cost: 12, 
+            cost: 12,
             buildTime: 0,
             description: '范围减速',
             role: 'tower', // It's still a tower logic-wise
             visual: {
                 colorHex: '#3C64DC', // Blue
-                scale: { x: 0.4, y: 0.8, z: 0.4 }
+                scale: { x: 0.4, y: 0.8, z: 0.4 },
             },
             stats: {
                 hp: 300,
                 attackRange: 22,
                 attackDamage: 5,
-                attackInterval: 0.8
+                attackInterval: 0.8,
             },
             features: {
                 bulletColorHex: '#0096FF',
                 bulletExplosionRadius: 2.5,
                 bulletSlowPercent: 0.5,
-                bulletSlowDuration: 2.0
-            }
+                bulletSlowDuration: 2.0,
+            },
         });
 
         // 闪电塔 - 连锁攻击
@@ -147,19 +147,19 @@ export class BuildingRegistry {
             role: 'tower',
             visual: {
                 colorHex: '#800080', // Purple
-                scale: { x: 0.4, y: 0.8, z: 0.4 }
+                scale: { x: 0.4, y: 0.8, z: 0.4 },
             },
             stats: {
                 hp: 250,
                 attackRange: 20,
                 attackDamage: 15, // Damage per hit
-                attackInterval: 1.0
+                attackInterval: 1.0,
             },
             features: {
                 chainCount: 3,
                 chainRange: 8,
-                bulletColorHex: '#A020F0'
-            }
+                bulletColorHex: '#A020F0',
+            },
         });
 
         // 农场 - 产生金币 (Concept)
@@ -172,10 +172,10 @@ export class BuildingRegistry {
             role: 'building',
             visual: {
                 colorHex: '#8B4513', // Brown
-                scale: { x: 0.6, y: 0.3, z: 0.6 }
+                scale: { x: 0.6, y: 0.3, z: 0.6 },
             },
             stats: { hp: 50 },
-            features: {} // TODO: Income logic
+            features: {}, // TODO: Income logic
         });
 
         // 墙 - 阻挡敌人
@@ -188,10 +188,10 @@ export class BuildingRegistry {
             role: 'building',
             visual: {
                 colorHex: '#808080', // Gray
-                scale: { x: 0.8, y: 0.8, z: 0.8 }
+                scale: { x: 0.8, y: 0.8, z: 0.8 },
             },
             stats: { hp: 1000 },
-            features: {}
+            features: {},
         });
 
         console.log('[BuildingRegistry] 注册了', this._types.size, '种建筑类型');

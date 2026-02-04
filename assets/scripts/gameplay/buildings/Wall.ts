@@ -11,7 +11,6 @@ const { ccclass, property } = _decorator;
  */
 @ccclass('Wall')
 export class Wall extends Building {
-
     // Visual state for broken wall
     private _originalScale: Vec3 = new Vec3();
     private _isBroken: boolean = false;
@@ -40,16 +39,21 @@ export class Wall extends Building {
 
         // 3. Visual Change (Broken State)
         // Flatten it
-        this.node.setScale(this._originalScale.x, this._originalScale.y * 0.2, this._originalScale.z);
-        
+        this.node.setScale(
+            this._originalScale.x,
+            this._originalScale.y * 0.2,
+            this._originalScale.z
+        );
+
         // Change color to gray if possible
-        const meshRenderer = this.node.getComponentInChildren(MeshRenderer) || this.node.getComponent(MeshRenderer);
+        const meshRenderer =
+            this.node.getComponentInChildren(MeshRenderer) || this.node.getComponent(MeshRenderer);
         if (meshRenderer && meshRenderer.material) {
-             // Note: In a real scenario, we might want to swap material or texture.
-             // For now, assuming material has `mainColor` property or we just rely on scale.
-             meshRenderer.material.setProperty('mainColor', new Color(100, 100, 100, 255));
+            // Note: In a real scenario, we might want to swap material or texture.
+            // For now, assuming material has `mainColor` property or we just rely on scale.
+            meshRenderer.material.setProperty('mainColor', new Color(100, 100, 100, 255));
         }
-        
+
         // Do NOT set active = false, so it remains visible as rubble
     }
 }

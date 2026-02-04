@@ -28,7 +28,7 @@ export class CharacterMover extends Component {
 
         const currentPos = this.node.position.clone();
         const targetPos = new Vec3(currentPos.x + dx, currentPos.y, currentPos.z + dz);
-        
+
         // Basic movement direction for sweep
         const moveVec = new Vec3(dx, 0, dz);
         const moveDist = moveVec.length();
@@ -38,14 +38,14 @@ export class CharacterMover extends Component {
         // Perform Sweep Test
         // Origin should be the center of the capsule for the sphere sweep
         const sweepOrigin = new Vec3(currentPos.x, currentPos.y + this.center.y, currentPos.z);
-        
+
         // Ray for sweep
         const ray = new geometry.Ray();
         Vec3.copy(ray.o, sweepOrigin);
         Vec3.normalize(ray.d, moveVec);
 
         // Sweep
-        const mask = 0xffffffff; 
+        const mask = 0xffffffff;
         const maxDist = moveDist + 0.1; // Check slightly further
 
         let finalX = targetPos.x;
@@ -53,19 +53,21 @@ export class CharacterMover extends Component {
 
         if (PhysicsSystem.instance.sweepSphereClosest(ray, this.radius, mask, maxDist, false)) {
             const result = PhysicsSystem.instance.sweepSphereClosestResult;
-            
+
             // If we hit something (Physical Obstacle, since queryTrigger is false)
             if (result.collider) {
                 // Determine if it's a wall or floor
                 // Floor normal is usually (0, 1, 0)
                 if (Math.abs(result.hitNormal.y) < 0.5) {
                     // It's a wall/obstacle (normal is mostly horizontal)
-                    
+
                     // Simple slide: Remove velocity component along normal
                     // V_new = V - (V . N) * N
                     const dot = Vec3.dot(moveVec, result.hitNormal);
-                    const slideVec = moveVec.clone().subtract(result.hitNormal.clone().multiplyScalar(dot));
-                    
+                    const slideVec = moveVec
+                        .clone()
+                        .subtract(result.hitNormal.clone().multiplyScalar(dot));
+
                     // Apply slide
                     finalX = currentPos.x + slideVec.x;
                     finalZ = currentPos.z + slideVec.z;
@@ -78,12 +80,12 @@ export class CharacterMover extends Component {
 
         // Face movement
         if (moveLen > 0.1) {
-             const lookTarget = new Vec3(
-                 finalX + dx, // Look at "desired" direction slightly better feel
-                 currentPos.y, 
-                 finalZ + dz 
-             );
-             this.node.lookAt(lookTarget);
+            const lookTarget = new Vec3(
+                finalX + dx, // Look at "desired" direction slightly better feel
+                currentPos.y,
+                finalZ + dz
+            );
+            this.node.lookAt(lookTarget);
         }
 
         this.clampPosition();
