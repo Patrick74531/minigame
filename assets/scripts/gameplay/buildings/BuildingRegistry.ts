@@ -16,6 +16,35 @@ export interface BuildingTypeConfig {
     buildTime: number;
     /** 描述 */
     description: string;
+    
+    // --- V2 Architecture Extensions ---
+    /** 视觉配置 */
+    visual?: {
+        colorHex: string; // e.g. '#FF0000'
+        scale: { x: number, y: number, z: number };
+    };
+
+    /** 核心角色类型 */
+    role?: 'building' | 'tower' | 'barracks';
+
+    /** 基础属性 */
+    stats?: {
+        hp: number;
+        attackRange?: number;
+        attackDamage?: number;
+        attackInterval?: number;
+    };
+
+    /** 特殊功能配置 */
+    features?: {
+        spawnInterval?: number;
+        maxUnits?: number;
+        // Bullet Visuals
+        bulletColorHex?: string;
+        bulletExplosionRadius?: number;
+        bulletSlowPercent?: number;
+        bulletSlowDuration?: number;
+    };
 }
 
 /**
@@ -43,18 +72,39 @@ export class BuildingRegistry {
         this.register({
             id: 'barracks',
             name: '兵营',
-            cost: 5, // Testing cost
+            cost: 5,
             buildTime: 0,
-            description: '生产士兵的建筑'
+            description: '生产士兵的建筑',
+            role: 'barracks',
+            visual: {
+                colorHex: '#64B464', // Green
+                scale: { x: 0.45, y: 0.45, z: 0.45 }
+            },
+            stats: { hp: 100 },
+            features: {
+                spawnInterval: 5, // GameConfig.BUILDING.SPAWN_INTERVAL
+                maxUnits: 3 // GameConfig.BUILDING.MAX_SOLDIERS_PER_BARRACKS
+            }
         });
 
         // 防御塔 - 远程攻击
         this.register({
             id: 'tower',
             name: '防御塔',
-            cost: 8, // Testing cost
+            cost: 8,
             buildTime: 0,
-            description: '远程攻击敌人'
+            description: '远程攻击敌人',
+            role: 'tower',
+            visual: {
+                colorHex: '#DCDC3C', // Yellow
+                scale: { x: 0.4, y: 0.8, z: 0.4 }
+            },
+            stats: {
+                hp: 300,
+                attackRange: 25,
+                attackDamage: 25,
+                attackInterval: 0.5
+            }
         });
 
         // 冰霜塔 - 减速
@@ -63,16 +113,40 @@ export class BuildingRegistry {
             name: '冰霜塔',
             cost: 12, 
             buildTime: 0,
-            description: '范围减速'
+            description: '范围减速',
+            role: 'tower', // It's still a tower logic-wise
+            visual: {
+                colorHex: '#3C64DC', // Blue
+                scale: { x: 0.4, y: 0.8, z: 0.4 }
+            },
+            stats: {
+                hp: 300,
+                attackRange: 22,
+                attackDamage: 5,
+                attackInterval: 0.8
+            },
+            features: {
+                bulletColorHex: '#0096FF',
+                bulletExplosionRadius: 2.5,
+                bulletSlowPercent: 0.5,
+                bulletSlowDuration: 2.0
+            }
         });
 
-        // 农场 - 产生金币
+        // 农场 - 产生金币 (Concept)
         this.register({
             id: 'farm',
             name: '农场',
             cost: 30,
             buildTime: 0,
-            description: '定期产生金币'
+            description: '定期产生金币',
+            role: 'building',
+            visual: {
+                colorHex: '#8B4513', // Brown
+                scale: { x: 0.6, y: 0.3, z: 0.6 }
+            },
+            stats: { hp: 50 },
+            features: {} // TODO: Income logic
         });
 
         console.log('[BuildingRegistry] 注册了', this._types.size, '种建筑类型');

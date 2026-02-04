@@ -2,6 +2,7 @@ import { _decorator, Node, MeshRenderer, primitives, utils, Material, Color } fr
 import { Building, BuildingType } from './Building';
 import { Tower } from './Tower';
 import { GameConfig } from '../../data/GameConfig';
+import { BuildingRegistry } from './BuildingRegistry';
 
 /**
  * 建筑工厂
@@ -135,6 +136,67 @@ export class BuildingFactory {
         tower.bulletSlowDuration = 2.0;
 
         return node;
+    }
+
+    /**
+     * Generic Building Creator (Data-Driven)
+     */
+    public static createBuilding(parent: Node, x: number, z: number, buildingId: string, unitContainer?: Node): Node | null {
+         const config = BuildingRegistry.instance.get(buildingId);
+         if (!config) {
+             console.error(`[BuildingFactory] Unknown building ID: ${buildingId}`);
+             return null;
+         }
+
+         // 1. Visuals
+         const colorHex = config.visual?.colorHex || '#FFFFFF';
+         const color = new Color().fromHEX(colorHex);
+         const node = this.createCubeNode(config.name, color);
+         node.setPosition(x, 0, z);
+         const scale = config.visual?.scale || { x: 1, y: 1, z: 1 };
+         node.setScale(scale.x, scale.y, scale.z);
+         parent.addChild(node);
+
+         // 2. Component Logic
+         if (config.role === 'barracks' || config.role === 'building') {
+             const building = node.addComponent(Building);
+             building.setConfig({
+                 type: BuildingType.BARRACKS, // TODO: Map role to enum if needed
+                 hp: config.stats?.hp || 100,
+                 spawnInterval: config.features?.spawnInterval || 10,
+                 maxUnits: config.features?.maxUnits || 5,
+             });
+             if (unitContainer) {
+                 building.setUnitContainer(unitContainer);
+             }
+         } else if (config.role === 'tower') {
+             const tower = node.addComponent(Tower);
+             tower.setConfig({
+                 type: BuildingType.TOWER,
+                 hp: config.stats?.hp || 300,
+                 spawnInterval: 0,
+                 maxUnits: 0
+             });
+             
+             // Apply stats
+             if (config.stats) {
+                 if (config.stats.attackRange) tower.attackRange = config.stats.attackRange;
+                 if (config.stats.attackDamage) tower.attackDamage = config.stats.attackDamage;
+                 if (config.stats.attackInterval) tower.attackInterval = config.stats.attackInterval;
+             }
+
+             // Apply features
+             if (config.features) {
+                 if (config.features.bulletColorHex) {
+                     tower.bulletColor = new Color().fromHEX(config.features.bulletColorHex);
+                 }
+                 if (config.features.bulletExplosionRadius) tower.bulletExplosionRadius = config.features.bulletExplosionRadius;
+                 if (config.features.bulletSlowPercent) tower.bulletSlowPercent = config.features.bulletSlowPercent;
+                 if (config.features.bulletSlowDuration) tower.bulletSlowDuration = config.features.bulletSlowDuration;
+             }
+         }
+
+         return node;
     }
 
     /**

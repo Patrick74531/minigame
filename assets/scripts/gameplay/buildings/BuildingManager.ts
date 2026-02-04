@@ -90,37 +90,16 @@ export class BuildingManager {
 
         // 根据建筑类型创建建筑
         if (this._buildingContainer) {
-            switch (data.buildingTypeId) {
-                case 'barracks':
-                    const buildingNode = BuildingFactory.createBarracks(
-                        this._buildingContainer,
-                        data.position.x,
-                        data.position.z 
-                    );
-                    
-                    const buildingComp = buildingNode.getComponent(Building);
-                    if (buildingComp && this._unitContainer) {
-                        buildingComp.setUnitContainer(this._unitContainer);
-                    }
-                    break;
+            const buildingNode = BuildingFactory.createBuilding(
+                this._buildingContainer,
+                data.position.x,
+                data.position.z,
+                data.buildingTypeId,
+                this._unitContainer || undefined
+            );
 
-                case 'tower':
-                     BuildingFactory.createTower(
-                        this._buildingContainer,
-                        data.position.x,
-                        data.position.z
-                     );
-                     break;
-                case 'frost_tower':
-                     BuildingFactory.createFrostTower(
-                        this._buildingContainer,
-                        data.position.x,
-                        data.position.z
-                     );
-                     break;
-                // 可扩展其他建筑类型
-                default:
-                    console.log(`[BuildingManager] 未实现的建筑类型: ${data.buildingTypeId}`);
+            if (!buildingNode) {
+                 console.error(`[BuildingManager] Failed to create building for type: ${data.buildingTypeId}`);
             }
         }
 
