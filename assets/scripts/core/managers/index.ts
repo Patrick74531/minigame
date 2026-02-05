@@ -4,7 +4,6 @@
 export { EventManager } from './EventManager';
 export { PoolManager, IPoolable } from './PoolManager';
 export { GameManager, GameState } from './GameManager';
-export { WaveManager } from './WaveManager';
 export { EffectManager } from './EffectManager';
 export { WaveService } from './WaveService';
 export { CombatService } from './CombatService';

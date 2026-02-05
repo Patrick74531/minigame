@@ -20,10 +20,13 @@
    Components that are pooled implement `onSpawn/onDespawn` and reset state.
 
 ## Current Cross-System Facades
-- None (keep cross-module calls explicit and simple for now).
+- **ServiceRegistry**: `assets/scripts/core/managers/ServiceRegistry.ts` (global, long-lived services only)
+- **WaveService**: `assets/scripts/core/managers/WaveService.ts` (read-only wave snapshot API for UI/analytics)
+- **CombatService**: `assets/scripts/core/managers/CombatService.ts` (centralized combat provider entry used by `CombatSystem`)
 
 ## Known Alternatives (Documented)
 - `gameplay/wave/WaveManager` (infinite mode)
+- `gameplay/combat/CombatSystem` (centralized targeting, active)
 
 ## TODO Backlog (Non-Blocking)
 - Building ownership tracking for spawned units

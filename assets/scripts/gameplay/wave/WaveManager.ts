@@ -4,6 +4,7 @@ import { GameEvents } from '../../data/GameEvents';
 import { UnitFactory } from '../units/UnitFactory';
 import { Unit } from '../units/Unit';
 import { GameConfig } from '../../data/GameConfig';
+import { WaveService } from '../../core/managers/WaveService';
 
 /**
  * 波次配置
@@ -52,6 +53,15 @@ export class WaveManager {
 
         // Listen for AOE impacts
         EventManager.instance.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
+        WaveService.instance.registerProvider({
+            id: 'infinite',
+            priority: 0,
+            getSnapshot: () => ({
+                currentWave: this._currentWave,
+                enemiesAlive: this._enemies.length,
+            }),
+        });
+
         console.log('[WaveManager] 初始化完成 (Infinite Mode)');
     }
 
@@ -208,6 +218,12 @@ export class WaveManager {
             this._waveConfig?.hpMultiplier || 1
         );
         this._enemies.push(enemy);
+
+        // Notify centralized systems (e.g., CombatSystem) about new enemy
+        EventManager.instance.emit(GameEvents.UNIT_SPAWNED, {
+            unitType: 'enemy',
+            node: enemy,
+        });
     }
 
     private getEdgePosition(): { x: number; y: number } {
@@ -230,6 +246,7 @@ export class WaveManager {
      */
     public cleanup(): void {
         EventManager.instance.off(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
+        WaveService.instance.unregisterProvider('infinite');
         this._enemies = [];
         this._waveConfig = null;
         this._waveActive = false;

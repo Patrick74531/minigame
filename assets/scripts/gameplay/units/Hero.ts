@@ -14,6 +14,7 @@ import {
 import { Unit, UnitType, UnitState } from './Unit';
 import { GameManager } from '../../core/managers/GameManager';
 import { WaveManager } from '../wave/WaveManager';
+import { CombatService } from '../../core/managers/CombatService';
 import { GameConfig } from '../../data/GameConfig';
 import { Coin } from '../economy/Coin';
 import { HUDManager } from '../../ui/HUDManager';
@@ -187,21 +188,31 @@ export class Hero extends Unit {
     }
 
     private updateTargeting(): void {
-        const enemies = WaveManager.instance.enemies;
         let nearest: Node | null = null;
-        let minDist = this._stats.attackRange;
 
-        const myPos = this.node.position;
+        const provider = CombatService.provider;
+        if (provider && provider.findEnemyInRange) {
+            const result: any = provider.findEnemyInRange(this.node.position, this._stats.attackRange);
+            if (result?.node) {
+                nearest = result.node;
+            } else if (result?.isValid) {
+                nearest = result as Node;
+            }
+        } else {
+            const enemies = WaveManager.instance.enemies;
+            let minDist = this._stats.attackRange;
+            const myPos = this.node.position;
 
-        for (const enemy of enemies) {
-            if (!enemy.isValid) continue;
-            const dx = enemy.position.x - myPos.x;
-            const dz = enemy.position.z - myPos.z;
-            const dist = Math.sqrt(dx * dx + dz * dz);
+            for (const enemy of enemies) {
+                if (!enemy.isValid) continue;
+                const dx = enemy.position.x - myPos.x;
+                const dz = enemy.position.z - myPos.z;
+                const dist = Math.sqrt(dx * dx + dz * dz);
 
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = enemy;
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = enemy;
+                }
             }
         }
 

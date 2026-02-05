@@ -32,6 +32,10 @@ import { BuildingManager } from './gameplay/buildings/BuildingManager';
 import { BuildingPad } from './gameplay/buildings/BuildingPad';
 import { EffectManager } from './core/managers/EffectManager';
 import { MapGenerator } from './gameplay/map/MapGenerator';
+import { CombatSystem } from './gameplay/combat/CombatSystem';
+import { ServiceRegistry } from './core/managers/ServiceRegistry';
+import { WaveService } from './core/managers/WaveService';
+import { PoolManager } from './core/managers/PoolManager';
 
 const { ccclass, property } = _decorator;
 
@@ -88,6 +92,12 @@ export class GameController extends Component {
         this._container?.addChild(mapNode);
         this._mapGenerator = mapNode.addComponent(MapGenerator);
 
+        // Setup Combat System (Centralized targeting)
+        // NOTE: Soldier auto-targeting depends on CombatSystem. If you remove it, add a fallback.
+        const combatNode = new Node('CombatSystem');
+        this._container?.addChild(combatNode);
+        combatNode.addComponent(CombatSystem);
+
         // 初始化 Managers
         GameManager.instance.initialize();
         // WaveManager initialized in Start() when Base is ready,
@@ -100,6 +110,17 @@ export class GameController extends Component {
 
         // 启用物理系统
         PhysicsSystem.instance.enable = true;
+
+        // Register core services for decoupled access
+        // NOTE: Use ServiceRegistry.get(...) for new code to reduce hard dependencies.
+        ServiceRegistry.register('EventManager', EventManager.instance);
+        ServiceRegistry.register('GameManager', GameManager.instance);
+        ServiceRegistry.register('HUDManager', HUDManager.instance);
+        ServiceRegistry.register('BuildingManager', BuildingManager.instance);
+        ServiceRegistry.register('EffectManager', EffectManager.instance);
+        ServiceRegistry.register('WaveManager', WaveManager.instance);
+        ServiceRegistry.register('WaveService', WaveService.instance);
+        ServiceRegistry.register('PoolManager', PoolManager.instance);
 
     }
 

@@ -1,7 +1,6 @@
-import { _decorator, Node, RigidBody, Vec3 } from 'cc';
+import { _decorator, Node, Vec3 } from 'cc';
 import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
-import { WaveManager } from '../wave/WaveManager';
 
 const { ccclass, property } = _decorator;
 
@@ -11,10 +10,6 @@ const { ccclass, property } = _decorator;
  */
 @ccclass('Soldier')
 export class Soldier extends Unit {
-    /** 索敌间隔（秒）*/
-    private readonly SEEK_INTERVAL = 0.5;
-    private _seekTimer: number = 0;
-
     /** 当前追踪的敌人节点（外部可读取） */
     public currentTarget: Node | null = null;
 
@@ -40,59 +35,20 @@ export class Soldier extends Unit {
     protected update(dt: number): void {
         if (!this.isAlive) return;
 
-        // 周期性索敌
-        this._seekTimer += dt;
-        if (this._seekTimer >= this.SEEK_INTERVAL) {
-            this._seekTimer = 0;
-            this.findAndChaseTarget();
-        }
-
         // 调用父类更新
         super.update(dt);
+
+        // Mirror target for external reads (CombatSystem assigns target)
+        this.currentTarget = this.target ? this.target.node : null;
     }
 
     /**
-     * 查找并追踪最近的敌人
+     * 由 CombatSystem 调用，设置并进入追击状态
      */
-    private findAndChaseTarget(): void {
-        // 如果当前目标还有效，继续追踪
-        if (this.currentTarget?.isValid && this._target?.isAlive) {
-            return;
-        }
-
-        // 从 WaveManager 获取敌人列表
-        const enemies = WaveManager.instance.enemies;
-        if (enemies.length === 0) {
-            this._state = UnitState.IDLE;
-            this.currentTarget = null;
-            this._target = null;
-            return;
-        }
-
-        // 找最近的敌人
-        let nearest: Node | null = null;
-        let minDist = Infinity;
-        const myPos = this.node.position;
-
-        for (const enemy of enemies) {
-            if (!enemy.isValid) continue;
-            const dx = enemy.position.x - myPos.x;
-            const dz = enemy.position.z - myPos.z; // 3D
-            const dist = Math.sqrt(dx * dx + dz * dz);
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = enemy;
-            }
-        }
-
-        if (nearest) {
-            this.currentTarget = nearest;
-            const enemyUnit = nearest.getComponent(Unit);
-            if (enemyUnit) {
-                this.setTarget(enemyUnit);
-                this._state = UnitState.MOVING;
-            }
-        }
+    public engageTarget(target: Unit): void {
+        this.setTarget(target);
+        this._state = UnitState.MOVING;
+        this.currentTarget = target.node;
     }
 
     protected updateMovement(dt: number): void {

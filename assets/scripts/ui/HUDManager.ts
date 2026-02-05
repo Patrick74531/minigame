@@ -3,6 +3,7 @@ import { EventManager } from '../core/managers/EventManager';
 import { GameEvents } from '../data/GameEvents';
 import { UIFactory } from './UIFactory';
 import { GameConfig } from '../data/GameConfig';
+import { WaveService } from '../core/managers/WaveService';
 
 // UI_2D Layer
 const UI_LAYER = 33554432;
@@ -164,7 +165,9 @@ export class HUDManager {
 
     private onWaveStart(data: { wave: number }): void {
         // console.log(`[HUD] 波次 ${data.wave} 开始`);
-        this.updateWaveDisplay(data.wave);
+        const snapshot = WaveService.instance.getSnapshot();
+        const wave = snapshot.currentWave || data.wave || 1;
+        this.updateWaveDisplay(wave);
     }
 
     private onWaveComplete(data: { wave: number; bonus: number }): void {
