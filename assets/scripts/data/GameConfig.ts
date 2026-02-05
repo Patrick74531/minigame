@@ -124,6 +124,34 @@ export const GameConfig = {
         ATTACK_RANGE: 2.5,
         /** 移动速度 - Was 120/60 ~ 2. Now using Physics Velocity directly */
         MOVE_SPEED: 6.0,
+        /**
+         * 模型资源配置
+         * 说明：
+         * - glb 必须放在 assets/resources 下
+         * - Prefab 子资源路径格式：character/<glb_name>/<glb_name>
+         * - AnimationClip 子资源路径格式：character/<glb_name>/<clip_name>
+         */
+        MODEL_PRESET: 'meshy',
+        MODEL_PRESETS: {
+            meshy: {
+                key: 'meshy',
+                prefabPath:
+                    'character/Meshy_AI_Animation_Running_withSkin/Meshy_AI_Animation_Running_withSkin',
+                prefabFallbacks: [
+                    'character/Meshy_AI_Animation_Running_withSkin',
+                ],
+                runClipPath:
+                    'character/Meshy_AI_Animation_Running_withSkin/Armature|running|baselayer',
+                runClipFallbacks: [
+                    'character/Meshy_AI_Animation_Running_withSkin',
+                ],
+                idleClipPath:
+                    'character/Meshy_AI_Animation_Idle_withSkin/Armature|Idle|baselayer',
+                idleClipFallbacks: [
+                    'character/Meshy_AI_Animation_Idle_withSkin',
+                ],
+            },
+        },
         /** 角色模型缩放 */
         MODEL_SCALE: 2.0,
         /** 角色模型高度偏移 */
@@ -136,6 +164,10 @@ export const GameConfig = {
         STACK_ITEM_HEIGHT: 0.15,
         /** 金币堆叠缩放 */
         STACK_ITEM_SCALE: 0.6,
+        /** 锁定动画根节点缩放，避免不同动画导致大小变化 */
+        LOCK_ANIM_ROOT_SCALE: true,
+        /** 动画根节点锁定缩放值 */
+        ANIM_ROOT_SCALE: 1.0,
     },
 
     // === 波次系统 ===
