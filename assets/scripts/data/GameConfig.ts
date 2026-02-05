@@ -135,28 +135,50 @@ export const GameConfig = {
         MODEL_PRESETS: {
             meshy: {
                 key: 'meshy',
-                prefabPath:
-                    'character/Meshy_AI_Animation_Running_withSkin/Meshy_AI_Animation_Running_withSkin',
-                prefabFallbacks: [
-                    'character/Meshy_AI_Animation_Running_withSkin',
-                ],
-                runClipPath:
-                    'character/Meshy_AI_Animation_Running_withSkin/Armature|running|baselayer',
-                runClipFallbacks: [
-                    'character/Meshy_AI_Animation_Running_withSkin',
-                ],
-                idleClipPath:
-                    'character/Meshy_AI_Animation_Idle_withSkin/Armature|Idle|baselayer',
-                idleClipFallbacks: [
-                    'character/Meshy_AI_Animation_Idle_withSkin',
-                ],
+                prefab: {
+                    path:
+                        'character/Meshy_AI_Animation_Running_withSkin/Meshy_AI_Animation_Running_withSkin',
+                    fallbacks: [
+                        'character/Meshy_AI_Animation_Running_withSkin',
+                    ],
+                },
+                clips: {
+                    run: {
+                        path:
+                            'character/Meshy_AI_Animation_Running_withSkin/Armature|running|baselayer',
+                        fallbacks: [
+                            'character/Meshy_AI_Animation_Running_withSkin',
+                        ],
+                    },
+                    idle: {
+                        path:
+                            'character/Meshy_AI_Animation_Idle_withSkin/Armature|Idle|baselayer',
+                        fallbacks: [
+                            'character/Meshy_AI_Animation_Idle_withSkin',
+                        ],
+                    },
+                },
+                transform: {
+                    scale: 2.0,
+                    offsetY: 0.0,
+                    rotY: 180,
+                },
+                animRootScale: {
+                    lock: true,
+                    scale: 1.0,
+                },
+                stack: {
+                    offsetY: 2.2,
+                    itemHeight: 0.15,
+                    itemScale: 0.6,
+                },
             },
         },
-        /** 角色模型缩放 */
+        /** 角色模型缩放（legacy fallback） */
         MODEL_SCALE: 2.0,
-        /** 角色模型高度偏移 */
+        /** 角色模型高度偏移（legacy fallback） */
         MODEL_OFFSET_Y: 0.0,
-        /** 角色模型朝向偏移（Y轴角度，度） */
+        /** 角色模型朝向偏移（Y轴角度，度）（legacy fallback） */
         MODEL_ROT_Y: 180,
         /** 金币堆叠容器高度 */
         STACK_OFFSET_Y: 2.2,
@@ -164,9 +186,9 @@ export const GameConfig = {
         STACK_ITEM_HEIGHT: 0.15,
         /** 金币堆叠缩放 */
         STACK_ITEM_SCALE: 0.6,
-        /** 锁定动画根节点缩放，避免不同动画导致大小变化 */
+        /** 锁定动画根节点缩放，避免不同动画导致大小变化（legacy fallback） */
         LOCK_ANIM_ROOT_SCALE: true,
-        /** 动画根节点锁定缩放值 */
+        /** 动画根节点锁定缩放值（legacy fallback） */
         ANIM_ROOT_SCALE: 1.0,
     },
 

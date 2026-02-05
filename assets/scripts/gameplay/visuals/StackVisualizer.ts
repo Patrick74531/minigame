@@ -1,5 +1,5 @@
 import { _decorator, Component, Node, Vec3, Tween, tween } from 'cc';
-import { GameConfig } from '../../data/GameConfig';
+import { resolveHeroModelConfig } from '../units/HeroModelConfig';
 
 const { ccclass, property } = _decorator;
 
@@ -21,12 +21,14 @@ export class StackVisualizer extends Component {
         if (!this.container) {
             this.container = new Node('StackContainer');
             this.node.addChild(this.container);
-            const offsetY = GameConfig.HERO.STACK_OFFSET_Y ?? 1.2;
+            const config = resolveHeroModelConfig();
+            const offsetY = config.stackOffsetY;
             this.container.setPosition(0, offsetY, 0);
         }
 
         if (this.itemHeight <= 0.1) {
-            this.itemHeight = GameConfig.HERO.STACK_ITEM_HEIGHT ?? this.itemHeight;
+            const config = resolveHeroModelConfig();
+            this.itemHeight = config.stackItemHeight ?? this.itemHeight;
         }
     }
 
@@ -34,7 +36,8 @@ export class StackVisualizer extends Component {
         if (!this.container) {
             this.container = new Node('StackContainer');
             this.node.addChild(this.container);
-            const offsetY = GameConfig.HERO.STACK_OFFSET_Y ?? 1.2;
+            const config = resolveHeroModelConfig();
+            const offsetY = config.stackOffsetY;
             this.container.setPosition(0, offsetY, 0);
         }
 
@@ -48,7 +51,8 @@ export class StackVisualizer extends Component {
         // Immediate set + random rot
         item.setPosition(targetPos);
         item.setRotationFromEuler(0, Math.random() * 360, 0);
-        const scale = GameConfig.HERO.STACK_ITEM_SCALE ?? 0.5;
+        const config = resolveHeroModelConfig();
+        const scale = config.stackItemScale ?? 0.5;
         item.setScale(scale, scale, scale);
 
         this._stack.push(item);

@@ -23,6 +23,7 @@ import { Hero } from './Hero';
 import { GameConfig } from '../../data/GameConfig';
 import { HeroAnimationController } from './HeroAnimationController';
 import { AnimRootScaleLock } from '../visuals/AnimRootScaleLock';
+import { resolveHeroModelConfig } from './HeroModelConfig';
 
 /**
  * 单位工厂
@@ -197,10 +198,11 @@ export class UnitFactory {
 
             const model = instantiate(prefab);
             model.name = 'HeroModel';
-            model.setPosition(0, GameConfig.HERO.MODEL_OFFSET_Y, 0);
-            const scale = Math.max(GameConfig.HERO.MODEL_SCALE, 0.05);
+            const config = resolveHeroModelConfig();
+            const scale = Math.max(config.transformScale, 0.05);
+            model.setPosition(0, config.transformOffsetY, 0);
             model.setScale(scale, scale, scale);
-            model.setRotationFromEuler(0, GameConfig.HERO.MODEL_ROT_Y, 0);
+            model.setRotationFromEuler(0, config.transformRotY, 0);
             this.applyLayerRecursive(model, root.layer);
             root.addChild(model);
 
@@ -220,13 +222,16 @@ export class UnitFactory {
             controller.configure(hero, anim, null);
 
             if (anim) {
-                if (GameConfig.HERO.LOCK_ANIM_ROOT_SCALE) {
+                if (config.lockAnimRootScale) {
                     let lock = anim.node.getComponent(AnimRootScaleLock);
                     if (!lock) {
                         lock = anim.node.addComponent(AnimRootScaleLock);
                     }
-                    const s = GameConfig.HERO.ANIM_ROOT_SCALE;
-                    lock.scale.set(s, s, s);
+                    lock.scale.set(
+                        config.animRootScale,
+                        config.animRootScale,
+                        config.animRootScale
+                    );
                 }
                 const existing = anim.clips && anim.clips.length > 0 ? anim.clips[0] : null;
                 if (existing) {
@@ -250,7 +255,7 @@ export class UnitFactory {
         anim: SkeletalAnimation,
         controller: HeroAnimationController | null
     ): void {
-        const config = this.getHeroModelConfig();
+        const config = resolveHeroModelConfig();
         if (!config) return;
 
         const cached = this._heroRunClipCache.get(config.key);
@@ -290,7 +295,7 @@ export class UnitFactory {
         if (!anim.node || !anim.node.isValid) {
             return;
         }
-        const config = this.getHeroModelConfig();
+        const config = resolveHeroModelConfig();
         if (!config) return;
 
         const cached = this._heroIdleClipCache.get(config.key);
@@ -328,7 +333,7 @@ export class UnitFactory {
     }
 
     private static loadRunPrefab(attach: (prefab: Prefab) => void): void {
-        const config = this.getHeroModelConfig();
+        const config = resolveHeroModelConfig();
         if (!config) return;
 
         const cached = this._heroPrefabs.get(config.key);
@@ -352,32 +357,7 @@ export class UnitFactory {
         });
     }
 
-    private static getHeroModelConfig(): {
-        key: string;
-        prefabPath: string;
-        prefabFallbacks: string[];
-        runClipPath?: string;
-        runClipFallbacks: string[];
-        idleClipPath?: string;
-        idleClipFallbacks: string[];
-    } | null {
-        const presets: any = GameConfig.HERO.MODEL_PRESETS as any;
-        if (!presets) return null;
-        const key = GameConfig.HERO.MODEL_PRESET;
-        const preset =
-            (key && presets[key]) ??
-            presets[Object.keys(presets)[0]];
-        if (!preset || !preset.prefabPath) return null;
-        return {
-            key: preset.key ?? key ?? 'default',
-            prefabPath: preset.prefabPath,
-            prefabFallbacks: preset.prefabFallbacks ?? [],
-            runClipPath: preset.runClipPath,
-            runClipFallbacks: preset.runClipFallbacks ?? [],
-            idleClipPath: preset.idleClipPath,
-            idleClipFallbacks: preset.idleClipFallbacks ?? [],
-        };
-    }
+    // Hero model config resolution moved to HeroModelConfig for reuse.
 
     private static buildPrefabPaths(config: { prefabPath: string; prefabFallbacks: string[] }): string[] {
         return [config.prefabPath, ...config.prefabFallbacks].filter(Boolean);
