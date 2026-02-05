@@ -13,7 +13,7 @@ import {
 } from 'cc';
 import { Unit, UnitType, UnitState } from './Unit';
 import { GameManager } from '../../core/managers/GameManager';
-import { WaveManager } from '../../core/managers/WaveManager';
+import { WaveManager } from '../wave/WaveManager';
 import { GameConfig } from '../../data/GameConfig';
 import { Coin } from '../economy/Coin';
 import { HUDManager } from '../../ui/HUDManager';

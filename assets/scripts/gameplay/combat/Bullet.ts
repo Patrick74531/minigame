@@ -4,7 +4,7 @@ import { Unit, UnitType } from '../units/Unit';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { EffectFactory } from '../effects/EffectFactory';
-import { WaveManager } from '../../core/managers/WaveManager';
+import { WaveManager } from '../wave/WaveManager';
 import { IPoolable } from '../../core/managers/PoolManager';
 
 const { ccclass, property } = _decorator;
@@ -201,7 +201,7 @@ export class Bullet extends BaseComponent implements IPoolable {
     }
 
     private findNextChainTarget(excludeNode: Node): Node | null {
-        // const { WaveManager } = require('../../core/managers/WaveManager');
+        // const { WaveManager } = require('../wave/WaveManager');
         const enemies = WaveManager.instance.enemies;
         let nearest: Node | null = null;
         let minMsg = this.chainRange * this.chainRange;

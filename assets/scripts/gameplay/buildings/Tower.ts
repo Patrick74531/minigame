@@ -15,7 +15,7 @@ import {
     resources,
 } from 'cc';
 import { Building } from './Building';
-import { WaveManager } from '../../core/managers/WaveManager';
+import { WaveManager } from '../wave/WaveManager';
 import { Bullet } from '../combat/Bullet';
 import { Unit } from '../units/Unit';
 

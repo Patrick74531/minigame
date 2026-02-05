@@ -14,27 +14,16 @@
    Only wire systems; do not add gameplay logic here.
 2. **Events must be typed**  
    When adding/modifying events, update `assets/scripts/data/GameEvents.ts` payload map.
-3. **Wave access is read-only via WaveService**  
-   UI reads wave snapshots from `assets/scripts/core/managers/WaveService.ts`.
-4. **Combat access via CombatService**  
-   New combat logic should register as provider rather than creating a new global.
-5. **Configuration first**  
+3. **Configuration first**  
    Tuning values and spawn layouts live in `assets/scripts/data/GameConfig.ts`.
-6. **Pooling lifecycle**  
+4. **Pooling lifecycle**  
    Components that are pooled implement `onSpawn/onDespawn` and reset state.
 
 ## Current Cross-System Facades
-- **WaveService**: Snapshot provider for UI and other systems
-- **CombatService**: Access point for active combat provider
-- **ServiceRegistry**: Central registry for global services
+- None (keep cross-module calls explicit and simple for now).
 
 ## Known Alternatives (Documented)
-- `gameplay/wave/WaveManager` (infinite mode) vs `gameplay/wave/WaveConfigManager` (config mode)
-  - `core/managers/WaveManager` is a re-export for legacy imports.
-
-## Combat Note
-- 当前没有集中式 CombatSystem，单位各自索敌。
-- 若未来引入集中式战斗系统，请通过 `CombatService` 注册 provider。
+- `gameplay/wave/WaveManager` (infinite mode)
 
 ## TODO Backlog (Non-Blocking)
 - Building ownership tracking for spawned units

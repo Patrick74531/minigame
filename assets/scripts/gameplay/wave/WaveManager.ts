@@ -3,7 +3,6 @@ import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { UnitFactory } from '../units/UnitFactory';
 import { Unit } from '../units/Unit';
-import { WaveService } from '../../core/managers/WaveService';
 import { GameConfig } from '../../data/GameConfig';
 
 /**
@@ -21,7 +20,7 @@ export interface WaveConfig {
  * 负责敌人波次的生成和管理
  *
  * NOTE: 当前由 GameController 驱动（无限波模式）。
- * 配置波次请使用 WaveConfigManager。
+ * 若需配置波次，可新增独立的配置波次管理器。
  */
 export class WaveManager {
     private static _instance: WaveManager | null = null;
@@ -53,15 +52,6 @@ export class WaveManager {
 
         // Listen for AOE impacts
         EventManager.instance.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
-        WaveService.instance.registerProvider({
-            id: 'infinite',
-            priority: 0,
-            getSnapshot: () => ({
-                currentWave: this._currentWave,
-                enemiesAlive: this._enemies.length,
-            }),
-        });
-
         console.log('[WaveManager] 初始化完成 (Infinite Mode)');
     }
 
@@ -240,7 +230,6 @@ export class WaveManager {
      */
     public cleanup(): void {
         EventManager.instance.off(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
-        WaveService.instance.unregisterProvider('infinite');
         this._enemies = [];
         this._waveConfig = null;
         this._waveActive = false;

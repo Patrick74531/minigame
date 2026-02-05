@@ -16,11 +16,7 @@ export {
     GameManager,
     GameState,
     IPoolable,
-    WaveManager,
     EffectManager,
-    WaveService,
-    CombatService,
-    ServiceRegistry,
 } from './managers';
 
 // 工具

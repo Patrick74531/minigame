@@ -1,7 +1,7 @@
 import { _decorator, Node, RigidBody, Vec3 } from 'cc';
 import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
-import { WaveManager } from '../../core/managers/WaveManager';
+import { WaveManager } from '../wave/WaveManager';
 
 const { ccclass, property } = _decorator;
 
