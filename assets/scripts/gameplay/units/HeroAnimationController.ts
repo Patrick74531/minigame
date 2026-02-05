@@ -23,11 +23,6 @@ export class HeroAnimationController extends Component {
     ): void {
         this._hero = hero;
         this._anim = anim;
-        console.warn('[HeroAnim] configure', {
-            hasHero: !!hero,
-            animType: anim ? anim.constructor.name : 'null',
-            runClip,
-        });
         if (runClip) {
             this.setRunClip(runClip);
         }
@@ -38,7 +33,6 @@ export class HeroAnimationController extends Component {
         if (!this._anim || !this._runClip) return;
         const shouldRun = this._hero ? this._hero.state === UnitState.MOVING : true;
         if (shouldRun && this._current !== this._runClip) {
-            console.warn('[HeroAnim] play run', this._runClip);
             this._anim.play(this._runClip);
             this._current = this._runClip;
         }
@@ -49,7 +43,6 @@ export class HeroAnimationController extends Component {
         if (!this._anim || !this._idleClip) return;
         const shouldIdle = this._hero ? this._hero.state !== UnitState.MOVING : true;
         if (shouldIdle && this._current !== this._idleClip) {
-            console.warn('[HeroAnim] play idle', this._idleClip);
             this._anim.play(this._idleClip);
             this._current = this._idleClip;
         }

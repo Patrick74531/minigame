@@ -1,4 +1,5 @@
 import { _decorator, Component, Node, Vec3, Tween, tween } from 'cc';
+import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass, property } = _decorator;
 
@@ -20,7 +21,12 @@ export class StackVisualizer extends Component {
         if (!this.container) {
             this.container = new Node('StackContainer');
             this.node.addChild(this.container);
-            this.container.setPosition(0, 1.2, 0); // Default head pos
+            const offsetY = GameConfig.HERO.STACK_OFFSET_Y ?? 1.2;
+            this.container.setPosition(0, offsetY, 0);
+        }
+
+        if (this.itemHeight <= 0.1) {
+            this.itemHeight = GameConfig.HERO.STACK_ITEM_HEIGHT ?? this.itemHeight;
         }
     }
 
@@ -28,7 +34,8 @@ export class StackVisualizer extends Component {
         if (!this.container) {
             this.container = new Node('StackContainer');
             this.node.addChild(this.container);
-            this.container.setPosition(0, 1.2, 0);
+            const offsetY = GameConfig.HERO.STACK_OFFSET_Y ?? 1.2;
+            this.container.setPosition(0, offsetY, 0);
         }
 
         // Visual logic extracted from Hero.ts
@@ -41,14 +48,17 @@ export class StackVisualizer extends Component {
         // Immediate set + random rot
         item.setPosition(targetPos);
         item.setRotationFromEuler(0, Math.random() * 360, 0);
-        item.setScale(0.5, 0.5, 0.5);
+        const scale = GameConfig.HERO.STACK_ITEM_SCALE ?? 0.5;
+        item.setScale(scale, scale, scale);
 
         this._stack.push(item);
 
         // Optional: Add simple bounce effect
         tween(item)
-            .to(0.1, { scale: new Vec3(0.6, 0.6, 0.6) })
-            .to(0.1, { scale: new Vec3(0.5, 0.5, 0.5) })
+            .to(0.1, {
+                scale: new Vec3(scale + 0.1, scale + 0.1, scale + 0.1),
+            })
+            .to(0.1, { scale: new Vec3(scale, scale, scale) })
             .start();
     }
 

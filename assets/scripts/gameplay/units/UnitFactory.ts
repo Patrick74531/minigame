@@ -231,7 +231,6 @@ export class UnitFactory {
             if (anim) {
                 const existing = anim.clips && anim.clips.length > 0 ? anim.clips[0] : null;
                 if (existing) {
-                    console.warn('[UnitFactory] Found existing run clip:', existing.name);
                     controller.setRunClip(existing.name);
                 } else {
                     this.ensureRunClip(anim, controller);
@@ -245,16 +244,7 @@ export class UnitFactory {
 
     private static diagnoseModelAnimations(model: Node): SkeletalAnimation | null {
         const skels = model.getComponentsInChildren(SkeletalAnimation);
-        const infos = skels.map((skel) => {
-            const names = skel.clips ? skel.clips.map((c) => c.name).join(',') : '';
-            return `${skel.node.name} [${names}]`;
-        });
-        console.warn('[UnitFactory] SkeletalAnimation count:', skels.length, infos);
-        const anim = skels[0] ?? null;
-        if (!anim) {
-            console.warn('[UnitFactory] No SkeletalAnimation found in model.');
-        }
-        return anim;
+        return skels[0] ?? null;
     }
 
     private static ensureRunClip(
@@ -266,7 +256,6 @@ export class UnitFactory {
                 if (!anim.node || !anim.node.isValid) {
                     return;
                 }
-                console.warn('[UnitFactory] Run clip loaded:', clip.name);
                 this.addClipIfNeeded(anim, clip);
                 if (controller) {
                     controller.setRunClip(clip.name);
@@ -282,7 +271,6 @@ export class UnitFactory {
                 if (!anim.node || !anim.node.isValid) {
                     return;
                 }
-                console.warn('[UnitFactory] Run clip loaded (fallback):', fallbackClip.name);
                 this.addClipIfNeeded(anim, fallbackClip);
                 if (controller) {
                     controller.setRunClip(fallbackClip.name);
@@ -319,7 +307,6 @@ export class UnitFactory {
                 this.addClipIfNeeded(anim, clip);
                 anim.defaultClip = clip;
                 anim.playOnLoad = true;
-                console.warn('[UnitFactory] Idle clip loaded:', clip.name);
                 if (controller) {
                     controller.setIdleClip(clip.name);
                 }
@@ -339,7 +326,6 @@ export class UnitFactory {
                 this.addClipIfNeeded(anim, fallbackClip);
                 anim.defaultClip = fallbackClip;
                 anim.playOnLoad = true;
-                console.warn('[UnitFactory] Idle clip loaded (fallback):', fallbackClip.name);
                 if (controller) {
                     controller.setIdleClip(fallbackClip.name);
                 }

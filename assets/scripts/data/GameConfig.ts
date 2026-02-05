@@ -130,6 +130,12 @@ export const GameConfig = {
         MODEL_OFFSET_Y: 0.0,
         /** 角色模型朝向偏移（Y轴角度，度） */
         MODEL_ROT_Y: 180,
+        /** 金币堆叠容器高度 */
+        STACK_OFFSET_Y: 2.2,
+        /** 金币堆叠间距 */
+        STACK_ITEM_HEIGHT: 0.15,
+        /** 金币堆叠缩放 */
+        STACK_ITEM_SCALE: 0.6,
     },
 
     // === 波次系统 ===
