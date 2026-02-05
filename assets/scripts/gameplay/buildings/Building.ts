@@ -214,6 +214,10 @@ export class Building extends BaseComponent implements IAttackable {
             return;
         }
 
+        console.log(
+            `[Building] Spawn attempt building=${this.node.name} active=${this._activeUnits}/${this.maxUnits} interval=${this.spawnInterval}s`
+        );
+
         let soldier = PoolManager.instance.spawn(this.soldierPoolName, this._unitContainer);
 
         // 3D 坐标系：XZ平面为地面，Y轴向上

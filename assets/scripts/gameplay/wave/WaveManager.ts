@@ -2,7 +2,7 @@ import { Node, Vec3 } from 'cc';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { UnitFactory } from '../units/UnitFactory';
-import { Unit } from '../units/Unit';
+import { Unit, UnitType } from '../units/Unit';
 import { GameConfig } from '../../data/GameConfig';
 import { WaveService } from '../../core/managers/WaveService';
 
@@ -53,6 +53,8 @@ export class WaveManager {
 
         // Listen for AOE impacts
         EventManager.instance.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
+        EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
+        EventManager.instance.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
         WaveService.instance.registerProvider({
             id: 'infinite',
             priority: 0,
@@ -63,6 +65,16 @@ export class WaveManager {
         });
 
         console.log('[WaveManager] 初始化完成 (Infinite Mode)');
+    }
+
+    private onUnitDied(data: { unitType: string; node?: Node }): void {
+        if (data.unitType !== UnitType.ENEMY || !data.node) return;
+        this.removeEnemy(data.node);
+    }
+
+    private onEnemyReachedBase(data: { enemy?: Node }): void {
+        if (!data?.enemy) return;
+        this.removeEnemy(data.enemy);
     }
 
     private onApplyAoE(data: {
@@ -246,6 +258,8 @@ export class WaveManager {
      */
     public cleanup(): void {
         EventManager.instance.off(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
+        EventManager.instance.off(GameEvents.UNIT_DIED, this.onUnitDied, this);
+        EventManager.instance.off(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
         WaveService.instance.unregisterProvider('infinite');
         this._enemies = [];
         this._waveConfig = null;

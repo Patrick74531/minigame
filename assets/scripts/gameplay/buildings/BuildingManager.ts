@@ -90,6 +90,9 @@ export class BuildingManager {
         position: Vec3;
     }): void {
         console.log(`[BuildingManager] 建造完成: ${data.buildingTypeId}`);
+        console.log(
+            `[BuildingManager] unitContainer=${this._unitContainer ? this._unitContainer.name : 'null'}`
+        );
 
         // Find the Pad Component
         const pad = data.padNode.getComponent(BuildingPad);

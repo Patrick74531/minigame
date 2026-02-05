@@ -16,15 +16,9 @@ import { GameManager } from './core/managers/GameManager';
 import { EventManager } from './core/managers/EventManager';
 import { WaveManager } from './gameplay/wave/WaveManager';
 import { HUDManager } from './ui/HUDManager';
-import { GameEvents } from './data/GameEvents';
 import { UnitFactory } from './gameplay/units/UnitFactory';
-import { UnitType } from './gameplay/units/Unit';
 import { BuildingFactory } from './gameplay/buildings/BuildingFactory';
-import { Building } from './gameplay/buildings/Building';
-import { Base } from './gameplay/buildings/Base';
-import { CoinFactory } from './gameplay/economy/CoinFactory';
 import { GameConfig } from './data/GameConfig';
-import { Unit } from './gameplay/units/Unit';
 import { Hero } from './gameplay/units/Hero';
 import { UIFactory } from './ui/UIFactory';
 import { Joystick } from './ui/Joystick';
@@ -36,6 +30,7 @@ import { CombatSystem } from './gameplay/combat/CombatSystem';
 import { ServiceRegistry } from './core/managers/ServiceRegistry';
 import { WaveService } from './core/managers/WaveService';
 import { PoolManager } from './core/managers/PoolManager';
+import { CoinDropManager } from './gameplay/economy/CoinDropManager';
 
 const { ccclass, property } = _decorator;
 
@@ -85,7 +80,6 @@ export class GameController extends Component {
 
         this.setupContainers();
         this.setupUI();
-        this.setupEventListeners();
 
         // Setup Map Generator
         const mapNode = new Node('MapGenerator');
@@ -117,12 +111,12 @@ export class GameController extends Component {
     }
 
     protected onDestroy(): void {
-        EventManager.instance.offAllByTarget(this);
         GameManager.instance.cleanup();
         WaveManager.instance.cleanup();
         HUDManager.instance.cleanup();
         BuildingManager.instance.cleanup();
         EffectManager.instance.cleanup();
+        CoinDropManager.instance.cleanup();
         ServiceRegistry.clear();
     }
 
@@ -240,6 +234,8 @@ export class GameController extends Component {
         this._container.addChild(this._buildingContainer);
         this._container.addChild(this._coinContainer);
 
+        CoinDropManager.instance.initialize(this._coinContainer);
+
         // Effects Container (Overlay)
         const effectContainer = new Node('Effects');
         this._container.addChild(effectContainer);
@@ -255,11 +251,6 @@ export class GameController extends Component {
 
         // 初始化 HUD
         HUDManager.instance.initialize(this._uiCanvas);
-    }
-
-    private setupEventListeners(): void {
-        EventManager.instance.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
-        EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
     }
 
     /**
@@ -280,42 +271,6 @@ export class GameController extends Component {
         ServiceRegistry.register('SoldierSpawner', (parent: Node, x: number, z: number) =>
             UnitFactory.createSoldier(parent, x, z)
         );
-    }
-
-    private onEnemyReachedBase(data: any): void {
-        const damage = data.damage || 10;
-        this.damageBase(damage);
-
-        // Fix: Remove from WaveManager so wave can complete
-        if (data.enemy) {
-            WaveManager.instance.removeEnemy(data.enemy);
-        }
-    }
-
-    private onUnitDied(data: any): void {
-        if (data.unitType === UnitType.ENEMY) {
-            // Remove from manager
-            if (data.node) {
-                WaveManager.instance.removeEnemy(data.node);
-            }
-
-            // Drop Coin
-            if (data.position && this._coinContainer) {
-                const value = 5 + Math.floor(Math.random() * 5);
-                CoinFactory.createCoin(
-                    this._coinContainer,
-                    data.position.x,
-                    data.position.z, // Use Z for 3D logic
-                    value
-                );
-            }
-            // Note: data.node is destroyed by Unit.die() -> onDeath() -> destroy()?
-            // Enemy.ts onDeath is empty now. Unit.die() emits event then onDeath().
-            // It does NOT destroy node automatically unless I call it.
-            if (data.node && data.node.isValid) {
-                data.node.destroy();
-            }
-        }
     }
 
     // === 建造系统 ===
@@ -365,17 +320,6 @@ export class GameController extends Component {
 
     // === 金币拾取 (Removed) ===
     // Physics System handles this via Coin.onTriggerEnter or Hero.onTriggerEnter
-
-    // === 基地伤害 ===
-
-    private damageBase(damage: number): void {
-        if (!this._base) return;
-
-        const baseComp = this._base.getComponent(Base);
-        if (baseComp && baseComp.isAlive) {
-            baseComp.takeDamage(damage);
-        }
-    }
 
     // === 工具方法 ===
 

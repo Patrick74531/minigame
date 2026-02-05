@@ -118,6 +118,7 @@ export class Hero extends Unit {
         if (coin) {
             this.addCoin(otherNode);
             coin.onPickup();
+            console.log(`[Hero] Picked coin. Stack=${this.coinCount}`);
             HUDManager.instance.updateCoinDisplay(this.coinCount);
         }
     }

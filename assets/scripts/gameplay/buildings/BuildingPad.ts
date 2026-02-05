@@ -169,6 +169,9 @@ export class BuildingPad extends BaseComponent {
         if (hero) {
             this._heroInArea = true;
             this._heroRef = hero;
+            console.log(
+                `[BuildingPad] Hero entered pad=${this.buildingTypeId} state=${BuildingPadState[this._state]} heroCoins=${this._heroRef.coinCount}`
+            );
 
             // Show Info
             if (HUDManager.instance) {
@@ -366,6 +369,9 @@ export class BuildingPad extends BaseComponent {
         if (toCollect > 0) {
             this._collectedCoins += toCollect;
             this.updateDisplay();
+            console.log(
+                `[BuildingPad] Collecting ${toCollect} coin(s) for ${this.buildingTypeId}. Progress=${this._collectedCoins}/${this.requiredCoins}`
+            );
 
             // 检查是否建造/升级完成
             if (this.isComplete) {
@@ -386,7 +392,9 @@ export class BuildingPad extends BaseComponent {
     private onBuildComplete(): void {
         this._state = BuildingPadState.COMPLETE; // Transient state before Manager calls onBuildingCreated
 
-        console.log(`[BuildingPad] 建造完成: ${this._config?.name}`);
+        console.log(
+            `[BuildingPad] 建造完成: ${this._config?.name} (${this.buildingTypeId})`
+        );
 
         // 发送建造完成事件
         EventManager.instance.emit(GameEvents.BUILDING_CONSTRUCTED, {
