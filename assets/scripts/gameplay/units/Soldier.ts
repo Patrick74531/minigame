@@ -1,8 +1,8 @@
 import { _decorator, Node, Vec3 } from 'cc';
 import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
-import { CombatService } from '../../core/managers/CombatService';
 import { WaveManager } from '../wave/WaveManager';
+import { HealthBar } from '../../ui/HealthBar';
 
 const { ccclass, property } = _decorator;
 
@@ -14,6 +14,9 @@ const { ccclass, property } = _decorator;
 export class Soldier extends Unit {
     /** 当前追踪的敌人节点（外部可读取） */
     public currentTarget: Node | null = null;
+    private _fallbackTimer: number = 0;
+    /** 产兵所属建筑 UUID */
+    public ownerBuildingId: string | null = null;
 
     protected initialize(): void {
         super.initialize();
@@ -26,12 +29,22 @@ export class Soldier extends Unit {
             attackInterval: GameConfig.SOLDIER.ATTACK_INTERVAL,
             moveSpeed: GameConfig.SOLDIER.MOVE_SPEED,
         });
+
+        // Add health bar for soldiers
+        let bar = this.node.getComponent(HealthBar);
+        if (!bar) {
+            bar = this.node.addComponent(HealthBar);
+        }
+        bar.yOffset = 1.2;
+        bar.width = 60;
+        bar.height = 6;
     }
 
     public onSpawn(): void {
         super.onSpawn();
         this._state = UnitState.IDLE;
         this.currentTarget = null;
+        this.ownerBuildingId = null;
     }
 
     protected update(dt: number): void {
@@ -43,9 +56,21 @@ export class Soldier extends Unit {
         // Mirror target for external reads (CombatSystem assigns target)
         this.currentTarget = this.target ? this.target.node : null;
 
-        // Fallback: if CombatSystem not present, do a lightweight local scan
-        if (!CombatService.provider && !this.target) {
-            this.tryAcquireTargetFallback();
+        // Clear dead targets early to allow re-acquisition
+        if (this.target && !this.target.isAlive) {
+            this.setTarget(null);
+            this.currentTarget = null;
+        }
+
+        // Fallback: ensure soldiers can still find targets if CombatSystem is missing or stalled
+        if (!this.target) {
+            this._fallbackTimer += dt;
+            if (this._fallbackTimer >= GameConfig.COMBAT.TARGET_CHECK_INTERVAL) {
+                this._fallbackTimer = 0;
+                this.tryAcquireTargetFallback();
+            }
+        } else {
+            this._fallbackTimer = 0;
         }
     }
 
@@ -62,6 +87,7 @@ export class Soldier extends Unit {
         if (!this.isAlive || !this._target || !this._target.isAlive) {
             this._state = UnitState.IDLE;
             this.currentTarget = null;
+            this.setTarget(null);
             return;
         }
 
@@ -117,7 +143,7 @@ export class Soldier extends Unit {
 
         const myPos = this.node.position;
         let nearest: Node | null = null;
-        let minDist = this._stats.attackRange;
+        let minDist = Infinity;
 
         for (const enemy of enemies) {
             if (!enemy || !enemy.isValid) continue;

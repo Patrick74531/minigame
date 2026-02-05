@@ -6,6 +6,8 @@ import { GameManager } from '../../core/managers/GameManager';
 import { GameEvents } from '../../data/GameEvents';
 import { Building } from '../buildings/Building';
 import { IAttackable } from '../../core/interfaces/IAttackable';
+import { CombatService } from '../../core/managers/CombatService';
+import { Soldier } from './Soldier';
 
 const { ccclass, property } = _decorator;
 
@@ -216,7 +218,19 @@ export class Enemy extends Unit {
         // Note: Collision logic sets _target directly.
 
         // 2. Check for nearby Soldiers (Units)
-         if (!GameManager.instance) return;
+        const provider = CombatService.provider;
+        if (provider && provider.findSoldierInRange) {
+            const soldier = provider.findSoldierInRange(this.node.position, this.AGGRO_RANGE) as
+                | Soldier
+                | null;
+            if (soldier && soldier.isAlive) {
+                this.setTarget(soldier);
+                this._state = UnitState.ATTACKING;
+                return;
+            }
+        }
+
+        if (!GameManager.instance) return;
         
         // Find nearest Soldier
         // Optimization: Rely on physics/colliders? Or iterate active units?

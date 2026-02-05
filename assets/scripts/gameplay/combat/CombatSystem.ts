@@ -176,6 +176,33 @@ export class CombatSystem extends Component implements CombatProvider {
         return nearest;
     }
 
+    public findSoldierInRange(
+        position: { x: number; y?: number; z?: number },
+        range: number
+    ): Soldier | null {
+        const rangeSquared = range * range;
+        let nearest: Soldier | null = null;
+        let minDistance = Infinity;
+
+        const px = position.x;
+        const pz = position.z ?? position.y ?? 0;
+
+        for (const soldier of this._soldiers) {
+            if (!soldier.isAlive) continue;
+
+            const dx = soldier.node.position.x - px;
+            const dz = soldier.node.position.z - pz;
+            const distSq = dx * dx + dz * dz;
+
+            if (distSq <= rangeSquared && distSq < minDistance) {
+                minDistance = distSq;
+                nearest = soldier;
+            }
+        }
+
+        return nearest;
+    }
+
     public clearAll(): void {
         this._enemies = [];
         this._soldiers = [];

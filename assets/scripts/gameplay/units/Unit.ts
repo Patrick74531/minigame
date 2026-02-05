@@ -5,6 +5,7 @@ import { GameEvents } from '../../data/GameEvents';
 import { IPoolable } from '../../core/managers/PoolManager';
 import { IAttackable } from '../../core/interfaces/IAttackable';
 import { Vec3 } from 'cc';
+import { HealthBar } from '../../ui/HealthBar';
 
 const { ccclass, property } = _decorator;
 
@@ -117,6 +118,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
     public initStats(stats: Partial<UnitStats>): void {
         Object.assign(this._stats, stats);
         this._stats.currentHp = this._stats.maxHp;
+        this.updateHealthBar();
     }
 
     /**
@@ -136,6 +138,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         if (!this.isAlive) return;
 
         this._stats.currentHp = Math.max(0, this._stats.currentHp - damage);
+        this.updateHealthBar();
 
         EventManager.instance.emit(GameEvents.UNIT_DAMAGED, {
             node: this.node,
@@ -174,6 +177,14 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         this._state = UnitState.IDLE;
         this._target = null;
         this._attackTimer = 0;
+        this.updateHealthBar();
+    }
+
+    protected updateHealthBar(): void {
+        const bar = this.node.getComponent(HealthBar);
+        if (bar) {
+            bar.updateHealth(this._stats.currentHp, this._stats.maxHp);
+        }
     }
 
     // === 子类重写 ===

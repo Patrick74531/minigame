@@ -3,10 +3,12 @@ import { BaseComponent } from '../../core/base/BaseComponent';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameManager } from '../../core/managers/GameManager';
 import { PoolManager } from '../../core/managers/PoolManager';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../data/GameEvents';
 import { GameConfig } from '../../data/GameConfig';
 import { HealthBar } from '../../ui/HealthBar';
 import { IAttackable } from '../../core/interfaces/IAttackable';
+import { Soldier } from '../units/Soldier';
 
 const { ccclass, property } = _decorator;
 
@@ -219,9 +221,16 @@ export class Building extends BaseComponent implements IAttackable {
         const spawnOffsetZ = 1.0;
 
         if (!soldier) {
-            console.warn(`[Building] Failed to spawn soldier from pool: ${this.soldierPoolName}`);
-            // Fallback removed to avoid circular dependency (Building -> UnitFactory -> Enemy -> Building)
-            return;
+            console.warn(`[Building] Pool missing for: ${this.soldierPoolName}. Using fallback spawner.`);
+            const fallback = ServiceRegistry.get<
+                (parent: Node, x: number, z: number) => Node
+            >('SoldierSpawner');
+            if (fallback) {
+                soldier = fallback(this._unitContainer, 0, 0);
+            } else {
+                console.warn('[Building] SoldierSpawner not registered, cannot spawn soldier.');
+                return;
+            }
         } else {
             soldier.setPosition(
                 this.node.position.x + spawnOffsetX,
@@ -231,6 +240,19 @@ export class Building extends BaseComponent implements IAttackable {
         }
 
         if (!soldier) return;
+
+        // Ensure correct spawn position for fallback path too
+        soldier.setPosition(
+            this.node.position.x + spawnOffsetX,
+            0, // 地面高度
+            this.node.position.z + spawnOffsetZ
+        );
+
+        // Track ownership for accurate unit counting
+        const soldierComp = soldier.getComponent(Soldier);
+        if (soldierComp) {
+            soldierComp.ownerBuildingId = this.node.uuid;
+        }
 
         this._activeUnits++;
 
@@ -288,6 +310,8 @@ export class Building extends BaseComponent implements IAttackable {
         // 只统计自己产出的士兵
         // TODO: 需要更精确的所有权追踪
         if (data.unitType === 'soldier') {
+            const soldier = data.node?.getComponent(Soldier);
+            if (soldier && soldier.ownerBuildingId !== this.node.uuid) return;
             this._activeUnits = Math.max(0, this._activeUnits - 1);
         }
     }

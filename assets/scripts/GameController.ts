@@ -276,6 +276,10 @@ export class GameController extends Component {
         ServiceRegistry.register('WaveManager', WaveManager.instance);
         ServiceRegistry.register('WaveService', WaveService.instance);
         ServiceRegistry.register('PoolManager', PoolManager.instance);
+        // Fallback spawner when soldier pool is not registered
+        ServiceRegistry.register('SoldierSpawner', (parent: Node, x: number, z: number) =>
+            UnitFactory.createSoldier(parent, x, z)
+        );
     }
 
     private onEnemyReachedBase(data: any): void {
