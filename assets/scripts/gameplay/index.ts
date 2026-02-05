@@ -15,4 +15,3 @@ export { WaveManager, WaveConfig } from './wave';
 export { Coin } from './economy';
 
 // 战斗系统
-// NOTE: No centralized CombatSystem in use. Units handle targeting internally.
