@@ -4,6 +4,7 @@ import { GameEvents } from '../data/GameEvents';
 import { UIFactory } from './UIFactory';
 import { GameConfig } from '../data/GameConfig';
 import { WaveService } from '../core/managers/WaveService';
+import { ServiceRegistry } from '../core/managers/ServiceRegistry';
 
 // UI_2D Layer
 const UI_LAYER = 33554432;
@@ -99,8 +100,8 @@ export class HUDManager {
 
     private setupEventListeners(): void {
         // 监听波次开始
-        EventManager.instance.on(GameEvents.WAVE_START, this.onWaveStart, this);
-        EventManager.instance.on(GameEvents.WAVE_COMPLETE, this.onWaveComplete, this);
+        this.eventManager.on(GameEvents.WAVE_START, this.onWaveStart, this);
+        this.eventManager.on(GameEvents.WAVE_COMPLETE, this.onWaveComplete, this);
     }
 
     // === 公共接口 ===
@@ -165,7 +166,7 @@ export class HUDManager {
 
     private onWaveStart(data: { wave: number }): void {
         // console.log(`[HUD] 波次 ${data.wave} 开始`);
-        const snapshot = WaveService.instance.getSnapshot();
+        const snapshot = this.waveService.getSnapshot();
         const wave = snapshot.currentWave || data.wave || 1;
         this.updateWaveDisplay(wave);
     }
@@ -179,11 +180,19 @@ export class HUDManager {
      * 清理
      */
     public cleanup(): void {
-        EventManager.instance.offAllByTarget(this);
+        this.eventManager.offAllByTarget(this);
         this._coinLabel = null;
         this._waveLabel = null;
         this._buildingInfoLabel = null;
         this._baseHpLabel = null;
         this._uiCanvas = null;
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
+    }
+
+    private get waveService(): WaveService {
+        return ServiceRegistry.get<WaveService>('WaveService') ?? WaveService.instance;
     }
 }

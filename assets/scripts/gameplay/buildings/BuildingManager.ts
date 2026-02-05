@@ -4,6 +4,7 @@ import { BuildingFactory } from './BuildingFactory';
 import { Building } from './Building';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
 const { ccclass } = _decorator;
 
@@ -44,8 +45,8 @@ export class BuildingManager {
 
         // 监听建造完成事件
         // 监听建造完成事件
-        EventManager.instance.on(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
-        EventManager.instance.on(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
+        this.eventManager.on(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
+        this.eventManager.on(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
 
         console.log('[BuildingManager] 初始化完成');
     }
@@ -139,12 +140,12 @@ export class BuildingManager {
      * 清理
      */
     public cleanup(): void {
-        EventManager.instance.off(
+        this.eventManager.off(
             GameEvents.BUILDING_CONSTRUCTED,
             this.onBuildingConstructed,
             this
         );
-        EventManager.instance.off(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
+        this.eventManager.off(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
         this._pads = [];
         this._activeBuildings = [];
     }
@@ -169,5 +170,9 @@ export class BuildingManager {
 
     private onBuildingDestroyed(data: { building: Building }): void {
         this.unregisterBuilding(data.building);
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }
 }

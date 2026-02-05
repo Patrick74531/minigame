@@ -8,6 +8,7 @@ import { Building } from '../buildings/Building';
 import { IAttackable } from '../../core/interfaces/IAttackable';
 import { CombatService } from '../../core/managers/CombatService';
 import { Soldier } from './Soldier';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
 const { ccclass, property } = _decorator;
 
@@ -133,7 +134,7 @@ export class Enemy extends Unit {
      * Arrived at Base
      */
     private onReachBase(): void {
-        EventManager.instance.emit(GameEvents.ENEMY_REACHED_BASE, {
+        this.eventManager.emit(GameEvents.ENEMY_REACHED_BASE, {
             enemy: this.node,
             damage: 10,
         });
@@ -230,8 +231,6 @@ export class Enemy extends Unit {
             }
         }
 
-        if (!GameManager.instance) return;
-        
         // Find nearest Soldier
         // Optimization: Rely on physics/colliders? Or iterate active units?
         // We don't have a global "Soldiers" list easily accessible except maybe converting WaveManager? 
@@ -241,8 +240,8 @@ export class Enemy extends Unit {
         // Let's look for Buildings specifically as primary blockers
         // And Soldiers if we want them to fight back.
         // For now, let's keep the scan for Buildings to break walls.
-        
-        const buildingNodes = GameManager.instance.activeBuildings;
+
+        const buildingNodes = this.gameManager.activeBuildings;
         if (buildingNodes && buildingNodes.length > 0) {
              const myPos = this.node.position;
             let nearest: Building | null = null;
@@ -277,5 +276,13 @@ export class Enemy extends Unit {
 
     protected onDeath(): void {
         // Handled by manager
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
+    }
+
+    private get gameManager(): GameManager {
+        return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
     }
 }

@@ -4,6 +4,7 @@ import { GameEvents } from '../../data/GameEvents';
 import { UnitType } from '../units/Unit';
 import { CoinFactory } from './CoinFactory';
 import { GameConfig } from '../../data/GameConfig';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
 /**
  * CoinDropManager
@@ -22,11 +23,11 @@ export class CoinDropManager {
 
     public initialize(coinContainer: Node): void {
         this._coinContainer = coinContainer;
-        EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
+        this.eventManager.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
     }
 
     public cleanup(): void {
-        EventManager.instance.off(GameEvents.UNIT_DIED, this.onUnitDied, this);
+        this.eventManager.off(GameEvents.UNIT_DIED, this.onUnitDied, this);
         this._coinContainer = null;
     }
 
@@ -47,5 +48,9 @@ export class CoinDropManager {
         if (data.node && data.node.isValid) {
             data.node.destroy();
         }
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }
 }

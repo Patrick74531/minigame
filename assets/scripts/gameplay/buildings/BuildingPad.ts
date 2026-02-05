@@ -23,6 +23,7 @@ import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { HUDManager } from '../../ui/HUDManager';
 import { Hero } from '../units/Hero';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
 const { ccclass, property } = _decorator;
 
@@ -171,9 +172,9 @@ export class BuildingPad extends BaseComponent {
             this._heroRef = hero;
 
             // Show Info
-            if (HUDManager.instance) {
+            if (this.hudManager) {
                 const title = this._state === BuildingPadState.UPGRADING ? `升级 ${this.buildingName} (Lv ${this._associatedBuilding?.level || 1} -> ${(this._associatedBuilding?.level || 1) + 1})` : `建造 ${this.buildingName}`;
-                HUDManager.instance.showBuildingInfo(
+                this.hudManager.showBuildingInfo(
                     title,
                     this.requiredCoins,
                     this.collectedCoins
@@ -193,8 +194,8 @@ export class BuildingPad extends BaseComponent {
             this._heroRef = null;
 
             // Hide Info
-            if (HUDManager.instance) {
-                HUDManager.instance.hideBuildingInfo();
+            if (this.hudManager) {
+                this.hudManager.hideBuildingInfo();
             }
         }
     }
@@ -223,11 +224,11 @@ export class BuildingPad extends BaseComponent {
                     this._heroRef.removeCoin(collected);
 
                     // Update HUD periodically or on change
-                    if (HUDManager.instance) {
-                        HUDManager.instance.updateCoinDisplay(this._heroRef.coinCount);
+                    if (this.hudManager) {
+                        this.hudManager.updateCoinDisplay(this._heroRef.coinCount);
                         // Update building info too as coins change
                         const title = this._state === BuildingPadState.UPGRADING ? `升级 ${this.buildingName} (Lv ${this._associatedBuilding?.level || 1} -> ${(this._associatedBuilding?.level || 1) + 1})` : `建造 ${this.buildingName}`;
-                        HUDManager.instance.showBuildingInfo(title, this.requiredCoins, this.collectedCoins);
+                        this.hudManager.showBuildingInfo(title, this.requiredCoins, this.collectedCoins);
                     }
                 }
             }
@@ -389,7 +390,7 @@ export class BuildingPad extends BaseComponent {
         console.log(`[BuildingPad] 建造完成: ${this._config?.name}`);
 
         // 发送建造完成事件
-        EventManager.instance.emit(GameEvents.BUILDING_CONSTRUCTED, {
+        this.eventManager.emit(GameEvents.BUILDING_CONSTRUCTED, {
             padNode: this.node,
             buildingTypeId: this.buildingTypeId,
             position: this.node.position.clone(),
@@ -436,5 +437,13 @@ export class BuildingPad extends BaseComponent {
         this._collectedCoins = 0;
         this._state = BuildingPadState.WAITING;
         this.updateDisplay();
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
+    }
+
+    private get hudManager(): HUDManager {
+        return ServiceRegistry.get<HUDManager>('HUDManager') ?? HUDManager.instance;
     }
 }

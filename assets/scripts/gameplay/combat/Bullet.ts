@@ -6,6 +6,7 @@ import { GameEvents } from '../../data/GameEvents';
 import { EffectFactory } from '../effects/EffectFactory';
 import { IPoolable } from '../../core/managers/PoolManager';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
 const { ccclass, property } = _decorator;
 
@@ -140,7 +141,7 @@ export class Bullet extends BaseComponent implements IPoolable {
             // 1. AOE Logic
             if (this.explosionRadius > 0) {
                 // Decoupled: Emit event for Manager to handle
-                EventManager.instance.emit(GameEvents.APPLY_AOE_EFFECT, {
+                this.eventManager.emit(GameEvents.APPLY_AOE_EFFECT, {
                     center: this.node.position.clone(),
                     radius: this.explosionRadius,
                     damage: this.damage,
@@ -234,5 +235,9 @@ export class Bullet extends BaseComponent implements IPoolable {
 
     private createHitEffect(): void {
         // TODO: Particle effect
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }
 }

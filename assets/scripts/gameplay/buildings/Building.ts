@@ -90,7 +90,7 @@ export class Building extends BaseComponent implements IAttackable {
         this._spawnTimer = 0;
 
         // Register Unit Died Event
-        EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
+        this.eventManager.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
 
         // Setup Physics (Obstacle)
         this.setupPhysics();
@@ -98,9 +98,7 @@ export class Building extends BaseComponent implements IAttackable {
         // Setup Health Bar
         this.setupHealthBar();
 
-        if (GameManager.instance) {
-            GameManager.instance.activeBuildings.push(this.node);
-        }
+        this.gameManager.activeBuildings.push(this.node);
     }
 
     private setupHealthBar(): void {
@@ -134,7 +132,7 @@ export class Building extends BaseComponent implements IAttackable {
     }
 
     protected cleanup(): void {
-        EventManager.instance.offAllByTarget(this);
+        this.eventManager.offAllByTarget(this);
     }
 
     /**
@@ -176,7 +174,7 @@ export class Building extends BaseComponent implements IAttackable {
         console.log(`[Building] Upgraded to Level ${this.level}. HP: ${oldHp} -> ${this.maxHp}`);
         
         // Effect?
-        EventManager.instance.emit(GameEvents.BUILDING_CONSTRUCTED, {
+        this.eventManager.emit(GameEvents.BUILDING_CONSTRUCTED, {
              padNode: this.node, // Reuse event or new event?
              // Let's rely on Manager or Pad to show effect
         });
@@ -214,7 +212,7 @@ export class Building extends BaseComponent implements IAttackable {
             return;
         }
 
-        let soldier = PoolManager.instance.spawn(this.soldierPoolName, this._unitContainer);
+        let soldier = this.poolManager.spawn(this.soldierPoolName, this._unitContainer);
 
         // 3D 坐标系：XZ平面为地面，Y轴向上
         const spawnOffsetX = 1.0;
@@ -256,7 +254,7 @@ export class Building extends BaseComponent implements IAttackable {
 
         this._activeUnits++;
 
-        EventManager.instance.emit(GameEvents.UNIT_SPAWNED, {
+        this.eventManager.emit(GameEvents.UNIT_SPAWNED, {
             unitType: 'soldier',
             node: soldier,
         });
@@ -288,14 +286,12 @@ export class Building extends BaseComponent implements IAttackable {
 
     protected onDestroyed(): void {
         // Unregister from global list
-        if (GameManager.instance) {
-            const idx = GameManager.instance.activeBuildings.indexOf(this.node);
-            if (idx !== -1) {
-                GameManager.instance.activeBuildings.splice(idx, 1);
-            }
+        const idx = this.gameManager.activeBuildings.indexOf(this.node);
+        if (idx !== -1) {
+            this.gameManager.activeBuildings.splice(idx, 1);
         }
 
-        EventManager.instance.emit(GameEvents.BUILDING_DESTROYED, {
+        this.eventManager.emit(GameEvents.BUILDING_DESTROYED, {
             buildingId: this.node.uuid,
             building: this,
         });
@@ -314,5 +310,17 @@ export class Building extends BaseComponent implements IAttackable {
             if (soldier && soldier.ownerBuildingId !== this.node.uuid) return;
             this._activeUnits = Math.max(0, this._activeUnits - 1);
         }
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
+    }
+
+    private get gameManager(): GameManager {
+        return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+    }
+
+    private get poolManager(): PoolManager {
+        return ServiceRegistry.get<PoolManager>('PoolManager') ?? PoolManager.instance;
     }
 }

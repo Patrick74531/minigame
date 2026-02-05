@@ -5,6 +5,7 @@ import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { CombatService, CombatProvider } from '../../core/managers/CombatService';
 import { GameConfig } from '../../data/GameConfig';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
 const { ccclass, property } = _decorator;
 
@@ -34,13 +35,13 @@ export class CombatSystem extends Component implements CombatProvider {
     protected onLoad(): void {
         CombatService.setProvider(this);
         // NOTE: CombatSystem depends on UNIT_SPAWNED/UNIT_DIED events for tracking.
-        EventManager.instance.on(GameEvents.UNIT_SPAWNED, this.onUnitSpawned, this);
-        EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
-        EventManager.instance.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
+        this.eventManager.on(GameEvents.UNIT_SPAWNED, this.onUnitSpawned, this);
+        this.eventManager.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
+        this.eventManager.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
     }
 
     protected onDestroy(): void {
-        EventManager.instance.offAllByTarget(this);
+        this.eventManager.offAllByTarget(this);
         if (CombatService.provider === this) {
             CombatService.setProvider(null);
         }
@@ -206,5 +207,9 @@ export class CombatSystem extends Component implements CombatProvider {
     public clearAll(): void {
         this._enemies = [];
         this._soldiers = [];
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }
 }

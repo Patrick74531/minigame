@@ -6,6 +6,7 @@ import { IPoolable } from '../../core/managers/PoolManager';
 import { tween, Tween } from 'cc';
 // import { GameManager } from '../../core/managers/GameManager';
 import { GameConfig } from '../../data/GameConfig';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
 const { ccclass, property } = _decorator;
 
@@ -140,11 +141,15 @@ export class Coin extends BaseComponent implements IPoolable {
         if (auto) {
             // Auto collect gives money to global?
             // For now, let's assume it just gives it.
-            EventManager.instance.emit(GameEvents.COIN_COLLECTED, {
+            this.eventManager.emit(GameEvents.COIN_COLLECTED, {
                 amount: this.value,
             });
         }
 
         this.node.destroy();
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }
 }

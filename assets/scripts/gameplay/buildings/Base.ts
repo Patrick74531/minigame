@@ -5,6 +5,7 @@ import { GameConfig } from '../../data/GameConfig';
 import { HUDManager } from '../../ui/HUDManager';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
 const { ccclass, property } = _decorator;
 
@@ -19,17 +20,17 @@ export class Base extends Building {
         this.buildingType = BuildingType.BASE;
         super.initialize();
 
-        EventManager.instance.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
+        this.eventManager.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
         
         // Initial HUD Update
-        HUDManager.instance.updateBaseHp(this.currentHp, this.maxHp);
+        this.hudManager.updateBaseHp(this.currentHp, this.maxHp);
     }
 
     public takeDamage(damage: number, attacker?: any): void {
         super.takeDamage(damage, attacker);
         
         // Update HUD
-        HUDManager.instance.updateBaseHp(this.currentHp, this.maxHp);
+        this.hudManager.updateBaseHp(this.currentHp, this.maxHp);
     }
 
     private onEnemyReachedBase(data: { damage?: number }): void {
@@ -44,6 +45,18 @@ export class Base extends Building {
 
         // Trigger Game Over
         console.log('[Base] Destroyed! Game Over.');
-        GameManager.instance.gameOver(false); // Victory = false
+        this.gameManager.gameOver(false); // Victory = false
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
+    }
+
+    private get hudManager(): HUDManager {
+        return ServiceRegistry.get<HUDManager>('HUDManager') ?? HUDManager.instance;
+    }
+
+    private get gameManager(): GameManager {
+        return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
     }
 }

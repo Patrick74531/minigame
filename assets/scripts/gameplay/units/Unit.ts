@@ -1,6 +1,7 @@
 import { _decorator } from 'cc';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { EventManager } from '../../core/managers/EventManager';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../data/GameEvents';
 import { IPoolable } from '../../core/managers/PoolManager';
 import { IAttackable } from '../../core/interfaces/IAttackable';
@@ -140,7 +141,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         this._stats.currentHp = Math.max(0, this._stats.currentHp - damage);
         this.updateHealthBar();
 
-        EventManager.instance.emit(GameEvents.UNIT_DAMAGED, {
+        this.eventManager.emit(GameEvents.UNIT_DAMAGED, {
             node: this.node,
             damage,
             currentHp: this._stats.currentHp,
@@ -159,7 +160,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
 
         this._state = UnitState.DEAD;
 
-        EventManager.instance.emit(GameEvents.UNIT_DIED, {
+        this.eventManager.emit(GameEvents.UNIT_DIED, {
             unitType: this.unitType,
             node: this.node,
             position: this.node.position.clone(),
@@ -194,6 +195,10 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
      */
     protected onDeath(): void {
         // 子类实现
+    }
+
+    protected get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }
 
     /**

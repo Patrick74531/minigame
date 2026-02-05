@@ -21,6 +21,7 @@ import { RangedWeapon } from '../combat/weapons/RangedWeapon';
 import { CharacterMover } from '../../core/physics/CharacterMover';
 import { StackVisualizer } from '../visuals/StackVisualizer';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
 const { ccclass, property } = _decorator;
 
@@ -38,8 +39,8 @@ export class Hero extends Unit {
     private _stackVisualizer: StackVisualizer | null = null;
 
     public onDespawn(): void {
-        if (GameManager.instance.hero === this.node) {
-            GameManager.instance.hero = null;
+        if (this.gameManager.hero === this.node) {
+            this.gameManager.hero = null;
         }
         super.onDespawn();
     }
@@ -101,7 +102,7 @@ export class Hero extends Unit {
     }
 
     protected start(): void {
-        GameManager.instance.hero = this.node;
+        this.gameManager.hero = this.node;
         Coin.HeroNode = this.node; // Set static reference for coins
 
         const col = this.node.getComponent(CapsuleCollider);
@@ -118,7 +119,7 @@ export class Hero extends Unit {
         if (coin) {
             this.addCoin(otherNode);
             coin.onPickup();
-            HUDManager.instance.updateCoinDisplay(this.coinCount);
+            this.hudManager.updateCoinDisplay(this.coinCount);
         }
     }
 
@@ -126,7 +127,7 @@ export class Hero extends Unit {
         super.onSpawn();
         this._state = UnitState.IDLE;
         this._inputVector.set(0, 0);
-        GameManager.instance.hero = this.node;
+        this.gameManager.hero = this.node;
     }
 
     /**
@@ -248,5 +249,13 @@ export class Hero extends Unit {
         if (this._weapon) {
             this._weapon.tryAttack(this._target.node);
         }
+    }
+
+    private get gameManager(): GameManager {
+        return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+    }
+
+    private get hudManager(): HUDManager {
+        return ServiceRegistry.get<HUDManager>('HUDManager') ?? HUDManager.instance;
     }
 }
