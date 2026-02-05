@@ -27,10 +27,7 @@ export class ControllerServices {
     }
 
     public get buildingManager(): BuildingManager {
-        return (
-            ServiceRegistry.get<BuildingManager>('BuildingManager') ??
-            BuildingManager.instance
-        );
+        return ServiceRegistry.get<BuildingManager>('BuildingManager') ?? BuildingManager.instance;
     }
 
     public get effectManager(): EffectManager {
@@ -50,9 +47,6 @@ export class ControllerServices {
     }
 
     public get coinDropManager(): CoinDropManager {
-        return (
-            ServiceRegistry.get<CoinDropManager>('CoinDropManager') ??
-            CoinDropManager.instance
-        );
+        return ServiceRegistry.get<CoinDropManager>('CoinDropManager') ?? CoinDropManager.instance;
     }
 }

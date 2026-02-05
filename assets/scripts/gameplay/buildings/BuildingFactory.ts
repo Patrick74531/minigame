@@ -20,6 +20,7 @@ export class BuildingFactory {
      * 创建兵营
      */
     public static createBarracks(parent: Node, x: number, z: number): Node {
+        const barracksConfig = this.buildingRegistry.get('barracks');
         const node = this.createCubeNode('Barracks', new Color(100, 180, 100, 255));
         node.setPosition(x, 0, z); // 3D 坐标：Y=0 在地面
         node.setScale(0.45, 0.45, 0.45);
@@ -28,9 +29,21 @@ export class BuildingFactory {
         const building = node.addComponent(Building);
         building.setConfig({
             type: BuildingType.BARRACKS,
-            hp: GameConfig.BUILDING.BASE_HP,
-            spawnInterval: GameConfig.BUILDING.SPAWN_INTERVAL,
-            maxUnits: GameConfig.BUILDING.MAX_SOLDIERS_PER_BARRACKS,
+            cost: barracksConfig?.cost ?? 0,
+            hp: barracksConfig?.stats?.hp ?? GameConfig.BUILDING.BASE_HP,
+            spawnInterval:
+                barracksConfig?.features?.spawnInterval ?? GameConfig.BUILDING.SPAWN_INTERVAL,
+            maxUnits:
+                barracksConfig?.features?.maxUnits ?? GameConfig.BUILDING.MAX_SOLDIERS_PER_BARRACKS,
+        });
+        building.setUpgradeConfig({
+            maxLevel: barracksConfig?.upgrades?.maxLevel ?? GameConfig.BUILDING.DEFAULT_MAX_LEVEL,
+            costMultiplier:
+                barracksConfig?.upgrades?.costMultiplier ??
+                GameConfig.BUILDING.DEFAULT_COST_MULTIPLIER,
+            statMultiplier: barracksConfig?.upgrades?.statMultiplier ?? 1.2,
+            spawnIntervalMultiplier: barracksConfig?.upgrades?.spawnIntervalMultiplier ?? 0.92,
+            maxUnitsPerLevel: barracksConfig?.upgrades?.maxUnitsPerLevel ?? 1,
         });
 
         return node;
@@ -88,6 +101,7 @@ export class BuildingFactory {
      * 创建防御塔
      */
     public static createTower(parent: Node, x: number, z: number): Node {
+        const towerConfig = this.buildingRegistry.get('tower');
         // 红色/黄色区分防御塔
         const node = this.createCubeNode('Tower', new Color(220, 220, 60, 255)); // Yellow
         node.setPosition(x, 0, z);
@@ -97,16 +111,30 @@ export class BuildingFactory {
         const tower = node.addComponent(Tower);
         tower.setConfig({
             type: BuildingType.TOWER,
-            hp: 300,
+            cost: towerConfig?.cost ?? 0,
+            hp: towerConfig?.stats?.hp ?? 300,
             // Towers don't spawn soldiers, so these values might be ignored or used differently
             spawnInterval: 0,
             maxUnits: 0,
         });
 
         // Custom Tower Config
-        tower.attackRange = 25; // Increased range
-        tower.attackDamage = 25;
-        tower.attackInterval = 0.5; // Faster attack
+        tower.attackRange = towerConfig?.stats?.attackRange ?? 18;
+        tower.attackDamage = towerConfig?.stats?.attackDamage ?? 26;
+        tower.attackInterval = towerConfig?.stats?.attackInterval ?? 0.45;
+        tower.setUpgradeConfig({
+            maxLevel: towerConfig?.upgrades?.maxLevel ?? GameConfig.BUILDING.DEFAULT_MAX_LEVEL,
+            costMultiplier:
+                towerConfig?.upgrades?.costMultiplier ??
+                GameConfig.BUILDING.DEFAULT_COST_MULTIPLIER,
+            statMultiplier: towerConfig?.upgrades?.statMultiplier ?? 1.2,
+        });
+        tower.setTowerUpgradeConfig({
+            attackMultiplier: towerConfig?.upgrades?.attackMultiplier ?? 1.22,
+            rangeMultiplier: towerConfig?.upgrades?.rangeMultiplier ?? 1.03,
+            intervalMultiplier: towerConfig?.upgrades?.intervalMultiplier ?? 0.95,
+            chainRangePerLevel: towerConfig?.upgrades?.chainRangePerLevel ?? 0,
+        });
 
         return node;
     }
@@ -115,6 +143,7 @@ export class BuildingFactory {
      * 创建冰霜塔 (AOE Slow)
      */
     public static createFrostTower(parent: Node, x: number, z: number): Node {
+        const frostConfig = this.buildingRegistry.get('frost_tower');
         const node = this.createCubeNode('FrostTower', new Color(60, 100, 220, 255)); // Blue
         node.setPosition(x, 0, z);
         node.setScale(0.4, 0.8, 0.4);
@@ -123,21 +152,35 @@ export class BuildingFactory {
         const tower = node.addComponent(Tower);
         tower.setConfig({
             type: BuildingType.TOWER,
-            hp: 300,
+            cost: frostConfig?.cost ?? 0,
+            hp: frostConfig?.stats?.hp ?? 280,
             spawnInterval: 0,
             maxUnits: 0,
         });
 
         // Frost Config (Low Damage, AOE Slow)
-        tower.attackRange = 22;
-        tower.attackDamage = 5; // Low Damage
-        tower.attackInterval = 0.8;
+        tower.attackRange = frostConfig?.stats?.attackRange ?? 16;
+        tower.attackDamage = frostConfig?.stats?.attackDamage ?? 12;
+        tower.attackInterval = frostConfig?.stats?.attackInterval ?? 0.8;
 
         // Bullet Visuals & Effects
-        tower.bulletColor = new Color(0, 150, 255, 255); // Cyan/Blue Glow
-        tower.bulletExplosionRadius = 2.5; // AOE
-        tower.bulletSlowPercent = 0.5; // 50% Slow
-        tower.bulletSlowDuration = 2.0;
+        tower.bulletColor = new Color().fromHEX(frostConfig?.features?.bulletColorHex ?? '#0096FF');
+        tower.bulletExplosionRadius = frostConfig?.features?.bulletExplosionRadius ?? 2.8;
+        tower.bulletSlowPercent = frostConfig?.features?.bulletSlowPercent ?? 0.45;
+        tower.bulletSlowDuration = frostConfig?.features?.bulletSlowDuration ?? 2.2;
+        tower.setUpgradeConfig({
+            maxLevel: frostConfig?.upgrades?.maxLevel ?? GameConfig.BUILDING.DEFAULT_MAX_LEVEL,
+            costMultiplier:
+                frostConfig?.upgrades?.costMultiplier ??
+                GameConfig.BUILDING.DEFAULT_COST_MULTIPLIER,
+            statMultiplier: frostConfig?.upgrades?.statMultiplier ?? 1.18,
+        });
+        tower.setTowerUpgradeConfig({
+            attackMultiplier: frostConfig?.upgrades?.attackMultiplier ?? 1.15,
+            rangeMultiplier: frostConfig?.upgrades?.rangeMultiplier ?? 1.03,
+            intervalMultiplier: frostConfig?.upgrades?.intervalMultiplier ?? 0.96,
+            chainRangePerLevel: frostConfig?.upgrades?.chainRangePerLevel ?? 0,
+        });
 
         return node;
     }
@@ -170,11 +213,21 @@ export class BuildingFactory {
         // 2. Component Logic
         if (config.role === 'barracks' || config.role === 'building') {
             const building = node.addComponent(Building);
+            const isBarracks = config.role === 'barracks';
             building.setConfig({
-                type: BuildingType.BARRACKS, // TODO: Map role to enum if needed
+                type: this.resolveBuildingType(buildingId, config.role),
+                cost: config.cost,
                 hp: config.stats?.hp || 100,
-                spawnInterval: config.features?.spawnInterval || 10,
-                maxUnits: config.features?.maxUnits || 5,
+                spawnInterval: isBarracks ? (config.features?.spawnInterval ?? 4.5) : 0,
+                maxUnits: isBarracks ? (config.features?.maxUnits ?? 3) : 0,
+            });
+            building.setUpgradeConfig({
+                maxLevel: config.upgrades?.maxLevel ?? GameConfig.BUILDING.DEFAULT_MAX_LEVEL,
+                costMultiplier:
+                    config.upgrades?.costMultiplier ?? GameConfig.BUILDING.DEFAULT_COST_MULTIPLIER,
+                statMultiplier: config.upgrades?.statMultiplier ?? 1.2,
+                spawnIntervalMultiplier: config.upgrades?.spawnIntervalMultiplier ?? 0.93,
+                maxUnitsPerLevel: config.upgrades?.maxUnitsPerLevel ?? 0,
             });
             if (unitContainer) {
                 building.setUnitContainer(unitContainer);
@@ -183,33 +236,51 @@ export class BuildingFactory {
             const tower = node.addComponent(Tower);
             tower.setConfig({
                 type: BuildingType.TOWER,
+                cost: config.cost,
                 hp: config.stats?.hp || 300,
                 spawnInterval: 0,
                 maxUnits: 0,
             });
+            tower.setUpgradeConfig({
+                maxLevel: config.upgrades?.maxLevel ?? GameConfig.BUILDING.DEFAULT_MAX_LEVEL,
+                costMultiplier:
+                    config.upgrades?.costMultiplier ?? GameConfig.BUILDING.DEFAULT_COST_MULTIPLIER,
+                statMultiplier: config.upgrades?.statMultiplier ?? 1.2,
+            });
+            tower.setTowerUpgradeConfig({
+                attackMultiplier: config.upgrades?.attackMultiplier ?? 1.2,
+                rangeMultiplier: config.upgrades?.rangeMultiplier ?? 1.03,
+                intervalMultiplier: config.upgrades?.intervalMultiplier ?? 0.95,
+                chainRangePerLevel: config.upgrades?.chainRangePerLevel ?? 0,
+            });
 
             // Apply stats
             if (config.stats) {
-                if (config.stats.attackRange) tower.attackRange = config.stats.attackRange;
-                if (config.stats.attackDamage) tower.attackDamage = config.stats.attackDamage;
-                if (config.stats.attackInterval) tower.attackInterval = config.stats.attackInterval;
+                if (config.stats.attackRange !== undefined)
+                    tower.attackRange = config.stats.attackRange;
+                if (config.stats.attackDamage !== undefined)
+                    tower.attackDamage = config.stats.attackDamage;
+                if (config.stats.attackInterval !== undefined)
+                    tower.attackInterval = config.stats.attackInterval;
             }
 
             // Apply features
             if (config.features) {
-                if (config.features.bulletColorHex) {
+                if (config.features.bulletColorHex !== undefined) {
                     tower.bulletColor = new Color().fromHEX(config.features.bulletColorHex);
                 }
-                if (config.features.bulletExplosionRadius)
+                if (config.features.bulletExplosionRadius !== undefined)
                     tower.bulletExplosionRadius = config.features.bulletExplosionRadius;
-                if (config.features.bulletSlowPercent)
+                if (config.features.bulletSlowPercent !== undefined)
                     tower.bulletSlowPercent = config.features.bulletSlowPercent;
-                if (config.features.bulletSlowDuration)
+                if (config.features.bulletSlowDuration !== undefined)
                     tower.bulletSlowDuration = config.features.bulletSlowDuration;
 
                 // Chain Lightning
-                if (config.features.chainCount) tower.chainCount = config.features.chainCount;
-                if (config.features.chainRange) tower.chainRange = config.features.chainRange;
+                if (config.features.chainCount !== undefined)
+                    tower.chainCount = config.features.chainCount;
+                if (config.features.chainRange !== undefined)
+                    tower.chainRange = config.features.chainRange;
             }
         }
 
@@ -225,8 +296,18 @@ export class BuildingFactory {
 
     private static get buildingRegistry(): BuildingRegistry {
         return (
-            ServiceRegistry.get<BuildingRegistry>('BuildingRegistry') ??
-            BuildingRegistry.instance
+            ServiceRegistry.get<BuildingRegistry>('BuildingRegistry') ?? BuildingRegistry.instance
         );
+    }
+
+    private static resolveBuildingType(
+        buildingId: string,
+        role?: 'building' | 'tower' | 'barracks'
+    ): BuildingType {
+        if (role === 'tower') return BuildingType.TOWER;
+        if (buildingId === 'wall') return BuildingType.WALL;
+        if (buildingId === 'base') return BuildingType.BASE;
+        if (role === 'barracks' || buildingId === 'barracks') return BuildingType.BARRACKS;
+        return BuildingType.BARRACKS;
     }
 }

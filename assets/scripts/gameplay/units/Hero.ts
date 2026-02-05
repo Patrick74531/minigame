@@ -193,7 +193,10 @@ export class Hero extends Unit {
 
         const provider = CombatService.provider;
         if (provider && provider.findEnemyInRange) {
-            const result: any = provider.findEnemyInRange(this.node.position, this._stats.attackRange);
+            const result: any = provider.findEnemyInRange(
+                this.node.position,
+                this._stats.attackRange
+            );
             if (result?.node) {
                 nearest = result.node;
             } else if (result?.isValid) {

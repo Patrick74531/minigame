@@ -10,7 +10,10 @@ export interface CombatProvider {
     unregisterEnemy?(enemy: unknown): void;
     registerSoldier?(soldier: unknown): void;
     unregisterSoldier?(soldier: unknown): void;
-    findEnemyInRange?(position: { x: number; y?: number; z?: number }, range: number): unknown | null;
+    findEnemyInRange?(
+        position: { x: number; y?: number; z?: number },
+        range: number
+    ): unknown | null;
     findSoldierInRange?(
         position: { x: number; y?: number; z?: number },
         range: number

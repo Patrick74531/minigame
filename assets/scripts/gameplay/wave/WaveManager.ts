@@ -12,9 +12,12 @@ import { EventManager } from '../../core/managers/EventManager';
  */
 export interface WaveConfig {
     waveNumber: number;
+    regularCount: number;
+    eliteCount: number;
     enemyCount: number;
     spawnInterval: number;
     hpMultiplier: number;
+    speedMultiplier: number;
 }
 
 /**
@@ -39,7 +42,8 @@ export class WaveManager {
     private _enemies: Node[] = [];
     private _currentWave: number = 0;
     private _waveActive: boolean = false;
-    private _enemiesSpawned: number = 0;
+    private _regularSpawned: number = 0;
+    private _eliteSpawned: number = 0;
     private _enemySpawnTimer: number = 0;
     private _waveConfig: WaveConfig | null = null;
 
@@ -134,26 +138,44 @@ export class WaveManager {
     public startWave(waveNumber: number): void {
         this._currentWave = waveNumber;
         this._waveActive = true;
-        this._enemiesSpawned = 0;
+        this._regularSpawned = 0;
+        this._eliteSpawned = 0;
         this._enemySpawnTimer = 0;
 
-        // Roguelike Scaling Logic
+        // Difficulty scaling from centralized config
         const infinite = GameConfig.WAVE.INFINITE;
-        const count = infinite.BASE_COUNT + waveNumber * infinite.COUNT_PER_WAVE;
-        const hpMult = infinite.BASE_HP_MULT + (waveNumber - 1) * infinite.HP_MULT_PER_WAVE;
+        const waveIndex = waveNumber - 1;
+        const countStepBonus =
+            Math.floor(waveIndex / infinite.COUNT_GROWTH_STEP_WAVES) *
+            infinite.COUNT_GROWTH_STEP_BONUS;
+        const regularCount = Math.max(
+            1,
+            Math.round(infinite.BASE_COUNT + waveIndex * infinite.COUNT_PER_WAVE + countStepBonus)
+        );
+        const eliteCount = this.getEliteCountForWave(waveNumber);
+        const hpMult = infinite.BASE_HP_MULT + waveIndex * infinite.HP_MULT_PER_WAVE;
+        const speedMult = Math.min(
+            infinite.MAX_SPEED_MULT,
+            infinite.BASE_SPEED_MULT + waveIndex * infinite.SPEED_MULT_PER_WAVE
+        );
 
         this._waveConfig = {
             waveNumber,
-            enemyCount: count,
+            regularCount,
+            eliteCount,
+            enemyCount: regularCount + eliteCount,
             spawnInterval: Math.max(
                 infinite.MIN_SPAWN_INTERVAL,
-                infinite.BASE_SPAWN_INTERVAL - waveNumber * infinite.SPAWN_INTERVAL_DECAY_PER_WAVE
+                infinite.BASE_SPAWN_INTERVAL - waveIndex * infinite.SPAWN_INTERVAL_DECAY_PER_WAVE
             ),
             hpMultiplier: hpMult,
+            speedMultiplier: speedMult,
         };
 
         console.log('═══════════════════════════════════════');
-        console.log(`🌊 第 ${waveNumber} 波! 敌人: ${this._waveConfig.enemyCount}`);
+        console.log(
+            `🌊 第 ${waveNumber} 波! 敌人: ${this._waveConfig.enemyCount} (普通:${regularCount} 精英:${eliteCount})`
+        );
         console.log('═══════════════════════════════════════');
 
         this.eventManager.emit(GameEvents.WAVE_START, {
@@ -172,14 +194,19 @@ export class WaveManager {
         this._enemySpawnTimer += dt;
         if (
             this._enemySpawnTimer >= this._waveConfig.spawnInterval &&
-            this._enemiesSpawned < this._waveConfig.enemyCount
+            this.totalSpawned < this._waveConfig.enemyCount
         ) {
             this._enemySpawnTimer = 0;
-            this.spawnEnemy();
-            this._enemiesSpawned++;
+            const spawnElite = this.shouldSpawnElite();
+            this.spawnEnemy(spawnElite);
+            if (spawnElite) {
+                this._eliteSpawned++;
+            } else {
+                this._regularSpawned++;
+            }
         }
 
-        if (this._enemiesSpawned >= this._waveConfig.enemyCount) {
+        if (this.totalSpawned >= this._waveConfig.enemyCount) {
             this._waveActive = false;
         }
     }
@@ -190,7 +217,11 @@ export class WaveManager {
     public checkWaveComplete(onComplete: (bonus: number) => void): void {
         if (this._waveActive || this._enemies.length > 0 || !this._waveConfig) return;
 
-        const bonus = this._currentWave * GameConfig.WAVE.INFINITE.BONUS_PER_WAVE;
+        const bonusBase = GameConfig.WAVE.INFINITE.BONUS_PER_WAVE;
+        const bonusGrowth = GameConfig.WAVE.INFINITE.BONUS_GROWTH_PER_WAVE;
+        const waveBonus = bonusBase + (this._currentWave - 1) * bonusGrowth;
+        const eliteBonus = this._waveConfig.eliteCount * Math.floor(bonusBase * 0.75);
+        const bonus = waveBonus + eliteBonus;
         console.log(`✅ 第 ${this._currentWave} 波完成! +${bonus} 金币`);
 
         this.eventManager.emit(GameEvents.WAVE_COMPLETE, {
@@ -222,16 +253,27 @@ export class WaveManager {
 
     // === 私有方法 ===
 
-    private spawnEnemy(): void {
+    private spawnEnemy(isElite: boolean): void {
         if (!this._enemyContainer) return;
 
         const pos = this.getEdgePosition();
+        const elite = GameConfig.ENEMY.ELITE;
         const enemy = UnitFactory.createEnemy(
             this._enemyContainer,
             pos.x,
             pos.y,
             this._baseNode ? this._baseNode.position : new Vec3(0, 0, 0), // Base Position
-            this._waveConfig?.hpMultiplier || 1
+            {
+                hpMultiplier:
+                    (this._waveConfig?.hpMultiplier || 1) * (isElite ? elite.HP_MULTIPLIER : 1),
+                speedMultiplier:
+                    (this._waveConfig?.speedMultiplier || 1) *
+                    (isElite ? elite.SPEED_MULTIPLIER : 1),
+                attackMultiplier: isElite ? elite.ATTACK_MULTIPLIER : 1,
+                isElite,
+                scaleMultiplier: isElite ? elite.SCALE_MULTIPLIER : 1,
+                coinDropMultiplier: isElite ? elite.COIN_DROP_MULTIPLIER : 1,
+            }
         );
         this._enemies.push(enemy);
 
@@ -240,6 +282,31 @@ export class WaveManager {
             unitType: 'enemy',
             node: enemy,
         });
+    }
+
+    private get totalSpawned(): number {
+        return this._regularSpawned + this._eliteSpawned;
+    }
+
+    private shouldSpawnElite(): boolean {
+        if (!this._waveConfig) return false;
+        if (this._eliteSpawned >= this._waveConfig.eliteCount) return false;
+        if (this._regularSpawned >= this._waveConfig.regularCount) return true;
+
+        const spawnEvery = Math.max(1, GameConfig.WAVE.INFINITE.ELITE.SPAWN_EVERY);
+        const nextSpawnIndex = this.totalSpawned + 1;
+        return nextSpawnIndex % spawnEvery === 0;
+    }
+
+    private getEliteCountForWave(waveNumber: number): number {
+        const elite = GameConfig.WAVE.INFINITE.ELITE;
+        if (waveNumber < elite.START_WAVE) return 0;
+        if ((waveNumber - elite.START_WAVE) % elite.INTERVAL !== 0) return 0;
+
+        const growthSteps = Math.floor(
+            (waveNumber - elite.START_WAVE) / elite.COUNT_GROWTH_STEP_WAVES
+        );
+        return Math.min(elite.MAX_COUNT, elite.BASE_COUNT + growthSteps);
     }
 
     private getEdgePosition(): { x: number; y: number } {

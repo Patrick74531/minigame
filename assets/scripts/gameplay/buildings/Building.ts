@@ -1,4 +1,4 @@
-import { _decorator, Vec2, Node, RigidBody, BoxCollider, Vec3 } from 'cc';
+import { _decorator, Node, RigidBody, BoxCollider, Vec3 } from 'cc';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameManager } from '../../core/managers/GameManager';
@@ -30,6 +30,14 @@ export interface BuildingConfig {
     soldierPoolName: string;
 }
 
+export interface BuildingUpgradeConfig {
+    maxLevel: number;
+    costMultiplier: number;
+    statMultiplier: number;
+    spawnIntervalMultiplier: number;
+    maxUnitsPerLevel: number;
+}
+
 /**
  * 建筑基类
  * 可放置在地图上，定期产生士兵
@@ -44,12 +52,15 @@ export class Building extends BaseComponent implements IAttackable {
 
     @property
     public currentHp: number = 500;
-    
+
     @property
     public level: number = 1;
 
-    public maxLevel: number = 3;
+    public maxLevel: number = GameConfig.BUILDING.DEFAULT_MAX_LEVEL;
+    public upgradeCostMultiplier: number = GameConfig.BUILDING.DEFAULT_COST_MULTIPLIER;
     public statMultiplier: number = 1.2;
+    public spawnIntervalMultiplier: number = 0.93;
+    public maxUnitsPerLevel: number = 0;
 
     @property
     public spawnInterval: number = 3;
@@ -148,36 +159,52 @@ export class Building extends BaseComponent implements IAttackable {
         if (config.spawnInterval !== undefined) this.spawnInterval = config.spawnInterval;
         if (config.maxUnits !== undefined) this.maxUnits = config.maxUnits;
         if (config.soldierPoolName !== undefined) this.soldierPoolName = config.soldierPoolName;
-        
-        // Upgrade Config
-        // Note: In real app, pass upgrade config here or fetch from Registry in Building.ts
+    }
+
+    public setUpgradeConfig(config: Partial<BuildingUpgradeConfig>): void {
+        if (config.maxLevel !== undefined) this.maxLevel = config.maxLevel;
+        if (config.costMultiplier !== undefined) this.upgradeCostMultiplier = config.costMultiplier;
+        if (config.statMultiplier !== undefined) this.statMultiplier = config.statMultiplier;
+        if (config.spawnIntervalMultiplier !== undefined)
+            this.spawnIntervalMultiplier = config.spawnIntervalMultiplier;
+        if (config.maxUnitsPerLevel !== undefined) this.maxUnitsPerLevel = config.maxUnitsPerLevel;
     }
 
     /**
      * 升级建筑
      */
-    public upgrade(): void {
+    public upgrade(): boolean {
+        if (!this.isAlive || this.level >= this.maxLevel) {
+            return false;
+        }
+
         const oldHp = this.maxHp;
         this.level++;
-        
-        // Scale Stats
+
+        // Scale core stats
         this.maxHp = Math.floor(this.maxHp * this.statMultiplier);
-        this.spawnInterval = Math.max(0.5, this.spawnInterval / 1.1); // Spawns 10% faster per level?
-        
+        if (this.spawnInterval > 0) {
+            this.spawnInterval = Math.max(0.5, this.spawnInterval * this.spawnIntervalMultiplier);
+        }
+        if (this.maxUnitsPerLevel > 0) {
+            this.maxUnits += this.maxUnitsPerLevel;
+        }
+
         // Heal to full (bonus)
         this.currentHp = this.maxHp;
-        
+
         if (this._healthBar) {
             this._healthBar.updateHealth(this.currentHp, this.maxHp);
         }
-        
+
         console.log(`[Building] Upgraded to Level ${this.level}. HP: ${oldHp} -> ${this.maxHp}`);
-        
-        // Effect?
-        this.eventManager.emit(GameEvents.BUILDING_CONSTRUCTED, {
-             padNode: this.node, // Reuse event or new event?
-             // Let's rely on Manager or Pad to show effect
+
+        this.eventManager.emit(GameEvents.BUILDING_UPGRADED, {
+            buildingId: this.node.uuid,
+            level: this.level,
         });
+
+        return true;
     }
 
     /**
@@ -219,10 +246,11 @@ export class Building extends BaseComponent implements IAttackable {
         const spawnOffsetZ = 1.0;
 
         if (!soldier) {
-            console.warn(`[Building] Pool missing for: ${this.soldierPoolName}. Using fallback spawner.`);
-            const fallback = ServiceRegistry.get<
-                (parent: Node, x: number, z: number) => Node
-            >('SoldierSpawner');
+            console.warn(
+                `[Building] Pool missing for: ${this.soldierPoolName}. Using fallback spawner.`
+            );
+            const fallback =
+                ServiceRegistry.get<(parent: Node, x: number, z: number) => Node>('SoldierSpawner');
             if (fallback) {
                 soldier = fallback(this._unitContainer, 0, 0);
             } else {

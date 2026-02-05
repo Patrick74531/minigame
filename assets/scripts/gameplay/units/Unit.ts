@@ -84,7 +84,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
     }
 
     // === IAttackable Implementation ===
-    
+
     public getWorldPosition(): Vec3 {
         return this.node.worldPosition;
     }

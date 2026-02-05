@@ -59,14 +59,179 @@ export const GameConfig = {
 
     // === 建筑系统 ===
     BUILDING: {
-        /** 兵营产兵间隔（秒） */
-        SPAWN_INTERVAL: 3,
-        /** 兵营最大产兵数 */
-        MAX_SOLDIERS_PER_BARRACKS: 10,
-        /** 建筑血量 */
+        /** 兵营产兵间隔（秒）（legacy fallback） */
+        SPAWN_INTERVAL: 4.5,
+        /** 兵营最大产兵数（legacy fallback） */
+        MAX_SOLDIERS_PER_BARRACKS: 3,
+        /** 建筑血量（legacy fallback） */
         BASE_HP: 500,
         /** 基地初始血量（与建筑默认 HP 区分，避免误改） */
         BASE_START_HP: 100,
+        /** 全局默认升级上限 */
+        DEFAULT_MAX_LEVEL: 5,
+        /** 全局默认升级成本倍率 */
+        DEFAULT_COST_MULTIPLIER: 1.45,
+        /**
+         * 建筑类型配置
+         * NOTE: 建筑战斗/成长数值统一维护在这里，避免分散硬编码。
+         */
+        TYPES: {
+            barracks: {
+                name: '兵营',
+                cost: 6,
+                buildTime: 0,
+                description: '自动生产士兵，稳定提供前线肉盾',
+                role: 'barracks',
+                visual: {
+                    colorHex: '#64B464',
+                    scale: { x: 0.45, y: 0.45, z: 0.45 },
+                },
+                stats: {
+                    hp: 180,
+                },
+                features: {
+                    spawnInterval: 4.5,
+                    maxUnits: 3,
+                },
+                upgrades: {
+                    maxLevel: 5,
+                    costMultiplier: 1.4,
+                    statMultiplier: 1.18,
+                    spawnIntervalMultiplier: 0.92,
+                    maxUnitsPerLevel: 1,
+                },
+            },
+            tower: {
+                name: '机炮塔',
+                cost: 10,
+                buildTime: 0,
+                description: '高频单体输出，稳定击杀前排目标',
+                role: 'tower',
+                visual: {
+                    colorHex: '#DCDC3C',
+                    scale: { x: 0.4, y: 0.8, z: 0.4 },
+                },
+                stats: {
+                    hp: 300,
+                    attackRange: 18,
+                    attackDamage: 26,
+                    attackInterval: 0.45,
+                },
+                upgrades: {
+                    maxLevel: 5,
+                    costMultiplier: 1.45,
+                    statMultiplier: 1.2,
+                    attackMultiplier: 1.22,
+                    rangeMultiplier: 1.03,
+                    intervalMultiplier: 0.95,
+                },
+            },
+            frost_tower: {
+                name: '冰霜塔',
+                cost: 12,
+                buildTime: 0,
+                description: '范围减速并补伤害，负责控场',
+                role: 'tower',
+                visual: {
+                    colorHex: '#3C64DC',
+                    scale: { x: 0.4, y: 0.8, z: 0.4 },
+                },
+                stats: {
+                    hp: 280,
+                    attackRange: 16,
+                    attackDamage: 12,
+                    attackInterval: 0.8,
+                },
+                features: {
+                    bulletColorHex: '#0096FF',
+                    bulletExplosionRadius: 2.8,
+                    bulletSlowPercent: 0.45,
+                    bulletSlowDuration: 2.2,
+                },
+                upgrades: {
+                    maxLevel: 5,
+                    costMultiplier: 1.45,
+                    statMultiplier: 1.18,
+                    attackMultiplier: 1.15,
+                    rangeMultiplier: 1.03,
+                    intervalMultiplier: 0.96,
+                },
+            },
+            lightning_tower: {
+                name: '闪电塔',
+                cost: 14,
+                buildTime: 0,
+                description: '弹射打击，适合清理中后排',
+                role: 'tower',
+                visual: {
+                    colorHex: '#800080',
+                    scale: { x: 0.4, y: 0.8, z: 0.4 },
+                },
+                stats: {
+                    hp: 260,
+                    attackRange: 17,
+                    attackDamage: 20,
+                    attackInterval: 0.95,
+                },
+                features: {
+                    chainCount: 2,
+                    chainRange: 6,
+                    bulletColorHex: '#A020F0',
+                },
+                upgrades: {
+                    maxLevel: 5,
+                    costMultiplier: 1.48,
+                    statMultiplier: 1.2,
+                    attackMultiplier: 1.2,
+                    rangeMultiplier: 1.03,
+                    intervalMultiplier: 0.95,
+                    chainRangePerLevel: 0.5,
+                },
+            },
+            farm: {
+                name: '回收工坊',
+                cost: 18,
+                buildTime: 0,
+                description: '将残骸转化为额外资源',
+                role: 'building',
+                visual: {
+                    colorHex: '#8B4513',
+                    scale: { x: 0.6, y: 0.3, z: 0.6 },
+                },
+                stats: {
+                    hp: 150,
+                },
+                features: {
+                    incomePerTick: 2,
+                    incomeInterval: 6,
+                },
+                upgrades: {
+                    maxLevel: 5,
+                    costMultiplier: 1.42,
+                    statMultiplier: 1.18,
+                    incomeMultiplier: 1.25,
+                },
+            },
+            wall: {
+                name: '焊接墙',
+                cost: 6,
+                buildTime: 0,
+                description: '高生命值防线，拖住敌人推进',
+                role: 'building',
+                visual: {
+                    colorHex: '#808080',
+                    scale: { x: 0.8, y: 0.8, z: 0.8 },
+                },
+                stats: {
+                    hp: 1100,
+                },
+                upgrades: {
+                    maxLevel: 5,
+                    costMultiplier: 1.35,
+                    statMultiplier: 1.25,
+                },
+            },
+        },
         /**
          * 初始建造点配置 (World XZ)
          * NOTE: 扩展新建造点请优先修改此处，避免在 GameController 中硬编码。
@@ -110,6 +275,16 @@ export const GameConfig = {
         ATTACK_RANGE: 1.2,
         /** 死亡掉落金币 */
         COIN_DROP: 5,
+        /** 死亡掉落随机浮动 */
+        COIN_DROP_VARIANCE: 3,
+        /** 精英敌人数值倍率 */
+        ELITE: {
+            HP_MULTIPLIER: 3.2,
+            ATTACK_MULTIPLIER: 1.4,
+            SPEED_MULTIPLIER: 1.1,
+            SCALE_MULTIPLIER: 1.35,
+            COIN_DROP_MULTIPLIER: 3.0,
+        },
     },
 
     // === 英雄系统 ===
@@ -136,26 +311,17 @@ export const GameConfig = {
             meshy: {
                 key: 'meshy',
                 prefab: {
-                    path:
-                        'character/Meshy_AI_Animation_Running_withSkin/Meshy_AI_Animation_Running_withSkin',
-                    fallbacks: [
-                        'character/Meshy_AI_Animation_Running_withSkin',
-                    ],
+                    path: 'character/Meshy_AI_Animation_Running_withSkin/Meshy_AI_Animation_Running_withSkin',
+                    fallbacks: ['character/Meshy_AI_Animation_Running_withSkin'],
                 },
                 clips: {
                     run: {
-                        path:
-                            'character/Meshy_AI_Animation_Running_withSkin/Armature|running|baselayer',
-                        fallbacks: [
-                            'character/Meshy_AI_Animation_Running_withSkin',
-                        ],
+                        path: 'character/Meshy_AI_Animation_Running_withSkin/Armature|running|baselayer',
+                        fallbacks: ['character/Meshy_AI_Animation_Running_withSkin'],
                     },
                     idle: {
-                        path:
-                            'character/Meshy_AI_Animation_Idle_withSkin/Armature|Idle|baselayer',
-                        fallbacks: [
-                            'character/Meshy_AI_Animation_Idle_withSkin',
-                        ],
+                        path: 'character/Meshy_AI_Animation_Idle_withSkin/Armature|Idle|baselayer',
+                        fallbacks: ['character/Meshy_AI_Animation_Idle_withSkin'],
                     },
                 },
                 transform: {
@@ -205,15 +371,29 @@ export const GameConfig = {
          * NOTE: 仅用于 gameplay/wave/WaveManager (Infinite Mode)。
          */
         INFINITE: {
-            BASE_COUNT: 5,
-            COUNT_PER_WAVE: 2,
+            BASE_COUNT: 6,
+            COUNT_PER_WAVE: 1,
+            COUNT_GROWTH_STEP_WAVES: 5,
+            COUNT_GROWTH_STEP_BONUS: 2,
             BASE_HP_MULT: 1,
-            HP_MULT_PER_WAVE: 0.5,
-            BASE_SPAWN_INTERVAL: 0.8,
-            SPAWN_INTERVAL_DECAY_PER_WAVE: 0.05,
-            MIN_SPAWN_INTERVAL: 0.2,
-            BONUS_PER_WAVE: 25,
+            HP_MULT_PER_WAVE: 0.16,
+            BASE_SPEED_MULT: 1,
+            SPEED_MULT_PER_WAVE: 0.015,
+            MAX_SPEED_MULT: 1.45,
+            BASE_SPAWN_INTERVAL: 0.95,
+            SPAWN_INTERVAL_DECAY_PER_WAVE: 0.03,
+            MIN_SPAWN_INTERVAL: 0.35,
+            BONUS_PER_WAVE: 20,
+            BONUS_GROWTH_PER_WAVE: 4,
             SPAWN_RANGE: 6,
+            ELITE: {
+                START_WAVE: 4,
+                INTERVAL: 3,
+                BASE_COUNT: 1,
+                COUNT_GROWTH_STEP_WAVES: 6,
+                MAX_COUNT: 3,
+                SPAWN_EVERY: 5,
+            },
         },
     },
 

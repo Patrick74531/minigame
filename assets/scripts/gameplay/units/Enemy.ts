@@ -23,6 +23,8 @@ export class Enemy extends Unit {
 
     // Target position (Base)
     private _targetPos: Vec3 = new Vec3(0, 0, 0);
+    private _isElite: boolean = false;
+    private _coinDropMultiplier: number = 1;
 
     protected initialize(): void {
         super.initialize();
@@ -44,6 +46,8 @@ export class Enemy extends Unit {
         super.onSpawn();
         this._state = UnitState.MOVING;
         this._target = null;
+        this._isElite = false;
+        this._coinDropMultiplier = 1;
     }
 
     private setupPhysics(): void {
@@ -59,12 +63,28 @@ export class Enemy extends Unit {
         this._targetPos.set(target);
     }
 
+    public setVariant(config: { isElite?: boolean; coinDropMultiplier?: number }): void {
+        this._isElite = config.isElite ?? false;
+        this._coinDropMultiplier = config.coinDropMultiplier ?? 1;
+    }
+
+    public get isElite(): boolean {
+        return this._isElite;
+    }
+
+    public get coinDropMultiplier(): number {
+        return this._coinDropMultiplier;
+    }
+
     protected updateMovement(dt: number): void {
         if (!this.isAlive) return;
-        
+
         // If Attacking, Don't move
-        if (this._state === UnitState.ATTACKING || (this._target && this.isTargetInRange(this._target))) {
-             return;
+        if (
+            this._state === UnitState.ATTACKING ||
+            (this._target && this.isTargetInRange(this._target))
+        ) {
+            return;
         }
 
         const pos = this.node.position;
@@ -92,7 +112,9 @@ export class Enemy extends Unit {
         );
 
         // Face target
-        this.node.lookAt(new Vec3(this._targetPos.x, GameConfig.PHYSICS.ENEMY_Y, this._targetPos.z));
+        this.node.lookAt(
+            new Vec3(this._targetPos.x, GameConfig.PHYSICS.ENEMY_Y, this._targetPos.z)
+        );
     }
 
     private onCollisionEnter(event: ICollisionEvent): void {
@@ -121,7 +143,7 @@ export class Enemy extends Unit {
         const other = event.otherCollider;
         const building = other.node.getComponent(Building);
         if (building && building === this._target) {
-            // Target left collision? 
+            // Target left collision?
             // If it's still in "Aggro Range" we might keep attacking.
             // But if we relied on collision to attack, we might lose it here.
             // For now, let Aggro Logic handle keeping target if close.
@@ -149,7 +171,7 @@ export class Enemy extends Unit {
             this._target.takeDamage(this._stats.attack, this);
             // console.log(`[Enemy] Attacked ${this._target.node.name}`);
         } else {
-             // Nothing to attack
+            // Nothing to attack
             this._state = UnitState.MOVING;
             this._target = null;
         }
@@ -173,11 +195,11 @@ export class Enemy extends Unit {
                 // If we have a target, check if it is still in range
                 if (this.isTargetInRange(this._target)) {
                     this._state = UnitState.ATTACKING;
-                     // Face the target
-                     const targetPos = this._target.getWorldPosition();
-                     this.node.lookAt(
-                         new Vec3(targetPos.x, GameConfig.PHYSICS.ENEMY_Y, targetPos.z)
-                     );
+                    // Face the target
+                    const targetPos = this._target.getWorldPosition();
+                    this.node.lookAt(
+                        new Vec3(targetPos.x, GameConfig.PHYSICS.ENEMY_Y, targetPos.z)
+                    );
                 } else {
                     // Chase target? Or give up?
                     // For now, if out of range, resume moving to Base (ignore chasing for simple enemies)
@@ -221,9 +243,10 @@ export class Enemy extends Unit {
         // 2. Check for nearby Soldiers (Units)
         const provider = CombatService.provider;
         if (provider && provider.findSoldierInRange) {
-            const soldier = provider.findSoldierInRange(this.node.position, this.AGGRO_RANGE) as
-                | Soldier
-                | null;
+            const soldier = provider.findSoldierInRange(
+                this.node.position,
+                this.AGGRO_RANGE
+            ) as Soldier | null;
             if (soldier && soldier.isAlive) {
                 this.setTarget(soldier);
                 this._state = UnitState.ATTACKING;
@@ -233,17 +256,17 @@ export class Enemy extends Unit {
 
         // Find nearest Soldier
         // Optimization: Rely on physics/colliders? Or iterate active units?
-        // We don't have a global "Soldiers" list easily accessible except maybe converting WaveManager? 
+        // We don't have a global "Soldiers" list easily accessible except maybe converting WaveManager?
         // Actually WaveManager tracks Enemies. GameManager tracks Buildings.
         // PoolManager tracks all units?
-        
+
         // Let's look for Buildings specifically as primary blockers
         // And Soldiers if we want them to fight back.
         // For now, let's keep the scan for Buildings to break walls.
 
         const buildingNodes = this.gameManager.activeBuildings;
         if (buildingNodes && buildingNodes.length > 0) {
-             const myPos = this.node.position;
+            const myPos = this.node.position;
             let nearest: Building | null = null;
             let minDistSq = this.AGGRO_RANGE * this.AGGRO_RANGE;
 

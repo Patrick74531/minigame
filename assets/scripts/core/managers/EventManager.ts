@@ -144,7 +144,9 @@ export class EventManager extends Singleton<EventManager>() {
     private validatePayload(eventName: string, args: unknown[]): void {
         // NOTE: Minimal dev-only checks. Keep runtime overhead low.
         if (args.length > 1) {
-            console.warn(`[EventManager] Event "${eventName}" has multiple args; prefer a single payload object.`);
+            console.warn(
+                `[EventManager] Event "${eventName}" has multiple args; prefer a single payload object.`
+            );
         }
     }
 

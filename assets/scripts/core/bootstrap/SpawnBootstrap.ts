@@ -20,13 +20,7 @@ export type SpawnResult = {
  * 负责初始实体创建与波次/相机/建造点的装配
  */
 export class SpawnBootstrap {
-    public static spawn(
-        containers: {
-            enemy: Node;
-            soldier: Node;
-            building: Node;
-        }
-    ): SpawnResult {
+    public static spawn(containers: { enemy: Node; soldier: Node; building: Node }): SpawnResult {
         const spawnX = GameConfig.MAP.BASE_SPAWN.x;
         const spawnZ = GameConfig.MAP.BASE_SPAWN.z;
 
@@ -66,9 +60,6 @@ export class SpawnBootstrap {
     }
 
     private static get buildingManager(): BuildingManager {
-        return (
-            ServiceRegistry.get<BuildingManager>('BuildingManager') ??
-            BuildingManager.instance
-        );
+        return ServiceRegistry.get<BuildingManager>('BuildingManager') ?? BuildingManager.instance;
     }
 }

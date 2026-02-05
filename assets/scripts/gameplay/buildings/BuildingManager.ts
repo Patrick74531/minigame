@@ -117,7 +117,7 @@ export class BuildingManager {
                 const buildingComp = buildingNode.getComponent(Building);
                 if (buildingComp) {
                     this._activeBuildings.push(buildingComp);
-                    
+
                     // Link Building back to Pad for upgrades
                     pad.onBuildingCreated(buildingComp);
                 }
@@ -140,11 +140,7 @@ export class BuildingManager {
      * 清理
      */
     public cleanup(): void {
-        this.eventManager.off(
-            GameEvents.BUILDING_CONSTRUCTED,
-            this.onBuildingConstructed,
-            this
-        );
+        this.eventManager.off(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
         this.eventManager.off(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
         this._pads = [];
         this._activeBuildings = [];

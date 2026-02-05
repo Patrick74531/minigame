@@ -1,9 +1,4 @@
-import {
-    _decorator,
-    Component,
-    Node,
-    PhysicsSystem,
-} from 'cc';
+import { _decorator, Component, Node, PhysicsSystem } from 'cc';
 import { MapGenerator } from './gameplay/map/MapGenerator';
 import { WaveLoop } from './gameplay/wave/WaveLoop';
 import { Joystick } from './ui/Joystick';
@@ -82,14 +77,16 @@ export class GameController extends Component {
         // Ideally: Set container in onLoad, Set Base in Start.
         // For now, let's keep it robust.
         // WaveManager initialize moved to start
-        this._services.buildingManager.initialize(this._buildingContainer!, this._soldierContainer!);
+        this._services.buildingManager.initialize(
+            this._buildingContainer!,
+            this._soldierContainer!
+        );
 
         // 启用物理系统
         PhysicsSystem.instance.enable = true;
 
         // Register core services for decoupled access
         ServiceRegistrar.registerCore();
-
     }
 
     protected onDestroy(): void {

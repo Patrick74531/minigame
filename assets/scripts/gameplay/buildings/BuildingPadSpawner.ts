@@ -16,7 +16,9 @@ export class BuildingPadSpawner {
             // Pre-spawn special towers
             if (pos.type === 'frost_tower' || pos.type === 'lightning_tower') {
                 BuildingFactory.createBuilding(buildingContainer, pos.x, pos.z, pos.type);
-                console.log(`[BuildingPadSpawner] Pre-spawned ${pos.type} at (${pos.x}, 0, ${pos.z})`);
+                console.log(
+                    `[BuildingPadSpawner] Pre-spawned ${pos.type} at (${pos.x}, 0, ${pos.z})`
+                );
                 continue;
             }
 

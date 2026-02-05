@@ -52,7 +52,9 @@ export class EffectFactory {
 
         // 扁平的圓柱体用来做光环 或者 Quad
         const renderer = ringNode.addComponent(MeshRenderer);
-        renderer.mesh = utils.MeshUtils.createMesh(primitives.plane({ width: 1, length: 1, widthSegments: 1, lengthSegments: 1 }));
+        renderer.mesh = utils.MeshUtils.createMesh(
+            primitives.plane({ width: 1, length: 1, widthSegments: 1, lengthSegments: 1 })
+        );
 
         const material = new Material();
         // Use 'transparent' technique (1) and define USE_TEXTURE
@@ -117,7 +119,7 @@ export class EffectFactory {
         particleSystem.capacity = 50;
         // Type casting to bypass strict declaration checks (runtime supports these)
         particleSystem.startColor = new Color(200, 240, 255, 255) as any;
-        (particleSystem as any).startSize = 0.5; 
+        (particleSystem as any).startSize = 0.5;
         (particleSystem as any).startSpeed = 10;
         (particleSystem as any).startLifetime = 0.8;
         (particleSystem as any).gravityModifier = 2.0;

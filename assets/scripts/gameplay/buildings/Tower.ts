@@ -7,7 +7,6 @@ import {
     primitives,
     utils,
     Material,
-    Component,
     tween,
     Tween,
     MotionStreak,
@@ -53,6 +52,11 @@ export class Tower extends Building {
     public chainCount: number = 0;
     @property
     public chainRange: number = 0;
+
+    public attackMultiplier: number = 1.2;
+    public rangeMultiplier: number = 1.03;
+    public intervalMultiplier: number = 0.95;
+    public chainRangePerLevel: number = 0;
 
     private _attackTimer: number = 0;
     private _target: Node | null = null;
@@ -143,6 +147,34 @@ export class Tower extends Building {
             this._bulletTexture = texture;
             console.log('[Tower] Glow texture loaded successfully');
         });
+    }
+
+    public setTowerUpgradeConfig(config: {
+        attackMultiplier?: number;
+        rangeMultiplier?: number;
+        intervalMultiplier?: number;
+        chainRangePerLevel?: number;
+    }): void {
+        if (config.attackMultiplier !== undefined) this.attackMultiplier = config.attackMultiplier;
+        if (config.rangeMultiplier !== undefined) this.rangeMultiplier = config.rangeMultiplier;
+        if (config.intervalMultiplier !== undefined)
+            this.intervalMultiplier = config.intervalMultiplier;
+        if (config.chainRangePerLevel !== undefined)
+            this.chainRangePerLevel = config.chainRangePerLevel;
+    }
+
+    public upgrade(): boolean {
+        const upgraded = super.upgrade();
+        if (!upgraded) return false;
+
+        this.attackDamage = Math.floor(this.attackDamage * this.attackMultiplier);
+        this.attackRange *= this.rangeMultiplier;
+        this.attackInterval = Math.max(0.2, this.attackInterval * this.intervalMultiplier);
+        if (this.chainRangePerLevel > 0) {
+            this.chainRange += this.chainRangePerLevel;
+        }
+
+        return true;
     }
 
     private shoot(target: Node): void {

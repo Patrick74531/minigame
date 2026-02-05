@@ -6,7 +6,6 @@ import {
     utils,
     Material,
     Color,
-    Component,
     RigidBody,
     BoxCollider,
     Vec3,
@@ -24,6 +23,15 @@ import { GameConfig } from '../../data/GameConfig';
 import { HeroAnimationController } from './HeroAnimationController';
 import { AnimRootScaleLock } from '../visuals/AnimRootScaleLock';
 import { resolveHeroModelConfig } from './HeroModelConfig';
+
+export interface EnemySpawnOptions {
+    hpMultiplier?: number;
+    attackMultiplier?: number;
+    speedMultiplier?: number;
+    isElite?: boolean;
+    scaleMultiplier?: number;
+    coinDropMultiplier?: number;
+}
 
 /**
  * 单位工厂
@@ -46,11 +54,21 @@ export class UnitFactory {
         x: number,
         z: number,
         targetPos: Vec3,
-        waveMultiplier: number = 1
+        options: EnemySpawnOptions = {}
     ): Node {
-        const node = this.createCubeNode('Enemy', new Color(220, 60, 60, 255));
+        const isElite = options.isElite ?? false;
+        const node = this.createCubeNode(
+            isElite ? 'Enemy_Elite' : 'Enemy',
+            isElite ? new Color(235, 245, 160, 255) : new Color(220, 60, 60, 255)
+        );
+        const scaleMultiplier = options.scaleMultiplier ?? 1;
+        const baseScale = 0.35;
         node.setPosition(x, GameConfig.PHYSICS.ENEMY_Y, z); // Raised
-        node.setScale(0.35, 0.35, 0.35);
+        node.setScale(
+            baseScale * scaleMultiplier,
+            baseScale * scaleMultiplier,
+            baseScale * scaleMultiplier
+        );
         parent.addChild(node);
 
         const enemy = node.addComponent(Enemy);
@@ -70,12 +88,20 @@ export class UnitFactory {
         col.setGroup(1 << 3); // ENEMY
         col.setMask(0xffffffff); // Collide with all
 
+        const hpMultiplier = options.hpMultiplier ?? 1;
+        const attackMultiplier = options.attackMultiplier ?? 1;
+        const speedMultiplier = options.speedMultiplier ?? 1;
+
         enemy.initStats({
-            maxHp: GameConfig.ENEMY.BASE_HP * waveMultiplier,
-            attack: GameConfig.ENEMY.BASE_ATTACK,
+            maxHp: GameConfig.ENEMY.BASE_HP * hpMultiplier,
+            attack: GameConfig.ENEMY.BASE_ATTACK * attackMultiplier,
             attackRange: GameConfig.ENEMY.ATTACK_RANGE,
             attackInterval: GameConfig.ENEMY.ATTACK_INTERVAL,
-            moveSpeed: GameConfig.ENEMY.MOVE_SPEED * (1 + (waveMultiplier - 1) * 0.1),
+            moveSpeed: GameConfig.ENEMY.MOVE_SPEED * speedMultiplier,
+        });
+        enemy.setVariant({
+            isElite,
+            coinDropMultiplier: options.coinDropMultiplier ?? 1,
         });
 
         // Set Target
@@ -359,7 +385,10 @@ export class UnitFactory {
 
     // Hero model config resolution moved to HeroModelConfig for reuse.
 
-    private static buildPrefabPaths(config: { prefabPath: string; prefabFallbacks: string[] }): string[] {
+    private static buildPrefabPaths(config: {
+        prefabPath: string;
+        prefabFallbacks: string[];
+    }): string[] {
         return [config.prefabPath, ...config.prefabFallbacks].filter(Boolean);
     }
 
@@ -392,11 +421,8 @@ export class UnitFactory {
         tryLoad(0, null);
     }
 
-    private static addClipIfNeeded(
-        anim: SkeletalAnimation,
-        clip: AnimationClip
-    ): void {
-        if (anim.clips && anim.clips.some((existing) => existing && existing.name === clip.name)) {
+    private static addClipIfNeeded(anim: SkeletalAnimation, clip: AnimationClip): void {
+        if (anim.clips && anim.clips.some(existing => existing && existing.name === clip.name)) {
             return;
         }
         anim.addClip(clip);

@@ -53,16 +53,10 @@ export class SceneGraphBuilder {
     }
 
     private static get coinDropManager(): CoinDropManager {
-        return (
-            ServiceRegistry.get<CoinDropManager>('CoinDropManager') ??
-            CoinDropManager.instance
-        );
+        return ServiceRegistry.get<CoinDropManager>('CoinDropManager') ?? CoinDropManager.instance;
     }
 
     private static get effectManager(): EffectManager {
-        return (
-            ServiceRegistry.get<EffectManager>('EffectManager') ??
-            EffectManager.instance
-        );
+        return ServiceRegistry.get<EffectManager>('EffectManager') ?? EffectManager.instance;
     }
 }

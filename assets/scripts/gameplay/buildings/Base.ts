@@ -15,20 +15,19 @@ const { ccclass, property } = _decorator;
  */
 @ccclass('Base')
 export class Base extends Building {
-
     protected initialize(): void {
         this.buildingType = BuildingType.BASE;
         super.initialize();
 
         this.eventManager.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
-        
+
         // Initial HUD Update
         this.hudManager.updateBaseHp(this.currentHp, this.maxHp);
     }
 
     public takeDamage(damage: number, attacker?: any): void {
         super.takeDamage(damage, attacker);
-        
+
         // Update HUD
         this.hudManager.updateBaseHp(this.currentHp, this.maxHp);
     }
@@ -38,7 +37,7 @@ export class Base extends Building {
         if (!this.isAlive) return;
         this.takeDamage(damage);
     }
-    
+
     protected onDestroyed(): void {
         // Trigger generic building destruction (remove from map, fx)
         super.onDestroyed();

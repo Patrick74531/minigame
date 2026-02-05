@@ -5,6 +5,7 @@ import { UnitType } from '../units/Unit';
 import { CoinFactory } from './CoinFactory';
 import { GameConfig } from '../../data/GameConfig';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import { Enemy } from '../units/Enemy';
 
 /**
  * CoinDropManager
@@ -35,14 +36,13 @@ export class CoinDropManager {
         if (data.unitType !== UnitType.ENEMY) return;
 
         if (data.position && this._coinContainer) {
-            const value =
-                GameConfig.ENEMY.COIN_DROP + Math.floor(Math.random() * 5);
-            CoinFactory.createCoin(
-                this._coinContainer,
-                data.position.x,
-                data.position.z,
-                value
-            );
+            const enemyComp = data.node?.getComponent(Enemy);
+            const dropMultiplier = enemyComp?.coinDropMultiplier ?? 1;
+            const baseDrop =
+                GameConfig.ENEMY.COIN_DROP +
+                Math.floor(Math.random() * (GameConfig.ENEMY.COIN_DROP_VARIANCE + 1));
+            const value = Math.max(1, Math.round(baseDrop * dropMultiplier));
+            CoinFactory.createCoin(this._coinContainer, data.position.x, data.position.z, value);
         }
 
         if (data.node && data.node.isValid) {

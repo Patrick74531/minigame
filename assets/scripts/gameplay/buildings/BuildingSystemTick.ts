@@ -17,10 +17,7 @@ export class BuildingSystemTick extends Component {
     }
 
     private get buildingManager(): BuildingManager {
-        return (
-            ServiceRegistry.get<BuildingManager>('BuildingManager') ??
-            BuildingManager.instance
-        );
+        return ServiceRegistry.get<BuildingManager>('BuildingManager') ?? BuildingManager.instance;
     }
 
     private get gameManager(): GameManager {

@@ -92,8 +92,7 @@ export const resolveHeroModelConfig = (): ResolvedHeroModelConfig => {
     return {
         key: preset.key ?? key ?? 'default',
         prefabPath: preset.prefab?.path ?? (preset as any).prefabPath ?? '',
-        prefabFallbacks:
-            preset.prefab?.fallbacks ?? (preset as any).prefabFallbacks ?? [],
+        prefabFallbacks: preset.prefab?.fallbacks ?? (preset as any).prefabFallbacks ?? [],
         runClipPath: runClip.path,
         runClipFallbacks: runClip.fallbacks,
         idleClipPath: idleClip.path ?? runClip.path,
