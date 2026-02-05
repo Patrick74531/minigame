@@ -1,6 +1,8 @@
 import { _decorator, Node, Vec3 } from 'cc';
 import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
+import { CombatService } from '../../core/managers/CombatService';
+import { WaveManager } from '../wave/WaveManager';
 
 const { ccclass, property } = _decorator;
 
@@ -40,6 +42,11 @@ export class Soldier extends Unit {
 
         // Mirror target for external reads (CombatSystem assigns target)
         this.currentTarget = this.target ? this.target.node : null;
+
+        // Fallback: if CombatSystem not present, do a lightweight local scan
+        if (!CombatService.provider && !this.target) {
+            this.tryAcquireTargetFallback();
+        }
     }
 
     /**
@@ -98,5 +105,36 @@ export class Soldier extends Unit {
 
     protected onDeath(): void {
         this.currentTarget = null;
+    }
+
+    /**
+     * Fallback targeting when CombatSystem is not running.
+     * NOTE: Keep lightweight. This exists for safety only.
+     */
+    private tryAcquireTargetFallback(): void {
+        const enemies = WaveManager.instance.enemies;
+        if (!enemies || enemies.length === 0) return;
+
+        const myPos = this.node.position;
+        let nearest: Node | null = null;
+        let minDist = this._stats.attackRange;
+
+        for (const enemy of enemies) {
+            if (!enemy || !enemy.isValid) continue;
+            const dx = enemy.position.x - myPos.x;
+            const dz = enemy.position.z - myPos.z;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = enemy;
+            }
+        }
+
+        if (nearest) {
+            const unit = nearest.getComponent(Unit);
+            if (unit && unit.isAlive) {
+                this.engageTarget(unit);
+            }
+        }
     }
 }

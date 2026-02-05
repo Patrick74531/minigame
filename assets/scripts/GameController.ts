@@ -112,15 +112,7 @@ export class GameController extends Component {
         PhysicsSystem.instance.enable = true;
 
         // Register core services for decoupled access
-        // NOTE: Use ServiceRegistry.get(...) for new code to reduce hard dependencies.
-        ServiceRegistry.register('EventManager', EventManager.instance);
-        ServiceRegistry.register('GameManager', GameManager.instance);
-        ServiceRegistry.register('HUDManager', HUDManager.instance);
-        ServiceRegistry.register('BuildingManager', BuildingManager.instance);
-        ServiceRegistry.register('EffectManager', EffectManager.instance);
-        ServiceRegistry.register('WaveManager', WaveManager.instance);
-        ServiceRegistry.register('WaveService', WaveService.instance);
-        ServiceRegistry.register('PoolManager', PoolManager.instance);
+        this.registerCoreServices();
 
     }
 
@@ -131,6 +123,7 @@ export class GameController extends Component {
         HUDManager.instance.cleanup();
         BuildingManager.instance.cleanup();
         EffectManager.instance.cleanup();
+        ServiceRegistry.clear();
     }
 
     protected start(): void {
@@ -267,6 +260,22 @@ export class GameController extends Component {
     private setupEventListeners(): void {
         EventManager.instance.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
         EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
+    }
+
+    /**
+     * 统一注册全局服务入口，方便后续扩展与统一清理。
+     * NOTE: 仅注册“全局/长生命周期”服务，避免短生命周期对象进入 Registry。
+     */
+    private registerCoreServices(): void {
+        // NOTE: Use ServiceRegistry.get(...) for new code to reduce hard dependencies.
+        ServiceRegistry.register('EventManager', EventManager.instance);
+        ServiceRegistry.register('GameManager', GameManager.instance);
+        ServiceRegistry.register('HUDManager', HUDManager.instance);
+        ServiceRegistry.register('BuildingManager', BuildingManager.instance);
+        ServiceRegistry.register('EffectManager', EffectManager.instance);
+        ServiceRegistry.register('WaveManager', WaveManager.instance);
+        ServiceRegistry.register('WaveService', WaveService.instance);
+        ServiceRegistry.register('PoolManager', PoolManager.instance);
     }
 
     private onEnemyReachedBase(data: any): void {

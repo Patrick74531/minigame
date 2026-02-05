@@ -41,3 +41,7 @@
 2. Implement logic in gameplay/core modules.
 3. Register providers (Wave/Combat) if required.
 4. Use events for cross-module communication.
+
+## Combat Targeting Flow (Active)
+- **CombatSystem present**: centralized targeting assigns Soldier targets via `CombatService`.
+- **CombatSystem absent**: Soldier performs a lightweight local scan as a safety fallback.

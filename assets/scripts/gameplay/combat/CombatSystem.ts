@@ -33,6 +33,7 @@ export class CombatSystem extends Component implements CombatProvider {
 
     protected onLoad(): void {
         CombatService.setProvider(this);
+        // NOTE: CombatSystem depends on UNIT_SPAWNED/UNIT_DIED events for tracking.
         EventManager.instance.on(GameEvents.UNIT_SPAWNED, this.onUnitSpawned, this);
         EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
         EventManager.instance.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
