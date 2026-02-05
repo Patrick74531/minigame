@@ -3,6 +3,7 @@ import { Singleton } from '../base/Singleton';
 import { EventManager } from './EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { GameConfig } from '../../data/GameConfig';
+import { ServiceRegistry } from './ServiceRegistry';
 
 const { ccclass, property } = _decorator;
 
@@ -21,11 +22,11 @@ export enum GameState {
  *
  * @example
  * // 开始游戏
- * GameManager.instance.startGame();
+ * ServiceRegistry.get<GameManager>('GameManager')?.startGame();
  *
  * // 暂停/恢复
- * GameManager.instance.pauseGame();
- * GameManager.instance.resumeGame();
+ * ServiceRegistry.get<GameManager>('GameManager')?.pauseGame();
+ * ServiceRegistry.get<GameManager>('GameManager')?.resumeGame();
  */
 export class GameManager extends Singleton<GameManager>() {
     private _gameState: GameState = GameState.NONE;
@@ -90,7 +91,7 @@ export class GameManager extends Singleton<GameManager>() {
         this._gameState = GameState.PLAYING;
         this._coins = GameConfig.ECONOMY.INITIAL_COINS;
 
-        EventManager.instance.emit(GameEvents.GAME_START);
+        this.eventManager.emit(GameEvents.GAME_START);
     }
 
     /**
@@ -100,7 +101,7 @@ export class GameManager extends Singleton<GameManager>() {
         if (this._gameState !== GameState.PLAYING) return;
 
         this._gameState = GameState.PAUSED;
-        EventManager.instance.emit(GameEvents.GAME_PAUSE);
+        this.eventManager.emit(GameEvents.GAME_PAUSE);
     }
 
     /**
@@ -110,7 +111,7 @@ export class GameManager extends Singleton<GameManager>() {
         if (this._gameState !== GameState.PAUSED) return;
 
         this._gameState = GameState.PLAYING;
-        EventManager.instance.emit(GameEvents.GAME_RESUME);
+        this.eventManager.emit(GameEvents.GAME_RESUME);
     }
 
     /**
@@ -121,7 +122,7 @@ export class GameManager extends Singleton<GameManager>() {
         if (this._gameState === GameState.GAME_OVER) return;
 
         this._gameState = GameState.GAME_OVER;
-        EventManager.instance.emit(GameEvents.GAME_OVER, { victory });
+        this.eventManager.emit(GameEvents.GAME_OVER, { victory });
     }
 
     /**
@@ -146,7 +147,7 @@ export class GameManager extends Singleton<GameManager>() {
         const oldCoins = this._coins;
         this._coins += amount;
 
-        EventManager.instance.emit(GameEvents.COIN_CHANGED, {
+        this.eventManager.emit(GameEvents.COIN_CHANGED, {
             current: this._coins,
             delta: amount,
         });
@@ -164,7 +165,7 @@ export class GameManager extends Singleton<GameManager>() {
 
         this._coins -= amount;
 
-        EventManager.instance.emit(GameEvents.COIN_CHANGED, {
+        this.eventManager.emit(GameEvents.COIN_CHANGED, {
             current: this._coins,
             delta: -amount,
         });
@@ -202,8 +203,8 @@ export class GameManager extends Singleton<GameManager>() {
     // === 事件处理 ===
 
     private registerEvents(): void {
-        EventManager.instance.on(GameEvents.COIN_COLLECTED, this.onCoinCollected, this);
-        EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
+        this.eventManager.on(GameEvents.COIN_COLLECTED, this.onCoinCollected, this);
+        this.eventManager.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
     }
 
     private onCoinCollected(data: { amount: number }): void {
@@ -221,6 +222,10 @@ export class GameManager extends Singleton<GameManager>() {
      * 清理事件监听
      */
     public cleanup(): void {
-        EventManager.instance.offAllByTarget(this);
+        this.eventManager.offAllByTarget(this);
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }
 }

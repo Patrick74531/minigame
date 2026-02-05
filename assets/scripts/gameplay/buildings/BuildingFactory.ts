@@ -3,6 +3,7 @@ import { Building, BuildingType } from './Building';
 import { Tower } from './Tower';
 import { GameConfig } from '../../data/GameConfig';
 import { BuildingRegistry } from './BuildingRegistry';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { Base } from './Base';
 
 /**
@@ -151,7 +152,7 @@ export class BuildingFactory {
         buildingId: string,
         unitContainer?: Node
     ): Node | null {
-        const config = BuildingRegistry.instance.get(buildingId);
+        const config = BuildingFactory.buildingRegistry.get(buildingId);
         if (!config) {
             console.error(`[BuildingFactory] Unknown building ID: ${buildingId}`);
             return null;
@@ -220,5 +221,12 @@ export class BuildingFactory {
      */
     public static clearCache(): void {
         this._materials.clear();
+    }
+
+    private static get buildingRegistry(): BuildingRegistry {
+        return (
+            ServiceRegistry.get<BuildingRegistry>('BuildingRegistry') ??
+            BuildingRegistry.instance
+        );
     }
 }

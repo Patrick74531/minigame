@@ -1,5 +1,6 @@
 import { Node, Prefab, instantiate, NodePool, Component } from 'cc';
 import { Singleton } from '../base/Singleton';
+import { ServiceRegistry } from './ServiceRegistry';
 
 /**
  * 可池化接口
@@ -28,13 +29,13 @@ interface PoolConfig {
  *
  * @example
  * // 注册预制体池
- * PoolManager.instance.registerPool('enemy_slime', slimePrefab, 20);
+ * ServiceRegistry.get<PoolManager>('PoolManager')?.registerPool('enemy_slime', slimePrefab, 20);
  *
  * // 获取对象
- * const enemy = PoolManager.instance.spawn('enemy_slime', parentNode);
+ * const enemy = ServiceRegistry.get<PoolManager>('PoolManager')?.spawn('enemy_slime', parentNode);
  *
  * // 回收对象
- * PoolManager.instance.despawn('enemy_slime', enemy);
+ * ServiceRegistry.get<PoolManager>('PoolManager')?.despawn('enemy_slime', enemy);
  */
 export class PoolManager extends Singleton<PoolManager>() {
     private _pools: Map<string, PoolConfig> = new Map();

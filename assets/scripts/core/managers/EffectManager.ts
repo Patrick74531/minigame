@@ -2,6 +2,7 @@ import { _decorator, Node, Vec3 } from 'cc';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { EffectFactory } from '../../gameplay/effects/EffectFactory';
+import { ServiceRegistry } from './ServiceRegistry';
 
 const { ccclass, property } = _decorator;
 
@@ -28,11 +29,11 @@ export class EffectManager {
     }
 
     public cleanup(): void {
-        EventManager.instance.off(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
+        this.eventManager.off(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
     }
 
     private setupListeners(): void {
-        EventManager.instance.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
+        this.eventManager.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
     }
 
     private onApplyAoE(data: {
@@ -53,5 +54,9 @@ export class EffectManager {
             // Default Explosion
             // EffectFactory.createExplosion(...)
         }
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }
 }

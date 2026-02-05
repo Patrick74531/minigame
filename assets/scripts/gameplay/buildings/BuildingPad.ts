@@ -113,7 +113,7 @@ export class BuildingPad extends BaseComponent {
         console.log(
             `[BuildingPad] start() \u88ab\u8c03\u7528, buildingTypeId=${this.buildingTypeId}`
         );
-        const config = BuildingRegistry.instance.get(this.buildingTypeId);
+        const config = this.buildingRegistry.get(this.buildingTypeId);
         this._config = config ?? null;
         if (!this._config) {
             console.error(
@@ -445,5 +445,12 @@ export class BuildingPad extends BaseComponent {
 
     private get hudManager(): HUDManager {
         return ServiceRegistry.get<HUDManager>('HUDManager') ?? HUDManager.instance;
+    }
+
+    private get buildingRegistry(): BuildingRegistry {
+        return (
+            ServiceRegistry.get<BuildingRegistry>('BuildingRegistry') ??
+            BuildingRegistry.instance
+        );
     }
 }

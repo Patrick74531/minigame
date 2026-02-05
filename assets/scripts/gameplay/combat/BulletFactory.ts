@@ -15,6 +15,7 @@ import {
 } from 'cc';
 import { Bullet } from './Bullet';
 import { PoolManager } from '../../core/managers/PoolManager';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
 const { ccclass, property } = _decorator;
 
@@ -41,7 +42,7 @@ export class BulletFactory {
         // For MVP, if PoolManager doesn't have it, we can just instantiate manually or register lazy.
         // Let's assume we use a simple "Bullet" pool name.
 
-        let node = PoolManager.instance.spawn('Bullet', parent);
+        let node = BulletFactory.poolManager.spawn('Bullet', parent);
         if (!node) {
             // Pool not ready or empty auto-spawn logic failing?
             // Let's create a fresh node manually if pool returns null (meaning pool not registered yet)
@@ -86,6 +87,10 @@ export class BulletFactory {
         bullet.setTarget(target);
 
         return node;
+    }
+
+    private static get poolManager(): PoolManager {
+        return ServiceRegistry.get<PoolManager>('PoolManager') ?? PoolManager.instance;
     }
 
     /**

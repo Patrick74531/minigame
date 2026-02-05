@@ -1,4 +1,5 @@
 import { Singleton } from '../base/Singleton';
+import { ServiceRegistry } from './ServiceRegistry';
 import type { GameEventName, GameEventPayloads } from '../../data/GameEvents';
 
 /** 事件回调函数类型 */
@@ -20,13 +21,13 @@ interface EventListener {
  *
  * @example
  * // 监听事件
- * EventManager.instance.on('COIN_COLLECTED', this.onCoinCollected, this);
+ * ServiceRegistry.get<EventManager>('EventManager')?.on('COIN_COLLECTED', this.onCoinCollected, this);
  *
  * // 发送事件
- * EventManager.instance.emit('COIN_COLLECTED', { amount: 10 });
+ * ServiceRegistry.get<EventManager>('EventManager')?.emit('COIN_COLLECTED', { amount: 10 });
  *
  * // 移除监听
- * EventManager.instance.off('COIN_COLLECTED', this.onCoinCollected, this);
+ * ServiceRegistry.get<EventManager>('EventManager')?.off('COIN_COLLECTED', this.onCoinCollected, this);
  */
 export class EventManager extends Singleton<EventManager>() {
     private _listeners: Map<string, EventListener[]> = new Map();

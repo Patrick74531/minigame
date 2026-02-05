@@ -1,11 +1,11 @@
 import { Node, Vec3 } from 'cc';
-import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { UnitFactory } from '../units/UnitFactory';
 import { Unit, UnitType } from '../units/Unit';
 import { GameConfig } from '../../data/GameConfig';
 import { WaveService } from '../../core/managers/WaveService';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import { EventManager } from '../../core/managers/EventManager';
 
 /**
  * 波次配置
@@ -53,13 +53,13 @@ export class WaveManager {
         this._currentWave = 0;
 
         // Listen for AOE impacts
-        EventManager.instance.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
-        EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
-        EventManager.instance.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
+        this.eventManager.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
+        this.eventManager.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
+        this.eventManager.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
         ServiceRegistry.register('EnemyProvider', {
             getEnemies: () => this._enemies,
         });
-        WaveService.instance.registerProvider({
+        this.waveService.registerProvider({
             id: 'infinite',
             priority: 0,
             getSnapshot: () => ({
@@ -156,7 +156,7 @@ export class WaveManager {
         console.log(`🌊 第 ${waveNumber} 波! 敌人: ${this._waveConfig.enemyCount}`);
         console.log('═══════════════════════════════════════');
 
-        EventManager.instance.emit(GameEvents.WAVE_START, {
+        this.eventManager.emit(GameEvents.WAVE_START, {
             wave: waveNumber,
             waveIndex: waveNumber - 1,
             enemyCount: this._waveConfig.enemyCount,
@@ -193,7 +193,7 @@ export class WaveManager {
         const bonus = this._currentWave * GameConfig.WAVE.INFINITE.BONUS_PER_WAVE;
         console.log(`✅ 第 ${this._currentWave} 波完成! +${bonus} 金币`);
 
-        EventManager.instance.emit(GameEvents.WAVE_COMPLETE, {
+        this.eventManager.emit(GameEvents.WAVE_COMPLETE, {
             wave: this._currentWave,
             waveIndex: this._currentWave - 1,
             bonus,
@@ -236,7 +236,7 @@ export class WaveManager {
         this._enemies.push(enemy);
 
         // Notify centralized systems (e.g., CombatSystem) about new enemy
-        EventManager.instance.emit(GameEvents.UNIT_SPAWNED, {
+        this.eventManager.emit(GameEvents.UNIT_SPAWNED, {
             unitType: 'enemy',
             node: enemy,
         });
@@ -261,12 +261,20 @@ export class WaveManager {
      * 清理
      */
     public cleanup(): void {
-        EventManager.instance.off(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
-        EventManager.instance.off(GameEvents.UNIT_DIED, this.onUnitDied, this);
-        EventManager.instance.off(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
-        WaveService.instance.unregisterProvider('infinite');
+        this.eventManager.off(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
+        this.eventManager.off(GameEvents.UNIT_DIED, this.onUnitDied, this);
+        this.eventManager.off(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
+        this.waveService.unregisterProvider('infinite');
         this._enemies = [];
         this._waveConfig = null;
         this._waveActive = false;
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
+    }
+
+    private get waveService(): WaveService {
+        return ServiceRegistry.get<WaveService>('WaveService') ?? WaveService.instance;
     }
 }
