@@ -15,6 +15,7 @@ import { GameplayBootstrap } from './core/bootstrap/GameplayBootstrap';
 import { RuntimeSystemsBootstrap } from './core/bootstrap/RuntimeSystemsBootstrap';
 import { GameStartFlow } from './core/bootstrap/GameStartFlow';
 import { ControllerServices } from './core/bootstrap/ControllerServices';
+import { PlayerInputAdapter } from './core/input/PlayerInputAdapter';
 
 const { ccclass, property } = _decorator;
 

@@ -124,6 +124,12 @@ export const GameConfig = {
         ATTACK_RANGE: 2.5,
         /** 移动速度 - Was 120/60 ~ 2. Now using Physics Velocity directly */
         MOVE_SPEED: 6.0,
+        /** 角色模型缩放 */
+        MODEL_SCALE: 2.0,
+        /** 角色模型高度偏移 */
+        MODEL_OFFSET_Y: 0.0,
+        /** 角色模型朝向偏移（Y轴角度，度） */
+        MODEL_ROT_Y: 180,
     },
 
     // === 波次系统 ===

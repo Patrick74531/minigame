@@ -10,11 +10,18 @@ import {
     RigidBody,
     BoxCollider,
     Vec3,
+    Prefab,
+    instantiate,
+    resources,
+    SkeletalAnimation,
+    AnimationClip,
+    Renderer,
 } from 'cc';
 import { Enemy } from './Enemy';
 import { Soldier } from './Soldier';
 import { Hero } from './Hero';
 import { GameConfig } from '../../data/GameConfig';
+import { HeroAnimationController } from './HeroAnimationController';
 
 /**
  * 单位工厂
@@ -22,6 +29,22 @@ import { GameConfig } from '../../data/GameConfig';
  */
 export class UnitFactory {
     private static _materials: Map<string, Material> = new Map();
+    private static _heroRunPrefab: Prefab | null = null;
+    private static _heroRunLoading: boolean = false;
+    private static _heroIdleClipLoading: boolean = false;
+    private static _heroIdleClip: AnimationClip | null = null;
+    private static readonly HERO_RUN_PREFAB_PATH =
+        'character/Meshy_AI_Animation_Running_withSkin/Meshy_AI_Animation_Running_withSkin';
+    private static readonly HERO_RUN_PREFAB_FALLBACK =
+        'character/Meshy_AI_Animation_Running_withSkin';
+    private static readonly HERO_RUN_CLIP_PATH =
+        'character/Meshy_AI_Animation_Running_withSkin/Armature|running|baselayer';
+    private static readonly HERO_RUN_CLIP_FALLBACK =
+        'character/Meshy_AI_Animation_Running_withSkin';
+    private static readonly HERO_IDLE_CLIP_PATH =
+        'character/Meshy_AI_Animation_Idle_withSkin/Armature|Idle|baselayer';
+    private static readonly HERO_IDLE_CLIP_FALLBACK =
+        'character/Meshy_AI_Animation_Idle_withSkin';
 
     /**
      * 创建敌人
@@ -135,6 +158,8 @@ export class UnitFactory {
             moveSpeed: GameConfig.HERO.MOVE_SPEED,
         });
 
+        this.attachHeroModel(node);
+
         return node;
     }
 
@@ -170,5 +195,201 @@ export class UnitFactory {
      */
     public static clearCache(): void {
         this._materials.clear();
+    }
+
+    private static attachHeroModel(root: Node): void {
+        if (root.getChildByName('HeroModel')) return;
+
+        const attach = (prefab: Prefab) => {
+            if (!root.isValid) return;
+            if (root.getChildByName('HeroModel')) return;
+
+            const model = instantiate(prefab);
+            model.name = 'HeroModel';
+            model.setPosition(0, GameConfig.HERO.MODEL_OFFSET_Y, 0);
+            const scale = Math.max(GameConfig.HERO.MODEL_SCALE, 0.05);
+            model.setScale(scale, scale, scale);
+            model.setRotationFromEuler(0, GameConfig.HERO.MODEL_ROT_Y, 0);
+            this.applyLayerRecursive(model, root.layer);
+            root.addChild(model);
+
+            const hasRenderer = model.getComponentsInChildren(Renderer).length > 0;
+            const mesh = root.getComponent(MeshRenderer);
+            if (mesh && hasRenderer) {
+                mesh.enabled = false;
+            }
+
+            const anim = this.diagnoseModelAnimations(model);
+
+            const hero = root.getComponent(Hero);
+            let controller = root.getComponent(HeroAnimationController);
+            if (!controller) {
+                controller = root.addComponent(HeroAnimationController);
+            }
+            controller.configure(hero, anim, null);
+
+            if (anim) {
+                const existing = anim.clips && anim.clips.length > 0 ? anim.clips[0] : null;
+                if (existing) {
+                    console.warn('[UnitFactory] Found existing run clip:', existing.name);
+                    controller.setRunClip(existing.name);
+                } else {
+                    this.ensureRunClip(anim, controller);
+                }
+                this.ensureIdleClip(anim, controller);
+            }
+        };
+
+        this.loadRunPrefab(attach);
+    }
+
+    private static diagnoseModelAnimations(model: Node): SkeletalAnimation | null {
+        const skels = model.getComponentsInChildren(SkeletalAnimation);
+        const infos = skels.map((skel) => {
+            const names = skel.clips ? skel.clips.map((c) => c.name).join(',') : '';
+            return `${skel.node.name} [${names}]`;
+        });
+        console.warn('[UnitFactory] SkeletalAnimation count:', skels.length, infos);
+        const anim = skels[0] ?? null;
+        if (!anim) {
+            console.warn('[UnitFactory] No SkeletalAnimation found in model.');
+        }
+        return anim;
+    }
+
+    private static ensureRunClip(
+        anim: SkeletalAnimation,
+        controller: HeroAnimationController | null
+    ): void {
+        resources.load(this.HERO_RUN_CLIP_PATH, AnimationClip, (err, clip) => {
+            if (!err && clip) {
+                if (!anim.node || !anim.node.isValid) {
+                    return;
+                }
+                console.warn('[UnitFactory] Run clip loaded:', clip.name);
+                this.addClipIfNeeded(anim, clip);
+                if (controller) {
+                    controller.setRunClip(clip.name);
+                }
+                return;
+            }
+
+            resources.load(this.HERO_RUN_CLIP_FALLBACK, AnimationClip, (fallbackErr, fallbackClip) => {
+                if (fallbackErr || !fallbackClip) {
+                    console.warn('[UnitFactory] Failed to load hero run clip:', err ?? fallbackErr);
+                    return;
+                }
+                if (!anim.node || !anim.node.isValid) {
+                    return;
+                }
+                console.warn('[UnitFactory] Run clip loaded (fallback):', fallbackClip.name);
+                this.addClipIfNeeded(anim, fallbackClip);
+                if (controller) {
+                    controller.setRunClip(fallbackClip.name);
+                }
+            });
+        });
+    }
+
+    private static ensureIdleClip(
+        anim: SkeletalAnimation,
+        controller: HeroAnimationController | null
+    ): void {
+        if (!anim.node || !anim.node.isValid) {
+            return;
+        }
+        if (this._heroIdleClip) {
+            this.addClipIfNeeded(anim, this._heroIdleClip);
+            anim.defaultClip = this._heroIdleClip;
+            anim.playOnLoad = true;
+            if (controller) {
+                controller.setIdleClip(this._heroIdleClip.name);
+            }
+            return;
+        }
+        if (this._heroIdleClipLoading) return;
+        this._heroIdleClipLoading = true;
+        resources.load(this.HERO_IDLE_CLIP_PATH, AnimationClip, (err, clip) => {
+            if (!err && clip) {
+                this._heroIdleClipLoading = false;
+                if (!anim.node || !anim.node.isValid) {
+                    return;
+                }
+                this._heroIdleClip = clip;
+                this.addClipIfNeeded(anim, clip);
+                anim.defaultClip = clip;
+                anim.playOnLoad = true;
+                console.warn('[UnitFactory] Idle clip loaded:', clip.name);
+                if (controller) {
+                    controller.setIdleClip(clip.name);
+                }
+                return;
+            }
+
+            resources.load(this.HERO_IDLE_CLIP_FALLBACK, AnimationClip, (fallbackErr, fallbackClip) => {
+                this._heroIdleClipLoading = false;
+                if (fallbackErr || !fallbackClip) {
+                    console.warn('[UnitFactory] Failed to load hero idle clip:', err ?? fallbackErr);
+                    return;
+                }
+                if (!anim.node || !anim.node.isValid) {
+                    return;
+                }
+                this._heroIdleClip = fallbackClip;
+                this.addClipIfNeeded(anim, fallbackClip);
+                anim.defaultClip = fallbackClip;
+                anim.playOnLoad = true;
+                console.warn('[UnitFactory] Idle clip loaded (fallback):', fallbackClip.name);
+                if (controller) {
+                    controller.setIdleClip(fallbackClip.name);
+                }
+            });
+        });
+    }
+
+    private static loadRunPrefab(attach: (prefab: Prefab) => void): void {
+        if (this._heroRunPrefab) {
+            attach(this._heroRunPrefab);
+            return;
+        }
+
+        if (this._heroRunLoading) return;
+        this._heroRunLoading = true;
+        
+        resources.load(this.HERO_RUN_PREFAB_PATH, Prefab, (err, prefab) => {
+            if (!err && prefab) {
+                this._heroRunLoading = false;
+                this._heroRunPrefab = prefab;
+                attach(prefab);
+                return;
+            }
+
+            resources.load(this.HERO_RUN_PREFAB_FALLBACK, Prefab, (fallbackErr, fallbackPrefab) => {
+                this._heroRunLoading = false;
+                if (fallbackErr || !fallbackPrefab) {
+                    console.warn('[UnitFactory] Failed to load hero run prefab:', err ?? fallbackErr);
+                    return;
+                }
+                this._heroRunPrefab = fallbackPrefab;
+                attach(fallbackPrefab);
+            });
+        });
+    }
+
+    private static addClipIfNeeded(
+        anim: SkeletalAnimation,
+        clip: AnimationClip
+    ): void {
+        if (anim.clips && anim.clips.some((existing) => existing && existing.name === clip.name)) {
+            return;
+        }
+        anim.addClip(clip);
+    }
+
+    private static applyLayerRecursive(node: Node, layer: number): void {
+        node.layer = layer;
+        for (const child of node.children) {
+            this.applyLayerRecursive(child, layer);
+        }
     }
 }
