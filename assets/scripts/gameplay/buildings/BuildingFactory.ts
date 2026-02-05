@@ -56,7 +56,6 @@ export class BuildingFactory {
         const node = this.createCubeNode('Base', new Color(150, 100, 200, 255));
         node.setPosition(x, 0, z);
         node.setScale(0.8, 0.8, 0.8);
-        parent.addChild(node);
 
         const base = node.addComponent(Base);
         base.setConfig({
@@ -65,6 +64,8 @@ export class BuildingFactory {
             spawnInterval: 0,
             maxUnits: 0,
         });
+        // Ensure Base.onLoad reads configured HP (avoid one-frame HUD mismatch at default 500).
+        parent.addChild(node);
 
         return node;
     }

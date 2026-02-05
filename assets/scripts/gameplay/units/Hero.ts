@@ -61,9 +61,6 @@ export class Hero extends Unit {
         this._weapon = this.node.getComponent(RangedWeapon);
         if (!this._weapon) {
             this._weapon = this.node.addComponent(RangedWeapon);
-            this._weapon.damage = this._stats.attack;
-            this._weapon.range = this._stats.attackRange;
-            this._weapon.attackInterval = this._stats.attackInterval;
             this._weapon.projectileSpeed = 20;
             this._weapon.projectileColor = new Color(0, 255, 255, 255);
         }
@@ -71,7 +68,6 @@ export class Hero extends Unit {
         this._mover = this.node.getComponent(CharacterMover);
         if (!this._mover) {
             this._mover = this.node.addComponent(CharacterMover);
-            this._mover.moveSpeed = this._stats.moveSpeed;
         }
 
         this._stackVisualizer = this.node.getComponent(StackVisualizer);
@@ -99,6 +95,8 @@ export class Hero extends Unit {
 
         col.setGroup(1 << 0);
         col.setMask(0xffffffff);
+
+        this.syncRuntimeStats();
     }
 
     protected start(): void {
@@ -251,6 +249,36 @@ export class Hero extends Unit {
 
         if (this._weapon) {
             this._weapon.tryAttack(this._target.node);
+        }
+    }
+
+    public applyBaseUpgradeBuff(): void {
+        const buff = GameConfig.BUILDING.BASE_UPGRADE.HERO_BUFF;
+
+        this._stats.maxHp = Math.floor(this._stats.maxHp * buff.HP_MULTIPLIER);
+        this._stats.attack = Math.floor(this._stats.attack * buff.ATTACK_MULTIPLIER);
+        this._stats.attackInterval = Math.max(
+            0.2,
+            this._stats.attackInterval * buff.ATTACK_INTERVAL_MULTIPLIER
+        );
+        this._stats.moveSpeed *= buff.MOVE_SPEED_MULTIPLIER;
+        this._stats.attackRange += buff.ATTACK_RANGE_BONUS;
+
+        const heal = Math.floor(this._stats.maxHp * buff.HEAL_PERCENT);
+        this._stats.currentHp = Math.min(this._stats.maxHp, this._stats.currentHp + heal);
+
+        this.syncRuntimeStats();
+        this.updateHealthBar();
+    }
+
+    private syncRuntimeStats(): void {
+        if (this._weapon) {
+            this._weapon.damage = this._stats.attack;
+            this._weapon.range = this._stats.attackRange;
+            this._weapon.attackInterval = this._stats.attackInterval;
+        }
+        if (this._mover) {
+            this._mover.moveSpeed = this._stats.moveSpeed;
         }
     }
 

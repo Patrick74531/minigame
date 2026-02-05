@@ -71,6 +71,32 @@ export const GameConfig = {
         DEFAULT_MAX_LEVEL: 5,
         /** 全局默认升级成本倍率 */
         DEFAULT_COST_MULTIPLIER: 1.45,
+        /** 基地升级系统 */
+        BASE_UPGRADE: {
+            /** 基地升级起始花费（英雄携带金币） */
+            START_COST: 20,
+            /** 基地升级花费倍率 */
+            COST_MULTIPLIER: 1.6,
+            /** 基地最大等级 */
+            MAX_LEVEL: 5,
+            /** 每次升级基地血量倍率 */
+            HP_MULTIPLIER: 1.45,
+            /** 基地自动收集金币半径 */
+            COLLECT_RADIUS: 3.0,
+            /** 每次收集金币数量 */
+            COLLECT_RATE: 2,
+            /** 收集间隔（秒） */
+            COLLECT_INTERVAL: 0.1,
+            /** 基地每次升级对英雄的增益 */
+            HERO_BUFF: {
+                HP_MULTIPLIER: 1.12,
+                ATTACK_MULTIPLIER: 1.12,
+                ATTACK_INTERVAL_MULTIPLIER: 0.97,
+                MOVE_SPEED_MULTIPLIER: 1.03,
+                ATTACK_RANGE_BONUS: 0.1,
+                HEAL_PERCENT: 0.35,
+            },
+        },
         /**
          * 建筑类型配置
          * NOTE: 建筑战斗/成长数值统一维护在这里，避免分散硬编码。
