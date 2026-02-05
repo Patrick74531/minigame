@@ -71,6 +71,15 @@ export const GameConfig = {
         DEFAULT_MAX_LEVEL: 5,
         /** 全局默认升级成本倍率 */
         DEFAULT_COST_MULTIPLIER: 1.45,
+        /** 升级投放区（建造后）参数 */
+        UPGRADE_PAD: {
+            /** 投放区半径（视觉与触发区共用） */
+            RADIUS: 0.6,
+            /** 建筑“前方”方向（世界坐标） */
+            FORWARD_DIR: { x: 0, z: 1 },
+            /** 与建筑前缘的额外间距 */
+            GAP: 0.2,
+        },
         /** 基地升级系统 */
         BASE_UPGRADE: {
             /** 基地升级起始花费（英雄携带金币） */

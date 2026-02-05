@@ -120,6 +120,7 @@ export class BuildingManager {
 
                     // Link Building back to Pad for upgrades
                     pad.onBuildingCreated(buildingComp);
+                    pad.placeUpgradeZoneInFront(buildingNode);
                 }
             }
         }

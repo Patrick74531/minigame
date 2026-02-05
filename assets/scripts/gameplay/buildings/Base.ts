@@ -1,4 +1,4 @@
-import { _decorator, Vec3 } from 'cc';
+import { _decorator, Vec3, Node, MeshRenderer, primitives, utils, Material, Color } from 'cc';
 import { Building, BuildingType } from './Building';
 import { GameManager } from '../../core/managers/GameManager';
 import { GameConfig } from '../../data/GameConfig';
@@ -20,6 +20,7 @@ export class Base extends Building {
     private _nextUpgradeCost: number = 0;
     private _collectTimer: number = 0;
     private _showingUpgradeInfo: boolean = false;
+    private _collectZoneVisual: Node | null = null;
 
     protected initialize(): void {
         this.buildingType = BuildingType.BASE;
@@ -28,6 +29,7 @@ export class Base extends Building {
         this.statMultiplier = GameConfig.BUILDING.BASE_UPGRADE.HP_MULTIPLIER;
         this._nextUpgradeCost = GameConfig.BUILDING.BASE_UPGRADE.START_COST;
         super.initialize();
+        this.createCollectZoneVisual();
 
         this.eventManager.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
 
@@ -158,6 +160,10 @@ export class Base extends Building {
     }
 
     protected onDestroyed(): void {
+        if (this._collectZoneVisual && this._collectZoneVisual.isValid) {
+            this._collectZoneVisual.destroy();
+            this._collectZoneVisual = null;
+        }
         if (this._showingUpgradeInfo) {
             this.hudManager.hideBuildingInfo();
             this._showingUpgradeInfo = false;
@@ -181,5 +187,24 @@ export class Base extends Building {
 
     private get gameManager(): GameManager {
         return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+    }
+
+    private createCollectZoneVisual(): void {
+        const radius = GameConfig.BUILDING.BASE_UPGRADE.COLLECT_RADIUS;
+        const zoneNode = new Node('BaseCollectZone');
+        this.node.addChild(zoneNode);
+
+        const renderer = zoneNode.addComponent(MeshRenderer);
+        renderer.mesh = utils.MeshUtils.createMesh(primitives.sphere());
+
+        const material = new Material();
+        material.initialize({ effectName: 'builtin-unlit' });
+        material.setProperty('mainColor', new Color(255, 140, 50, 255));
+        renderer.material = material;
+
+        const diameter = radius * 2;
+        zoneNode.setScale(diameter, 0.04, diameter);
+        zoneNode.setPosition(0, 0.12, 0);
+        this._collectZoneVisual = zoneNode;
     }
 }

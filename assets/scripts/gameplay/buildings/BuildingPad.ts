@@ -10,8 +10,7 @@ import {
     UITransform,
     Billboard,
     RenderRoot2D,
-    Layers,
-    BoxCollider,
+    SphereCollider,
     ITriggerEvent,
     Vec3,
     RigidBody,
@@ -21,6 +20,7 @@ import { BaseComponent } from '../../core/base/BaseComponent';
 import { BuildingRegistry, BuildingTypeConfig } from './BuildingRegistry';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
+import { GameConfig } from '../../data/GameConfig';
 import { HUDManager } from '../../ui/HUDManager';
 import { Hero } from '../units/Hero';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
@@ -47,9 +47,9 @@ export class BuildingPad extends BaseComponent {
     @property
     public buildingTypeId: string = 'barracks';
 
-    /** 收集范围半径 */
+    /** 投放区半径（与视觉模型和触发区一致） */
     @property
-    public collectRadius: number = 3.0; // 增大检测半径，更容易触发
+    public collectRadius: number = GameConfig.BUILDING.UPGRADE_PAD.RADIUS;
 
     /** 每次收集金币数量 */
     @property
@@ -134,16 +134,15 @@ export class BuildingPad extends BaseComponent {
             rb.type = RigidBody.Type.STATIC;
         }
 
-        let col = this.node.getComponent(BoxCollider);
+        let col = this.node.getComponent(SphereCollider);
         if (!col) {
-            col = this.node.addComponent(BoxCollider);
+            col = this.node.addComponent(SphereCollider);
         }
 
         // Force update properties even if component existed (e.g. from Prefab)
         col.isTrigger = true;
-        // Tall box to catch Hero jumping or slight Y offsets
-        col.center = new Vec3(0, 2.5, 0);
-        col.size = new Vec3(this.collectRadius, 5.0, this.collectRadius);
+        col.center = new Vec3(0, 0.7, 0);
+        col.radius = this.collectRadius;
 
         col.setGroup(1 << 2); // BUILDING_PAD
         col.setMask(1 << 0); // Collide with HERO
@@ -152,7 +151,7 @@ export class BuildingPad extends BaseComponent {
         col.on('onTriggerExit', this.onTriggerExit, this);
 
         console.log(
-            `[BuildingPad] Physics Setup Complete. Collider Size: ${col.size}, Trigger: ${col.isTrigger}`
+            `[BuildingPad] Physics Setup Complete. Collider Radius: ${col.radius}, Trigger: ${col.isTrigger}`
         );
     }
 
@@ -253,16 +252,17 @@ export class BuildingPad extends BaseComponent {
         this.node.addChild(padNode);
 
         const renderer = padNode.addComponent(MeshRenderer);
-        renderer.mesh = utils.MeshUtils.createMesh(
-            primitives.box({ width: 1.2, height: 0.1, length: 1.2 })
-        );
+        renderer.mesh = utils.MeshUtils.createMesh(primitives.sphere());
 
         this._padMaterial = new Material();
         this._padMaterial.initialize({ effectName: 'builtin-unlit' });
-        this._padMaterial.setProperty('mainColor', new Color(255, 200, 0, 255));
+        this._padMaterial.setProperty('mainColor', new Color(80, 220, 255, 255));
 
         renderer.material = this._padMaterial;
-        padNode.setPosition(0, 0.16, 0);
+        // Use a flattened sphere so top-down camera can clearly see a circular zone.
+        const diameter = this.collectRadius * 2;
+        padNode.setScale(diameter, 0.04, diameter);
+        padNode.setPosition(0, 0.12, 0);
 
         const labelRoot = new Node('LabelRoot');
         this.node.addChild(labelRoot);
@@ -338,6 +338,35 @@ export class BuildingPad extends BaseComponent {
         console.log(
             `[BuildingPad] Entered Upgrade Mode. Base: ${baseCost}, Next Cost: ${this._nextUpgradeCost}`
         );
+    }
+
+    /**
+     * 将投放区放到建筑前方，避免与建筑模型重叠
+     */
+    public placeUpgradeZoneInFront(buildingNode: Node): void {
+        const forwardCfg = GameConfig.BUILDING.UPGRADE_PAD.FORWARD_DIR;
+        const forward = new Vec3(forwardCfg.x, 0, forwardCfg.z);
+        if (forward.lengthSqr() < 0.0001) {
+            forward.set(0, 0, 1);
+        } else {
+            forward.normalize();
+        }
+
+        const buildingHalfSize =
+            Math.max(Math.abs(buildingNode.scale.x), Math.abs(buildingNode.scale.z)) * 0.5;
+        const offsetDistance =
+            buildingHalfSize + this.collectRadius + GameConfig.BUILDING.UPGRADE_PAD.GAP;
+
+        this.node.setPosition(
+            buildingNode.position.x + forward.x * offsetDistance,
+            this.node.position.y,
+            buildingNode.position.z + forward.z * offsetDistance
+        );
+
+        // Prevent stale in-area state from old position causing accidental collection
+        this._heroInArea = false;
+        this._heroRef = null;
+        this.hudManager.hideBuildingInfo();
     }
 
     public get requiredCoins(): number {
