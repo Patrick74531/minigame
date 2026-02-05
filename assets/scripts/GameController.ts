@@ -141,7 +141,12 @@ export class GameController extends Component {
         const spawnX = GameConfig.MAP.BASE_SPAWN.x;
         const spawnZ = GameConfig.MAP.BASE_SPAWN.z;
 
-        this._base = BuildingFactory.createBase(this._buildingContainer!, spawnX, spawnZ, 100);
+        this._base = BuildingFactory.createBase(
+            this._buildingContainer!,
+            spawnX,
+            spawnZ,
+            GameConfig.BUILDING.BASE_START_HP
+        );
 
         // Spawn Hero slightly offset from base
         this._hero = UnitFactory.createHero(

@@ -3,6 +3,7 @@ import { Soldier } from '../units/Soldier';
 import { Enemy } from '../units/Enemy';
 import { MathUtils } from '../../core/utils/MathUtils';
 import { CombatService, CombatProvider } from '../../core/managers/CombatService';
+import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass, property } = _decorator;
 
@@ -23,7 +24,7 @@ export class CombatSystem extends Component implements CombatProvider {
 
     /** 目标分配检查间隔 */
     @property
-    public targetCheckInterval: number = 0.5;
+    public targetCheckInterval: number = GameConfig.COMBAT.TARGET_CHECK_INTERVAL;
 
     private _targetCheckTimer: number = 0;
 

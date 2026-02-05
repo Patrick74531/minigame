@@ -1,12 +1,9 @@
 import { _decorator, Node, Vec3 } from 'cc';
 import { BuildingPad } from './BuildingPad';
-import { BuildingRegistry } from './BuildingRegistry';
 import { BuildingFactory } from './BuildingFactory';
 import { Building } from './Building';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
-import { Hero } from '../units/Hero';
-import { HUDManager } from '../../ui/HUDManager';
 
 const { ccclass } = _decorator;
 
@@ -22,7 +19,6 @@ export class BuildingManager {
     private _activeBuildings: Building[] = [];
     private _heroNode: Node | null = null;
     private _buildingContainer: Node | null = null;
-    private _collectTimer: number = 0;
 
     public static get instance(): BuildingManager {
         if (!this._instance) {

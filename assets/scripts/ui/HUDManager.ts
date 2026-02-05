@@ -2,6 +2,7 @@ import { Node, Label, Color, UITransform, Widget } from 'cc';
 import { EventManager } from '../core/managers/EventManager';
 import { GameEvents } from '../data/GameEvents';
 import { UIFactory } from './UIFactory';
+import { GameConfig } from '../data/GameConfig';
 
 // UI_2D Layer
 const UI_LAYER = 33554432;
@@ -9,6 +10,9 @@ const UI_LAYER = 33554432;
 /**
  * HUD 管理器
  * 负责游戏内 UI 的更新
+ *
+ * NOTE: 当前运行主要由 HUDManager 驱动。
+ * 若使用旧 HUD 组件，请确保事件负载兼容。
  */
 export class HUDManager {
     private static _instance: HUDManager | null = null;
@@ -43,7 +47,11 @@ export class HUDManager {
         this._coinLabel = UIFactory.createCoinDisplay(uiCanvas);
 
         // 创建基地 HP 显示
-        this._baseHpLabel = UIFactory.createLabel(uiCanvas, 'Base HP: 100/100', 'BaseHPLabel');
+        this._baseHpLabel = UIFactory.createLabel(
+            uiCanvas,
+            `Base HP: ${GameConfig.BUILDING.BASE_START_HP}/${GameConfig.BUILDING.BASE_START_HP}`,
+            'BaseHPLabel'
+        );
         this._baseHpLabel.node.setPosition(0, 300); // 屏幕上方
         this._baseHpLabel.fontSize = 24;
 

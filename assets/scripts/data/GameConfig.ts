@@ -19,6 +19,22 @@ export const GameConfig = {
         BASE_SPAWN: { x: -9, z: -9 },
         /** 英雄相对基地的偏移 */
         HERO_SPAWN_OFFSET: { x: 2, z: 2 },
+        /** 可移动范围限制 */
+        LIMITS: { x: 25, z: 25 },
+    },
+
+    // === 物理/高度 ===
+    PHYSICS: {
+        /** 敌人/士兵/英雄的默认高度（Y） */
+        ENEMY_Y: 0.5,
+        SOLDIER_Y: 1.0,
+        HERO_Y: 1.0,
+        /** 金币默认高度（Y） */
+        COIN_Y: 0.5,
+        /** 远程武器子弹出生高度偏移 */
+        PROJECTILE_SPAWN_OFFSET_Y: 1.0,
+        /** 单位刚体阻尼 */
+        UNIT_LINEAR_DAMPING: 0.5,
     },
 
     // === 经济系统 ===
@@ -29,8 +45,16 @@ export const GameConfig = {
         COIN_FLY_DURATION: 0.5,
         /** 金币收集范围 (3D units) */
         COIN_COLLECT_RANGE: 2.5,
+        /** 金币磁吸速度 */
+        COIN_MAGNET_SPEED: 15.0,
         /** 金币自动回收时间（秒） */
         COIN_LIFETIME: 15,
+        /** 金币浮动动画速度 */
+        COIN_FLOAT_SPEED: 5,
+        /** 金币浮动动画幅度 */
+        COIN_FLOAT_AMPLITUDE: 0.1,
+        /** 金币吸附时的高度偏移（更像吸到身体中心） */
+        COIN_MAGNET_HEIGHT_OFFSET: 0.5,
     },
 
     // === 建筑系统 ===
@@ -41,6 +65,8 @@ export const GameConfig = {
         MAX_SOLDIERS_PER_BARRACKS: 10,
         /** 建筑血量 */
         BASE_HP: 500,
+        /** 基地初始血量（与建筑默认 HP 区分，避免误改） */
+        BASE_START_HP: 100,
         /**
          * 初始建造点配置 (World XZ)
          * NOTE: 扩展新建造点请优先修改此处，避免在 GameController 中硬编码。
@@ -121,6 +147,7 @@ export const GameConfig = {
             SPAWN_INTERVAL_DECAY_PER_WAVE: 0.05,
             MIN_SPAWN_INTERVAL: 0.2,
             BONUS_PER_WAVE: 25,
+            SPAWN_RANGE: 6,
         },
     },
 
@@ -142,6 +169,8 @@ export const GameConfig = {
         GRID_CELL_SIZE: 64,
         /** 伤害数字显示时间 */
         DAMAGE_NUMBER_DURATION: 0.8,
+        /** 战斗系统的目标检测间隔 */
+        TARGET_CHECK_INTERVAL: 0.5,
     },
 } as const;
 

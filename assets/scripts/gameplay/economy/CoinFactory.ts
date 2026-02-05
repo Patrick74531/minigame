@@ -8,6 +8,7 @@ import {
     Color,
     BoxCollider,
 } from 'cc';
+import { GameConfig } from '../../data/GameConfig';
 // import { GameManager } from '../../core/managers/GameManager';
 // import { EventManager } from '../../core/managers/EventManager';
 // import { GameEvents } from '../../data/GameEvents';
@@ -25,7 +26,7 @@ export class CoinFactory {
      */
     public static createCoin(parent: Node, x: number, z: number, value: number): Node {
         const node = this.createCubeNode('Coin', new Color(255, 165, 0, 255));
-        node.setPosition(x, 0.5, z);
+        node.setPosition(x, GameConfig.PHYSICS.COIN_Y, z);
         node.setScale(0.3, 0.3, 0.3); // Slightly larger for visibility
         parent.addChild(node);
 

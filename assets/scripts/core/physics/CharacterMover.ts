@@ -1,4 +1,5 @@
 import { _decorator, Component, Vec3, PhysicsSystem, geometry, CapsuleCollider, Vec2 } from 'cc';
+import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass, property } = _decorator;
 
@@ -14,8 +15,8 @@ export class CharacterMover extends Component {
     public center: Vec3 = new Vec3(0, 0.75, 0);
 
     // Limits for the map
-    private _limitX: number = 25;
-    private _limitZ: number = 25;
+    private _limitX: number = GameConfig.MAP.LIMITS.x;
+    private _limitZ: number = GameConfig.MAP.LIMITS.z;
 
     public move(inputVector: Vec2, dt: number): void {
         const moveLen = inputVector.length();

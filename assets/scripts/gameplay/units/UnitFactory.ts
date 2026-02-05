@@ -34,7 +34,7 @@ export class UnitFactory {
         waveMultiplier: number = 1
     ): Node {
         const node = this.createCubeNode('Enemy', new Color(220, 60, 60, 255));
-        node.setPosition(x, 0.5, z); // Raised to 0.5
+        node.setPosition(x, GameConfig.PHYSICS.ENEMY_Y, z); // Raised
         node.setScale(0.35, 0.35, 0.35);
         parent.addChild(node);
 
@@ -44,7 +44,7 @@ export class UnitFactory {
         const rb = node.addComponent(RigidBody);
         rb.type = RigidBody.Type.DYNAMIC; // Dynamic for physics movement
         rb.useGravity = false;
-        rb.linearDamping = 0.5; // Low damping
+        rb.linearDamping = GameConfig.PHYSICS.UNIT_LINEAR_DAMPING; // Low damping
         rb.angularFactor = new Vec3(0, 0, 0); // Lock rotation
         rb.linearFactor = new Vec3(1, 0, 1);
         rb.group = 1 << 3; // GROUP_ENEMY
@@ -74,7 +74,7 @@ export class UnitFactory {
      */
     public static createSoldier(parent: Node, x: number, z: number): Node {
         const node = this.createCubeNode('Soldier', new Color(60, 140, 220, 255));
-        node.setPosition(x, 1.0, z); // Spawn high safe
+        node.setPosition(x, GameConfig.PHYSICS.SOLDIER_Y, z); // Spawn high safe
         node.setScale(0.3, 0.3, 0.3);
         parent.addChild(node);
 
@@ -82,7 +82,7 @@ export class UnitFactory {
         const rb = node.addComponent(RigidBody);
         rb.type = RigidBody.Type.DYNAMIC;
         rb.useGravity = false;
-        rb.linearDamping = 0.5;
+        rb.linearDamping = GameConfig.PHYSICS.UNIT_LINEAR_DAMPING;
         rb.angularFactor = new Vec3(0, 0, 0);
         rb.linearFactor = new Vec3(1, 0, 1); // Lock Y
         // Group? Let's say Soldier is layer 5 or just Default(0) for now if not defined
@@ -108,7 +108,7 @@ export class UnitFactory {
 
     public static createHero(parent: Node, x: number, z: number): Node {
         const node = this.createCubeNode('Hero', new Color(255, 215, 0, 255));
-        node.setPosition(x, 1.0, z); // Raised to 1.0 to be super safe
+        node.setPosition(x, GameConfig.PHYSICS.HERO_Y, z); // Raised to be safe
         node.setScale(0.5, 0.5, 0.5);
         parent.addChild(node);
 

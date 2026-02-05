@@ -124,7 +124,11 @@ export class Soldier extends Unit {
                 new Vec3(dirX * speed, 0, dirZ * speed)
             );
         } else {
-            this.node.setPosition(myPos.x + dirX * speed * dt, 0.5, myPos.z + dirZ * speed * dt);
+            this.node.setPosition(
+                myPos.x + dirX * speed * dt,
+                GameConfig.PHYSICS.SOLDIER_Y,
+                myPos.z + dirZ * speed * dt
+            );
         }
 
         // Face target

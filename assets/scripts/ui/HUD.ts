@@ -13,6 +13,7 @@ const { ccclass, property } = _decorator;
  *
  * NOTE: HUD 通过 WaveService 获取快照，避免直接依赖某个 WaveManager。
  * 若新增波次系统，请注册到 WaveService。
+ * LEGACY: 当前运行主要由 HUDManager 负责 UI。
  */
 @ccclass('HUD')
 export class HUD extends BaseComponent {

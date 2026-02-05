@@ -82,10 +82,14 @@ export class Enemy extends Unit {
         const dirZ = dz / distToTarget;
 
         // Simple movement (Kinematic or manual)
-        this.node.setPosition(pos.x + dirX * speed * dt, 0.5, pos.z + dirZ * speed * dt);
+        this.node.setPosition(
+            pos.x + dirX * speed * dt,
+            GameConfig.PHYSICS.ENEMY_Y,
+            pos.z + dirZ * speed * dt
+        );
 
         // Face target
-        this.node.lookAt(new Vec3(this._targetPos.x, 0.5, this._targetPos.z));
+        this.node.lookAt(new Vec3(this._targetPos.x, GameConfig.PHYSICS.ENEMY_Y, this._targetPos.z));
     }
 
     private onCollisionEnter(event: ICollisionEvent): void {
@@ -168,7 +172,9 @@ export class Enemy extends Unit {
                     this._state = UnitState.ATTACKING;
                      // Face the target
                      const targetPos = this._target.getWorldPosition();
-                     this.node.lookAt(new Vec3(targetPos.x, 0.5, targetPos.z));
+                     this.node.lookAt(
+                         new Vec3(targetPos.x, GameConfig.PHYSICS.ENEMY_Y, targetPos.z)
+                     );
                 } else {
                     // Chase target? Or give up?
                     // For now, if out of range, resume moving to Base (ignore chasing for simple enemies)

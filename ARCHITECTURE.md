@@ -33,9 +33,16 @@
 - `core/managers/CombatManager` vs `gameplay/combat/CombatSystem`
 - `ui/HUD` vs `ui/HUDManager` (overlap in responsibilities)
 
+## TODO Backlog (Non-Blocking)
+- Building ownership tracking for spawned units
+- Building destroy VFX
+- Building role-to-enum mapping in factory
+- Farm income logic
+- Bullet hit particles
+- VisualEffect pooling
+
 ## Recommended Extension Flow
 1. Add data to `GameConfig` or registries.
 2. Implement logic in gameplay/core modules.
 3. Register providers (Wave/Combat) if required.
 4. Use events for cross-module communication.
-

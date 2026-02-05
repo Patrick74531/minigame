@@ -74,7 +74,7 @@ export class Coin extends BaseComponent implements IPoolable {
             const myPos = this.node.worldPosition;
             const dist = Vec3.distance(heroPos, myPos);
 
-            if (dist < 2.5) {
+            if (dist < GameConfig.ECONOMY.COIN_COLLECT_RANGE) {
                 // Magnet Radius
                 isAttracted = true;
 
@@ -82,10 +82,10 @@ export class Coin extends BaseComponent implements IPoolable {
                 const direction = new Vec3();
                 Vec3.subtract(direction, heroPos, myPos);
                 // Aim slightly higher (center of body)
-                direction.y += 0.5;
+                direction.y += GameConfig.ECONOMY.COIN_MAGNET_HEIGHT_OFFSET;
                 direction.normalize();
 
-                const speed = 15.0; // Magnet Speed
+                const speed = GameConfig.ECONOMY.COIN_MAGNET_SPEED;
                 const moveStep = direction.multiplyScalar(speed * dt);
 
                 const newPos = new Vec3();
@@ -104,7 +104,9 @@ export class Coin extends BaseComponent implements IPoolable {
             }
 
             // Floating Animation
-            const floatY = Math.sin(this._lifetime * 5) * 0.1;
+            const floatY =
+                Math.sin(this._lifetime * GameConfig.ECONOMY.COIN_FLOAT_SPEED) *
+                GameConfig.ECONOMY.COIN_FLOAT_AMPLITUDE;
             this.node.setPosition(this.node.position.x, this.startY + floatY, this.node.position.z);
         }
     }

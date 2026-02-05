@@ -1,6 +1,7 @@
 import { _decorator, Node, Color } from 'cc';
 import { Weapon } from '../Weapon';
 import { BulletFactory } from '../BulletFactory';
+import { GameConfig } from '../../../data/GameConfig';
 
 const { ccclass, property } = _decorator;
 
@@ -23,7 +24,7 @@ export class RangedWeapon extends Weapon {
 
         // Spawn position (e.g. from self position, maybe elevated)
         const spawnPos = this.node.position.clone();
-        spawnPos.y += 1.0; // Shoot from chest/head height
+        spawnPos.y += GameConfig.PHYSICS.PROJECTILE_SPAWN_OFFSET_Y; // Shoot from chest/head height
 
         console.log(`[RangedWeapon] Creating bullet at ${spawnPos} targeting ${target.name}`);
 

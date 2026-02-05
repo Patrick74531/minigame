@@ -224,7 +224,7 @@ export class WaveManager {
     }
 
     private getEdgePosition(): { x: number; y: number } {
-        const range = 6;
+        const range = GameConfig.WAVE.INFINITE.SPAWN_RANGE;
         const side = Math.floor(Math.random() * 4);
         switch (side) {
             case 0:
