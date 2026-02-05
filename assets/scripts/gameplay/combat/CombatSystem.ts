@@ -12,7 +12,7 @@ const { ccclass, property } = _decorator;
  * 管理单位之间的战斗和目标分配
  * 挂载到场景中的战斗管理节点
  *
- * NOTE: 与 core/managers/CombatManager 功能重叠，建议后续统一入口。
+ * NOTE: 通过 CombatService 注册为当前战斗实现。
  */
 @ccclass('CombatSystem')
 export class CombatSystem extends Component implements CombatProvider {

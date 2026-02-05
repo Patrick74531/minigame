@@ -18,7 +18,6 @@ export {
     IPoolable,
     WaveManager,
     EffectManager,
-    CombatManager,
     WaveService,
     CombatService,
     ServiceRegistry,

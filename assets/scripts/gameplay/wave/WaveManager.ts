@@ -1,233 +1,237 @@
-import { Node, Vec2, Vec3 } from 'cc';
-import { Singleton } from '../../core/base/Singleton';
+import { Node, Vec3 } from 'cc';
 import { EventManager } from '../../core/managers/EventManager';
-import { PoolManager } from '../../core/managers/PoolManager';
 import { GameEvents } from '../../data/GameEvents';
-import { GameConfig } from '../../data/GameConfig';
-import { Enemy } from '../units/Enemy';
+import { UnitFactory } from '../units/UnitFactory';
+import { Unit } from '../units/Unit';
 import { WaveService } from '../../core/managers/WaveService';
+import { GameConfig } from '../../data/GameConfig';
 
-/** 波次配置 */
+/**
+ * 波次配置
+ */
 export interface WaveConfig {
-    /** 波次索引 */
-    index: number;
-    /** 敌人总数 */
+    waveNumber: number;
     enemyCount: number;
-    /** 敌人生成间隔（秒） */
     spawnInterval: number;
-    /** 敌人池名称 */
-    enemyPoolName: string;
-    /** 难度系数（乘以基础属性） */
-    difficultyMultiplier: number;
+    hpMultiplier: number;
 }
 
 /**
- * 波次管理器
- * 管理敌人波次的生成
+ * 波次管理器（无限波模式）
+ * 负责敌人波次的生成和管理
  *
- * NOTE: 该版本主要用于“配置波次”模式/旧 HUD。
- * 若新增核心玩法，请优先对 core/managers/WaveManager 进行扩展，
- * 并在需要时通过 UI 适配层读取数据。
+ * NOTE: 当前由 GameController 驱动（无限波模式）。
+ * 配置波次请使用 WaveConfigManager。
  */
-export class WaveManager extends Singleton<WaveManager>() {
-    private _waves: WaveConfig[] = [];
-    private _currentWaveIndex: number = 0;
-    private _enemiesSpawned: number = 0;
-    private _enemiesAlive: number = 0;
-    private _isWaveActive: boolean = false;
-    private _spawnTimer: number = 0;
+export class WaveManager {
+    private static _instance: WaveManager | null = null;
 
-    /** 敌人容器节点 */
+    public static get instance(): WaveManager {
+        if (!this._instance) {
+            this._instance = new WaveManager();
+        }
+        return this._instance;
+    }
+
+    // === 状态 ===
     private _enemyContainer: Node | null = null;
-
-    /** 敌人目标位置（基地） */
-    private _targetPosition: Vec2 = new Vec2(0, 0);
-
-    /** 敌人生成位置生成器 */
-    private _spawnPositionGenerator: (() => Vec2) | null = null;
-
-    // === 访问器 ===
-
-    public get currentWaveIndex(): number {
-        return this._currentWaveIndex;
-    }
-
-    public get isWaveActive(): boolean {
-        return this._isWaveActive;
-    }
-
-    public get enemiesAlive(): number {
-        return this._enemiesAlive;
-    }
-
-    public get totalWaves(): number {
-        return this._waves.length;
-    }
-
-    public get enemies(): Node[] {
-        return this._enemyContainer ? this._enemyContainer.children : [];
-    }
+    private _enemies: Node[] = [];
+    private _currentWave: number = 0;
+    private _waveActive: boolean = false;
+    private _enemiesSpawned: number = 0;
+    private _enemySpawnTimer: number = 0;
+    private _waveConfig: WaveConfig | null = null;
 
     // === 初始化 ===
 
-    /**
-     * 初始化波次管理器
-     * @param enemyContainer 敌人父节点
-     * @param targetPosition 敌人目标位置（基地）
-     */
-    public initialize(
-        enemyContainer: Node,
-        targetPosition: Vec2,
-        spawnPositionGenerator: () => Vec2
-    ): void {
+    private _baseNode: Node | null = null;
+    public initialize(enemyContainer: Node, baseNode: Node): void {
         this._enemyContainer = enemyContainer;
-        this._targetPosition = targetPosition;
-        this._spawnPositionGenerator = spawnPositionGenerator;
+        this._baseNode = baseNode;
+        this._enemies = [];
+        this._currentWave = 0;
 
-        // 注册事件
-        EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
+        // Listen for AOE impacts
+        EventManager.instance.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
         WaveService.instance.registerProvider({
-            id: 'gameplay',
-            priority: 10,
-            isReady: () => this._waves.length > 0,
+            id: 'infinite',
+            priority: 0,
             getSnapshot: () => ({
-                currentWave: this._currentWaveIndex + 1,
-                totalWaves: this._waves.length,
-                enemiesAlive: this._enemiesAlive,
+                currentWave: this._currentWave,
+                enemiesAlive: this._enemies.length,
             }),
         });
+
+        console.log('[WaveManager] 初始化完成 (Infinite Mode)');
     }
 
-    /**
-     * 加载波次配置
-     * @param waves 波次配置数组
-     */
-    public loadWaves(waves: WaveConfig[]): void {
-        this._waves = waves;
-        this._currentWaveIndex = 0;
-    }
+    private onApplyAoE(data: {
+        center: any;
+        radius: number;
+        damage: number;
+        slowPercent: number;
+        slowDuration: number;
+    }): void {
+        const radiusSqr = data.radius * data.radius;
+        const center = data.center;
 
-    /**
-     * 生成默认波次配置
-     * @param waveCount 波次数量
-     */
-    public generateDefaultWaves(waveCount: number = 10): void {
-        this._waves = [];
+        // Iterate all active enemies
+        for (const enemy of this._enemies) {
+            if (!enemy.isValid) continue;
 
-        for (let i = 0; i < waveCount; i++) {
-            const multiplier = Math.pow(GameConfig.WAVE.DIFFICULTY_MULTIPLIER, i);
-            this._waves.push({
-                index: i,
-                enemyCount: 5 + Math.floor(i * 2),
-                spawnInterval: GameConfig.WAVE.SPAWN_INTERVAL,
-                enemyPoolName: 'enemy_basic',
-                difficultyMultiplier: multiplier,
-            });
-        }
-    }
+            // Check distance
+            const dx = enemy.position.x - center.x;
+            const dz = enemy.position.z - center.z;
+            const distSqr = dx * dx + dz * dz;
 
-    // === 波次控制 ===
+            if (distSqr <= radiusSqr) {
+                const u = enemy.getComponent(Unit);
 
-    /**
-     * 开始下一波
-     */
-    public startNextWave(): void {
-        if (this._currentWaveIndex >= this._waves.length) {
-            // 所有波次完成
-            EventManager.instance.emit(GameEvents.ALL_WAVES_COMPLETE);
-            return;
-        }
-
-        const wave = this._waves[this._currentWaveIndex];
-        this._isWaveActive = true;
-        this._enemiesSpawned = 0;
-        this._spawnTimer = 0;
-
-        EventManager.instance.emit(GameEvents.WAVE_START, {
-            wave: wave.index + 1,
-            waveIndex: wave.index,
-            enemyCount: wave.enemyCount,
-        });
-    }
-
-    /**
-     * 更新波次（需要在游戏主循环中调用）
-     * @param dt 帧间隔时间
-     */
-    public update(dt: number): void {
-        if (!this._isWaveActive) return;
-
-        const wave = this._waves[this._currentWaveIndex];
-        if (!wave) return;
-
-        // 检查是否需要生成敌人
-        if (this._enemiesSpawned < wave.enemyCount) {
-            this._spawnTimer += dt;
-
-            if (this._spawnTimer >= wave.spawnInterval) {
-                this._spawnTimer = 0;
-                this.spawnEnemy(wave);
+                if (u && u.isAlive) {
+                    u.takeDamage(data.damage);
+                    if (data.slowPercent > 0) {
+                        u.applySlow(data.slowPercent, data.slowDuration);
+                    }
+                }
             }
         }
-
-        // 检查波次是否完成
-        if (this._enemiesSpawned >= wave.enemyCount && this._enemiesAlive === 0) {
-            this.completeWave();
-        }
+        console.log(`[WaveManager] AOE Applied to ${this._enemies.length} potential targets.`);
     }
 
-    // === 敌人生成 ===
+    // === 公共接口 ===
 
-    private spawnEnemy(wave: WaveConfig): void {
-        if (!this._enemyContainer || !this._spawnPositionGenerator) return;
+    public get enemies(): Node[] {
+        return this._enemies;
+    }
 
-        const enemy = PoolManager.instance.spawn(wave.enemyPoolName, this._enemyContainer);
-        if (!enemy) return;
+    public get currentWave(): number {
+        return this._currentWave;
+    }
 
-        // 设置生成位置
-        const spawnPos = this._spawnPositionGenerator();
-        enemy.setPosition(spawnPos.x, spawnPos.y, 0);
+    public get isWaveActive(): boolean {
+        return this._waveActive;
+    }
 
-        // 设置敌人目标和属性
-        const enemyComponent = enemy.getComponent(Enemy);
-        if (enemyComponent) {
-            enemyComponent.setTargetPosition(new Vec3(this._targetPosition.x, 0, this._targetPosition.y));
+    /**
+     * 开始新波次
+     */
+    public startWave(waveNumber: number): void {
+        this._currentWave = waveNumber;
+        this._waveActive = true;
+        this._enemiesSpawned = 0;
+        this._enemySpawnTimer = 0;
 
-            // 应用难度系数
-            enemyComponent.initStats({
-                maxHp: Math.floor(GameConfig.ENEMY.BASE_HP * wave.difficultyMultiplier),
-                attack: Math.floor(GameConfig.ENEMY.BASE_ATTACK * wave.difficultyMultiplier),
-            });
-        }
+        // Roguelike Scaling Logic
+        const infinite = GameConfig.WAVE.INFINITE;
+        const count = infinite.BASE_COUNT + waveNumber * infinite.COUNT_PER_WAVE;
+        const hpMult = infinite.BASE_HP_MULT + (waveNumber - 1) * infinite.HP_MULT_PER_WAVE;
 
-        this._enemiesSpawned++;
-        this._enemiesAlive++;
+        this._waveConfig = {
+            waveNumber,
+            enemyCount: count,
+            spawnInterval: Math.max(
+                infinite.MIN_SPAWN_INTERVAL,
+                infinite.BASE_SPAWN_INTERVAL - waveNumber * infinite.SPAWN_INTERVAL_DECAY_PER_WAVE
+            ),
+            hpMultiplier: hpMult,
+        };
 
-        EventManager.instance.emit(GameEvents.UNIT_SPAWNED, {
-            unitType: 'enemy',
-            node: enemy,
+        console.log('═══════════════════════════════════════');
+        console.log(`🌊 第 ${waveNumber} 波! 敌人: ${this._waveConfig.enemyCount}`);
+        console.log('═══════════════════════════════════════');
+
+        EventManager.instance.emit(GameEvents.WAVE_START, {
+            wave: waveNumber,
+            waveIndex: waveNumber - 1,
+            enemyCount: this._waveConfig.enemyCount,
         });
     }
 
-    private completeWave(): void {
-        this._isWaveActive = false;
+    /**
+     * 每帧更新波次生成
+     */
+    public update(dt: number): void {
+        if (!this._waveActive || !this._waveConfig) return;
+
+        this._enemySpawnTimer += dt;
+        if (
+            this._enemySpawnTimer >= this._waveConfig.spawnInterval &&
+            this._enemiesSpawned < this._waveConfig.enemyCount
+        ) {
+            this._enemySpawnTimer = 0;
+            this.spawnEnemy();
+            this._enemiesSpawned++;
+        }
+
+        if (this._enemiesSpawned >= this._waveConfig.enemyCount) {
+            this._waveActive = false;
+        }
+    }
+
+    /**
+     * 检查波次是否完成
+     */
+    public checkWaveComplete(onComplete: (bonus: number) => void): void {
+        if (this._waveActive || this._enemies.length > 0 || !this._waveConfig) return;
+
+        const bonus = this._currentWave * GameConfig.WAVE.INFINITE.BONUS_PER_WAVE;
+        console.log(`✅ 第 ${this._currentWave} 波完成! +${bonus} 金币`);
 
         EventManager.instance.emit(GameEvents.WAVE_COMPLETE, {
-            wave: this._currentWaveIndex + 1,
-            waveIndex: this._currentWaveIndex,
+            wave: this._currentWave,
+            waveIndex: this._currentWave - 1,
+            bonus,
         });
 
-        this._currentWaveIndex++;
-
-        // 自动开始下一波（可配置间隔）
-        // 这里简化处理，实际应该用定时器
+        this._waveConfig = null;
+        onComplete(bonus);
     }
 
-    // === 事件处理 ===
+    /**
+     * 是否还有更多波次
+     */
+    public hasMoreWaves(): boolean {
+        return true; // Infinite
+    }
 
-    private onUnitDied(data: { unitType: string }): void {
-        if (data.unitType === 'enemy') {
-            this._enemiesAlive = Math.max(0, this._enemiesAlive - 1);
+    /**
+     * 移除敌人（死亡或到达基地）
+     */
+    public removeEnemy(enemy: Node): void {
+        const idx = this._enemies.indexOf(enemy);
+        if (idx !== -1) {
+            this._enemies.splice(idx, 1);
+        }
+    }
+
+    // === 私有方法 ===
+
+    private spawnEnemy(): void {
+        if (!this._enemyContainer) return;
+
+        const pos = this.getEdgePosition();
+        const enemy = UnitFactory.createEnemy(
+            this._enemyContainer,
+            pos.x,
+            pos.y,
+            this._baseNode ? this._baseNode.position : new Vec3(0, 0, 0), // Base Position
+            this._waveConfig?.hpMultiplier || 1
+        );
+        this._enemies.push(enemy);
+    }
+
+    private getEdgePosition(): { x: number; y: number } {
+        const range = GameConfig.WAVE.INFINITE.SPAWN_RANGE;
+        const side = Math.floor(Math.random() * 4);
+        switch (side) {
+            case 0:
+                return { x: Math.random() * range * 2 - range, y: range + 1 };
+            case 1:
+                return { x: Math.random() * range * 2 - range, y: -range - 1 };
+            case 2:
+                return { x: -range - 1, y: Math.random() * range * 2 - range };
+            default:
+                return { x: range + 1, y: Math.random() * range * 2 - range };
         }
     }
 
@@ -235,10 +239,10 @@ export class WaveManager extends Singleton<WaveManager>() {
      * 清理
      */
     public cleanup(): void {
-        EventManager.instance.offAllByTarget(this);
-        WaveService.instance.unregisterProvider('gameplay');
-        this._waves = [];
-        this._currentWaveIndex = 0;
-        this._isWaveActive = false;
+        EventManager.instance.off(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
+        WaveService.instance.unregisterProvider('infinite');
+        this._enemies = [];
+        this._waveConfig = null;
+        this._waveActive = false;
     }
 }

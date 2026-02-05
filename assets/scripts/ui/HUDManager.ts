@@ -12,7 +12,6 @@ const UI_LAYER = 33554432;
  * 负责游戏内 UI 的更新
  *
  * NOTE: 当前运行主要由 HUDManager 驱动。
- * 若使用旧 HUD 组件，请确保事件负载兼容。
  */
 export class HUDManager {
     private static _instance: HUDManager | null = null;

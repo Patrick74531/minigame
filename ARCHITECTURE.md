@@ -28,10 +28,9 @@
 - **CombatService**: Access point for active combat provider
 - **ServiceRegistry**: Central registry for global services
 
-## Known Duplications (Planned to Unify)
-- `core/managers/WaveManager` vs `gameplay/wave/WaveManager`
-- `core/managers/CombatManager` vs `gameplay/combat/CombatSystem`
-- `ui/HUD` vs `ui/HUDManager` (overlap in responsibilities)
+## Known Alternatives (Documented)
+- `gameplay/wave/WaveManager` (infinite mode) vs `gameplay/wave/WaveConfigManager` (config mode)
+  - `core/managers/WaveManager` is a re-export for legacy imports.
 
 ## TODO Backlog (Non-Blocking)
 - Building ownership tracking for spawned units

@@ -9,7 +9,7 @@ export { Unit, UnitType, UnitState, UnitStats, Enemy, Soldier } from './units';
 export { Building, BuildingType, BuildingConfig } from './buildings';
 
 // 波次系统
-export { WaveManager, WaveConfig } from './wave';
+export { WaveManager, WaveConfig, WaveConfigManager, WaveScheduleConfig } from './wave';
 
 // 经济系统
 export { Coin } from './economy';

@@ -136,7 +136,7 @@ export const GameConfig = {
         DIFFICULTY_MULTIPLIER: 1.1,
         /**
          * 无限波次模式参数
-         * NOTE: 仅用于 core/managers/WaveManager (Infinite Mode)。
+         * NOTE: 仅用于 gameplay/wave/WaveManager (Infinite Mode)。
          */
         INFINITE: {
             BASE_COUNT: 5,
