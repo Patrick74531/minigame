@@ -1,4 +1,4 @@
 /**
  * 战斗模块导出
  */
-export { CombatSystem } from './CombatSystem';
+// NOTE: No centralized CombatSystem in use. Units handle targeting internally.

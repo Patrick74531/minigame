@@ -27,6 +27,7 @@ export interface WaveScheduleConfig {
  *
  * NOTE: 目前主流程使用无限波模式。
  * 若要使用配置波次，请在场景中驱动此管理器的 update。
+ * 该模块当前为“休眠/备用”状态。
  */
 export class WaveConfigManager extends Singleton<WaveConfigManager>() {
     private _waves: WaveScheduleConfig[] = [];

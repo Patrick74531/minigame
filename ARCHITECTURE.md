@@ -32,6 +32,10 @@
 - `gameplay/wave/WaveManager` (infinite mode) vs `gameplay/wave/WaveConfigManager` (config mode)
   - `core/managers/WaveManager` is a re-export for legacy imports.
 
+## Combat Note
+- 当前没有集中式 CombatSystem，单位各自索敌。
+- 若未来引入集中式战斗系统，请通过 `CombatService` 注册 provider。
+
 ## TODO Backlog (Non-Blocking)
 - Building ownership tracking for spawned units
 - Building destroy VFX
