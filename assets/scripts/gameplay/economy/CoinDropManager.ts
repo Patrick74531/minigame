@@ -42,9 +42,6 @@ export class CoinDropManager {
                 data.position.z,
                 value
             );
-            console.log(
-                `[CoinDropManager] Dropped coin value=${value} at (${data.position.x}, ${data.position.z})`
-            );
         }
 
         if (data.node && data.node.isValid) {

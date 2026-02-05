@@ -1,8 +1,8 @@
 import { _decorator, Node, Vec3 } from 'cc';
 import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
-import { WaveManager } from '../wave/WaveManager';
 import { HealthBar } from '../../ui/HealthBar';
+import { EnemyQuery } from '../../core/managers/EnemyQuery';
 
 const { ccclass, property } = _decorator;
 
@@ -138,7 +138,7 @@ export class Soldier extends Unit {
      * NOTE: Keep lightweight. This exists for safety only.
      */
     private tryAcquireTargetFallback(): void {
-        const enemies = WaveManager.instance.enemies;
+        const enemies = EnemyQuery.getEnemies();
         if (!enemies || enemies.length === 0) return;
 
         const myPos = this.node.position;

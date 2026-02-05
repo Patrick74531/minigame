@@ -11,7 +11,6 @@ import {
     geometry,
     Camera,
 } from 'cc';
-import { CameraFollow } from './core/camera/CameraFollow';
 import { GameManager } from './core/managers/GameManager';
 import { EventManager } from './core/managers/EventManager';
 import { WaveManager } from './gameplay/wave/WaveManager';
@@ -23,7 +22,6 @@ import { Hero } from './gameplay/units/Hero';
 import { UIFactory } from './ui/UIFactory';
 import { Joystick } from './ui/Joystick';
 import { BuildingManager } from './gameplay/buildings/BuildingManager';
-import { BuildingPad } from './gameplay/buildings/BuildingPad';
 import { EffectManager } from './core/managers/EffectManager';
 import { MapGenerator } from './gameplay/map/MapGenerator';
 import { CombatSystem } from './gameplay/combat/CombatSystem';
@@ -31,6 +29,9 @@ import { ServiceRegistry } from './core/managers/ServiceRegistry';
 import { WaveService } from './core/managers/WaveService';
 import { PoolManager } from './core/managers/PoolManager';
 import { CoinDropManager } from './gameplay/economy/CoinDropManager';
+import { WaveLoop } from './gameplay/wave/WaveLoop';
+import { BuildingPadSpawner } from './gameplay/buildings/BuildingPadSpawner';
+import { CameraRig } from './core/camera/CameraRig';
 
 const { ccclass, property } = _decorator;
 
@@ -56,22 +57,15 @@ export class GameController extends Component {
     private _uiCanvas: Node | null = null;
 
     // === 实体 ===
-    private _soldiers: Node[] = [];
-    private _buildings: Node[] = [];
-    private _coins: Node[] = [];
     private _base: Node | null = null;
     private _hero: Node | null = null;
     private _joystick: Joystick | null = null;
-
-    // === 计时器 ===
-    private _buildingTimer: number = 0;
-    private _combatTimer: number = 0;
-    private _coinTimer: number = 0;
 
     // === 生命周期 ===
 
     // Map Generator
     private _mapGenerator: MapGenerator | null = null;
+    private _waveLoop: WaveLoop | null = null;
 
     protected onLoad(): void {
         console.log('╔════════════════════════════════════════════════════╗');
@@ -91,6 +85,10 @@ export class GameController extends Component {
         const combatNode = new Node('CombatSystem');
         this._container?.addChild(combatNode);
         combatNode.addComponent(CombatSystem);
+
+        const waveNode = new Node('WaveLoop');
+        this._container?.addChild(waveNode);
+        this._waveLoop = waveNode.addComponent(WaveLoop);
 
         // 初始化 Managers
         GameManager.instance.initialize();
@@ -157,31 +155,20 @@ export class GameController extends Component {
         WaveManager.instance.initialize(this._enemyContainer!, this._base);
 
         // Setup Camera Follow
-        const mainCamera = this.node.scene.getComponentInChildren(Camera);
-        if (mainCamera) {
-            let follow = mainCamera.node.getComponent(CameraFollow);
-            if (!follow) {
-                follow = mainCamera.node.addComponent(CameraFollow);
-                // Adjust offset for isometric view
-                follow.offset = new Vec3(0, 10, 8);
-            }
-            follow.target = this._hero;
-            // Force snap to new start position immediately
-            follow.snap();
-        } else {
-            console.warn('[GameController] Main Camera not found!');
-        }
+        CameraRig.setupFollow(this.node.scene, this._hero, new Vec3(0, 10, 8));
 
         // 设置英雄引用给建造管理器
         BuildingManager.instance.setHeroNode(this._hero);
 
         // 创建建造点 - Restore this
-        this.createBuildingPads();
+        BuildingPadSpawner.spawnPads(this._buildingContainer!, BuildingManager.instance);
 
         console.log(`[Game] 💰 初始金币: ${GameManager.instance.coins}`);
 
         // 开始第一波
-        this.scheduleOnce(() => WaveManager.instance.startWave(1), 2);
+        if (this._waveLoop) {
+            this._waveLoop.initialize(WaveManager.instance, GameManager.instance, 2);
+        }
     }
 
     protected update(dt: number): void {
@@ -190,26 +177,8 @@ export class GameController extends Component {
         // 输入处理
         this.processInput();
 
-        // 波次生成
-        WaveManager.instance.update(dt);
-
-        // 金币拾取检测 (Physics System handles this now)
-        // this.updateCoinPickup(dt);
-
         // 建造系统更新
         BuildingManager.instance.update(dt);
-
-        // 波次完成检查
-        WaveManager.instance.checkWaveComplete(bonus => {
-            GameManager.instance.addCoins(bonus);
-
-            // Loop forever
-            const nextWave = WaveManager.instance.currentWave + 1;
-            console.log(
-                `[Game] Wave ${WaveManager.instance.currentWave} Complete. Next Wave: ${nextWave}`
-            );
-            this.scheduleOnce(() => WaveManager.instance.startWave(nextWave), 3);
-        });
     }
 
     // === 初始化 ===
@@ -265,6 +234,7 @@ export class GameController extends Component {
         ServiceRegistry.register('BuildingManager', BuildingManager.instance);
         ServiceRegistry.register('EffectManager', EffectManager.instance);
         ServiceRegistry.register('WaveManager', WaveManager.instance);
+        ServiceRegistry.register('WaveRuntime', WaveManager.instance);
         ServiceRegistry.register('WaveService', WaveService.instance);
         ServiceRegistry.register('PoolManager', PoolManager.instance);
         // Fallback spawner when soldier pool is not registered
@@ -274,39 +244,6 @@ export class GameController extends Component {
     }
 
     // === 建造系统 ===
-
-    private createBuildingPads(): void {
-        // 建造点配置集中在 GameConfig，避免硬编码
-        const padPositions = GameConfig.BUILDING.PADS;
-
-        for (const pos of padPositions) {
-            // TEST: Pre-spawn Frost Tower or Lightning Tower
-            if (pos.type === 'frost_tower' || pos.type === 'lightning_tower') {
-                BuildingFactory.createBuilding(this._buildingContainer!, pos.x, pos.z, pos.type);
-                console.log(`[GameController] Pre-spawned ${pos.type} at (${pos.x}, 0, ${pos.z})`);
-                continue; // Skip creating pad
-            }
-
-            const padNode = new Node(`BuildingPad_${pos.type}`);
-            this._buildingContainer!.addChild(padNode);
-            // Map y in config to z in world space for top-down view
-            padNode.setPosition(pos.x, 0, pos.z);
-
-            console.log(
-                `[GameController] 创建建造点: type=${pos.type}, pos=(${pos.x}, 0, ${pos.z})`
-            );
-
-            const pad = padNode.addComponent(BuildingPad);
-            pad.buildingTypeId = pos.type;
-
-            BuildingManager.instance.registerPad(pad);
-        }
-
-        console.log(
-            `[GameController] 创建了 ${padPositions.length} 个建造点, 父节点: ${this._buildingContainer!.name}`
-        );
-    }
-
     // === 输入处理 ===
 
     private processInput(): void {
@@ -320,12 +257,4 @@ export class GameController extends Component {
 
     // === 金币拾取 (Removed) ===
     // Physics System handles this via Coin.onTriggerEnter or Hero.onTriggerEnter
-
-    // === 工具方法 ===
-
-    private getDistance(a: Node, b: Node): number {
-        const dx = b.position.x - a.position.x;
-        const dz = b.position.z - a.position.z; // 3D logic
-        return Math.sqrt(dx * dx + dz * dz);
-    }
 }

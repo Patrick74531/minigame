@@ -5,6 +5,7 @@ import { UnitFactory } from '../units/UnitFactory';
 import { Unit, UnitType } from '../units/Unit';
 import { GameConfig } from '../../data/GameConfig';
 import { WaveService } from '../../core/managers/WaveService';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
 /**
  * 波次配置
@@ -55,6 +56,9 @@ export class WaveManager {
         EventManager.instance.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
         EventManager.instance.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
         EventManager.instance.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
+        ServiceRegistry.register('EnemyProvider', {
+            getEnemies: () => this._enemies,
+        });
         WaveService.instance.registerProvider({
             id: 'infinite',
             priority: 0,

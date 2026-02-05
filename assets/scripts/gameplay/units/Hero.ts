@@ -13,7 +13,6 @@ import {
 } from 'cc';
 import { Unit, UnitType, UnitState } from './Unit';
 import { GameManager } from '../../core/managers/GameManager';
-import { WaveManager } from '../wave/WaveManager';
 import { CombatService } from '../../core/managers/CombatService';
 import { GameConfig } from '../../data/GameConfig';
 import { Coin } from '../economy/Coin';
@@ -21,6 +20,7 @@ import { HUDManager } from '../../ui/HUDManager';
 import { RangedWeapon } from '../combat/weapons/RangedWeapon';
 import { CharacterMover } from '../../core/physics/CharacterMover';
 import { StackVisualizer } from '../visuals/StackVisualizer';
+import { EnemyQuery } from '../../core/managers/EnemyQuery';
 
 const { ccclass, property } = _decorator;
 
@@ -118,7 +118,6 @@ export class Hero extends Unit {
         if (coin) {
             this.addCoin(otherNode);
             coin.onPickup();
-            console.log(`[Hero] Picked coin. Stack=${this.coinCount}`);
             HUDManager.instance.updateCoinDisplay(this.coinCount);
         }
     }
@@ -200,7 +199,7 @@ export class Hero extends Unit {
                 nearest = result as Node;
             }
         } else {
-            const enemies = WaveManager.instance.enemies;
+            const enemies = EnemyQuery.getEnemies();
             let minDist = this._stats.attackRange;
             const myPos = this.node.position;
 

@@ -15,9 +15,9 @@ import {
     resources,
 } from 'cc';
 import { Building } from './Building';
-import { WaveManager } from '../wave/WaveManager';
 import { Bullet } from '../combat/Bullet';
 import { Unit } from '../units/Unit';
+import { EnemyQuery } from '../../core/managers/EnemyQuery';
 
 const { ccclass, property } = _decorator;
 
@@ -103,7 +103,7 @@ export class Tower extends Building {
     }
 
     private findNearestEnemy(): Node | null {
-        const enemies = WaveManager.instance.enemies;
+        const enemies = EnemyQuery.getEnemies();
         let nearest: Node | null = null;
         let minMsg = this.attackRange * this.attackRange; // Sqr Dist checking
 
