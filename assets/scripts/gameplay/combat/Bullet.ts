@@ -1,10 +1,21 @@
-import { _decorator, Component, Node, Vec3, BoxCollider, ITriggerEvent, RigidBody } from 'cc';
+import {
+    _decorator,
+    Component,
+    Node,
+    Vec3,
+    BoxCollider,
+    ITriggerEvent,
+    RigidBody,
+    Tween,
+} from 'cc';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { Unit, UnitType } from '../units/Unit';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { EffectFactory } from '../effects/EffectFactory';
 import { IPoolable } from '../../core/managers/PoolManager';
+import { ProjectilePool } from '../weapons/vfx/ProjectilePool';
+import { WeaponVFX } from '../weapons/WeaponVFX';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
@@ -40,6 +51,12 @@ export class Bullet extends BaseComponent implements IPoolable {
     public critRate: number = 0;
     public critDamage: number = 1.5;
 
+    // === Pool Recycling ===
+    /** 若非空，销毁时回收到 ProjectilePool 而非 destroy */
+    public poolKey: string = '';
+    /** 当为 true 时，用 +X 轴对齐速度方向（用于水平朝向的精灵贴图子弹） */
+    public orientXAxis: boolean = false;
+
     /** 公开速度向量，供武器行为修改弹道 */
     public get velocity(): Vec3 {
         return this._velocity;
@@ -52,20 +69,41 @@ export class Bullet extends BaseComponent implements IPoolable {
 
     public onSpawn(): void {
         // NOTE: For pooled bullets, ensure clean state on reuse.
-        this._lifetime = 0;
-        this._logTimer = 0;
-        this._target = null;
-        this._velocity.set(0, 0, 0);
-        this.critRate = 0;
-        this.critDamage = 1.5;
+        this.resetState();
     }
 
     public onDespawn(): void {
         // NOTE: Clear references to avoid leaking targets between pooled instances.
+        this.resetState();
+    }
+
+    /** 重置子弹状态（对象池复用时调用） */
+    public resetState(): void {
+        this._lifetime = 0;
+        this._logTimer = 0;
         this._target = null;
         this._velocity.set(0, 0, 0);
+        this.explosionRadius = 0;
+        this.slowPercent = 0;
+        this.slowDuration = 0;
+        this.chainCount = 0;
+        this.chainRange = 0;
         this.critRate = 0;
         this.critDamage = 1.5;
+        this.orientXAxis = false;
+    }
+
+    /** 回收子弹：有 poolKey 则归池，否则 destroy */
+    public recycle(): void {
+        Tween.stopAllByTarget(this.node);
+        if (this.poolKey) {
+            const key = this.poolKey;
+            this.poolKey = '';
+            this.resetState();
+            ProjectilePool.put(key, this.node);
+        } else {
+            this.node.destroy();
+        }
     }
 
     protected initialize(): void {
@@ -107,14 +145,14 @@ export class Bullet extends BaseComponent implements IPoolable {
         }
 
         if (this._lifetime > this._maxLifetime) {
-            this.node.destroy();
+            this.recycle();
             return;
         }
 
         if (this._target && this._target.isValid) {
             this.updateVelocity();
         } else if (this._velocity.lengthSqr() < 0.001) {
-            this.node.destroy();
+            this.recycle();
             return;
         }
 
@@ -126,8 +164,14 @@ export class Bullet extends BaseComponent implements IPoolable {
 
         // Face direction
         if (this._velocity.lengthSqr() > 0.1) {
-            const lookAtPos = currentPos.clone().add(this._velocity);
-            this.node.lookAt(lookAtPos);
+            if (this.orientXAxis) {
+                // 精灵子弹：将 +X 轴对齐速度方向（贴图水平朝右）
+                const yDeg = Math.atan2(-this._velocity.z, this._velocity.x) * (180 / Math.PI);
+                this.node.setRotationFromEuler(0, yDeg, 0);
+            } else {
+                const lookAtPos = currentPos.clone().add(this._velocity);
+                this.node.lookAt(lookAtPos);
+            }
         }
     }
 
@@ -175,7 +219,7 @@ export class Bullet extends BaseComponent implements IPoolable {
             }
 
             this.createHitEffect();
-            this.node.destroy();
+            this.recycle();
         }
     }
 
@@ -211,7 +255,7 @@ export class Bullet extends BaseComponent implements IPoolable {
         } else {
             // No target found, chain ends
             this.createHitEffect();
-            this.node.destroy();
+            this.recycle();
         }
     }
 
@@ -255,7 +299,10 @@ export class Bullet extends BaseComponent implements IPoolable {
     }
 
     private createHitEffect(): void {
-        // TODO: Particle effect
+        if (!this.node.parent) return;
+        // Throttle: 60% of hits create sparks (performance on mobile)
+        if (Math.random() > 0.6) return;
+        WeaponVFX.createHitSpark(this.node.parent, this.node.position.clone());
     }
 
     private get eventManager(): EventManager {

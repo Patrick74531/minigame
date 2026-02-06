@@ -198,18 +198,42 @@ export class Hero extends Unit {
             this.updateTargeting();
         }
 
+        // 自定义武器：绕过 Unit 基类的 _attackTimer，使用武器自身射速
+        // Unit._attackTimer 默认以英雄基础攻击间隔（~1s）为节奏，会严重限制武器射速
+        // 这里直接调用 performAttack()，内部有 _customWeaponTimer 控制实际射速
+        const manager = HeroWeaponManager.instance;
+        if (
+            this._state === UnitState.ATTACKING &&
+            manager.activeWeapon &&
+            this._customWeaponTimer <= 0
+        ) {
+            this.performAttack();
+        }
+
         super.update(dt);
+    }
+
+    /** 获取当前有效攻击范围（优先使用武器射程） */
+    private getEffectiveRange(): number {
+        const manager = HeroWeaponManager.instance;
+        const active = manager.activeWeapon;
+        if (active) {
+            const def = manager.getWeaponDef(active.type);
+            if (def) {
+                const stats = getWeaponLevelStats(def, active.level);
+                return stats.range ?? this._stats.attackRange;
+            }
+        }
+        return this._stats.attackRange;
     }
 
     private updateTargeting(): void {
         let nearest: Node | null = null;
+        const effectiveRange = this.getEffectiveRange();
 
         const provider = CombatService.provider;
         if (provider && provider.findEnemyInRange) {
-            const result: any = provider.findEnemyInRange(
-                this.node.position,
-                this._stats.attackRange
-            );
+            const result: any = provider.findEnemyInRange(this.node.position, effectiveRange);
             if (result?.node) {
                 nearest = result.node;
             } else if (result?.isValid) {
@@ -217,11 +241,14 @@ export class Hero extends Unit {
             }
         } else {
             const enemies = EnemyQuery.getEnemies();
-            let minDist = this._stats.attackRange;
+            let minDist = effectiveRange;
             const myPos = this.node.position;
 
             for (const enemy of enemies) {
                 if (!enemy.isValid) continue;
+                // 跳过已死亡的敌人，避免锁定尸体导致无法转火
+                const u = enemy.getComponent(Unit);
+                if (!u || !u.isAlive) continue;
                 const dx = enemy.position.x - myPos.x;
                 const dz = enemy.position.z - myPos.z;
                 const dist = Math.sqrt(dx * dx + dz * dz);
@@ -236,9 +263,6 @@ export class Hero extends Unit {
         if (nearest) {
             const unit = nearest.getComponent(Unit);
             if (unit && unit.isAlive) {
-                if (this._state !== UnitState.ATTACKING) {
-                    // console.log(`[Hero] Targeting ${nearest.name}`);
-                }
                 this.setTarget(unit);
                 this._state = UnitState.ATTACKING;
             } else {

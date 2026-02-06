@@ -11,6 +11,7 @@ import {
     Tween,
     Mesh,
     Texture2D,
+    ImageAsset,
     resources,
 } from 'cc';
 import { ProjectilePool } from './vfx/ProjectilePool';
@@ -33,6 +34,8 @@ export class WeaponVFX {
     private static _beamNoiseTex: Texture2D | null = null;
     private static _beamNoiseLoading: boolean = false;
     private static _beamPoolReady: boolean = false;
+    private static _bulletTex: Texture2D | null = null;
+    private static _bulletTexLoading: boolean = false;
 
     /** 初始化共享资源 + 预热池（在 GameController.onLoad 调用一次） */
     public static initialize(): void {
@@ -40,14 +43,18 @@ export class WeaponVFX {
         this._initialized = true;
 
         // 预热 VFX 节点池
-        ProjectilePool.register('vfx_flash', () => this._createVfxNode('Flash'), 5);
+        ProjectilePool.register('vfx_flash', () => this._createVfxNode('Flash'), 12);
         ProjectilePool.register('vfx_ring', () => this._createVfxNode('Ring'), 4);
         ProjectilePool.register('vfx_debris', () => this._createVfxNode('Debris'), 15);
         ProjectilePool.register('vfx_ground', () => this._createVfxNode('Ground'), 3);
         ProjectilePool.register('vfx_beam_core', () => this._createVfxNode('BeamCore'), 2);
         ProjectilePool.register('vfx_beam_glow', () => this._createVfxNode('BeamGlow'), 2);
         ProjectilePool.register('vfx_beam_pulse', () => this._createVfxNode('BeamPulse'), 2);
+        // 机枪子弹池 + 弹壳池
+        ProjectilePool.register('mg_bullet', () => this._createMGBulletNode(), 40);
+        ProjectilePool.register('mg_casing', () => this._createCasingNode(), 10);
         this._ensureBeamNoiseTexture();
+        this._ensureBulletTexture();
     }
 
     private static _ensureBeamNoiseTexture(): void {
@@ -61,6 +68,50 @@ export class WeaponVFX {
             }
             this._beamNoiseTex = texture;
         });
+    }
+
+    private static _ensureBulletTexture(): void {
+        if (this._bulletTex || this._bulletTexLoading) return;
+        this._bulletTexLoading = true;
+
+        // 优先尝试加载 Texture2D（编辑器已处理的资源）
+        resources.load('textures/bullet/texture', Texture2D, (err, texture) => {
+            if (!err && texture) {
+                this._bulletTexLoading = false;
+                this._bulletTex = texture;
+                console.log('[WeaponVFX] Bullet texture loaded (Texture2D)');
+                return;
+            }
+            // 回退：尝试直接加载 Texture2D（不带 /texture 后缀）
+            resources.load('textures/bullet', Texture2D, (err2, tex2) => {
+                if (!err2 && tex2) {
+                    this._bulletTexLoading = false;
+                    this._bulletTex = tex2;
+                    console.log('[WeaponVFX] Bullet texture loaded (Texture2D direct)');
+                    return;
+                }
+                // 再回退：加载为 ImageAsset，手动创建 Texture2D
+                resources.load('textures/bullet', ImageAsset, (err3, imgAsset) => {
+                    this._bulletTexLoading = false;
+                    if (err3 || !imgAsset) {
+                        console.warn(
+                            '[WeaponVFX] All bullet texture load attempts failed.',
+                            '\n  Please open project in Cocos Creator editor to generate bullet.webp.meta'
+                        );
+                        return;
+                    }
+                    const tex = new Texture2D();
+                    tex.image = imgAsset;
+                    this._bulletTex = tex;
+                    console.log('[WeaponVFX] Bullet texture loaded (ImageAsset → Texture2D)');
+                });
+            });
+        });
+    }
+
+    /** 获取子弹贴图（可能为 null，异步加载中） */
+    public static get bulletTexture(): Texture2D | null {
+        return this._bulletTex;
     }
 
     // ========== 材质工厂（缓存 + GPU Instancing） ==========
@@ -81,7 +132,7 @@ export class WeaponVFX {
         return mat;
     }
 
-    /** 获取/创建发光(Additive)材质（缓存，开启 Instancing） */
+    /** 获取/创建发光(透明)材质（缓存，开启 Instancing） */
     public static getGlowMat(color: Color): Material {
         const key = `glow_${color.toHEX()}`;
         let mat = this._matCache.get(key);
@@ -90,8 +141,27 @@ export class WeaponVFX {
         mat = new Material();
         mat.initialize({
             effectName: 'builtin-unlit',
+            technique: 1, // Transparent (alpha blend)
             defines: { USE_INSTANCING: true },
         });
+        mat.setProperty('mainColor', color);
+        this._matCache.set(key, mat);
+        return mat;
+    }
+
+    /** 获取/创建带贴图的透明材质（子弹精灵用，alpha 混合） */
+    public static getSpriteMat(color: Color, tex: Texture2D): Material {
+        const key = `sprite_${color.toHEX()}_${tex._uuid?.substring(0, 8) ?? 'def'}`;
+        let mat = this._matCache.get(key);
+        if (mat) return mat;
+
+        mat = new Material();
+        mat.initialize({
+            effectName: 'builtin-unlit',
+            technique: 1, // Transparent (alpha blend)
+            defines: { USE_TEXTURE: true, USE_INSTANCING: true },
+        });
+        mat.setProperty('mainTexture', tex);
         mat.setProperty('mainColor', color);
         this._matCache.set(key, mat);
         return mat;
@@ -168,6 +238,129 @@ export class WeaponVFX {
         renderer.mesh = this.getFlatQuadMesh(w, l);
         renderer.setMaterial(this.getUnlitMat(color), 0);
         return node;
+    }
+
+    // ========== 机枪精灵子弹（池化 + 贴图） ==========
+
+    /**
+     * 工厂：创建机枪子弹节点（带贴图的 billboard 面片）
+     * 由 ProjectilePool 调用，预热 + 按需扩容
+     */
+    private static _createMGBulletNode(): Node {
+        const node = new Node('MG_Bullet');
+        node.layer = 1 << 0;
+        const renderer = node.addComponent(MeshRenderer);
+        // 默认尺寸，fire() 时通过 setScale 调整
+        renderer.mesh = this.getFlatQuadMesh(1, 1);
+        // 先用白色 unlit；fire() 时根据等级换材质
+        renderer.setMaterial(this.getUnlitMat(Color.WHITE), 0);
+        return node;
+    }
+
+    /**
+     * 配置机枪子弹的视觉：尺寸、材质、贴图
+     * @param node    从池中取出的子弹节点
+     * @param w       宽度
+     * @param l       长度（拖尾感）
+     * @param color   色调
+     */
+    public static configureMGBullet(node: Node, w: number, l: number, color: Color): void {
+        const renderer = node.getComponent(MeshRenderer);
+        if (!renderer) return;
+        if (this._bulletTex) {
+            renderer.setMaterial(this.getSpriteMat(color, this._bulletTex), 0);
+        } else {
+            renderer.setMaterial(this.getUnlitMat(color), 0);
+        }
+        // X=长度（匹配贴图水平方向），Z=宽度；mesh 保持 1×1 避免缓存碎片
+        node.setScale(l, 1, w);
+    }
+
+    /**
+     * 子弹命中火花（打击感反馈）
+     * 小型闪光 + 1-2 个碎片，低开销高反馈
+     */
+    public static createHitSpark(parent: Node, pos: Vec3, color?: Color): void {
+        const c = color ?? new Color(255, 220, 150, 255);
+        // 小型闪光
+        const flash = ProjectilePool.get('vfx_flash');
+        if (flash) {
+            parent.addChild(flash);
+            flash.setPosition(pos);
+            this.configureVfxNode(flash, this.getBoxMesh(0.08, 0.08, 0.08), this.getGlowMat(c));
+            flash.setScale(0.3, 0.3, 0.3);
+            tween(flash)
+                .to(0.03, { scale: new Vec3(1.2, 1.2, 1.2) })
+                .to(0.05, { scale: new Vec3(0, 0, 0) })
+                .call(() => ProjectilePool.put('vfx_flash', flash))
+                .start();
+        }
+        // 1-2 个碎片飞溅
+        const debrisCount = 1 + (Math.random() > 0.5 ? 1 : 0);
+        for (let i = 0; i < debrisCount; i++) {
+            const d = ProjectilePool.get('vfx_debris');
+            if (!d) continue;
+            parent.addChild(d);
+            d.setPosition(pos);
+            const s = 0.02 + Math.random() * 0.02;
+            this.configureVfxNode(d, this.getBoxMesh(s, s, s), this.getUnlitMat(c));
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 1.5 + Math.random() * 2;
+            const endP = new Vec3(
+                pos.x + Math.cos(angle) * speed * 0.08,
+                pos.y + 0.05 + Math.random() * 0.1,
+                pos.z + Math.sin(angle) * speed * 0.08
+            );
+            d.setScale(1, 1, 1);
+            tween(d)
+                .to(0.1, { position: endP, scale: new Vec3(0.5, 0.5, 0.5) }, { easing: 'quartOut' })
+                .to(0.08, { scale: new Vec3(0, 0, 0) })
+                .call(() => ProjectilePool.put('vfx_debris', d))
+                .start();
+        }
+    }
+
+    // ========== 弹壳粒子（池化） ==========
+
+    private static _createCasingNode(): Node {
+        const node = new Node('Casing');
+        node.layer = 1 << 0;
+        const renderer = node.addComponent(MeshRenderer);
+        renderer.mesh = this.getBoxMesh(0.03, 0.015, 0.06);
+        renderer.setMaterial(this.getUnlitMat(new Color(200, 170, 60, 255)), 0);
+        return node;
+    }
+
+    /**
+     * 弹壳抛射（元气骑士风格：机枪射击时抛出小弹壳）
+     */
+    public static ejectCasing(parent: Node, pos: Vec3, dirX: number, dirZ: number): void {
+        const node = ProjectilePool.get('mg_casing');
+        if (!node) return;
+
+        parent.addChild(node);
+        node.setPosition(pos);
+        node.setScale(1, 1, 1);
+
+        // 弹壳向射击方向的右侧抛出
+        const rightX = -dirZ;
+        const rightZ = dirX;
+        const side = Math.random() > 0.5 ? 1 : -1;
+        const ejectSpeed = 0.3 + Math.random() * 0.4;
+        const upSpeed = 0.15 + Math.random() * 0.15;
+
+        const endPos = new Vec3(
+            pos.x + rightX * side * ejectSpeed,
+            pos.y + upSpeed,
+            pos.z + rightZ * side * ejectSpeed
+        );
+        const fallPos = new Vec3(endPos.x, pos.y - 0.05, endPos.z);
+
+        tween(node)
+            .to(0.12, { position: endPos, scale: new Vec3(0.8, 0.8, 0.8) }, { easing: 'quartOut' })
+            .to(0.2, { position: fallPos, scale: new Vec3(0.3, 0.3, 0.3) }, { easing: 'quartIn' })
+            .call(() => ProjectilePool.put('mg_casing', node))
+            .start();
     }
 
     // ========== VFX 节点工厂（池友好） ==========
@@ -444,12 +637,17 @@ export class WeaponVFX {
 
         parent.addChild(node);
         node.setPosition(pos);
-        this.configureVfxNode(node, this.getBoxMesh(size, size, size), this.getGlowMat(color));
+        // 使用扁平面片（俯视可见），透明材质渲染枪口火焰
+        this.configureVfxNode(
+            node,
+            this.getFlatQuadMesh(size * 2, size * 2),
+            this.getGlowMat(color)
+        );
 
-        node.setScale(0.5, 0.5, 0.5);
+        node.setScale(0.5, 1, 0.5);
         tween(node)
-            .to(0.04, { scale: new Vec3(1.5, 1.5, 1.5) })
-            .to(0.06, { scale: new Vec3(0, 0, 0) })
+            .to(0.04, { scale: new Vec3(1.8, 1, 1.8) })
+            .to(0.06, { scale: new Vec3(0, 1, 0) })
             .call(() => ProjectilePool.put('vfx_flash', node))
             .start();
     }
@@ -584,6 +782,8 @@ export class WeaponVFX {
         this._beamPoolReady = false;
         this._beamNoiseTex = null;
         this._beamNoiseLoading = false;
+        this._bulletTex = null;
+        this._bulletTexLoading = false;
         this._initialized = false;
     }
 }
