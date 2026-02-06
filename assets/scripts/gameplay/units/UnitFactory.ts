@@ -19,6 +19,7 @@ import {
 import { Enemy } from './Enemy';
 import { Soldier } from './Soldier';
 import { Hero } from './Hero';
+import { HealthBar } from '../../ui/HealthBar';
 import { GameConfig } from '../../data/GameConfig';
 import { HeroAnimationController } from './HeroAnimationController';
 import { AnimRootScaleLock } from '../visuals/AnimRootScaleLock';
@@ -106,6 +107,12 @@ export class UnitFactory {
 
         // Set Target
         enemy.setTargetPosition(targetPos);
+
+        // 血条
+        const hb = node.addComponent(HealthBar);
+        hb.width = 80;
+        hb.height = 8;
+        hb.yOffset = 1.8;
 
         return node;
     }

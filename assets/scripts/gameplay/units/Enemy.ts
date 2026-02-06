@@ -1,4 +1,4 @@
-import { _decorator, Vec3, ICollisionEvent, BoxCollider } from 'cc';
+import { _decorator, Vec3, ICollisionEvent, BoxCollider, RigidBody } from 'cc';
 import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
 import { EventManager } from '../../core/managers/EventManager';
@@ -78,6 +78,12 @@ export class Enemy extends Unit {
 
     protected updateMovement(dt: number): void {
         if (!this.isAlive) return;
+
+        // 清除 RigidBody 残余速度，避免物理引擎干扰 setPosition 移动
+        const rb = this.node.getComponent(RigidBody);
+        if (rb) {
+            rb.setLinearVelocity(Vec3.ZERO);
+        }
 
         // If Attacking, Don't move
         if (

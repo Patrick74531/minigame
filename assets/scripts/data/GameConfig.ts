@@ -432,10 +432,10 @@ export const GameConfig = {
          * NOTE: 仅用于 gameplay/wave/WaveManager (Infinite Mode)。
          */
         INFINITE: {
-            BASE_COUNT: 6,
-            COUNT_PER_WAVE: 1,
+            BASE_COUNT: 10,
+            COUNT_PER_WAVE: 2,
             COUNT_GROWTH_STEP_WAVES: 5,
-            COUNT_GROWTH_STEP_BONUS: 2,
+            COUNT_GROWTH_STEP_BONUS: 3,
             BASE_HP_MULT: 1,
             HP_MULT_PER_WAVE: 0.16,
             BASE_SPEED_MULT: 1,
@@ -628,23 +628,23 @@ export const GameConfig = {
                 description: '高射速曳光机枪，以炽热弹幕切割敌人',
                 iconColor: '#FF4500',
                 levels: [
-                    { damage: 8, attackInterval: 0.12, range: 8, projectileSpeed: 28, spread: 1.5 },
+                    { damage: 8, attackInterval: 0.12, range: 8, projectileSpeed: 28, spread: 4 },
                     {
                         damage: 10,
                         attackInterval: 0.1,
                         range: 8.5,
                         projectileSpeed: 30,
-                        spread: 2,
+                        spread: 5,
                     },
-                    { damage: 12, attackInterval: 0.08, range: 9, projectileSpeed: 32, spread: 2 },
+                    { damage: 12, attackInterval: 0.08, range: 9, projectileSpeed: 32, spread: 6 },
                     {
                         damage: 15,
                         attackInterval: 0.06,
                         range: 9.5,
                         projectileSpeed: 34,
-                        spread: 2.5,
+                        spread: 7,
                     },
-                    { damage: 18, attackInterval: 0.04, range: 10, projectileSpeed: 36, spread: 3 },
+                    { damage: 18, attackInterval: 0.04, range: 10, projectileSpeed: 36, spread: 8 },
                 ],
             },
             flamethrower: {

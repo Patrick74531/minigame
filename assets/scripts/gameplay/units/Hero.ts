@@ -190,23 +190,19 @@ export class Hero extends Unit {
             this._customWeaponTimer -= dt;
         }
 
-        // 如果有输入，强制为移动状态
-        if (this._inputVector.lengthSqr() > 0.01) {
+        const isMoving = this._inputVector.lengthSqr() > 0.01;
+
+        // 始终索敌（移动时也能锁定目标并开火）
+        this.updateTargeting();
+
+        // 移动输入覆盖状态，但保留目标用于射击
+        if (isMoving) {
             this._state = UnitState.MOVING;
-        } else {
-            // 否则尝试索敌
-            this.updateTargeting();
         }
 
-        // 自定义武器：绕过 Unit 基类的 _attackTimer，使用武器自身射速
-        // Unit._attackTimer 默认以英雄基础攻击间隔（~1s）为节奏，会严重限制武器射速
-        // 这里直接调用 performAttack()，内部有 _customWeaponTimer 控制实际射速
+        // 只要有目标 + 武器就绪，无论移动还是静止都开火
         const manager = HeroWeaponManager.instance;
-        if (
-            this._state === UnitState.ATTACKING &&
-            manager.activeWeapon &&
-            this._customWeaponTimer <= 0
-        ) {
+        if (this._target && manager.activeWeapon && this._customWeaponTimer <= 0) {
             this.performAttack();
         }
 

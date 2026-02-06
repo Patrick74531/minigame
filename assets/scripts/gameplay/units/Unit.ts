@@ -5,7 +5,7 @@ import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../data/GameEvents';
 import { IPoolable } from '../../core/managers/PoolManager';
 import { IAttackable } from '../../core/interfaces/IAttackable';
-import { Vec3 } from 'cc';
+import { Vec3, RigidBody } from 'cc';
 import { HealthBar } from '../../ui/HealthBar';
 
 const { ccclass, property } = _decorator;
@@ -67,6 +67,12 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
 
     protected _speedModifier: number = 1.0;
     protected _slowTimer: number = 0;
+    /** 击退硬直计时器：> 0 时单位无法自主移动 */
+    protected _stunTimer: number = 0;
+    /** 击退速度向量（硬直期间用于手动位移） */
+    protected _knockbackVel: Vec3 = new Vec3();
+    /** 复用临时向量（避免每帧 GC） */
+    private static readonly _tmpKbVec = new Vec3();
 
     public get stats(): UnitStats {
         return this._stats;
@@ -114,6 +120,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
     public onDespawn(): void {
         this._target = null;
         this._state = UnitState.IDLE;
+        this.clearKnockbackState();
     }
 
     // === 公共方法 ===
@@ -184,6 +191,9 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         this._state = UnitState.IDLE;
         this._target = null;
         this._attackTimer = 0;
+        this._speedModifier = 1.0;
+        this._slowTimer = 0;
+        this.clearKnockbackState();
         this.updateHealthBar();
     }
 
@@ -232,12 +242,47 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         // console.log(`[Unit] Slowed! Mod: ${this._speedModifier}`);
     }
 
+    /**
+     * 击退效果：记录击退速度 + 短暂硬直
+     * 硬直期间通过 setPosition 推移，避免依赖刚体速度带来的不稳定性
+     */
+    public applyKnockback(
+        dirX: number,
+        dirZ: number,
+        force: number,
+        stunDuration: number = 0.15
+    ): void {
+        if (!this.isAlive) return;
+        if (force <= 0) return;
+        const dirLen = Math.sqrt(dirX * dirX + dirZ * dirZ);
+        if (dirLen <= 0.0001) return;
+
+        const nx = dirX / dirLen;
+        const nz = dirZ / dirLen;
+
+        // 叠加击退速度（单位/秒）
+        this._knockbackVel.x += nx * force;
+        this._knockbackVel.z += nz * force;
+
+        // 命中当帧立即推开，确保击退肉眼可见
+        const impactDistance = Math.min(0.9, Math.max(0.22, force * 0.03));
+        const pos = this.node.position;
+        this.node.setPosition(pos.x + nx * impactDistance, pos.y, pos.z + nz * impactDistance);
+
+        // 叠加硬直：取较大值避免短硬直覆盖长硬直
+        if (stunDuration > 0) {
+            this._stunTimer = Math.max(this._stunTimer, stunDuration);
+        }
+    }
+
     private updateStatusEffects(dt: number): void {
+        if (this._stunTimer > 0) {
+            this._stunTimer -= dt;
+        }
         if (this._slowTimer > 0) {
             this._slowTimer -= dt;
             if (this._slowTimer <= 0) {
                 this._speedModifier = 1.0;
-                // console.log(`[Unit] Slow ended.`);
             }
         }
     }
@@ -249,6 +294,17 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
 
         this.updateStatusEffects(dt);
 
+        // 击退硬直优先于所有状态（MOVING / ATTACKING / IDLE 都被打断）
+        if (this._stunTimer > 0) {
+            this.applyKnockbackMovement(dt);
+            return;
+        }
+
+        // 硬直刚结束：清除残余击退状态，避免物理速度干扰正常移动
+        if (this._knockbackVel.lengthSqr() > 0.001) {
+            this.clearKnockbackState();
+        }
+
         switch (this._state) {
             case UnitState.MOVING:
                 this.updateMovement(dt);
@@ -256,6 +312,42 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
             case UnitState.ATTACKING:
                 this.updateAttack(dt);
                 break;
+        }
+    }
+
+    /** 硬直期间：直接位移（setPosition）驱动击退，每帧衰减 */
+    private applyKnockbackMovement(dt: number): void {
+        // 先位移再衰减：确保低帧率下第一帧也有可见击退
+        if (this._knockbackVel.lengthSqr() > 0.0001) {
+            const pos = this.node.position;
+            this.node.setPosition(
+                pos.x + this._knockbackVel.x * dt,
+                pos.y,
+                pos.z + this._knockbackVel.z * dt
+            );
+        }
+
+        // 60fps 基准衰减，按 dt 折算，避免帧率越高衰减越快
+        const damping = Math.pow(0.88, dt * 60);
+        this._knockbackVel.x *= damping;
+        this._knockbackVel.z *= damping;
+
+        // 若有刚体，清掉线速度，避免和手动位移互相干扰
+        const rb = this.node.getComponent(RigidBody);
+        if (rb) {
+            Unit._tmpKbVec.set(0, 0, 0);
+            rb.setLinearVelocity(Unit._tmpKbVec);
+        }
+    }
+
+    /** 清除击退状态：归零速度向量和 RigidBody 线速度 */
+    private clearKnockbackState(): void {
+        this._stunTimer = 0;
+        this._knockbackVel.set(0, 0, 0);
+        const rb = this.node.getComponent(RigidBody);
+        if (rb) {
+            Unit._tmpKbVec.set(0, 0, 0);
+            rb.setLinearVelocity(Unit._tmpKbVec);
         }
     }
 

@@ -43,7 +43,7 @@ export class WeaponVFX {
         this._initialized = true;
 
         // 预热 VFX 节点池
-        ProjectilePool.register('vfx_flash', () => this._createVfxNode('Flash'), 12);
+        ProjectilePool.register('vfx_flash', () => this._createVfxNode('Flash'), 30);
         ProjectilePool.register('vfx_ring', () => this._createVfxNode('Ring'), 4);
         ProjectilePool.register('vfx_debris', () => this._createVfxNode('Debris'), 15);
         ProjectilePool.register('vfx_ground', () => this._createVfxNode('Ground'), 3);
@@ -632,23 +632,53 @@ export class WeaponVFX {
     // ========== 枪口闪光（池化） ==========
 
     public static createMuzzleFlash(parent: Node, pos: Vec3, color: Color, size: number): void {
+        // 第一层：主火焰（随机旋转 + 非均匀拉伸 → 不规则火焰形状）
         const node = ProjectilePool.get('vfx_flash');
         if (!node) return;
 
         parent.addChild(node);
         node.setPosition(pos);
-        // 使用扁平面片（俯视可见），透明材质渲染枪口火焰
         this.configureVfxNode(
             node,
             this.getFlatQuadMesh(size * 2, size * 2),
             this.getGlowMat(color)
         );
 
-        node.setScale(0.5, 1, 0.5);
+        const angle1 = Math.random() * 360;
+        const stretch = 1.3 + Math.random() * 0.5;
+        node.setRotationFromEuler(0, angle1, 0);
+        node.setScale(0.3 * stretch, 1, 0.25);
         tween(node)
-            .to(0.04, { scale: new Vec3(1.8, 1, 1.8) })
+            .to(0.04, { scale: new Vec3(1.6 * stretch, 1, 1.1) })
             .to(0.06, { scale: new Vec3(0, 1, 0) })
             .call(() => ProjectilePool.put('vfx_flash', node))
+            .start();
+
+        // 第二层：交叉火焰（与主火焰夹 40~80°）→ 打破正方形轮廓，形成不规则星形
+        const node2 = ProjectilePool.get('vfx_flash');
+        if (!node2) return;
+
+        parent.addChild(node2);
+        node2.setPosition(pos);
+        const innerColor = new Color(
+            Math.min(255, color.r + 40),
+            Math.min(255, color.g + 20),
+            color.b,
+            Math.floor(color.a * 0.8)
+        );
+        this.configureVfxNode(
+            node2,
+            this.getFlatQuadMesh(size * 1.5, size * 1.5),
+            this.getGlowMat(innerColor)
+        );
+
+        const angle2 = angle1 + 40 + Math.random() * 40;
+        node2.setRotationFromEuler(0, angle2, 0);
+        node2.setScale(0.2, 1, 0.35);
+        tween(node2)
+            .to(0.03, { scale: new Vec3(0.9, 1, 1.5) })
+            .to(0.05, { scale: new Vec3(0, 1, 0) })
+            .call(() => ProjectilePool.put('vfx_flash', node2))
             .start();
     }
 

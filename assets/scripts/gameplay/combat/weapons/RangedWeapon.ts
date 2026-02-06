@@ -26,8 +26,6 @@ export class RangedWeapon extends Weapon {
         const spawnPos = this.node.position.clone();
         spawnPos.y += GameConfig.PHYSICS.PROJECTILE_SPAWN_OFFSET_Y; // Shoot from chest/head height
 
-        console.log(`[RangedWeapon] Creating bullet at ${spawnPos} targeting ${target.name}`);
-
         // Use Factory
         BulletFactory.createBullet(this.node.parent!, spawnPos, target, {
             damage: this.damage,

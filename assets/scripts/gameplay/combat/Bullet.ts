@@ -1,13 +1,4 @@
-import {
-    _decorator,
-    Component,
-    Node,
-    Vec3,
-    BoxCollider,
-    ITriggerEvent,
-    RigidBody,
-    Tween,
-} from 'cc';
+import { _decorator, Node, Vec3, BoxCollider, ITriggerEvent, RigidBody, Tween } from 'cc';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { Unit, UnitType } from '../units/Unit';
 import { EventManager } from '../../core/managers/EventManager';
@@ -51,6 +42,16 @@ export class Bullet extends BaseComponent implements IPoolable {
     public critRate: number = 0;
     public critDamage: number = 1.5;
 
+    // === Pierce & Knockback ===
+    /** 穿透：子弹击中后继续飞行，伤害直线上所有敌人 */
+    public pierce: boolean = false;
+    /** 击退力度 */
+    public knockbackForce: number = 0;
+    /** 击退硬直时长（秒） */
+    public knockbackStun: number = 0.1;
+    /** 已命中的敌人节点（穿透时避免重复伤害） */
+    private _hitNodes: Set<Node> = new Set();
+
     // === Pool Recycling ===
     /** 若非空，销毁时回收到 ProjectilePool 而非 destroy */
     public poolKey: string = '';
@@ -61,6 +62,9 @@ export class Bullet extends BaseComponent implements IPoolable {
     public get velocity(): Vec3 {
         return this._velocity;
     }
+
+    private static readonly _tmpPos = new Vec3();
+    private static readonly _tmpLookAt = new Vec3();
 
     public setTarget(target: Node): void {
         this._target = target;
@@ -80,7 +84,6 @@ export class Bullet extends BaseComponent implements IPoolable {
     /** 重置子弹状态（对象池复用时调用） */
     public resetState(): void {
         this._lifetime = 0;
-        this._logTimer = 0;
         this._target = null;
         this._velocity.set(0, 0, 0);
         this.explosionRadius = 0;
@@ -91,6 +94,10 @@ export class Bullet extends BaseComponent implements IPoolable {
         this.critRate = 0;
         this.critDamage = 1.5;
         this.orientXAxis = false;
+        this.pierce = false;
+        this.knockbackForce = 0;
+        this.knockbackStun = 0.1;
+        this._hitNodes.clear();
     }
 
     /** 回收子弹：有 poolKey 则归池，否则 destroy */
@@ -107,7 +114,6 @@ export class Bullet extends BaseComponent implements IPoolable {
     }
 
     protected initialize(): void {
-        console.log('[Bullet] Created/Initialized');
         this._lifetime = 0;
 
         // Force Layer to Default (1 << 0)
@@ -133,16 +139,8 @@ export class Bullet extends BaseComponent implements IPoolable {
         col.on('onTriggerEnter', this.onTriggerEnter, this);
     }
 
-    private _logTimer: number = 0;
-
     protected update(dt: number): void {
         this._lifetime += dt;
-        this._logTimer += dt;
-
-        if (this._logTimer > 1.0) {
-            this._logTimer = 0;
-            console.log(`[Bullet] Alive at: ${this.node.position} | Scale: ${this.node.scale}`);
-        }
 
         if (this._lifetime > this._maxLifetime) {
             this.recycle();
@@ -156,20 +154,29 @@ export class Bullet extends BaseComponent implements IPoolable {
             return;
         }
 
-        const currentPos = this.node.position.clone();
-        const move = new Vec3();
-        Vec3.multiplyScalar(move, this._velocity, dt);
-        Vec3.add(currentPos, currentPos, move);
+        const pos = this.node.position;
+        const currentPos = Bullet._tmpPos;
+        currentPos.set(
+            pos.x + this._velocity.x * dt,
+            pos.y + this._velocity.y * dt,
+            pos.z + this._velocity.z * dt
+        );
         this.node.setPosition(currentPos);
 
         // Face direction
         if (this._velocity.lengthSqr() > 0.1) {
             if (this.orientXAxis) {
-                // 精灵子弹：将 +X 轴对齐速度方向（贴图水平朝右）
-                const yDeg = Math.atan2(-this._velocity.z, this._velocity.x) * (180 / Math.PI);
+                // 精灵子弹：将 -X 轴对齐速度方向（贴图弹头朝左）
+                const yDeg =
+                    Math.atan2(-this._velocity.z, this._velocity.x) * (180 / Math.PI) + 180;
                 this.node.setRotationFromEuler(0, yDeg, 0);
             } else {
-                const lookAtPos = currentPos.clone().add(this._velocity);
+                const lookAtPos = Bullet._tmpLookAt;
+                lookAtPos.set(
+                    currentPos.x + this._velocity.x,
+                    currentPos.y + this._velocity.y,
+                    currentPos.z + this._velocity.z
+                );
                 this.node.lookAt(lookAtPos);
             }
         }
@@ -187,15 +194,21 @@ export class Bullet extends BaseComponent implements IPoolable {
     }
 
     private onTriggerEnter(event: ITriggerEvent): void {
-        // Prevent instant collision on spawn
-        if (this._lifetime < 0.1) return;
+        // Prevent instant collision on spawn (1 frame at 60fps)
+        if (this._lifetime < 0.02) return;
 
         const other = event.otherCollider.node;
+
+        // 穿透模式：跳过已命中的敌人
+        if (this.pierce && this._hitNodes.has(other)) return;
 
         // Check if unit (Direct Hit)
         const unit = other.getComponent(Unit);
 
         if (unit && unit.unitType === UnitType.ENEMY) {
+            // 记录已命中（穿透时避免重复伤害）
+            this._hitNodes.add(other);
+
             // 1. AOE Logic
             if (this.explosionRadius > 0) {
                 // Decoupled: Emit event for Manager to handle
@@ -211,6 +224,26 @@ export class Bullet extends BaseComponent implements IPoolable {
                 this.applyDamage(unit);
             }
 
+            // 击退效果
+            if (this.knockbackForce > 0 && this._velocity.lengthSqr() > 0.01) {
+                const lenXZ = Math.sqrt(
+                    this._velocity.x * this._velocity.x + this._velocity.z * this._velocity.z
+                );
+                if (lenXZ > 0.0001) {
+                    unit.applyKnockback(
+                        this._velocity.x / lenXZ,
+                        this._velocity.z / lenXZ,
+                        this.knockbackForce,
+                        this.knockbackStun
+                    );
+                }
+            }
+
+            this.createHitEffect();
+
+            // 穿透模式：不回收，继续飞行
+            if (this.pierce) return;
+
             // 2. Chain Logic (Bounce)
             if (this.chainCount > 0 && this.chainRange > 0) {
                 this.handleChainBounce(unit.node);
@@ -218,7 +251,6 @@ export class Bullet extends BaseComponent implements IPoolable {
                 return;
             }
 
-            this.createHitEffect();
             this.recycle();
         }
     }
@@ -228,7 +260,6 @@ export class Bullet extends BaseComponent implements IPoolable {
         const nextTarget = this.findNextChainTarget(currentHitNode);
 
         if (nextTarget) {
-            console.log(`[Bullet] Chaining to ${nextTarget.name}. Remaining: ${this.chainCount}`);
             this.chainCount--;
 
             // Visual Trail/Zap
@@ -300,8 +331,8 @@ export class Bullet extends BaseComponent implements IPoolable {
 
     private createHitEffect(): void {
         if (!this.node.parent) return;
-        // Throttle: 60% of hits create sparks (performance on mobile)
-        if (Math.random() > 0.6) return;
+        // Throttle: 90% of hits create sparks (performance on mobile)
+        if (Math.random() > 0.9) return;
         WeaponVFX.createHitSpark(this.node.parent, this.node.position.clone());
     }
 
