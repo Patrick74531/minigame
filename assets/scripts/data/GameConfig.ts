@@ -37,6 +37,28 @@ export const GameConfig = {
         UNIT_LINEAR_DAMPING: 0.5,
     },
 
+    // === VFX 视觉参数 ===
+    VFX: {
+        CANNON_BEAM: {
+            maxLevel: 5,
+            beamColorStart: [255, 120, 40, 255],
+            beamColorEnd: [255, 70, 30, 255],
+            coreColorStart: [255, 245, 220, 255],
+            coreColorEnd: [255, 255, 255, 255],
+            width: { base: 0.22, perLevel: 0.05 },
+            duration: { base: 0.1, perLevel: 0.015 },
+            beamWidth: { base: 0.1, perLevel: 0.01 },
+            glowWidth: { base: 0.55, perLevel: 0.05 },
+            pulseSpeed: { base: 6.0, perLevel: 0.4 },
+            pulseScale: { base: 0.18, perLevel: 0.03 },
+            noiseScale: { base: 9.0, perLevel: 1.2 },
+            noiseAmp: { base: 0.025, perLevel: 0.004 },
+            intensity: { base: 2.2, perLevel: 0.5 },
+            fadeIn: 0.03,
+            fadeOut: 0.05,
+        },
+    },
+
     // === 经济系统 ===
     ECONOMY: {
         /** 初始金币 */

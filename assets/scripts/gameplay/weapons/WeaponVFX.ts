@@ -1,4 +1,18 @@
-import { Node, Vec3, Color, MeshRenderer, primitives, utils, Material, tween, Mesh } from 'cc';
+import {
+    Node,
+    Vec3,
+    Vec4,
+    Color,
+    MeshRenderer,
+    primitives,
+    utils,
+    Material,
+    tween,
+    Tween,
+    Mesh,
+    Texture2D,
+    resources,
+} from 'cc';
 import { ProjectilePool } from './vfx/ProjectilePool';
 
 /**
@@ -16,6 +30,9 @@ export class WeaponVFX {
     private static _matCache: Map<string, Material> = new Map();
     private static _meshCache: Map<string, Mesh> = new Map();
     private static _initialized: boolean = false;
+    private static _beamNoiseTex: Texture2D | null = null;
+    private static _beamNoiseLoading: boolean = false;
+    private static _beamPoolReady: boolean = false;
 
     /** 初始化共享资源 + 预热池（在 GameController.onLoad 调用一次） */
     public static initialize(): void {
@@ -27,6 +44,23 @@ export class WeaponVFX {
         ProjectilePool.register('vfx_ring', () => this._createVfxNode('Ring'), 4);
         ProjectilePool.register('vfx_debris', () => this._createVfxNode('Debris'), 15);
         ProjectilePool.register('vfx_ground', () => this._createVfxNode('Ground'), 3);
+        ProjectilePool.register('vfx_beam_core', () => this._createVfxNode('BeamCore'), 2);
+        ProjectilePool.register('vfx_beam_glow', () => this._createVfxNode('BeamGlow'), 2);
+        ProjectilePool.register('vfx_beam_pulse', () => this._createVfxNode('BeamPulse'), 2);
+        this._ensureBeamNoiseTexture();
+    }
+
+    private static _ensureBeamNoiseTexture(): void {
+        if (this._beamNoiseTex || this._beamNoiseLoading) return;
+        this._beamNoiseLoading = true;
+        resources.load('textures/beam_noise', Texture2D, (err, texture) => {
+            this._beamNoiseLoading = false;
+            if (err) {
+                console.warn('[WeaponVFX] Failed to load beam_noise texture:', err);
+                return;
+            }
+            this._beamNoiseTex = texture;
+        });
     }
 
     // ========== 材质工厂（缓存 + GPU Instancing） ==========
@@ -56,23 +90,9 @@ export class WeaponVFX {
         mat = new Material();
         mat.initialize({
             effectName: 'builtin-unlit',
-            technique: 1,
             defines: { USE_INSTANCING: true },
         });
         mat.setProperty('mainColor', color);
-        try {
-            if (mat.passes && mat.passes.length > 0) {
-                const pass = mat.passes[0];
-                const target = pass.blendState.targets[0];
-                target.blend = true;
-                target.blendSrc = 2; // SRC_ALPHA
-                target.blendDst = 1; // ONE
-                target.blendSrcAlpha = 2;
-                target.blendDstAlpha = 1;
-            }
-        } catch (_e) {
-            /* fallback */
-        }
         this._matCache.set(key, mat);
         return mat;
     }
@@ -103,6 +123,18 @@ export class WeaponVFX {
         return this.getBoxMesh(w, 0.01, l);
     }
 
+    /** 获取缓存的单位平面 mesh（beam 用，UV: x=length, y=width） */
+    public static getUnitPlaneMesh(): Mesh {
+        const key = 'plane_1_1';
+        let mesh = this._meshCache.get(key);
+        if (mesh) return mesh;
+        mesh = utils.MeshUtils.createMesh(
+            primitives.plane({ width: 1, length: 1, widthSegments: 1, lengthSegments: 1 })
+        );
+        this._meshCache.set(key, mesh);
+        return mesh;
+    }
+
     /** 添加 box mesh 到节点（使用缓存） */
     public static addBoxMesh(
         node: Node,
@@ -116,7 +148,7 @@ export class WeaponVFX {
             renderer = node.addComponent(MeshRenderer);
         }
         renderer.mesh = this.getBoxMesh(w, h, l);
-        renderer.material = mat;
+        renderer.setMaterial(mat, 0);
         return renderer;
     }
 
@@ -134,7 +166,7 @@ export class WeaponVFX {
         node.layer = 1 << 0;
         const renderer = node.addComponent(MeshRenderer);
         renderer.mesh = this.getFlatQuadMesh(w, l);
-        renderer.material = this.getUnlitMat(color);
+        renderer.setMaterial(this.getUnlitMat(color), 0);
         return node;
     }
 
@@ -147,13 +179,261 @@ export class WeaponVFX {
         return node;
     }
 
+    private static _createBeamNode(): Node {
+        const node = new Node('Beam');
+        node.layer = 1 << 0;
+
+        const renderer = node.addComponent(MeshRenderer);
+        renderer.mesh = this.getUnitPlaneMesh();
+
+        const mat = new Material();
+        mat.initialize({
+            effectName: 'builtin-unlit',
+            defines: {
+                USE_TEXTURE: true,
+            },
+        });
+        mat.setProperty('mainColor', new Color(255, 255, 255, 220));
+        renderer.setMaterial(mat, 0);
+        return node;
+    }
+
+    private static _ensureBeamPool(): void {
+        if (this._beamPoolReady) return;
+        ProjectilePool.register('vfx_beam', () => this._createBeamNode(), 1);
+        this._beamPoolReady = true;
+    }
+
     /** 配置 VFX 节点的 mesh + material（复用节点，只换皮） */
     public static configureVfxNode(node: Node, mesh: Mesh, mat: Material): void {
         const renderer = node.getComponent(MeshRenderer);
         if (renderer) {
             renderer.mesh = mesh;
-            renderer.material = mat;
+            renderer.setMaterial(mat, 0);
         }
+    }
+
+    public static createBeam(
+        parent: Node,
+        start: Vec3,
+        end: Vec3,
+        opts: {
+            width: number;
+            duration: number;
+            beamColor: Color;
+            coreColor: Color;
+            beamWidth: number;
+            glowWidth: number;
+            pulseSpeed: number;
+            pulseScale: number;
+            noiseScale: number;
+            noiseAmp: number;
+            intensity: number;
+            fadeIn: number;
+            fadeOut: number;
+        }
+    ): void {
+        this._ensureBeamPool();
+        this._ensureBeamNoiseTexture();
+        const node = ProjectilePool.get('vfx_beam');
+        if (!node) return;
+
+        parent.addChild(node);
+
+        const s = start.clone();
+        const e = end.clone();
+        e.y = s.y;
+
+        const dx = e.x - s.x;
+        const dz = e.z - s.z;
+        const len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 0.001) {
+            const earlyRenderer = node.getComponent(MeshRenderer);
+            if (earlyRenderer) {
+                earlyRenderer.enabled = false;
+            }
+            ProjectilePool.put('vfx_beam', node);
+            return;
+        }
+
+        node.setPosition((s.x + e.x) * 0.5, s.y, (s.z + e.z) * 0.5);
+
+        const yawRad = Math.atan2(dz, dx);
+        node.setRotationFromEuler(0, (yawRad * 180) / Math.PI, 0);
+
+        node.setScale(len, 1, opts.width);
+
+        const renderer = node.getComponent(MeshRenderer);
+        if (!renderer) {
+            ProjectilePool.put('vfx_beam', node);
+            return;
+        }
+
+        renderer.mesh = this.getUnitPlaneMesh();
+
+        let mat = renderer.getMaterial(0);
+        if (!mat) {
+            mat = new Material();
+            mat.initialize({
+                effectName: 'builtin-unlit',
+                defines: {
+                    USE_TEXTURE: true,
+                },
+            });
+            renderer.setMaterial(mat, 0);
+        }
+
+        if (this._beamNoiseTex) {
+            mat.setProperty('mainTexture', this._beamNoiseTex);
+        }
+        const beamAlpha = Math.min(255, Math.max(80, Math.floor(110 + opts.intensity * 45)));
+        const beamColor = new Color(
+            opts.coreColor.r,
+            opts.coreColor.g,
+            opts.coreColor.b,
+            beamAlpha
+        );
+        mat.setProperty('mainColor', beamColor);
+        mat.setProperty('tilingOffset', new Vec4(Math.max(1, len * 0.45), 1, 0, 0));
+
+        renderer.enabled = true;
+        Tween.stopAllByTarget(node);
+        const startWidth = Math.max(0.02, opts.width * 1.2);
+        const midWidth = Math.max(0.02, opts.width);
+        const endWidth = Math.max(0.01, opts.width * 0.1);
+        const inTime = Math.max(0.015, opts.duration * 0.2);
+        const outTime = Math.max(0.02, opts.duration * 0.8);
+        node.setScale(len, 1, startWidth);
+        tween(node)
+            .to(inTime, { scale: new Vec3(len, 1, midWidth) })
+            .to(outTime, { scale: new Vec3(len, 1, endWidth) })
+            .call(() => {
+                renderer.enabled = false;
+                ProjectilePool.put('vfx_beam', node);
+            })
+            .start();
+    }
+
+    /**
+     * 代码模拟光束（无 shader 时序依赖）
+     * - Core: 主光束
+     * - Glow: 外层晕光
+     * - Pulse: 沿束前进的高亮脉冲
+     */
+    public static createCodeBeam(
+        parent: Node,
+        start: Vec3,
+        end: Vec3,
+        opts: {
+            width: number;
+            duration: number;
+            beamColor: Color;
+            coreColor: Color;
+            intensity: number;
+        }
+    ): void {
+        const s = start.clone();
+        const e = end.clone();
+        e.y = s.y;
+
+        const dx = e.x - s.x;
+        const dz = e.z - s.z;
+        const len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 0.001) return;
+
+        const core = ProjectilePool.get('vfx_beam_core');
+        const glow = ProjectilePool.get('vfx_beam_glow');
+        const pulse = ProjectilePool.get('vfx_beam_pulse');
+        if (!core || !glow || !pulse) {
+            if (core) ProjectilePool.put('vfx_beam_core', core);
+            if (glow) ProjectilePool.put('vfx_beam_glow', glow);
+            if (pulse) ProjectilePool.put('vfx_beam_pulse', pulse);
+            return;
+        }
+
+        parent.addChild(core);
+        parent.addChild(glow);
+        parent.addChild(pulse);
+
+        const yawDeg = (Math.atan2(dx, dz) * 180) / Math.PI;
+        const midX = (s.x + e.x) * 0.5;
+        const midZ = (s.z + e.z) * 0.5;
+
+        const intensityScale = Math.max(0.8, Math.min(2.2, opts.intensity / 2.2 + 0.9));
+        const coreW = Math.max(0.04, opts.width * 0.34 * intensityScale);
+        const glowW = Math.max(0.08, opts.width * 0.9 * intensityScale);
+        const pulseLen = Math.max(0.18, len * 0.12);
+
+        const coreMesh = this.getBoxMesh(1, 1, 1);
+        const glowMesh = coreMesh;
+        const pulseMesh = coreMesh;
+        this.configureVfxNode(core, coreMesh, this.getUnlitMat(opts.coreColor));
+        this.configureVfxNode(glow, glowMesh, this.getUnlitMat(opts.beamColor));
+        this.configureVfxNode(
+            pulse,
+            pulseMesh,
+            this.getUnlitMat(this.lerpColor(opts.coreColor, opts.beamColor, 0.35))
+        );
+
+        core.setPosition(midX, s.y, midZ);
+        glow.setPosition(midX, s.y, midZ);
+        pulse.setPosition(s.x, s.y, s.z);
+        core.setRotationFromEuler(0, yawDeg, 0);
+        glow.setRotationFromEuler(0, yawDeg, 0);
+        pulse.setRotationFromEuler(0, yawDeg, 0);
+
+        const coreH = 0.018;
+        const glowH = 0.012;
+        const pulseH = 0.022;
+        core.setScale(coreW, coreH, len);
+        glow.setScale(glowW, glowH, len * 1.02);
+        pulse.setScale(coreW * 1.25, pulseH, pulseLen);
+
+        const dirX = dx / len;
+        const dirZ = dz / len;
+        const rightX = -dirZ;
+        const rightZ = dirX;
+        const duration = Math.max(0.05, opts.duration);
+
+        Tween.stopAllByTarget(core);
+        Tween.stopAllByTarget(glow);
+        Tween.stopAllByTarget(pulse);
+
+        const state = { t: 0 };
+        tween(state)
+            .to(
+                duration,
+                { t: 1 },
+                {
+                    onUpdate: () => {
+                        const t = state.t;
+                        const flare = 1 + Math.sin(t * Math.PI * 6) * 0.1;
+                        const taper = Math.max(0.08, 1 - t * 0.9);
+
+                        core.setScale(coreW * flare * taper, coreH, len);
+                        glow.setScale(glowW * (1 + 0.16 * flare) * taper, glowH, len * 1.02);
+
+                        const travel = len * t;
+                        const jitter = Math.sin(t * Math.PI * 20) * opts.width * 0.06;
+                        pulse.setPosition(
+                            s.x + dirX * travel + rightX * jitter,
+                            s.y,
+                            s.z + dirZ * travel + rightZ * jitter
+                        );
+                        pulse.setScale(
+                            coreW * 1.28 * (1 + 0.25 * (1 - t)),
+                            pulseH,
+                            pulseLen * (1 - 0.35 * t)
+                        );
+                    },
+                }
+            )
+            .call(() => {
+                ProjectilePool.put('vfx_beam_core', core);
+                ProjectilePool.put('vfx_beam_glow', glow);
+                ProjectilePool.put('vfx_beam_pulse', pulse);
+            })
+            .start();
     }
 
     // ========== 枪口闪光（池化） ==========
@@ -301,6 +581,9 @@ export class WeaponVFX {
         this._matCache.clear();
         this._meshCache.clear();
         ProjectilePool.clearAll();
+        this._beamPoolReady = false;
+        this._beamNoiseTex = null;
+        this._beamNoiseLoading = false;
         this._initialized = false;
     }
 }
