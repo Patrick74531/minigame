@@ -24,3 +24,16 @@ export {
     BuffCardEffect,
     CardRarity,
 } from './roguelike/BuffCardService';
+
+// 武器系统
+export {
+    WeaponType,
+    WeaponDef,
+    WeaponInstance,
+    WeaponBehavior,
+    WeaponBehaviorFactory,
+    HeroWeaponManager,
+} from './weapons';
+
+// 空投系统
+export { AirdropService } from './airdrop/AirdropService';

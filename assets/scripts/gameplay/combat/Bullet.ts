@@ -23,6 +23,7 @@ export class Bullet extends BaseComponent implements IPoolable {
     public damage: number = 10;
 
     private _target: Node | null = null;
+    /** 速度向量（武器行为可通过 velocity 访问器修改） */
     private _velocity: Vec3 = new Vec3();
     private _lifetime: number = 0;
     private _maxLifetime: number = 3;
@@ -38,6 +39,11 @@ export class Bullet extends BaseComponent implements IPoolable {
     // === Crit Properties ===
     public critRate: number = 0;
     public critDamage: number = 1.5;
+
+    /** 公开速度向量，供武器行为修改弹道 */
+    public get velocity(): Vec3 {
+        return this._velocity;
+    }
 
     public setTarget(target: Node): void {
         this._target = target;

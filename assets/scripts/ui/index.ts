@@ -7,3 +7,5 @@ export { UIFactory } from './UIFactory';
 export { Joystick } from './Joystick';
 export { HealthBar } from './HealthBar';
 export { BuffCardUI } from './BuffCardUI';
+export { WeaponSelectUI } from './WeaponSelectUI';
+export { WeaponBarUI } from './WeaponBarUI';

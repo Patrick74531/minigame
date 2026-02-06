@@ -3,6 +3,8 @@ import { UIFactory } from '../../ui/UIFactory';
 import { Joystick } from '../../ui/Joystick';
 import { HUDManager } from '../../ui/HUDManager';
 import { BuffCardUI } from '../../ui/BuffCardUI';
+import { WeaponSelectUI } from '../../ui/WeaponSelectUI';
+import { WeaponBarUI } from '../../ui/WeaponBarUI';
 import { ServiceRegistry } from '../managers/ServiceRegistry';
 
 export type UIRefs = {
@@ -22,6 +24,8 @@ export class UIBootstrap {
         const joystick = UIFactory.createJoystick(canvas);
         UIBootstrap.hudManager.initialize(canvas);
         UIBootstrap.buffCardUI.initialize(canvas);
+        UIBootstrap.weaponSelectUI.initialize(canvas);
+        UIBootstrap.weaponBarUI.initialize(canvas);
 
         return { canvas, joystick };
     }
@@ -32,5 +36,13 @@ export class UIBootstrap {
 
     private static get buffCardUI(): BuffCardUI {
         return ServiceRegistry.get<BuffCardUI>('BuffCardUI') ?? BuffCardUI.instance;
+    }
+
+    private static get weaponSelectUI(): WeaponSelectUI {
+        return ServiceRegistry.get<WeaponSelectUI>('WeaponSelectUI') ?? WeaponSelectUI.instance;
+    }
+
+    private static get weaponBarUI(): WeaponBarUI {
+        return ServiceRegistry.get<WeaponBarUI>('WeaponBarUI') ?? WeaponBarUI.instance;
     }
 }

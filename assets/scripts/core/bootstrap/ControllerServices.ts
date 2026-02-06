@@ -10,6 +10,10 @@ import { WaveManager } from '../../gameplay/wave/WaveManager';
 import { CoinDropManager } from '../../gameplay/economy/CoinDropManager';
 import { BuffCardService } from '../../gameplay/roguelike/BuffCardService';
 import { BuffCardUI } from '../../ui/BuffCardUI';
+import { HeroWeaponManager } from '../../gameplay/weapons/HeroWeaponManager';
+import { AirdropService } from '../../gameplay/airdrop/AirdropService';
+import { WeaponSelectUI } from '../../ui/WeaponSelectUI';
+import { WeaponBarUI } from '../../ui/WeaponBarUI';
 
 /**
  * ControllerServices
@@ -58,5 +62,24 @@ export class ControllerServices {
 
     public get buffCardUI(): BuffCardUI {
         return ServiceRegistry.get<BuffCardUI>('BuffCardUI') ?? BuffCardUI.instance;
+    }
+
+    public get heroWeaponManager(): HeroWeaponManager {
+        return (
+            ServiceRegistry.get<HeroWeaponManager>('HeroWeaponManager') ??
+            HeroWeaponManager.instance
+        );
+    }
+
+    public get airdropService(): AirdropService {
+        return ServiceRegistry.get<AirdropService>('AirdropService') ?? AirdropService.instance;
+    }
+
+    public get weaponSelectUI(): WeaponSelectUI {
+        return ServiceRegistry.get<WeaponSelectUI>('WeaponSelectUI') ?? WeaponSelectUI.instance;
+    }
+
+    public get weaponBarUI(): WeaponBarUI {
+        return ServiceRegistry.get<WeaponBarUI>('WeaponBarUI') ?? WeaponBarUI.instance;
     }
 }

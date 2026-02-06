@@ -13,6 +13,10 @@ import { CoinDropManager } from '../../gameplay/economy/CoinDropManager';
 import { UnitFactory } from '../../gameplay/units/UnitFactory';
 import { BuffCardService } from '../../gameplay/roguelike/BuffCardService';
 import { BuffCardUI } from '../../ui/BuffCardUI';
+import { HeroWeaponManager } from '../../gameplay/weapons/HeroWeaponManager';
+import { AirdropService } from '../../gameplay/airdrop/AirdropService';
+import { WeaponSelectUI } from '../../ui/WeaponSelectUI';
+import { WeaponBarUI } from '../../ui/WeaponBarUI';
 
 /**
  * ServiceRegistrar
@@ -37,5 +41,9 @@ export class ServiceRegistrar {
         );
         ServiceRegistry.register('BuffCardService', BuffCardService.instance);
         ServiceRegistry.register('BuffCardUI', BuffCardUI.instance);
+        ServiceRegistry.register('HeroWeaponManager', HeroWeaponManager.instance);
+        ServiceRegistry.register('AirdropService', AirdropService.instance);
+        ServiceRegistry.register('WeaponSelectUI', WeaponSelectUI.instance);
+        ServiceRegistry.register('WeaponBarUI', WeaponBarUI.instance);
     }
 }

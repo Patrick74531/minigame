@@ -11,6 +11,7 @@ import { RuntimeSystemsBootstrap } from './core/bootstrap/RuntimeSystemsBootstra
 import { GameStartFlow } from './core/bootstrap/GameStartFlow';
 import { ControllerServices } from './core/bootstrap/ControllerServices';
 import { PlayerInputAdapter } from './core/input/PlayerInputAdapter';
+import { WeaponBehaviorFactory } from './gameplay/weapons/WeaponBehaviorFactory';
 
 const { ccclass, property } = _decorator;
 
@@ -90,6 +91,11 @@ export class GameController extends Component {
 
         // Initialize roguelike card system
         this._services.buffCardService.initialize();
+
+        // Initialize weapon system
+        WeaponBehaviorFactory.initialize();
+        this._services.heroWeaponManager.initialize();
+        this._services.airdropService.initialize();
     }
 
     protected onDestroy(): void {
@@ -101,6 +107,10 @@ export class GameController extends Component {
         this._services.coinDropManager.cleanup();
         this._services.buffCardService.cleanup();
         this._services.buffCardUI.cleanup();
+        this._services.heroWeaponManager.cleanup();
+        this._services.airdropService.cleanup();
+        this._services.weaponSelectUI.cleanup();
+        this._services.weaponBarUI.cleanup();
         ServiceRegistry.clear();
     }
 

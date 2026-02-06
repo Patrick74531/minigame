@@ -23,6 +23,9 @@ import { StackVisualizer } from '../visuals/StackVisualizer';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import type { BuffCardEffect } from '../roguelike/BuffCardService';
+import { HeroWeaponManager } from '../weapons/HeroWeaponManager';
+import { WeaponBehaviorFactory } from '../weapons/WeaponBehaviorFactory';
+import { getWeaponLevelStats } from '../weapons/WeaponTypes';
 
 const { ccclass, property } = _decorator;
 
@@ -38,6 +41,8 @@ export class Hero extends Unit {
     private _weapon: RangedWeapon | null = null;
     private _mover: CharacterMover | null = null;
     private _stackVisualizer: StackVisualizer | null = null;
+    /** 空投武器冷却计时器 */
+    private _customWeaponTimer: number = 0;
 
     public onDespawn(): void {
         if (this.gameManager.hero === this.node) {
@@ -180,6 +185,11 @@ export class Hero extends Unit {
         // 游戏暂停时不处理移动和攻击
         if (!this.gameManager.isPlaying) return;
 
+        // 空投武器冷却
+        if (this._customWeaponTimer > 0) {
+            this._customWeaponTimer -= dt;
+        }
+
         // 如果有输入，强制为移动状态
         if (this._inputVector.lengthSqr() > 0.01) {
             this._state = UnitState.MOVING;
@@ -252,6 +262,26 @@ export class Hero extends Unit {
     protected performAttack(): void {
         if (!this._target || !this._target.isAlive) return;
 
+        // 优先使用空投武器系统
+        const manager = HeroWeaponManager.instance;
+        const active = manager.activeWeapon;
+        if (active) {
+            const behavior = WeaponBehaviorFactory.get(active.type);
+            const def = manager.getWeaponDef(active.type);
+            if (behavior && def) {
+                const stats = getWeaponLevelStats(def, active.level);
+                if (this._customWeaponTimer <= 0) {
+                    const parent = this.node.parent;
+                    if (parent) {
+                        behavior.fire(this.node, this._target.node, stats, active.level, parent);
+                    }
+                    this._customWeaponTimer = stats.attackInterval;
+                }
+                return;
+            }
+        }
+
+        // 默认武器
         if (this._weapon) {
             this._weapon.tryAttack(this._target.node);
         }

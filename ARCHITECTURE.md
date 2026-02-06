@@ -40,6 +40,26 @@
 - **Events**: `BASE_UPGRADE_READY` → triggers card draw; `BUFF_CARD_PICKED` → applies chosen card
 - **Flow**: Base upgrade → emit `BASE_UPGRADE_READY` → BuffCardService draws 3 cards → BuffCardUI shows overlay → player picks → `BUFF_CARD_PICKED` → Hero.applyBuffCard() → resume game
 
+## Airdrop Weapon System
+
+- **WeaponTypes**: `assets/scripts/gameplay/weapons/WeaponTypes.ts` — enums, interfaces, level stats
+- **WeaponBehavior**: `assets/scripts/gameplay/weapons/WeaponBehavior.ts` — abstract base for weapon fire logic
+- **WeaponBehaviorFactory**: `assets/scripts/gameplay/weapons/WeaponBehaviorFactory.ts` — maps WeaponType → behavior instance
+- **HeroWeaponManager**: `assets/scripts/gameplay/weapons/HeroWeaponManager.ts` — weapon inventory, switching, upgrade
+- **Behaviors** (`gameplay/weapons/behaviors/`):
+    - `MachineGunBehavior` — high-rate tracer stream (orange trails, random spread)
+    - `FlamethrowerBehavior` — oil arc with gravity (parabolic projectile)
+    - `CannonBehavior` — spinning rebar with AOE explosion
+    - `GlitchWaveBehavior` — expanding energy ring (AOE damage)
+- **AirdropService**: `assets/scripts/gameplay/airdrop/AirdropService.ts` — listens to `WAVE_START`, draws 3 weapons, pauses game
+- **WeaponSelectUI**: `assets/scripts/ui/WeaponSelectUI.ts` — 3-choice weapon overlay (pause → pick → resume)
+- **WeaponBarUI**: `assets/scripts/ui/WeaponBarUI.ts` — bottom-right weapon icons, click to switch active weapon
+- **Config**: `GameConfig.WEAPON_SYSTEM` — weapon definitions with 5 upgrade levels each
+- **Events**: `WAVE_START` → `WEAPONS_OFFERED` → `WEAPON_PICKED` → `WEAPON_SWITCHED`
+- **Flow**: Wave starts → AirdropService draws 3 weapons → pause → WeaponSelectUI shows overlay → player picks → HeroWeaponManager adds/upgrades weapon → WeaponBarUI refreshes → resume → Hero.performAttack() uses active WeaponBehavior
+- **Upgrade**: Picking a duplicate weapon auto-upgrades it (max Lv.5); stats scale per level in config
+- **Extension**: Add new weapon by: (1) add entry to `GameConfig.WEAPON_SYSTEM.WEAPONS`, (2) add `WeaponType` enum value, (3) create `XxxBehavior extends WeaponBehavior`, (4) register in `WeaponBehaviorFactory`
+
 ## TODO Backlog (Non-Blocking)
 
 - Building ownership tracking for spawned units

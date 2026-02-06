@@ -67,6 +67,18 @@ export const GameEvents = {
     /** 玩家选择了一张增益卡牌 { cardId: string } */
     BUFF_CARD_PICKED: 'BUFF_CARD_PICKED',
 
+    // === 空投武器系统 ===
+    /** 空投生成 { wave: number, position: Vec3 } */
+    AIRDROP_SPAWNED: 'AIRDROP_SPAWNED',
+    /** 空投宝箱被打开 */
+    AIRDROP_OPENED: 'AIRDROP_OPENED',
+    /** 武器选择已抽取完毕，可展示选择界面 { weapons: string[] } */
+    WEAPONS_OFFERED: 'WEAPONS_OFFERED',
+    /** 玩家选择了一把武器 { weaponId: string } */
+    WEAPON_PICKED: 'WEAPON_PICKED',
+    /** 武器切换 { weaponId: string } */
+    WEAPON_SWITCHED: 'WEAPON_SWITCHED',
+
     // === 技能/特效系统 ===
     /** 应用AOE效果 { center: Vec3, radius: number, damage: number, slowPercent: number, slowDuration: number } */
     APPLY_AOE_EFFECT: 'APPLY_AOE_EFFECT',
@@ -108,6 +120,11 @@ export type GameEventPayloads = {
     [GameEvents.BASE_UPGRADE_READY]: { baseLevel: number };
     [GameEvents.BUFF_CARDS_DRAWN]: { count: number };
     [GameEvents.BUFF_CARD_PICKED]: { cardId: string };
+    [GameEvents.AIRDROP_SPAWNED]: { wave: number; position: Vec3 };
+    [GameEvents.AIRDROP_OPENED]: void;
+    [GameEvents.WEAPONS_OFFERED]: { weapons: string[] };
+    [GameEvents.WEAPON_PICKED]: { weaponId: string };
+    [GameEvents.WEAPON_SWITCHED]: { weaponId: string };
     [GameEvents.APPLY_AOE_EFFECT]: {
         center: Vec3;
         radius: number;

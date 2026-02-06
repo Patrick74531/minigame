@@ -585,6 +585,158 @@ export const GameConfig = {
         ],
     },
 
+    // === 空投武器系统 ===
+    WEAPON_SYSTEM: {
+        /** 每次空投展示的武器数量 */
+        PICK_COUNT: 3,
+        /** 空投箱下落速度 */
+        CRATE_FALL_SPEED: 8,
+        /** 空投箱停留高度 (Y) */
+        CRATE_LAND_Y: 0.5,
+        /** 空投随机偏移范围 (相对于基地) */
+        AIRDROP_RANGE: 5,
+        /** 武器最大等级 */
+        MAX_WEAPON_LEVEL: 5,
+
+        /** 武器定义 */
+        WEAPONS: {
+            machine_gun: {
+                id: 'machine_gun',
+                name: '寡妇制造者',
+                description: '高射速曳光机枪，以炽热弹幕切割敌人',
+                iconColor: '#FF4500',
+                levels: [
+                    { damage: 8, attackInterval: 0.15, range: 6, projectileSpeed: 25, spread: 3 },
+                    {
+                        damage: 10,
+                        attackInterval: 0.13,
+                        range: 6.5,
+                        projectileSpeed: 27,
+                        spread: 4,
+                    },
+                    { damage: 13, attackInterval: 0.11, range: 7, projectileSpeed: 30, spread: 4 },
+                    {
+                        damage: 16,
+                        attackInterval: 0.09,
+                        range: 7.5,
+                        projectileSpeed: 32,
+                        spread: 5,
+                    },
+                    { damage: 20, attackInterval: 0.07, range: 8, projectileSpeed: 35, spread: 5 },
+                ],
+            },
+            flamethrower: {
+                id: 'flamethrower',
+                name: '堆肥喷火器',
+                description: '喷射粘稠废油，抛物线落地后猛烈燃烧',
+                iconColor: '#8B0000',
+                levels: [
+                    {
+                        damage: 15,
+                        attackInterval: 0.3,
+                        range: 4,
+                        projectileSpeed: 10,
+                        gravity: 8,
+                        burnDuration: 1.5,
+                    },
+                    {
+                        damage: 20,
+                        attackInterval: 0.27,
+                        range: 4.5,
+                        projectileSpeed: 11,
+                        gravity: 8,
+                        burnDuration: 2.0,
+                    },
+                    {
+                        damage: 26,
+                        attackInterval: 0.24,
+                        range: 5,
+                        projectileSpeed: 12,
+                        gravity: 7,
+                        burnDuration: 2.5,
+                    },
+                    {
+                        damage: 33,
+                        attackInterval: 0.21,
+                        range: 5.5,
+                        projectileSpeed: 13,
+                        gravity: 7,
+                        burnDuration: 3.0,
+                    },
+                    {
+                        damage: 42,
+                        attackInterval: 0.18,
+                        range: 6,
+                        projectileSpeed: 14,
+                        gravity: 6,
+                        burnDuration: 3.5,
+                    },
+                ],
+            },
+            cannon: {
+                id: 'cannon',
+                name: '断桩机加农炮',
+                description: '发射旋转螺纹钢，巨大冲击力附带范围伤害',
+                iconColor: '#708090',
+                levels: [
+                    {
+                        damage: 40,
+                        attackInterval: 1.2,
+                        range: 8,
+                        projectileSpeed: 18,
+                        explosionRadius: 1.5,
+                        spinSpeed: 15,
+                    },
+                    {
+                        damage: 55,
+                        attackInterval: 1.1,
+                        range: 8.5,
+                        projectileSpeed: 19,
+                        explosionRadius: 1.8,
+                        spinSpeed: 18,
+                    },
+                    {
+                        damage: 72,
+                        attackInterval: 1.0,
+                        range: 9,
+                        projectileSpeed: 20,
+                        explosionRadius: 2.1,
+                        spinSpeed: 20,
+                    },
+                    {
+                        damage: 92,
+                        attackInterval: 0.9,
+                        range: 9.5,
+                        projectileSpeed: 21,
+                        explosionRadius: 2.5,
+                        spinSpeed: 22,
+                    },
+                    {
+                        damage: 115,
+                        attackInterval: 0.8,
+                        range: 10,
+                        projectileSpeed: 22,
+                        explosionRadius: 3.0,
+                        spinSpeed: 25,
+                    },
+                ],
+            },
+            glitch_wave: {
+                id: 'glitch_wave',
+                name: '模拟回音',
+                description: '释放故障能量波，对范围内所有敌人造成伤害',
+                iconColor: '#00FFFF',
+                levels: [
+                    { damage: 30, attackInterval: 2.0, range: 5, waveSpeed: 8, waveRadius: 4 },
+                    { damage: 42, attackInterval: 1.8, range: 5.5, waveSpeed: 9, waveRadius: 4.5 },
+                    { damage: 56, attackInterval: 1.6, range: 6, waveSpeed: 10, waveRadius: 5 },
+                    { damage: 72, attackInterval: 1.4, range: 6.5, waveSpeed: 11, waveRadius: 5.5 },
+                    { damage: 90, attackInterval: 1.2, range: 7, waveSpeed: 12, waveRadius: 6 },
+                ],
+            },
+        } as Record<string, any>,
+    },
+
     // === 对象池 ===
     POOL: {
         /** 敌人预创建数量 */
