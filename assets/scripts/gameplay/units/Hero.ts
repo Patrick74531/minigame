@@ -56,6 +56,8 @@ export class Hero extends Unit {
             attackRange: GameConfig.HERO.ATTACK_RANGE,
             attackInterval: GameConfig.HERO.ATTACK_INTERVAL,
             moveSpeed: GameConfig.HERO.MOVE_SPEED,
+            critRate: GameConfig.HERO.CRIT_RATE,
+            critDamage: GameConfig.HERO.CRIT_DAMAGE,
         });
 
         // Initialize Components
@@ -175,6 +177,8 @@ export class Hero extends Unit {
 
     protected update(dt: number): void {
         if (!this.isAlive) return;
+        // 游戏暂停时不处理移动和攻击
+        if (!this.gameManager.isPlaying) return;
 
         // 如果有输入，强制为移动状态
         if (this._inputVector.lengthSqr() > 0.01) {
@@ -255,34 +259,30 @@ export class Hero extends Unit {
 
     /**
      * 应用肉鸽卡牌增益效果
-     * 支持 multiply（乘算）和 add（加算）两种模式，以及 healPercent 回血
+     * 支持 multiply（乘算）和 add（加算）两种模式
      */
     public applyBuffCard(effects: BuffCardEffect): void {
-        this.applyStat('maxHp', effects.maxHp);
         this.applyStat('attack', effects.attack);
         this.applyStat('attackInterval', effects.attackInterval, 0.2);
         this.applyStat('moveSpeed', effects.moveSpeed);
         this.applyStat('attackRange', effects.attackRange);
-
-        // 回血效果
-        if (effects.healPercent) {
-            const heal = Math.floor(this._stats.maxHp * effects.healPercent);
-            this._stats.currentHp = Math.min(this._stats.maxHp, this._stats.currentHp + heal);
-        }
+        this.applyStat('critRate', effects.critRate, undefined, 1.0);
+        this.applyStat('critDamage', effects.critDamage);
 
         this.syncRuntimeStats();
         this.updateHealthBar();
     }
 
     private applyStat(
-        key: 'maxHp' | 'attack' | 'attackInterval' | 'moveSpeed' | 'attackRange',
+        key: 'attack' | 'attackInterval' | 'moveSpeed' | 'attackRange' | 'critRate' | 'critDamage',
         mod?: { multiply?: number; add?: number },
-        min?: number
+        min?: number,
+        max?: number
     ): void {
         if (!mod) return;
         if (mod.multiply !== undefined) {
             this._stats[key] =
-                key === 'maxHp' || key === 'attack'
+                key === 'attack'
                     ? Math.floor(this._stats[key] * mod.multiply)
                     : this._stats[key] * mod.multiply;
         }
@@ -292,6 +292,9 @@ export class Hero extends Unit {
         if (min !== undefined) {
             this._stats[key] = Math.max(min, this._stats[key]);
         }
+        if (max !== undefined) {
+            this._stats[key] = Math.min(max, this._stats[key]);
+        }
     }
 
     private syncRuntimeStats(): void {
@@ -299,6 +302,8 @@ export class Hero extends Unit {
             this._weapon.damage = this._stats.attack;
             this._weapon.range = this._stats.attackRange;
             this._weapon.attackInterval = this._stats.attackInterval;
+            this._weapon.critRate = this._stats.critRate;
+            this._weapon.critDamage = this._stats.critDamage;
         }
         if (this._mover) {
             this._mover.moveSpeed = this._stats.moveSpeed;

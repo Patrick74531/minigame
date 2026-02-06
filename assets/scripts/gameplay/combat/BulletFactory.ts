@@ -83,6 +83,8 @@ export class BulletFactory {
         bullet.slowDuration = stats.slowDuration || 0;
         bullet.chainCount = stats.chainCount || 0;
         bullet.chainRange = stats.chainRange || 0;
+        bullet.critRate = stats.critRate || 0;
+        bullet.critDamage = stats.critDamage || 1.5;
 
         bullet.setTarget(target);
 

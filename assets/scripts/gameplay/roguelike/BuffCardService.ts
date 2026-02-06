@@ -8,15 +8,17 @@ import { Hero } from '../units/Hero';
 
 /**
  * 卡牌效果：支持乘算（multiply）和加算（add）两种模式
- * 与 UnitStats 字段对应，healPercent 为特殊回血效果
+ * 与 UnitStats 战斗属性字段对应
  */
 export interface BuffCardEffect {
-    maxHp?: { multiply?: number; add?: number };
     attack?: { multiply?: number; add?: number };
     attackInterval?: { multiply?: number; add?: number };
     moveSpeed?: { multiply?: number; add?: number };
     attackRange?: { multiply?: number; add?: number };
-    healPercent?: number;
+    /** 暴击率增量 (add: 0.05 = +5% 暴击率) */
+    critRate?: { multiply?: number; add?: number };
+    /** 暴击伤害增量 (add: 0.3 = +30% 暴击伤害) */
+    critDamage?: { multiply?: number; add?: number };
 }
 
 /** 卡牌稀有度 */

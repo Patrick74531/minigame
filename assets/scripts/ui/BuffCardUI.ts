@@ -280,22 +280,27 @@ export class BuffCardUI {
     // === 属性格式化 ===
 
     private static readonly STAT_NAMES: Record<string, string> = {
-        maxHp: '生命值',
         attack: '攻击力',
         attackInterval: '攻击间隔',
         moveSpeed: '移动速度',
         attackRange: '攻击范围',
+        critRate: '暴击率',
+        critDamage: '暴击伤害',
     };
+
+    /** critRate / critDamage 的 add 值以百分比展示 */
+    private static readonly PERCENT_ADD_KEYS = new Set(['critRate', 'critDamage']);
 
     private formatEffects(effects: BuffCardEffect): string {
         const lines: string[] = [];
 
         const statKeys: (keyof BuffCardEffect)[] = [
-            'maxHp',
             'attack',
             'attackInterval',
             'moveSpeed',
             'attackRange',
+            'critRate',
+            'critDamage',
         ];
 
         for (const key of statKeys) {
@@ -314,20 +319,25 @@ export class BuffCardUI {
                 }
             }
             if ('add' in mod && mod.add !== undefined) {
-                if (mod.add > 0) {
-                    parts.push(`+${mod.add}`);
-                } else if (mod.add < 0) {
-                    parts.push(`${mod.add}`);
+                if (BuffCardUI.PERCENT_ADD_KEYS.has(key)) {
+                    const pct = Math.round(mod.add * 100);
+                    if (pct > 0) {
+                        parts.push(`+${pct}%`);
+                    } else if (pct < 0) {
+                        parts.push(`${pct}%`);
+                    }
+                } else {
+                    if (mod.add > 0) {
+                        parts.push(`+${mod.add}`);
+                    } else if (mod.add < 0) {
+                        parts.push(`${mod.add}`);
+                    }
                 }
             }
 
             if (parts.length > 0) {
                 lines.push(`${name} ${parts.join(' ')}`);
             }
-        }
-
-        if (effects.healPercent) {
-            lines.push(`回复 ${Math.round(effects.healPercent * 100)}% 生命`);
         }
 
         return lines.join('\n');

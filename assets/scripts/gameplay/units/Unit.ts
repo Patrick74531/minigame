@@ -33,6 +33,10 @@ export interface UnitStats {
     attackRange: number;
     attackInterval: number;
     moveSpeed: number;
+    /** 暴击率 (0~1)，默认 0 */
+    critRate: number;
+    /** 暴击伤害倍率，默认 1.5 (即 150%) */
+    critDamage: number;
 }
 
 /**
@@ -51,6 +55,8 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         attackRange: 30,
         attackInterval: 1,
         moveSpeed: 100,
+        critRate: 0,
+        critDamage: 1.5,
     };
 
     protected _state: UnitState = UnitState.IDLE;

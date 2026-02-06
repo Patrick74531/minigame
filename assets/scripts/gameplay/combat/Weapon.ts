@@ -13,6 +13,12 @@ export abstract class Weapon extends Component {
     @property
     public range: number = 8;
 
+    @property
+    public critRate: number = 0;
+
+    @property
+    public critDamage: number = 1.5;
+
     protected _cooldownTimer: number = 0;
 
     protected update(dt: number): void {

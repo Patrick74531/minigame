@@ -35,6 +35,10 @@ export class Bullet extends BaseComponent implements IPoolable {
     public chainCount: number = 0;
     public chainRange: number = 0;
 
+    // === Crit Properties ===
+    public critRate: number = 0;
+    public critDamage: number = 1.5;
+
     public setTarget(target: Node): void {
         this._target = target;
         this.updateVelocity();
@@ -46,12 +50,16 @@ export class Bullet extends BaseComponent implements IPoolable {
         this._logTimer = 0;
         this._target = null;
         this._velocity.set(0, 0, 0);
+        this.critRate = 0;
+        this.critDamage = 1.5;
     }
 
     public onDespawn(): void {
         // NOTE: Clear references to avoid leaking targets between pooled instances.
         this._target = null;
         this._velocity.set(0, 0, 0);
+        this.critRate = 0;
+        this.critDamage = 1.5;
     }
 
     protected initialize(): void {
@@ -227,7 +235,14 @@ export class Bullet extends BaseComponent implements IPoolable {
     }
 
     private applyDamage(unit: Unit): void {
-        unit.takeDamage(this.damage);
+        let finalDamage = this.damage;
+
+        // 暴击判定
+        if (this.critRate > 0 && Math.random() < this.critRate) {
+            finalDamage = Math.floor(finalDamage * this.critDamage);
+        }
+
+        unit.takeDamage(finalDamage);
         if (this.slowPercent > 0) {
             unit.applySlow(this.slowPercent, this.slowDuration);
         }

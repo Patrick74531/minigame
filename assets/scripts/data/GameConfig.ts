@@ -334,6 +334,10 @@ export const GameConfig = {
         ATTACK_RANGE: 2.5,
         /** 移动速度 - Was 120/60 ~ 2. Now using Physics Velocity directly */
         MOVE_SPEED: 6.0,
+        /** 暴击率 (0~1) */
+        CRIT_RATE: 0.05,
+        /** 暴击伤害倍率 (1.5 = 150%) */
+        CRIT_DAMAGE: 1.5,
         /**
          * 模型资源配置
          * 说明：
@@ -447,13 +451,7 @@ export const GameConfig = {
 
         /** 卡牌定义（id 全局唯一，rarity 决定颜色与强度） */
         POOL: [
-            // ========== 蓝色卡牌 (Blue) — 1~2 词条，数值较低 ==========
-            {
-                id: 'blue_hp',
-                name: '强化体质',
-                rarity: 'blue',
-                effects: { maxHp: { multiply: 1.1 } },
-            },
+            // ========== 蓝色卡牌 (Blue) — 1 词条，数值较低 ==========
             {
                 id: 'blue_attack',
                 name: '锋刃磨砺',
@@ -479,10 +477,16 @@ export const GameConfig = {
                 effects: { attackInterval: { multiply: 0.95 } },
             },
             {
-                id: 'blue_heal',
-                name: '生命汲取',
+                id: 'blue_crit_chance',
+                name: '锐利直觉',
                 rarity: 'blue',
-                effects: { healPercent: 0.25 },
+                effects: { critRate: { add: 0.05 } },
+            },
+            {
+                id: 'blue_crit_power',
+                name: '致命一击',
+                rarity: 'blue',
+                effects: { critDamage: { add: 0.2 } },
             },
 
             // ========== 紫色卡牌 (Purple) — 2~3 词条，数值适中 ==========
@@ -492,7 +496,7 @@ export const GameConfig = {
                 rarity: 'purple',
                 effects: {
                     attack: { multiply: 1.15 },
-                    maxHp: { multiply: 1.1 },
+                    critRate: { add: 0.05 },
                 },
             },
             {
@@ -505,12 +509,12 @@ export const GameConfig = {
                 },
             },
             {
-                id: 'purple_fortress',
-                name: '坚韧壁垒',
+                id: 'purple_assassin',
+                name: '暗影刺客',
                 rarity: 'purple',
                 effects: {
-                    maxHp: { multiply: 1.2 },
-                    healPercent: 0.25,
+                    critRate: { add: 0.08 },
+                    critDamage: { add: 0.3 },
                 },
             },
             {
@@ -527,9 +531,9 @@ export const GameConfig = {
                 name: '全面训练',
                 rarity: 'purple',
                 effects: {
-                    maxHp: { multiply: 1.08 },
                     attack: { multiply: 1.08 },
                     moveSpeed: { multiply: 1.05 },
+                    critRate: { add: 0.03 },
                 },
             },
 
@@ -545,13 +549,13 @@ export const GameConfig = {
                 },
             },
             {
-                id: 'gold_immortal',
-                name: '不灭意志',
+                id: 'gold_deathblow',
+                name: '死神之手',
                 rarity: 'gold',
                 effects: {
-                    maxHp: { multiply: 1.3 },
-                    healPercent: 0.35,
-                    moveSpeed: { multiply: 1.05 },
+                    critRate: { add: 0.12 },
+                    critDamage: { add: 0.5 },
+                    attack: { multiply: 1.1 },
                 },
             },
             {
@@ -560,9 +564,9 @@ export const GameConfig = {
                 rarity: 'gold',
                 effects: {
                     attack: { multiply: 1.2 },
-                    maxHp: { multiply: 1.15 },
                     attackInterval: { multiply: 0.92 },
                     moveSpeed: { multiply: 1.08 },
+                    critRate: { add: 0.05 },
                 },
             },
             {
@@ -570,12 +574,12 @@ export const GameConfig = {
                 name: '完美强化',
                 rarity: 'gold',
                 effects: {
-                    maxHp: { multiply: 1.12 },
                     attack: { multiply: 1.12 },
                     attackInterval: { multiply: 0.95 },
                     moveSpeed: { multiply: 1.06 },
                     attackRange: { add: 0.1 },
-                    healPercent: 0.2,
+                    critRate: { add: 0.06 },
+                    critDamage: { add: 0.25 },
                 },
             },
         ],

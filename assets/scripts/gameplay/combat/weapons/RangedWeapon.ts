@@ -35,7 +35,8 @@ export class RangedWeapon extends Weapon {
             color: this.projectileColor,
             chainCount: this.chainCount,
             explosionRadius: this.explosionRadius,
-            // Pass other stats if needed
+            critRate: this.critRate,
+            critDamage: this.critDamage,
         });
     }
 }
