@@ -1,4 +1,5 @@
 import { _decorator, Component, Node, Vec3 } from 'cc';
+import { ScreenShake } from '../../gameplay/weapons/vfx/ScreenShake';
 
 const { ccclass, property } = _decorator;
 
@@ -30,6 +31,9 @@ export class CameraFollow extends Component {
     }
 
     protected lateUpdate(dt: number): void {
+        // 驱动屏幕震动（通过修改 offset 实现，零额外开销）
+        ScreenShake.update(dt);
+
         if (!this.target || !this.target.isValid) return;
 
         // Desired Position

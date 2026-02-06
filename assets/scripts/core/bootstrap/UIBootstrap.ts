@@ -6,6 +6,7 @@ import { BuffCardUI } from '../../ui/BuffCardUI';
 import { WeaponSelectUI } from '../../ui/WeaponSelectUI';
 import { WeaponBarUI } from '../../ui/WeaponBarUI';
 import { ServiceRegistry } from '../managers/ServiceRegistry';
+import { GlitchWaveBehavior } from '../../gameplay/weapons/behaviors/GlitchWaveBehavior';
 
 export type UIRefs = {
     canvas: Node;
@@ -26,6 +27,9 @@ export class UIBootstrap {
         UIBootstrap.buffCardUI.initialize(canvas);
         UIBootstrap.weaponSelectUI.initialize(canvas);
         UIBootstrap.weaponBarUI.initialize(canvas);
+
+        // 绑定 UI 画布供 GlitchWave 故障闪屏使用
+        GlitchWaveBehavior.bindUICanvas(canvas);
 
         return { canvas, joystick };
     }

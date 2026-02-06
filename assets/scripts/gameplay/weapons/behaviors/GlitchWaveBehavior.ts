@@ -1,32 +1,44 @@
-import { Node, Vec3, Color, tween } from 'cc';
+import { Node, Color } from 'cc';
 import { WeaponBehavior } from '../WeaponBehavior';
 import { WeaponType, WeaponLevelStats } from '../WeaponTypes';
 import { WeaponVFX } from '../WeaponVFX';
+import { GlitchOverlay } from '../vfx/GlitchOverlay';
+import { ScreenShake } from '../vfx/ScreenShake';
 import { EventManager } from '../../../core/managers/EventManager';
 import { ServiceRegistry } from '../../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../../data/GameEvents';
 
 /**
- * 模拟回音 — 故障扫描线能量波
+ * 模拟回音 — 故障扫描线能量波 (性能优化版)
  *
- * Lv.1: 单个青色扩散环
- * Lv.2: 双层环（外环 + 内环），颜色更亮
- * Lv.3: 三层环 + 中心爆闪 + 碎片
- * Lv.4: 环变宽变亮，碎片更多，地面印记
- * Lv.5: 四层渐变环 + 大量碎片 + 中心脉冲球 + 地面灼痕
+ * 核心优化：
+ * - 用 UI 层扫描线覆盖代替多层 3D 扩散环（零 DrawCall 开销）
+ * - 3D 层只保留 1 个池化冲击波环（视觉锚点）
+ * - 去掉碎片生成、脉冲球等重开销 VFX
+ * - 屏幕震动 + UI 故障闪屏 = 视觉冲击力更强，性能更低
+ *
+ * Lv.1: 1 个扩散环 + 轻微 UI 闪屏
+ * Lv.2: 扩散环 + 中等 UI 闪屏 + 中心闪光
+ * Lv.3: 扩散环 + 强 UI 闪屏 + 轻微屏幕震动
+ * Lv.4: 扩散环 + 强 UI 闪屏 + 中等屏幕震动
+ * Lv.5: 扩散环 + 超强 UI 故障 + 强屏幕震动 + 地面印记
  */
 export class GlitchWaveBehavior extends WeaponBehavior {
     public readonly type = WeaponType.GLITCH_WAVE;
 
-    // 每级环的数量
-    private static readonly RING_COUNT = [1, 2, 3, 3, 4];
-    // 环颜色（从深青到亮白）
-    private static readonly RING_COLORS: Color[] = [
-        new Color(0, 180, 255, 180),
-        new Color(30, 210, 255, 200),
-        new Color(80, 230, 255, 220),
-        new Color(150, 245, 255, 235),
-        new Color(220, 255, 255, 250),
+    private static _uiCanvas: Node | null = null;
+
+    /** 绑定 UI 画布（在 UIBootstrap 中调用一次） */
+    public static bindUICanvas(uiCanvas: Node): void {
+        this._uiCanvas = uiCanvas;
+    }
+
+    private static readonly COLORS: Color[] = [
+        new Color(0, 180, 255, 255),
+        new Color(30, 210, 255, 255),
+        new Color(80, 230, 255, 255),
+        new Color(150, 245, 255, 255),
+        new Color(220, 255, 255, 255),
     ];
 
     public fire(
@@ -41,8 +53,9 @@ export class GlitchWaveBehavior extends WeaponBehavior {
 
         const waveRadius = (stats['waveRadius'] ?? 4) as number;
         const idx = Math.min(level - 1, 4);
+        const color = GlitchWaveBehavior.COLORS[idx];
 
-        // 发射 AOE 伤害事件
+        // AOE 伤害事件
         const eventManager =
             ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
         eventManager.emit(GameEvents.APPLY_AOE_EFFECT, {
@@ -53,99 +66,37 @@ export class GlitchWaveBehavior extends WeaponBehavior {
             slowDuration: 0,
         });
 
-        // 多层扩散环
-        const ringCount = GlitchWaveBehavior.RING_COUNT[idx];
-        for (let i = 0; i < ringCount; i++) {
-            const delay = i * 0.06;
-            const radiusMult = 1 - i * 0.15; // 内环更小
-            const ringColor = GlitchWaveBehavior.RING_COLORS[Math.min(idx + i, 4)].clone();
-            ringColor.a = Math.max(100, ringColor.a - i * 30);
-            const ringHeight = 0.06 + level * 0.015 - i * 0.01;
-            const duration = 0.3 + level * 0.04;
+        // === 3D 层：只需 1 个池化冲击波环作为视觉锚点 ===
+        const ringColor = color.clone();
+        ringColor.a = 180;
+        WeaponVFX.createShockRing(parent, center, waveRadius, ringColor, 0.35, 0.06 + level * 0.01);
 
-            // 延迟生成每层环
-            if (delay > 0) {
-                const capturedRadius = waveRadius * radiusMult;
-                const capturedColor = ringColor;
-                const capturedHeight = Math.max(0.03, ringHeight);
-                const capturedDuration = duration;
-                const capturedCenter = center.clone();
-                tween(parent)
-                    .delay(delay)
-                    .call(() => {
-                        WeaponVFX.createShockRing(
-                            parent,
-                            capturedCenter,
-                            capturedRadius,
-                            capturedColor,
-                            capturedDuration,
-                            capturedHeight
-                        );
-                    })
-                    .start();
-            } else {
-                WeaponVFX.createShockRing(
-                    parent,
-                    center,
-                    waveRadius * radiusMult,
-                    ringColor,
-                    duration,
-                    Math.max(0.03, ringHeight)
-                );
-            }
-        }
-
-        // 中心爆闪 (Lv.2+)
+        // 中心闪光 (Lv.2+)
         if (level >= 2) {
-            const flashSize = 0.3 + level * 0.1;
-            const flashColor = GlitchWaveBehavior.RING_COLORS[idx].clone();
-            flashColor.a = 220;
-            WeaponVFX.createMuzzleFlash(parent, center, flashColor, flashSize);
-        }
-
-        // 碎片粒子 (Lv.3+)
-        if (level >= 3) {
-            const debrisCount = 4 + level * 2;
-            const debrisColor = new Color(100, 220, 255, 255);
-            WeaponVFX.createDebris(
-                parent,
-                center,
-                debrisCount,
-                debrisColor,
-                3 + level * 0.5,
-                0.06 + level * 0.015
-            );
-        }
-
-        // 中心脉冲球 (Lv.4+)
-        if (level >= 4) {
-            this.createPulseSphere(parent, center, level);
+            WeaponVFX.createMuzzleFlash(parent, center, color, 0.3 + level * 0.1);
         }
 
         // 地面印记 (Lv.5)
         if (level >= 5) {
             const burnColor = new Color(0, 150, 200, 100);
-            WeaponVFX.createGroundBurn(parent, center, waveRadius * 0.7, burnColor, 1.2);
+            WeaponVFX.createGroundBurn(parent, center, waveRadius * 0.6, burnColor, 1.0);
         }
-    }
 
-    private createPulseSphere(parent: Node, center: Vec3, level: number): void {
-        const node = new Node('PulseSphere');
-        node.layer = 1 << 0;
-        parent.addChild(node);
-        node.setPosition(center);
+        // === UI 层：故障扫描线覆盖（零 3D 开销） ===
+        if (GlitchWaveBehavior._uiCanvas) {
+            const intensity = 0.3 + level * 0.14; // Lv.1=0.44, Lv.5=1.0
+            const duration = 0.25 + level * 0.06;
+            GlitchOverlay.flash(
+                GlitchWaveBehavior._uiCanvas,
+                duration,
+                Math.min(intensity, 1),
+                color
+            );
+        }
 
-        const size = 0.4 + level * 0.1;
-        const color = new Color(150, 240, 255, 150);
-        WeaponVFX.addBoxMesh(node, size, size, size, WeaponVFX.createGlowMat(color));
-
-        // 快速膨胀后消失
-        node.setScale(0.2, 0.2, 0.2);
-        const peak = size * 3;
-        tween(node)
-            .to(0.1, { scale: new Vec3(peak, peak, peak) }, { easing: 'expoOut' })
-            .to(0.2, { scale: new Vec3(0, 0, 0) }, { easing: 'quadIn' })
-            .call(() => node.destroy())
-            .start();
+        // === 屏幕震动 (Lv.3+) ===
+        if (level >= 3) {
+            ScreenShake.shake(0.1 + level * 0.06, 0.12 + level * 0.03);
+        }
     }
 }

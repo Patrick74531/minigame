@@ -12,6 +12,8 @@ import { GameStartFlow } from './core/bootstrap/GameStartFlow';
 import { ControllerServices } from './core/bootstrap/ControllerServices';
 import { PlayerInputAdapter } from './core/input/PlayerInputAdapter';
 import { WeaponBehaviorFactory } from './gameplay/weapons/WeaponBehaviorFactory';
+import { WeaponVFX } from './gameplay/weapons/WeaponVFX';
+import { ScreenShake } from './gameplay/weapons/vfx/ScreenShake';
 
 const { ccclass, property } = _decorator;
 
@@ -93,9 +95,13 @@ export class GameController extends Component {
         this._services.buffCardService.initialize();
 
         // Initialize weapon system
+        WeaponVFX.initialize();
         WeaponBehaviorFactory.initialize();
         this._services.heroWeaponManager.initialize();
         this._services.airdropService.initialize();
+
+        // Bind ScreenShake to camera (will find camera in scene)
+        ScreenShake.bind(this.node);
     }
 
     protected onDestroy(): void {
@@ -111,6 +117,7 @@ export class GameController extends Component {
         this._services.airdropService.cleanup();
         this._services.weaponSelectUI.cleanup();
         this._services.weaponBarUI.cleanup();
+        WeaponVFX.cleanup();
         ServiceRegistry.clear();
     }
 
