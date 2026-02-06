@@ -16,3 +16,11 @@ export { Coin } from './economy';
 
 // 战斗系统
 export { CombatSystem } from './combat/CombatSystem';
+
+// 肉鸽卡牌系统
+export {
+    BuffCardService,
+    BuffCardDef,
+    BuffCardEffect,
+    CardRarity,
+} from './roguelike/BuffCardService';

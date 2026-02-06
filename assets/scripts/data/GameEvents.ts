@@ -59,6 +59,14 @@ export const GameEvents = {
     /** 建筑建造完成 { padNode: Node, buildingTypeId: string, position: Vec3 } */
     BUILDING_CONSTRUCTED: 'BUILDING_CONSTRUCTED',
 
+    // === 肉鸽卡牌系统 ===
+    /** 基地升级完成，请求展示卡牌选择 { baseLevel: number } */
+    BASE_UPGRADE_READY: 'BASE_UPGRADE_READY',
+    /** 卡牌已抽取完毕，可展示选择界面 { count: number } */
+    BUFF_CARDS_DRAWN: 'BUFF_CARDS_DRAWN',
+    /** 玩家选择了一张增益卡牌 { cardId: string } */
+    BUFF_CARD_PICKED: 'BUFF_CARD_PICKED',
+
     // === 技能/特效系统 ===
     /** 应用AOE效果 { center: Vec3, radius: number, damage: number, slowPercent: number, slowDuration: number } */
     APPLY_AOE_EFFECT: 'APPLY_AOE_EFFECT',
@@ -97,6 +105,9 @@ export type GameEventPayloads = {
         buildingTypeId?: string;
         position?: Vec3;
     };
+    [GameEvents.BASE_UPGRADE_READY]: { baseLevel: number };
+    [GameEvents.BUFF_CARDS_DRAWN]: { count: number };
+    [GameEvents.BUFF_CARD_PICKED]: { cardId: string };
     [GameEvents.APPLY_AOE_EFFECT]: {
         center: Vec3;
         radius: number;

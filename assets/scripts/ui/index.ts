@@ -6,3 +6,4 @@ export { HUDManager } from './HUDManager';
 export { UIFactory } from './UIFactory';
 export { Joystick } from './Joystick';
 export { HealthBar } from './HealthBar';
+export { BuffCardUI } from './BuffCardUI';

@@ -122,14 +122,16 @@ export class Base extends Building {
         }
     }
 
-    private onBaseUpgradeComplete(hero: Hero): void {
+    private onBaseUpgradeComplete(_hero: Hero): void {
         const upgraded = this.upgrade();
         if (!upgraded) {
             return;
         }
 
-        hero.applyBaseUpgradeBuff();
         this.hudManager.updateBaseHp(this.currentHp, this.maxHp);
+
+        // 触发肉鸽卡牌选择流程（替代原先的全面属性提升）
+        this.eventManager.emit(GameEvents.BASE_UPGRADE_READY, { baseLevel: this.level });
 
         this._upgradeProgress = 0;
         if (this.level < this.maxLevel) {

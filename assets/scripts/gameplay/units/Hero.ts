@@ -22,6 +22,7 @@ import { CharacterMover } from '../../core/physics/CharacterMover';
 import { StackVisualizer } from '../visuals/StackVisualizer';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import type { BuffCardEffect } from '../roguelike/BuffCardService';
 
 const { ccclass, property } = _decorator;
 
@@ -252,23 +253,45 @@ export class Hero extends Unit {
         }
     }
 
-    public applyBaseUpgradeBuff(): void {
-        const buff = GameConfig.BUILDING.BASE_UPGRADE.HERO_BUFF;
+    /**
+     * 应用肉鸽卡牌增益效果
+     * 支持 multiply（乘算）和 add（加算）两种模式，以及 healPercent 回血
+     */
+    public applyBuffCard(effects: BuffCardEffect): void {
+        this.applyStat('maxHp', effects.maxHp);
+        this.applyStat('attack', effects.attack);
+        this.applyStat('attackInterval', effects.attackInterval, 0.2);
+        this.applyStat('moveSpeed', effects.moveSpeed);
+        this.applyStat('attackRange', effects.attackRange);
 
-        this._stats.maxHp = Math.floor(this._stats.maxHp * buff.HP_MULTIPLIER);
-        this._stats.attack = Math.floor(this._stats.attack * buff.ATTACK_MULTIPLIER);
-        this._stats.attackInterval = Math.max(
-            0.2,
-            this._stats.attackInterval * buff.ATTACK_INTERVAL_MULTIPLIER
-        );
-        this._stats.moveSpeed *= buff.MOVE_SPEED_MULTIPLIER;
-        this._stats.attackRange += buff.ATTACK_RANGE_BONUS;
-
-        const heal = Math.floor(this._stats.maxHp * buff.HEAL_PERCENT);
-        this._stats.currentHp = Math.min(this._stats.maxHp, this._stats.currentHp + heal);
+        // 回血效果
+        if (effects.healPercent) {
+            const heal = Math.floor(this._stats.maxHp * effects.healPercent);
+            this._stats.currentHp = Math.min(this._stats.maxHp, this._stats.currentHp + heal);
+        }
 
         this.syncRuntimeStats();
         this.updateHealthBar();
+    }
+
+    private applyStat(
+        key: 'maxHp' | 'attack' | 'attackInterval' | 'moveSpeed' | 'attackRange',
+        mod?: { multiply?: number; add?: number },
+        min?: number
+    ): void {
+        if (!mod) return;
+        if (mod.multiply !== undefined) {
+            this._stats[key] =
+                key === 'maxHp' || key === 'attack'
+                    ? Math.floor(this._stats[key] * mod.multiply)
+                    : this._stats[key] * mod.multiply;
+        }
+        if (mod.add !== undefined) {
+            this._stats[key] += mod.add;
+        }
+        if (min !== undefined) {
+            this._stats[key] = Math.max(min, this._stats[key]);
+        }
     }
 
     private syncRuntimeStats(): void {

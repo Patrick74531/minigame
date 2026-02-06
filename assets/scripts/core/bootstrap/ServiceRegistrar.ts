@@ -11,6 +11,8 @@ import { WaveService } from '../managers/WaveService';
 import { PoolManager } from '../managers/PoolManager';
 import { CoinDropManager } from '../../gameplay/economy/CoinDropManager';
 import { UnitFactory } from '../../gameplay/units/UnitFactory';
+import { BuffCardService } from '../../gameplay/roguelike/BuffCardService';
+import { BuffCardUI } from '../../ui/BuffCardUI';
 
 /**
  * ServiceRegistrar
@@ -33,5 +35,7 @@ export class ServiceRegistrar {
         ServiceRegistry.register('SoldierSpawner', (parent: Node, x: number, z: number) =>
             UnitFactory.createSoldier(parent, x, z)
         );
+        ServiceRegistry.register('BuffCardService', BuffCardService.instance);
+        ServiceRegistry.register('BuffCardUI', BuffCardUI.instance);
     }
 }

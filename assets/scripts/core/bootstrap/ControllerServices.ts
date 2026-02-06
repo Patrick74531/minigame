@@ -8,6 +8,8 @@ import { HUDManager } from '../../ui/HUDManager';
 import { BuildingManager } from '../../gameplay/buildings/BuildingManager';
 import { WaveManager } from '../../gameplay/wave/WaveManager';
 import { CoinDropManager } from '../../gameplay/economy/CoinDropManager';
+import { BuffCardService } from '../../gameplay/roguelike/BuffCardService';
+import { BuffCardUI } from '../../ui/BuffCardUI';
 
 /**
  * ControllerServices
@@ -48,5 +50,13 @@ export class ControllerServices {
 
     public get coinDropManager(): CoinDropManager {
         return ServiceRegistry.get<CoinDropManager>('CoinDropManager') ?? CoinDropManager.instance;
+    }
+
+    public get buffCardService(): BuffCardService {
+        return ServiceRegistry.get<BuffCardService>('BuffCardService') ?? BuffCardService.instance;
+    }
+
+    public get buffCardUI(): BuffCardUI {
+        return ServiceRegistry.get<BuffCardUI>('BuffCardUI') ?? BuffCardUI.instance;
     }
 }

@@ -432,6 +432,155 @@ export const GameConfig = {
         },
     },
 
+    // === 肉鸽卡牌系统 ===
+    // 稀有度: gold(金) = 高词条+高数值, purple(紫) = 中词条+中数值, blue(蓝) = 低词条+低数值
+    BUFF_CARDS: {
+        /** 每次升级展示的卡牌数量 */
+        PICK_COUNT: 3,
+
+        /** 稀有度颜色映射（边框 + 顶部色条） */
+        RARITY_COLORS: {
+            gold: '#FFD700',
+            purple: '#B24BF3',
+            blue: '#4A9FD9',
+        } as Record<string, string>,
+
+        /** 卡牌定义（id 全局唯一，rarity 决定颜色与强度） */
+        POOL: [
+            // ========== 蓝色卡牌 (Blue) — 1~2 词条，数值较低 ==========
+            {
+                id: 'blue_hp',
+                name: '强化体质',
+                rarity: 'blue',
+                effects: { maxHp: { multiply: 1.1 } },
+            },
+            {
+                id: 'blue_attack',
+                name: '锋刃磨砺',
+                rarity: 'blue',
+                effects: { attack: { multiply: 1.1 } },
+            },
+            {
+                id: 'blue_speed',
+                name: '迅捷之风',
+                rarity: 'blue',
+                effects: { moveSpeed: { multiply: 1.08 } },
+            },
+            {
+                id: 'blue_range',
+                name: '精准射击',
+                rarity: 'blue',
+                effects: { attackRange: { add: 0.15 } },
+            },
+            {
+                id: 'blue_rapid',
+                name: '快速连击',
+                rarity: 'blue',
+                effects: { attackInterval: { multiply: 0.95 } },
+            },
+            {
+                id: 'blue_heal',
+                name: '生命汲取',
+                rarity: 'blue',
+                effects: { healPercent: 0.25 },
+            },
+
+            // ========== 紫色卡牌 (Purple) — 2~3 词条，数值适中 ==========
+            {
+                id: 'purple_warrior',
+                name: '战士之力',
+                rarity: 'purple',
+                effects: {
+                    attack: { multiply: 1.15 },
+                    maxHp: { multiply: 1.1 },
+                },
+            },
+            {
+                id: 'purple_hunter',
+                name: '疾风猎手',
+                rarity: 'purple',
+                effects: {
+                    moveSpeed: { multiply: 1.12 },
+                    attackInterval: { multiply: 0.92 },
+                },
+            },
+            {
+                id: 'purple_fortress',
+                name: '坚韧壁垒',
+                rarity: 'purple',
+                effects: {
+                    maxHp: { multiply: 1.2 },
+                    healPercent: 0.25,
+                },
+            },
+            {
+                id: 'purple_sniper',
+                name: '远程精通',
+                rarity: 'purple',
+                effects: {
+                    attackRange: { add: 0.25 },
+                    attack: { multiply: 1.1 },
+                },
+            },
+            {
+                id: 'purple_training',
+                name: '全面训练',
+                rarity: 'purple',
+                effects: {
+                    maxHp: { multiply: 1.08 },
+                    attack: { multiply: 1.08 },
+                    moveSpeed: { multiply: 1.05 },
+                },
+            },
+
+            // ========== 金色卡牌 (Gold) — 3~5 词条，数值很高 ==========
+            {
+                id: 'gold_wargod',
+                name: '战神降临',
+                rarity: 'gold',
+                effects: {
+                    attack: { multiply: 1.25 },
+                    attackInterval: { multiply: 0.9 },
+                    attackRange: { add: 0.2 },
+                },
+            },
+            {
+                id: 'gold_immortal',
+                name: '不灭意志',
+                rarity: 'gold',
+                effects: {
+                    maxHp: { multiply: 1.3 },
+                    healPercent: 0.35,
+                    moveSpeed: { multiply: 1.05 },
+                },
+            },
+            {
+                id: 'gold_berserker',
+                name: '狂战之魂',
+                rarity: 'gold',
+                effects: {
+                    attack: { multiply: 1.2 },
+                    maxHp: { multiply: 1.15 },
+                    attackInterval: { multiply: 0.92 },
+                    moveSpeed: { multiply: 1.08 },
+                },
+            },
+            {
+                id: 'gold_perfection',
+                name: '完美强化',
+                rarity: 'gold',
+                effects: {
+                    maxHp: { multiply: 1.12 },
+                    attack: { multiply: 1.12 },
+                    attackInterval: { multiply: 0.95 },
+                    moveSpeed: { multiply: 1.06 },
+                    attackRange: { add: 0.1 },
+                    healPercent: 0.2,
+                },
+            },
+        ],
+    },
+
     // === 对象池 ===
     POOL: {
         /** 敌人预创建数量 */

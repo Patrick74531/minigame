@@ -87,6 +87,9 @@ export class GameController extends Component {
 
         // Register core services for decoupled access
         ServiceRegistrar.registerCore();
+
+        // Initialize roguelike card system
+        this._services.buffCardService.initialize();
     }
 
     protected onDestroy(): void {
@@ -96,6 +99,8 @@ export class GameController extends Component {
         this._services.buildingManager.cleanup();
         this._services.effectManager.cleanup();
         this._services.coinDropManager.cleanup();
+        this._services.buffCardService.cleanup();
+        this._services.buffCardUI.cleanup();
         ServiceRegistry.clear();
     }
 
