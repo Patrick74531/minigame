@@ -25,13 +25,13 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         this._uiCanvas = uiCanvas;
         this.createBarContainer();
 
-        this.eventManager.on(GameEvents.WEAPON_PICKED, this.refresh, this);
+        this.eventManager.on(GameEvents.WEAPON_INVENTORY_CHANGED, this.refresh, this);
         this.eventManager.on(GameEvents.WEAPON_SWITCHED, this.refresh, this);
         console.log('[WeaponBarUI] 初始化完成');
     }
 
     public cleanup(): void {
-        this.eventManager.off(GameEvents.WEAPON_PICKED, this.refresh, this);
+        this.eventManager.off(GameEvents.WEAPON_INVENTORY_CHANGED, this.refresh, this);
         this.eventManager.off(GameEvents.WEAPON_SWITCHED, this.refresh, this);
         if (this._barNode) {
             this._barNode.destroy();

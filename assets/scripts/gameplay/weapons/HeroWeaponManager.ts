@@ -70,6 +70,11 @@ export class HeroWeaponManager extends Singleton<HeroWeaponManager>() {
             }
             existing.level++;
             console.log(`[HeroWeaponManager] ${type} 升级到 Lv.${existing.level}`);
+            this.eventManager.emit(GameEvents.WEAPON_INVENTORY_CHANGED, {
+                weaponId: type,
+                level: existing.level,
+                isNew: false,
+            });
             return existing.level;
         }
 
@@ -83,6 +88,11 @@ export class HeroWeaponManager extends Singleton<HeroWeaponManager>() {
         }
 
         console.log(`[HeroWeaponManager] 获得新武器: ${type} Lv.1`);
+        this.eventManager.emit(GameEvents.WEAPON_INVENTORY_CHANGED, {
+            weaponId: type,
+            level: 1,
+            isNew: true,
+        });
         return 1;
     }
 

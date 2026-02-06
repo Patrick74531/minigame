@@ -78,6 +78,8 @@ export const GameEvents = {
     WEAPON_PICKED: 'WEAPON_PICKED',
     /** 武器切换 { weaponId: string } */
     WEAPON_SWITCHED: 'WEAPON_SWITCHED',
+    /** 武器背包变更（新增/升级后触发） { weaponId: string, level: number, isNew: boolean } */
+    WEAPON_INVENTORY_CHANGED: 'WEAPON_INVENTORY_CHANGED',
 
     // === 技能/特效系统 ===
     /** 应用AOE效果 { center: Vec3, radius: number, damage: number, slowPercent: number, slowDuration: number } */
@@ -125,6 +127,7 @@ export type GameEventPayloads = {
     [GameEvents.WEAPONS_OFFERED]: { weapons: string[] };
     [GameEvents.WEAPON_PICKED]: { weaponId: string };
     [GameEvents.WEAPON_SWITCHED]: { weaponId: string };
+    [GameEvents.WEAPON_INVENTORY_CHANGED]: { weaponId: string; level: number; isNew: boolean };
     [GameEvents.APPLY_AOE_EFFECT]: {
         center: Vec3;
         radius: number;
