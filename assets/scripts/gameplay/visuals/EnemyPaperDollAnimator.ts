@@ -31,27 +31,27 @@ interface PartFrameSpec {
 const PART_FRAME_SPECS: Record<PartKey, PartFrameSpec> = {
     body: {
         required: true,
-        candidates: ['enemies/Assets/GameAssetsSource/Robot(512px)/Body'],
+        candidates: ['enemies/Robot/Body'],
     },
     head: {
         required: true,
-        candidates: ['enemies/Assets/GameAssetsSource/Robot(512px)/Head'],
+        candidates: ['enemies/Robot/Head'],
     },
     leftArm: {
         required: true,
-        candidates: ['enemies/Assets/GameAssetsSource/Robot(512px)/LeftArm'],
+        candidates: ['enemies/Robot/LeftArm'],
     },
     rightArm: {
         required: true,
-        candidates: ['enemies/Assets/GameAssetsSource/Robot(512px)/RightArm'],
+        candidates: ['enemies/Robot/RightArm'],
     },
     leftLeg: {
         required: true,
-        candidates: ['enemies/Assets/GameAssetsSource/Robot(512px)/LeftLeg'],
+        candidates: ['enemies/Robot/LeftLeg'],
     },
     rightLeg: {
         required: true,
-        candidates: ['enemies/Assets/GameAssetsSource/Robot(512px)/RightLeg'],
+        candidates: ['enemies/Robot/RightLeg'],
     },
 };
 
@@ -159,25 +159,25 @@ export class EnemyPaperDollAnimator extends Component {
             rigRoot,
             'RightArm',
             frames.rightArm!,
-            new Vec3(-66, 71, 0),
-            0.469,
-            0.629
+            new Vec3(-13, 1, 0),
+            0.465,
+            0.633
         );
         this._rightLegNode = this.createPartNode(
             rigRoot,
             'RightLeg',
             frames.rightLeg!,
-            new Vec3(-32, -7, 0),
+            new Vec3(-6, -19, 0),
             0.48,
-            0.633
+            0.641
         );
         this._leftLegNode = this.createPartNode(
             rigRoot,
             'LeftLeg',
             frames.leftLeg!,
-            new Vec3(10, -15, 0),
+            new Vec3(5, -20, 0),
             0.484,
-            0.623
+            0.625
         );
 
         this.createPartNode(rigRoot, 'Body', frames.body!, new Vec3(0, 0, 0), 0.5, 0.5);
@@ -185,18 +185,18 @@ export class EnemyPaperDollAnimator extends Component {
             rigRoot,
             'Head',
             frames.head!,
-            new Vec3(-3, 69, 0),
-            0.488,
-            0.404
+            new Vec3(1, 30, 0),
+            0.492,
+            0.398
         );
 
         this._leftArmNode = this.createPartNode(
             rigRoot,
             'LeftArm',
             frames.leftArm!,
-            new Vec3(52, 77, 0),
-            0.494,
-            0.641
+            new Vec3(14, 1, 0),
+            0.496,
+            0.648
         );
 
         this.applyEliteTint();
@@ -227,7 +227,7 @@ export class EnemyPaperDollAnimator extends Component {
     ): Node {
         const root = new Node(name);
         parent.addChild(root);
-        root.setPosition(localPos);
+        root.setPosition(this.resolveAnchorCompensatedPosition(frame, localPos, anchorX, anchorY));
 
         this.createPartFace(root, `${name}_Front`, frame, anchorX, anchorY, 0);
         return root;
@@ -258,6 +258,24 @@ export class EnemyPaperDollAnimator extends Component {
         }
         this._sprites.push(sprite);
         return sprite;
+    }
+
+    private resolveAnchorCompensatedPosition(
+        frame: SpriteFrame,
+        basePos: Vec3,
+        anchorX: number,
+        anchorY: number
+    ): Vec3 {
+        // Keep each part at the same rest pose as anchor(0.5,0.5),
+        // so switching to shoulder/hip pivots does not pull parts apart.
+        const rect = frame.rect;
+        const w = rect ? rect.width : 128;
+        const h = rect ? rect.height : 128;
+        return new Vec3(
+            basePos.x + (anchorX - 0.5) * w,
+            basePos.y + (anchorY - 0.5) * h,
+            basePos.z
+        );
     }
 
     private applyEliteTint(): void {

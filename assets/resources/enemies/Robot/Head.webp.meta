@@ -2,16 +2,16 @@
   "ver": "1.0.27",
   "importer": "image",
   "imported": true,
-  "uuid": "77195ddd-cf76-4028-8f6b-712cf5d0237d",
+  "uuid": "39a3c4a8-446f-4280-be2e-18089780e993",
   "files": [
     ".json",
-    ".png"
+    ".webp"
   ],
   "subMetas": {
     "6c48a": {
       "importer": "texture",
-      "uuid": "77195ddd-cf76-4028-8f6b-712cf5d0237d@6c48a",
-      "displayName": "Knee01",
+      "uuid": "39a3c4a8-446f-4280-be2e-18089780e993@6c48a",
+      "displayName": "Head",
       "id": "6c48a",
       "name": "texture",
       "userData": {
@@ -22,7 +22,7 @@
         "mipfilter": "none",
         "anisotropy": 0,
         "isUuid": true,
-        "imageUuidOrDatabaseUri": "77195ddd-cf76-4028-8f6b-712cf5d0237d",
+        "imageUuidOrDatabaseUri": "39a3c4a8-446f-4280-be2e-18089780e993",
         "visible": false
       },
       "ver": "1.0.22",
@@ -37,6 +37,6 @@
     "type": "texture",
     "fixAlphaTransparencyArtifacts": false,
     "hasAlpha": true,
-    "redirect": "77195ddd-cf76-4028-8f6b-712cf5d0237d@6c48a"
+    "redirect": "39a3c4a8-446f-4280-be2e-18089780e993@6c48a"
   }
 }
