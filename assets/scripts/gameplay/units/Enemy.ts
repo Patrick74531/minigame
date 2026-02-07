@@ -137,6 +137,14 @@ export class Enemy extends Unit {
     private checkCollision(event: ICollisionEvent): void {
         const other = event.otherCollider;
 
+        // Check if it's the Hero
+        const heroUnit = other.node.getComponent(Unit);
+        if (heroUnit && heroUnit.unitType === UnitType.HERO && heroUnit.isAlive) {
+            this.setTarget(heroUnit);
+            this._state = UnitState.ATTACKING;
+            return;
+        }
+
         // Check if it's an Attackable Building involved in collision
         const building = other.node.getComponent(Building);
         if (building && building.isAlive) {
@@ -185,7 +193,7 @@ export class Enemy extends Unit {
 
     // === Aggro Logic ===
 
-    private readonly AGGRO_RANGE = 2.5;
+    private readonly AGGRO_RANGE = 3.0;
     private _scanTimer: number = 0;
 
     protected update(dt: number): void {
@@ -242,16 +250,29 @@ export class Enemy extends Unit {
      * Scan for Soldiers or Buildings to attack
      */
     protected scanForTargets(): void {
-        // 1. Check for blocking buildings (via Physics Collision - handled in onCollisionEnter)
-        // Note: Collision logic sets _target directly.
+        const myPos = this.node.position;
+        const aggroSq = this.AGGRO_RANGE * this.AGGRO_RANGE;
 
-        // 2. Check for nearby Soldiers (Units)
+        // 1. Check for nearby Hero (highest priority melee target)
+        const heroNode = this.gameManager.hero;
+        if (heroNode && heroNode.isValid) {
+            const heroUnit = heroNode.getComponent(Unit);
+            if (heroUnit && heroUnit.isAlive) {
+                const dx = heroNode.position.x - myPos.x;
+                const dz = heroNode.position.z - myPos.z;
+                const distSq = dx * dx + dz * dz;
+                if (distSq < aggroSq) {
+                    this.setTarget(heroUnit);
+                    this._state = UnitState.ATTACKING;
+                    return;
+                }
+            }
+        }
+
+        // 2. Check for nearby Soldiers
         const provider = CombatService.provider;
         if (provider && provider.findSoldierInRange) {
-            const soldier = provider.findSoldierInRange(
-                this.node.position,
-                this.AGGRO_RANGE
-            ) as Soldier | null;
+            const soldier = provider.findSoldierInRange(myPos, this.AGGRO_RANGE) as Soldier | null;
             if (soldier && soldier.isAlive) {
                 this.setTarget(soldier);
                 this._state = UnitState.ATTACKING;
@@ -259,21 +280,11 @@ export class Enemy extends Unit {
             }
         }
 
-        // Find nearest Soldier
-        // Optimization: Rely on physics/colliders? Or iterate active units?
-        // We don't have a global "Soldiers" list easily accessible except maybe converting WaveManager?
-        // Actually WaveManager tracks Enemies. GameManager tracks Buildings.
-        // PoolManager tracks all units?
-
-        // Let's look for Buildings specifically as primary blockers
-        // And Soldiers if we want them to fight back.
-        // For now, let's keep the scan for Buildings to break walls.
-
+        // 3. Check for nearby Buildings
         const buildingNodes = this.gameManager.activeBuildings;
         if (buildingNodes && buildingNodes.length > 0) {
-            const myPos = this.node.position;
             let nearest: Building | null = null;
-            let minDistSq = this.AGGRO_RANGE * this.AGGRO_RANGE;
+            let minDistSq = aggroSq;
 
             for (const bNode of buildingNodes) {
                 if (!bNode.isValid) continue;
@@ -292,7 +303,6 @@ export class Enemy extends Unit {
             }
 
             if (nearest) {
-                // Found a building to attack
                 this.setTarget(nearest);
                 this._state = UnitState.ATTACKING;
             }

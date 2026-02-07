@@ -186,6 +186,12 @@ export class UnitFactory {
             moveSpeed: GameConfig.HERO.MOVE_SPEED,
         });
 
+        // 英雄血条（显示在头顶，金币堆叠在血条上方）
+        const hb = node.addComponent(HealthBar);
+        hb.width = 100;
+        hb.height = 10;
+        hb.yOffset = 2.0;
+
         this.attachHeroModel(node);
 
         return node;

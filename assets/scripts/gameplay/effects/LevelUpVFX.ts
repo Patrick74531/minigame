@@ -2,152 +2,148 @@ import {
     Node,
     Vec3,
     Color,
-    MeshRenderer,
-    Material,
-    primitives,
-    utils,
     tween,
-    Billboard,
-    RenderRoot2D,
     Label,
     UIOpacity,
     LabelOutline,
+    UITransform,
+    Graphics,
 } from 'cc';
 
+const UI_LAYER = 33554432; // Cocos UI_2D layer
+
 /**
- * 升级特效
- * 在英雄头顶播放光环扩散 + "LEVEL UP!" 文字弹跳动画
+ * 升级特效 — 纯屏幕空间 UI 动画
+ * 不使用任何 3D mesh，全部在 UI Canvas 上绘制
+ * - 全屏金色闪光
+ * - "LEVEL UP!" 文字弹跳动画
+ * - 向四周扩散的光线条
  */
 export class LevelUpVFX {
     /**
-     * 在指定节点位置播放升级特效
-     * @param parent 父节点（场景容器）
-     * @param heroNode 英雄节点（用于获取位置）
+     * 在 UI Canvas 上播放升级特效
+     * @param uiCanvas UI 画布节点
      * @param level 新等级
      */
-    public static play(parent: Node, heroNode: Node, level: number): void {
-        const pos = heroNode.worldPosition;
-        this.createRing(parent, pos);
-        this.createText(parent, pos, level);
-        this.createBurstParticles(parent, pos);
+    public static play(uiCanvas: Node, _heroNode: Node, level: number): void {
+        this.createFlash(uiCanvas);
+        this.createText(uiCanvas, level);
+        this.createBurstLines(uiCanvas);
     }
 
-    /** 扩散光环 */
-    private static createRing(parent: Node, pos: Vec3): void {
-        const ring = new Node('LvUpRing');
-        parent.addChild(ring);
-        ring.setWorldPosition(pos.x, pos.y + 0.1, pos.z);
+    /** 全屏金色闪光 */
+    private static createFlash(uiCanvas: Node): void {
+        const node = new Node('LvUpFlash');
+        node.layer = UI_LAYER;
+        uiCanvas.addChild(node);
 
-        const renderer = ring.addComponent(MeshRenderer);
-        renderer.mesh = utils.MeshUtils.createMesh(
-            primitives.plane({ width: 1, length: 1, widthSegments: 1, lengthSegments: 1 })
-        );
+        const transform = node.addComponent(UITransform);
+        transform.setContentSize(1400, 900);
 
-        const mat = new Material();
-        mat.initialize({ effectName: 'builtin-unlit', technique: 1 });
-        mat.setProperty('mainColor', new Color(80, 200, 255, 200));
-        if (mat.passes && mat.passes.length > 0) {
-            const target = mat.passes[0].blendState.targets[0];
-            target.blend = true;
-            target.blendSrc = 2;
-            target.blendDst = 1;
-        }
-        renderer.material = mat;
+        const gfx = node.addComponent(Graphics);
+        gfx.fillColor = new Color(255, 220, 80, 100);
+        gfx.rect(-700, -450, 1400, 900);
+        gfx.fill();
 
-        ring.setScale(0.3, 1, 0.3);
-        tween(ring)
-            .to(0.4, { scale: new Vec3(5, 1, 5) }, { easing: 'quartOut' })
-            .to(0.3, { scale: new Vec3(6, 1, 6) })
-            .call(() => ring.destroy())
+        const opacity = node.addComponent(UIOpacity);
+        opacity.opacity = 0;
+
+        tween(opacity)
+            .to(0.08, { opacity: 180 })
+            .to(0.25, { opacity: 0 })
+            .call(() => node.destroy())
             .start();
     }
 
-    /** "LEVEL UP!" 文字 */
-    private static createText(parent: Node, pos: Vec3, level: number): void {
+    /** "LEVEL UP!" 居中文字弹跳 */
+    private static createText(uiCanvas: Node, level: number): void {
         const root = new Node('LvUpText');
-        parent.addChild(root);
-        root.setWorldPosition(pos.x, pos.y + 2.5, pos.z);
+        root.layer = UI_LAYER;
+        uiCanvas.addChild(root);
+        root.setPosition(0, 60, 0);
 
-        root.addComponent(RenderRoot2D);
-        root.addComponent(Billboard);
+        const transform = root.addComponent(UITransform);
+        transform.setContentSize(400, 120);
 
-        const baseScale = 0.04;
-        root.setScale(0.01, 0.01, 0.01);
-
-        const labelNode = new Node('Label');
-        root.addChild(labelNode);
-
-        const label = labelNode.addComponent(Label);
-        label.string = `LEVEL UP!\nLv.${level}`;
-        label.fontSize = 42;
-        label.lineHeight = 48;
+        const label = root.addComponent(Label);
+        label.string = `LEVEL UP!  Lv.${level}`;
+        label.fontSize = 48;
+        label.lineHeight = 56;
         label.isBold = true;
         label.overflow = Label.Overflow.NONE;
         label.horizontalAlign = Label.HorizontalAlign.CENTER;
         label.verticalAlign = Label.VerticalAlign.CENTER;
-        label.color = new Color(255, 230, 80, 255);
+        label.color = new Color(255, 230, 50, 255);
 
-        const outline = labelNode.addComponent(LabelOutline);
-        outline.color = new Color(200, 80, 0, 255);
+        const outline = root.addComponent(LabelOutline);
+        outline.color = new Color(180, 60, 0, 255);
         outline.width = 3;
 
-        const opacity = labelNode.addComponent(UIOpacity);
-        opacity.opacity = 255;
+        const opacity = root.addComponent(UIOpacity);
+        opacity.opacity = 0;
 
-        // 弹跳放大 + 上飘
-        const peakScale = baseScale * 1.4;
+        // 从小弹大 + 持续 + 上移淡出
+        root.setScale(0.3, 0.3, 1);
+        tween(opacity).to(0.05, { opacity: 255 }).start();
+
         tween(root)
-            .to(0.12, { scale: new Vec3(peakScale, peakScale, peakScale) })
-            .to(0.1, { scale: new Vec3(baseScale, baseScale, baseScale) })
-            .to(0.08, { scale: new Vec3(peakScale * 0.95, peakScale * 0.95, peakScale * 0.95) })
-            .to(0.1, { scale: new Vec3(baseScale, baseScale, baseScale) })
-            .delay(0.4)
-            .to(0.5, { position: new Vec3(pos.x, pos.y + 4.5, pos.z) })
+            .to(0.15, { scale: new Vec3(1.3, 1.3, 1) }, { easing: 'backOut' })
+            .to(0.1, { scale: new Vec3(1.0, 1.0, 1) })
+            .to(0.08, { scale: new Vec3(1.15, 1.15, 1) })
+            .to(0.1, { scale: new Vec3(1.0, 1.0, 1) })
+            .delay(0.5)
+            .to(0.5, { position: new Vec3(0, 140, 0) })
             .call(() => root.destroy())
             .start();
 
-        tween(opacity)
-            .delay(0.9)
-            .to(0.4, { opacity: 0 })
-            .start();
+        tween(opacity).delay(0.8).to(0.5, { opacity: 0 }).start();
     }
 
-    /** 光粒子爆发 */
-    private static createBurstParticles(parent: Node, pos: Vec3): void {
-        const count = 8;
-        for (let i = 0; i < count; i++) {
-            const p = new Node('LvUpParticle');
-            parent.addChild(p);
-            p.setWorldPosition(pos.x, pos.y + 1.0, pos.z);
+    /** 向四周扩散的光线条 */
+    private static createBurstLines(uiCanvas: Node): void {
+        const lineCount = 12;
+        for (let i = 0; i < lineCount; i++) {
+            const node = new Node('LvUpLine');
+            node.layer = UI_LAYER;
+            uiCanvas.addChild(node);
 
-            const renderer = p.addComponent(MeshRenderer);
-            const size = 0.06 + Math.random() * 0.04;
-            renderer.mesh = utils.MeshUtils.createMesh(
-                primitives.box({ width: size, height: size, length: size })
-            );
+            const transform = node.addComponent(UITransform);
+            transform.setContentSize(6, 40);
 
-            const mat = new Material();
-            mat.initialize({ effectName: 'builtin-unlit' });
-            const hue = Math.random();
-            const r = hue < 0.5 ? 255 : 80 + Math.floor(Math.random() * 175);
-            const g = 180 + Math.floor(Math.random() * 75);
-            const b = hue > 0.5 ? 255 : 80 + Math.floor(Math.random() * 175);
-            mat.setProperty('mainColor', new Color(r, g, b, 255));
-            renderer.material = mat;
+            const gfx = node.addComponent(Graphics);
+            const hue = i / lineCount;
+            const r = hue < 0.5 ? 255 : Math.floor(200 + Math.random() * 55);
+            const g = Math.floor(180 + Math.random() * 75);
+            const b = hue > 0.5 ? 255 : Math.floor(50 + Math.random() * 100);
+            gfx.fillColor = new Color(r, g, b, 220);
+            gfx.rect(-3, -20, 6, 40);
+            gfx.fill();
 
-            const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
-            const speed = 1.5 + Math.random() * 2.0;
-            const endPos = new Vec3(
-                pos.x + Math.cos(angle) * speed,
-                pos.y + 1.5 + Math.random() * 1.5,
-                pos.z + Math.sin(angle) * speed
-            );
+            const angle = (Math.PI * 2 * i) / lineCount + (Math.random() - 0.5) * 0.3;
+            // 从中心偏移一点开始
+            const startDist = 30;
+            const endDist = 200 + Math.random() * 150;
+            const sx = Math.cos(angle) * startDist;
+            const sy = Math.sin(angle) * startDist + 60; // 偏移到文字中心
+            const ex = Math.cos(angle) * endDist;
+            const ey = Math.sin(angle) * endDist + 60;
 
-            p.setScale(1, 1, 1);
-            tween(p)
-                .to(0.3, { position: endPos, scale: new Vec3(0.5, 0.5, 0.5) }, { easing: 'quartOut' })
-                .to(0.2, { scale: new Vec3(0, 0, 0) })
-                .call(() => p.destroy())
+            node.setPosition(sx, sy, 0);
+            // 旋转对齐方向
+            const deg = (angle * 180) / Math.PI + 90;
+            node.setRotationFromEuler(0, 0, -deg);
+
+            const opacity = node.addComponent(UIOpacity);
+            opacity.opacity = 255;
+
+            tween(node)
+                .to(0.3, { position: new Vec3(ex, ey, 0) }, { easing: 'quartOut' })
+                .start();
+
+            tween(opacity)
+                .delay(0.1)
+                .to(0.25, { opacity: 0 })
+                .call(() => node.destroy())
                 .start();
         }
     }

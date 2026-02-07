@@ -69,6 +69,9 @@ export class DamageNumberFactory {
             this._lastShowTime.set(sourceNode, now);
         }
 
+        // 伤害取整
+        damage = Math.round(damage);
+
         // 根节点
         const root = new Node('DmgNum');
         parent.addChild(root);

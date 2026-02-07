@@ -347,15 +347,15 @@ export const GameConfig = {
     // === 英雄系统 ===
     HERO: {
         /** 基础血量 */
-        BASE_HP: 200,
+        BASE_HP: 80,
         /** 基础攻击力 */
-        BASE_ATTACK: 25,
+        BASE_ATTACK: 12,
         /** 攻击间隔（秒） */
-        ATTACK_INTERVAL: 0.8,
+        ATTACK_INTERVAL: 0.9,
         /** 攻击范围 */
         ATTACK_RANGE: 2.5,
-        /** 移动速度 - Was 120/60 ~ 2. Now using Physics Velocity directly */
-        MOVE_SPEED: 6.0,
+        /** 移动速度 */
+        MOVE_SPEED: 5.5,
         /** 暴击率 (0~1) */
         CRIT_RATE: 0.05,
         /** 暴击伤害倍率 (1.5 = 150%) */
@@ -462,29 +462,29 @@ export const GameConfig = {
          * 设计原则：敌人成长略快于英雄，迫使玩家利用建筑和卡牌体系
          */
         INFINITE: {
-            BASE_COUNT: 15,
-            COUNT_PER_WAVE: 3,
-            COUNT_GROWTH_STEP_WAVES: 4,
-            COUNT_GROWTH_STEP_BONUS: 4,
+            BASE_COUNT: 30,
+            COUNT_PER_WAVE: 6,
+            COUNT_GROWTH_STEP_WAVES: 3,
+            COUNT_GROWTH_STEP_BONUS: 8,
             BASE_HP_MULT: 1,
-            HP_MULT_PER_WAVE: 0.25,
+            HP_MULT_PER_WAVE: 0.18,
             BASE_ATTACK_MULT: 1,
-            ATTACK_MULT_PER_WAVE: 0.12,
+            ATTACK_MULT_PER_WAVE: 0.1,
             BASE_SPEED_MULT: 1,
-            SPEED_MULT_PER_WAVE: 0.018,
+            SPEED_MULT_PER_WAVE: 0.015,
             MAX_SPEED_MULT: 1.55,
-            BASE_SPAWN_INTERVAL: 0.85,
-            SPAWN_INTERVAL_DECAY_PER_WAVE: 0.03,
-            MIN_SPAWN_INTERVAL: 0.28,
+            BASE_SPAWN_INTERVAL: 0.35,
+            SPAWN_INTERVAL_DECAY_PER_WAVE: 0.02,
+            MIN_SPAWN_INTERVAL: 0.12,
             BONUS_PER_WAVE: 20,
             BONUS_GROWTH_PER_WAVE: 4,
-            SPAWN_RANGE: 6,
+            SPAWN_RANGE: 8,
             ELITE: {
                 START_WAVE: 3,
                 INTERVAL: 2,
                 BASE_COUNT: 1,
-                COUNT_GROWTH_STEP_WAVES: 5,
-                MAX_COUNT: 5,
+                COUNT_GROWTH_STEP_WAVES: 4,
+                MAX_COUNT: 6,
                 SPAWN_EVERY: 4,
             },
         },

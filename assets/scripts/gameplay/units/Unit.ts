@@ -153,6 +153,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
     public takeDamage(damage: number, _attacker?: any, isCrit: boolean = false): void {
         if (!this.isAlive) return;
 
+        damage = Math.floor(damage);
         this._stats.currentHp = Math.max(0, this._stats.currentHp - damage);
         this.updateHealthBar();
 

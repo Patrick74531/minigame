@@ -170,8 +170,8 @@ export class GameController extends Component {
     // === 升级 VFX ===
 
     private onHeroLevelUp(data: { level: number; heroNode: Node }): void {
-        if (data.heroNode && data.heroNode.parent) {
-            LevelUpVFX.play(data.heroNode.parent, data.heroNode, data.level);
+        if (this._uiCanvas) {
+            LevelUpVFX.play(this._uiCanvas, data.heroNode, data.level);
         }
     }
 
