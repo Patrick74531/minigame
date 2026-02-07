@@ -5,6 +5,7 @@ import { WeaponType, WeaponLevelStats } from '../WeaponTypes';
 import { WeaponVFX } from '../WeaponVFX';
 import { Bullet } from '../../combat/Bullet';
 import { GameConfig } from '../../../data/GameConfig';
+import { Unit } from '../../units/Unit';
 
 const { ccclass } = _decorator;
 
@@ -68,6 +69,12 @@ export class FlamethrowerBehavior extends WeaponBehavior {
             bullet.damage = Math.ceil(stats.damage / blobCount);
             bullet.speed = stats.projectileSpeed * (0.9 + Math.random() * 0.2);
             bullet.setTarget(target);
+            // 从持有者读取暴击属性
+            const ownerUnit = owner.getComponent(Unit);
+            if (ownerUnit) {
+                bullet.critRate = ownerUnit.stats.critRate;
+                bullet.critDamage = ownerUnit.stats.critDamage;
+            }
 
             // 抛物线初速度
             bullet.velocity.y += 3.5 + level * 0.6 + Math.random() * 1.5;

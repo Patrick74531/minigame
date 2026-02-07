@@ -108,13 +108,31 @@ export class CannonBehavior extends WeaponBehavior {
         const explosionRadius = (stats['explosionRadius'] ?? 1.5) as number;
         const beamHitRadius = Math.max(0.28, explosionRadius * 0.55 + baseWidth * 0.45);
         const hits = this.collectPiercingHits(spawnPos, dirX, dirZ, beamLength, beamHitRadius);
+
+        // 从持有者读取暴击属性
+        const ownerUnit = owner.getComponent(Unit);
+        const critRate = ownerUnit ? ownerUnit.stats.critRate : 0;
+        const critDmgMul = ownerUnit ? ownerUnit.stats.critDamage : 1.5;
+
         for (const hit of hits) {
-            hit.unit.takeDamage(stats.damage);
+            let dmg = stats.damage;
+            let isCrit = false;
+            if (critRate > 0 && Math.random() < critRate) {
+                dmg = Math.floor(dmg * critDmgMul);
+                isCrit = true;
+            }
+            hit.unit.takeDamage(dmg, undefined, isCrit);
         }
         if (hits.length === 0) {
             const unit = target.getComponent(Unit);
             if (unit && unit.unitType === UnitType.ENEMY && unit.isAlive) {
-                unit.takeDamage(stats.damage);
+                let dmg = stats.damage;
+                let isCrit = false;
+                if (critRate > 0 && Math.random() < critRate) {
+                    dmg = Math.floor(dmg * critDmgMul);
+                    isCrit = true;
+                }
+                unit.takeDamage(dmg, undefined, isCrit);
             }
         }
 

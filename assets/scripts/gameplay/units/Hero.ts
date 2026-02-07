@@ -26,6 +26,9 @@ import type { BuffCardEffect } from '../roguelike/BuffCardService';
 import { HeroWeaponManager } from '../weapons/HeroWeaponManager';
 import { WeaponBehaviorFactory } from '../weapons/WeaponBehaviorFactory';
 import { getWeaponLevelStats } from '../weapons/WeaponTypes';
+import { HeroLevelSystem } from './HeroLevelSystem';
+import { GameEvents } from '../../data/GameEvents';
+import { EventManager } from '../../core/managers/EventManager';
 
 const { ccclass, property } = _decorator;
 
@@ -44,6 +47,20 @@ export class Hero extends Unit {
     /** 空投武器冷却计时器 */
     private _customWeaponTimer: number = 0;
 
+    /** 基础属性快照（用于成长计算） */
+    private _baseStats = {
+        maxHp: 0,
+        attack: 0,
+        attackRange: 0,
+        attackInterval: 0,
+        moveSpeed: 0,
+        critRate: 0,
+        critDamage: 0,
+    };
+    /** buff 卡片累计倍率 / 加算（分层叠加） */
+    private _buffMultipliers: Record<string, number> = {};
+    private _buffAdditives: Record<string, number> = {};
+
     public onDespawn(): void {
         if (this.gameManager.hero === this.node) {
             this.gameManager.hero = null;
@@ -55,7 +72,8 @@ export class Hero extends Unit {
         super.initialize();
         this.unitType = UnitType.HERO;
 
-        this.initStats({
+        // 存储基础属性快照
+        this._baseStats = {
             maxHp: GameConfig.HERO.BASE_HP,
             attack: GameConfig.HERO.BASE_ATTACK,
             attackRange: GameConfig.HERO.ATTACK_RANGE,
@@ -63,7 +81,11 @@ export class Hero extends Unit {
             moveSpeed: GameConfig.HERO.MOVE_SPEED,
             critRate: GameConfig.HERO.CRIT_RATE,
             critDamage: GameConfig.HERO.CRIT_DAMAGE,
-        });
+        };
+        this._buffMultipliers = {};
+        this._buffAdditives = {};
+
+        this.initStats({ ...this._baseStats });
 
         // Initialize Components
         this._weapon = this.node.getComponent(RangedWeapon);
@@ -115,6 +137,17 @@ export class Hero extends Unit {
         if (col) {
             col.on('onTriggerEnter', this.onTriggerEnter, this);
         }
+
+        // 监听升级事件
+        this._eventMgr.on(GameEvents.HERO_LEVEL_UP, this.onLevelUp, this);
+    }
+
+    protected onDestroy(): void {
+        this._eventMgr.off(GameEvents.HERO_LEVEL_UP, this.onLevelUp, this);
+    }
+
+    private get _eventMgr(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }
 
     private onTriggerEnter(event: ITriggerEvent): void {
@@ -307,43 +340,82 @@ export class Hero extends Unit {
         }
     }
 
+    // === 升级处理 ===
+
+    private onLevelUp(data: { level: number; heroNode: Node }): void {
+        if (data.heroNode !== this.node) return;
+        this.recalcStats();
+        // 升级回满血
+        this._stats.currentHp = this._stats.maxHp;
+        this.updateHealthBar();
+    }
+
+    /**
+     * 重算属性：base * levelGrowth * buffMultiplier + levelAdd + buffAdd
+     * 分层叠加，避免升级与 buff 累计影响
+     */
+    private recalcStats(): void {
+        const levelSys = HeroLevelSystem.instance;
+        const keys = [
+            'maxHp',
+            'attack',
+            'attackRange',
+            'attackInterval',
+            'moveSpeed',
+            'critRate',
+            'critDamage',
+        ] as const;
+
+        for (const key of keys) {
+            const base = this._baseStats[key];
+            const growth = levelSys.getStatGrowth(key, levelSys.level);
+            const buffMul = this._buffMultipliers[key] ?? 1;
+            const buffAdd = this._buffAdditives[key] ?? 0;
+
+            let value = base * growth.multiplier * buffMul + growth.additive + buffAdd;
+
+            // 上限约束
+            if (growth.cap !== undefined) {
+                value = Math.min(value, growth.cap);
+            }
+            // attack 取整
+            if (key === 'attack' || key === 'maxHp') {
+                value = Math.floor(value);
+            }
+            // attackInterval 下限
+            if (key === 'attackInterval') {
+                value = Math.max(0.2, value);
+            }
+
+            this._stats[key] = value;
+        }
+
+        this.syncRuntimeStats();
+    }
+
     /**
      * 应用肉鸽卡牌增益效果
      * 支持 multiply（乘算）和 add（加算）两种模式
      */
     public applyBuffCard(effects: BuffCardEffect): void {
-        this.applyStat('attack', effects.attack);
-        this.applyStat('attackInterval', effects.attackInterval, 0.2);
-        this.applyStat('moveSpeed', effects.moveSpeed);
-        this.applyStat('attackRange', effects.attackRange);
-        this.applyStat('critRate', effects.critRate, undefined, 1.0);
-        this.applyStat('critDamage', effects.critDamage);
+        this.applyBuffStat('attack', effects.attack);
+        this.applyBuffStat('attackInterval', effects.attackInterval);
+        this.applyBuffStat('moveSpeed', effects.moveSpeed);
+        this.applyBuffStat('attackRange', effects.attackRange);
+        this.applyBuffStat('critRate', effects.critRate);
+        this.applyBuffStat('critDamage', effects.critDamage);
 
-        this.syncRuntimeStats();
+        this.recalcStats();
         this.updateHealthBar();
     }
 
-    private applyStat(
-        key: 'attack' | 'attackInterval' | 'moveSpeed' | 'attackRange' | 'critRate' | 'critDamage',
-        mod?: { multiply?: number; add?: number },
-        min?: number,
-        max?: number
-    ): void {
+    private applyBuffStat(key: string, mod?: { multiply?: number; add?: number }): void {
         if (!mod) return;
         if (mod.multiply !== undefined) {
-            this._stats[key] =
-                key === 'attack'
-                    ? Math.floor(this._stats[key] * mod.multiply)
-                    : this._stats[key] * mod.multiply;
+            this._buffMultipliers[key] = (this._buffMultipliers[key] ?? 1) * mod.multiply;
         }
         if (mod.add !== undefined) {
-            this._stats[key] += mod.add;
-        }
-        if (min !== undefined) {
-            this._stats[key] = Math.max(min, this._stats[key]);
-        }
-        if (max !== undefined) {
-            this._stats[key] = Math.min(max, this._stats[key]);
+            this._buffAdditives[key] = (this._buffAdditives[key] ?? 0) + mod.add;
         }
     }
 

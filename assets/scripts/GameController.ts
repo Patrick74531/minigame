@@ -14,6 +14,10 @@ import { PlayerInputAdapter } from './core/input/PlayerInputAdapter';
 import { WeaponBehaviorFactory } from './gameplay/weapons/WeaponBehaviorFactory';
 import { WeaponVFX } from './gameplay/weapons/WeaponVFX';
 import { ScreenShake } from './gameplay/weapons/vfx/ScreenShake';
+import { HeroLevelSystem } from './gameplay/units/HeroLevelSystem';
+import { LevelUpVFX } from './gameplay/effects/LevelUpVFX';
+import { GameEvents } from './data/GameEvents';
+import { EventManager } from './core/managers/EventManager';
 
 const { ccclass, property } = _decorator;
 
@@ -117,6 +121,8 @@ export class GameController extends Component {
         this._services.airdropService.cleanup();
         this._services.weaponSelectUI.cleanup();
         this._services.weaponBarUI.cleanup();
+        HeroLevelSystem.instance.cleanup();
+        this.evtMgr.off(GameEvents.HERO_LEVEL_UP, this.onHeroLevelUp, this);
         WeaponVFX.cleanup();
         ServiceRegistry.clear();
     }
@@ -136,6 +142,9 @@ export class GameController extends Component {
                 if (this._inputAdapter) {
                     this._inputAdapter.setTarget(this._hero, this._joystick);
                 }
+                // 初始化英雄成长系统
+                HeroLevelSystem.instance.initialize(hero);
+                this.evtMgr.on(GameEvents.HERO_LEVEL_UP, this.onHeroLevelUp, this);
             },
         });
     }
@@ -158,7 +167,15 @@ export class GameController extends Component {
         this._joystick = ui.joystick;
     }
 
-    // === 建造系统 ===
-    // === 金币拾取 (Removed) ===
-    // Physics System handles this via Coin.onTriggerEnter or Hero.onTriggerEnter
+    // === 升级 VFX ===
+
+    private onHeroLevelUp(data: { level: number; heroNode: Node }): void {
+        if (data.heroNode && data.heroNode.parent) {
+            LevelUpVFX.play(data.heroNode.parent, data.heroNode, data.level);
+        }
+    }
+
+    private get evtMgr(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
+    }
 }

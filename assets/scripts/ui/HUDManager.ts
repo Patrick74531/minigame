@@ -1,4 +1,4 @@
-import { Node, Label, Color, UITransform, Widget } from 'cc';
+import { Node, Label, Color, UITransform, Widget, Graphics } from 'cc';
 import { EventManager } from '../core/managers/EventManager';
 import { GameEvents } from '../data/GameEvents';
 import { UIFactory } from './UIFactory';
@@ -31,6 +31,13 @@ export class HUDManager {
     private _buildingInfoLabel: Label | null = null;
     private _baseHpLabel: Label | null = null;
     private _uiCanvas: Node | null = null;
+
+    // === 经验条 UI ===
+    private _xpBarBg: Graphics | null = null;
+    private _xpBarFg: Graphics | null = null;
+    private _levelLabel: Label | null = null;
+    private _xpBarWidth: number = 260;
+    private _xpBarHeight: number = 14;
 
     /**
      * 初始化 HUD
@@ -65,7 +72,8 @@ export class HUDManager {
         this._waveLabel.fontSize = 30;
         this._waveLabel.color = new Color(255, 215, 0, 255); // Gold color
 
-        // console.log('[HUDManager] 初始化完成');
+        // 创建经验条 (Top Center)
+        this.createXpBar(uiCanvas);
 
         // 监听事件
         this.setupEventListeners();
@@ -102,6 +110,9 @@ export class HUDManager {
         // 监听波次开始
         this.eventManager.on(GameEvents.WAVE_START, this.onWaveStart, this);
         this.eventManager.on(GameEvents.WAVE_COMPLETE, this.onWaveComplete, this);
+        // 监听英雄经验变化
+        this.eventManager.on(GameEvents.HERO_XP_GAINED, this.onXpGained, this);
+        this.eventManager.on(GameEvents.HERO_LEVEL_UP, this.onHeroLevelUp, this);
     }
 
     // === 公共接口 ===
@@ -173,7 +184,112 @@ export class HUDManager {
 
     private onWaveComplete(data: { wave: number; bonus: number }): void {
         // 可以在这里显示波次完成的提示
-        // console.log(`[HUD] 波次 ${data.wave} 完成, 奖励 ${data.bonus}`);
+    }
+
+    private onXpGained(data: {
+        xp: number;
+        currentXp: number;
+        maxXp: number;
+        level: number;
+    }): void {
+        this.updateXpBar(data.currentXp, data.maxXp, data.level);
+    }
+
+    private onHeroLevelUp(data: { level: number }): void {
+        this.updateXpBar(0, 1, data.level);
+    }
+
+    // === 经验条 ===
+
+    private createXpBar(parent: Node): void {
+        // 清理旧节点
+        parent.getChildByName('XpBarRoot')?.destroy();
+
+        const root = new Node('XpBarRoot');
+        root.layer = UI_LAYER;
+        parent.addChild(root);
+
+        const transform = root.addComponent(UITransform);
+        transform.setContentSize(this._xpBarWidth + 80, this._xpBarHeight + 30);
+
+        const widget = root.addComponent(Widget);
+        widget.isAlignTop = true;
+        widget.isAlignHorizontalCenter = true;
+        widget.top = 20;
+
+        // 等级标签
+        const lvNode = new Node('LevelLabel');
+        lvNode.layer = UI_LAYER;
+        root.addChild(lvNode);
+        lvNode.addComponent(UITransform);
+        this._levelLabel = lvNode.addComponent(Label);
+        this._levelLabel.string = 'Lv.1';
+        this._levelLabel.fontSize = 22;
+        this._levelLabel.lineHeight = 26;
+        this._levelLabel.color = new Color(255, 230, 140, 255);
+        this._levelLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        lvNode.setPosition(0, 12, 0);
+
+        // 背景条
+        const bgNode = new Node('XpBg');
+        bgNode.layer = UI_LAYER;
+        root.addChild(bgNode);
+        bgNode.addComponent(UITransform);
+        this._xpBarBg = bgNode.addComponent(Graphics);
+        this._xpBarBg.fillColor = new Color(40, 40, 40, 200);
+        this._xpBarBg.roundRect(
+            -this._xpBarWidth / 2,
+            -this._xpBarHeight / 2,
+            this._xpBarWidth,
+            this._xpBarHeight,
+            4
+        );
+        this._xpBarBg.fill();
+        // 边框
+        this._xpBarBg.strokeColor = new Color(120, 120, 120, 180);
+        this._xpBarBg.lineWidth = 1;
+        this._xpBarBg.roundRect(
+            -this._xpBarWidth / 2,
+            -this._xpBarHeight / 2,
+            this._xpBarWidth,
+            this._xpBarHeight,
+            4
+        );
+        this._xpBarBg.stroke();
+        bgNode.setPosition(0, -6, 0);
+
+        // 前景条
+        const fgNode = new Node('XpFg');
+        fgNode.layer = UI_LAYER;
+        root.addChild(fgNode);
+        fgNode.addComponent(UITransform);
+        this._xpBarFg = fgNode.addComponent(Graphics);
+        fgNode.setPosition(0, -6, 0);
+        this.drawXpFill(0);
+    }
+
+    private drawXpFill(ratio: number): void {
+        if (!this._xpBarFg) return;
+        this._xpBarFg.clear();
+        const w = this._xpBarWidth * Math.max(0, Math.min(1, ratio));
+        if (w < 1) return;
+        this._xpBarFg.fillColor = new Color(80, 200, 255, 255);
+        this._xpBarFg.roundRect(
+            -this._xpBarWidth / 2,
+            -this._xpBarHeight / 2,
+            w,
+            this._xpBarHeight,
+            4
+        );
+        this._xpBarFg.fill();
+    }
+
+    public updateXpBar(currentXp: number, maxXp: number, level: number): void {
+        const ratio = maxXp > 0 ? currentXp / maxXp : 0;
+        this.drawXpFill(ratio);
+        if (this._levelLabel) {
+            this._levelLabel.string = `Lv.${level}`;
+        }
     }
 
     /**
@@ -185,6 +301,9 @@ export class HUDManager {
         this._waveLabel = null;
         this._buildingInfoLabel = null;
         this._baseHpLabel = null;
+        this._xpBarBg = null;
+        this._xpBarFg = null;
+        this._levelLabel = null;
         this._uiCanvas = null;
     }
 

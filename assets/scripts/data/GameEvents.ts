@@ -54,6 +54,10 @@ export const GameEvents = {
     HERO_ATTACK: 'HERO_ATTACK',
     /** 英雄技能使用 { skillId: string } */
     HERO_SKILL_USED: 'HERO_SKILL_USED',
+    /** 英雄获得经验 { xp: number, currentXp: number, maxXp: number, level: number } */
+    HERO_XP_GAINED: 'HERO_XP_GAINED',
+    /** 英雄升级 { level: number, heroNode: Node } */
+    HERO_LEVEL_UP: 'HERO_LEVEL_UP',
 
     // === 建造系统 ===
     /** 建筑建造完成 { padNode: Node, buildingTypeId: string, position: Vec3 } */
@@ -114,6 +118,8 @@ export type GameEventPayloads = {
     [GameEvents.GAME_OVER]: { victory: boolean };
     [GameEvents.HERO_ATTACK]: { target: Node };
     [GameEvents.HERO_SKILL_USED]: { skillId: string };
+    [GameEvents.HERO_XP_GAINED]: { xp: number; currentXp: number; maxXp: number; level: number };
+    [GameEvents.HERO_LEVEL_UP]: { level: number; heroNode: Node };
     [GameEvents.BUILDING_CONSTRUCTED]: {
         padNode: Node;
         buildingTypeId?: string;

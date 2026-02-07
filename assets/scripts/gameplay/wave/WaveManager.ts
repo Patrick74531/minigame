@@ -18,6 +18,7 @@ export interface WaveConfig {
     spawnInterval: number;
     hpMultiplier: number;
     speedMultiplier: number;
+    attackMultiplier: number;
 }
 
 /**
@@ -154,6 +155,7 @@ export class WaveManager {
         );
         const eliteCount = this.getEliteCountForWave(waveNumber);
         const hpMult = infinite.BASE_HP_MULT + waveIndex * infinite.HP_MULT_PER_WAVE;
+        const atkMult = infinite.BASE_ATTACK_MULT + waveIndex * infinite.ATTACK_MULT_PER_WAVE;
         const speedMult = Math.min(
             infinite.MAX_SPEED_MULT,
             infinite.BASE_SPEED_MULT + waveIndex * infinite.SPEED_MULT_PER_WAVE
@@ -170,6 +172,7 @@ export class WaveManager {
             ),
             hpMultiplier: hpMult,
             speedMultiplier: speedMult,
+            attackMultiplier: atkMult,
         };
 
         console.log('═══════════════════════════════════════');
@@ -269,7 +272,9 @@ export class WaveManager {
                 speedMultiplier:
                     (this._waveConfig?.speedMultiplier || 1) *
                     (isElite ? elite.SPEED_MULTIPLIER : 1),
-                attackMultiplier: isElite ? elite.ATTACK_MULTIPLIER : 1,
+                attackMultiplier:
+                    (this._waveConfig?.attackMultiplier || 1) *
+                    (isElite ? elite.ATTACK_MULTIPLIER : 1),
                 isElite,
                 scaleMultiplier: isElite ? elite.SCALE_MULTIPLIER : 1,
                 coinDropMultiplier: isElite ? elite.COIN_DROP_MULTIPLIER : 1,

@@ -6,6 +6,7 @@ import { Bullet } from '../../combat/Bullet';
 import { GameConfig } from '../../../data/GameConfig';
 import { ProjectilePool } from '../vfx/ProjectilePool';
 import { ScreenShake } from '../vfx/ScreenShake';
+import { Unit } from '../../units/Unit';
 
 /**
  * 寡妇制造者 — 炽热曳光机枪 (元气骑士风格)
@@ -137,6 +138,12 @@ export class MachineGunBehavior extends WeaponBehavior {
         bullet.knockbackDirX = dirX;
         bullet.knockbackDirZ = dirZ;
         bullet.damage = stats.damage;
+        // 从持有者读取暴击属性
+        const ownerUnit = owner.getComponent(Unit);
+        if (ownerUnit) {
+            bullet.critRate = ownerUnit.stats.critRate;
+            bullet.critDamage = ownerUnit.stats.critDamage;
+        }
         const speed = stats.projectileSpeed + (Math.random() - 0.5) * 3;
         bullet.speed = speed;
 

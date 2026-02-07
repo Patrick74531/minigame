@@ -419,6 +419,35 @@ export const GameConfig = {
         ANIM_ROOT_SCALE: 1.0,
     },
 
+    // === 英雄成长系统 ===
+    HERO_LEVEL: {
+        /** 最大等级 */
+        MAX_LEVEL: 30,
+        /** 升级所需经验基础值 */
+        XP_BASE: 20,
+        /** 每级经验增长倍率 */
+        XP_GROWTH: 1.18,
+        /** 击杀普通敌人获得的经验 */
+        XP_PER_KILL: 5,
+        /** 击杀精英敌人获得的经验 */
+        XP_PER_ELITE_KILL: 20,
+        /**
+         * 每级属性增长（复合倍率 / 加算）
+         * multiply: 每级乘算倍率（如 1.08 = +8%/级）
+         * add:      每级加算值
+         * cap:      属性上限（可选）
+         */
+        GROWTH: {
+            maxHp: { multiply: 1.1 },
+            attack: { multiply: 1.08 },
+            critRate: { add: 0.012, cap: 0.5 },
+            critDamage: { add: 0.06 },
+            moveSpeed: { multiply: 1.015 },
+            attackRange: { multiply: 1.005 },
+            attackInterval: { multiply: 0.985 },
+        } as Record<string, { multiply?: number; add?: number; cap?: number }>,
+    },
+
     // === 波次系统 ===
     WAVE: {
         /** 波次间隔（秒） */
@@ -430,30 +459,33 @@ export const GameConfig = {
         /**
          * 无限波次模式参数
          * NOTE: 仅用于 gameplay/wave/WaveManager (Infinite Mode)。
+         * 设计原则：敌人成长略快于英雄，迫使玩家利用建筑和卡牌体系
          */
         INFINITE: {
-            BASE_COUNT: 10,
-            COUNT_PER_WAVE: 2,
-            COUNT_GROWTH_STEP_WAVES: 5,
-            COUNT_GROWTH_STEP_BONUS: 3,
+            BASE_COUNT: 15,
+            COUNT_PER_WAVE: 3,
+            COUNT_GROWTH_STEP_WAVES: 4,
+            COUNT_GROWTH_STEP_BONUS: 4,
             BASE_HP_MULT: 1,
-            HP_MULT_PER_WAVE: 0.16,
+            HP_MULT_PER_WAVE: 0.25,
+            BASE_ATTACK_MULT: 1,
+            ATTACK_MULT_PER_WAVE: 0.12,
             BASE_SPEED_MULT: 1,
-            SPEED_MULT_PER_WAVE: 0.015,
-            MAX_SPEED_MULT: 1.45,
-            BASE_SPAWN_INTERVAL: 0.95,
+            SPEED_MULT_PER_WAVE: 0.018,
+            MAX_SPEED_MULT: 1.55,
+            BASE_SPAWN_INTERVAL: 0.85,
             SPAWN_INTERVAL_DECAY_PER_WAVE: 0.03,
-            MIN_SPAWN_INTERVAL: 0.35,
+            MIN_SPAWN_INTERVAL: 0.28,
             BONUS_PER_WAVE: 20,
             BONUS_GROWTH_PER_WAVE: 4,
             SPAWN_RANGE: 6,
             ELITE: {
-                START_WAVE: 4,
-                INTERVAL: 3,
+                START_WAVE: 3,
+                INTERVAL: 2,
                 BASE_COUNT: 1,
-                COUNT_GROWTH_STEP_WAVES: 6,
-                MAX_COUNT: 3,
-                SPAWN_EVERY: 5,
+                COUNT_GROWTH_STEP_WAVES: 5,
+                MAX_COUNT: 5,
+                SPAWN_EVERY: 4,
             },
         },
     },
