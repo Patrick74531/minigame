@@ -30,6 +30,12 @@ export class WeaponVFX {
 
     private static _matCache: Map<string, Material> = new Map();
     private static _meshCache: Map<string, Mesh> = new Map();
+
+    // ========== 复用的常量向量（避免热路径 new Vec3） ==========
+    private static readonly _SCALE_ZERO = new Vec3(0, 0, 0);
+    private static readonly _SCALE_FLASH_PEAK = new Vec3(1.2, 1.2, 1.2);
+    private static readonly _SCALE_HALF = new Vec3(0.5, 0.5, 0.5);
+    private static readonly _DEFAULT_HIT_COLOR = new Color(255, 220, 150, 255);
     private static _initialized: boolean = false;
     private static _beamNoiseTex: Texture2D | null = null;
     private static _beamNoiseLoading: boolean = false;
@@ -281,7 +287,7 @@ export class WeaponVFX {
      * 小型闪光 + 1-2 个碎片，低开销高反馈
      */
     public static createHitSpark(parent: Node, pos: Vec3, color?: Color): void {
-        const c = color ?? new Color(255, 220, 150, 255);
+        const c = color ?? this._DEFAULT_HIT_COLOR;
         // 小型闪光
         const flash = ProjectilePool.get('vfx_flash');
         if (flash) {
@@ -290,34 +296,31 @@ export class WeaponVFX {
             this.configureVfxNode(flash, this.getBoxMesh(0.08, 0.08, 0.08), this.getGlowMat(c));
             flash.setScale(0.3, 0.3, 0.3);
             tween(flash)
-                .to(0.03, { scale: new Vec3(1.2, 1.2, 1.2) })
-                .to(0.05, { scale: new Vec3(0, 0, 0) })
+                .to(0.03, { scale: this._SCALE_FLASH_PEAK })
+                .to(0.05, { scale: this._SCALE_ZERO })
                 .call(() => ProjectilePool.put('vfx_flash', flash))
                 .start();
         }
-        // 1-2 个碎片飞溅
-        const debrisCount = 1 + (Math.random() > 0.5 ? 1 : 0);
-        for (let i = 0; i < debrisCount; i++) {
-            const d = ProjectilePool.get('vfx_debris');
-            if (!d) continue;
-            parent.addChild(d);
-            d.setPosition(pos);
-            const s = 0.02 + Math.random() * 0.02;
-            this.configureVfxNode(d, this.getBoxMesh(s, s, s), this.getUnlitMat(c));
-            const angle = Math.random() * Math.PI * 2;
-            const speed = 1.5 + Math.random() * 2;
-            const endP = new Vec3(
-                pos.x + Math.cos(angle) * speed * 0.08,
-                pos.y + 0.05 + Math.random() * 0.1,
-                pos.z + Math.sin(angle) * speed * 0.08
-            );
-            d.setScale(1, 1, 1);
-            tween(d)
-                .to(0.1, { position: endP, scale: new Vec3(0.5, 0.5, 0.5) }, { easing: 'quartOut' })
-                .to(0.08, { scale: new Vec3(0, 0, 0) })
-                .call(() => ProjectilePool.put('vfx_debris', d))
-                .start();
-        }
+        // 1 个碎片飞溅
+        const d = ProjectilePool.get('vfx_debris');
+        if (!d) return;
+        parent.addChild(d);
+        d.setPosition(pos);
+        const s = 0.02 + Math.random() * 0.02;
+        this.configureVfxNode(d, this.getBoxMesh(s, s, s), this.getUnlitMat(c));
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1.5 + Math.random() * 2;
+        const endP = new Vec3(
+            pos.x + Math.cos(angle) * speed * 0.08,
+            pos.y + 0.05 + Math.random() * 0.1,
+            pos.z + Math.sin(angle) * speed * 0.08
+        );
+        d.setScale(1, 1, 1);
+        tween(d)
+            .to(0.1, { position: endP, scale: this._SCALE_HALF }, { easing: 'quartOut' })
+            .to(0.08, { scale: this._SCALE_ZERO })
+            .call(() => ProjectilePool.put('vfx_debris', d))
+            .start();
     }
 
     // ========== 弹壳粒子（池化） ==========

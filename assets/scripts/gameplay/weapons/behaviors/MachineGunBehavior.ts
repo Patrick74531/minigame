@@ -69,6 +69,7 @@ export class MachineGunBehavior extends WeaponBehavior {
 
     // 复用的临时向量
     private static readonly _tmpPos = new Vec3();
+    private static readonly _tmpMuzzle = new Vec3();
 
     public fire(
         owner: Node,
@@ -100,7 +101,8 @@ export class MachineGunBehavior extends WeaponBehavior {
         const dirZ = dist3d > 0.001 ? dz / dist3d : 1;
 
         // 枪口位置（前移 1.2，避免第一颗子弹距角色过近导致方向偏转）
-        const muzzlePos = new Vec3(spawnPos.x + dirX * 1.2, spawnPos.y, spawnPos.z + dirZ * 1.2);
+        const muzzlePos = MachineGunBehavior._tmpMuzzle;
+        muzzlePos.set(spawnPos.x + dirX * 1.2, spawnPos.y, spawnPos.z + dirZ * 1.2);
 
         // ==================== 弹壳抛射（按节奏） ====================
         const casingInterval = MachineGunBehavior.CASING_INTERVAL[idx];
@@ -126,9 +128,14 @@ export class MachineGunBehavior extends WeaponBehavior {
         bullet.poolKey = 'mg_bullet';
         bullet.orientXAxis = true; // 贴图水平朝右，用 +X 轴对齐飞行方向
         bullet.pierce = true; // 穿透直线上所有敌人
+        bullet.useManualHitDetection = true; // 手动碰撞检测（防隧穿 + 降物理开销）
+        bullet.maxLifetime = 1.5; // 机枪子弹短寿命，减少同屏数量
+        bullet.disablePhysics(); // 禁用 RigidBody/BoxCollider
         const [kbForce, kbStun] = MachineGunBehavior.KNOCKBACK_PARAMS[idx];
         bullet.knockbackForce = kbForce;
         bullet.knockbackStun = kbStun;
+        bullet.knockbackDirX = dirX;
+        bullet.knockbackDirZ = dirZ;
         bullet.damage = stats.damage;
         const speed = stats.projectileSpeed + (Math.random() - 0.5) * 3;
         bullet.speed = speed;

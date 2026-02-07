@@ -49,8 +49,21 @@ export class Bullet extends BaseComponent implements IPoolable {
     public knockbackForce: number = 0;
     /** 击退硬直时长（秒） */
     public knockbackStun: number = 0.1;
+    /** 可选：显式击退方向（XZ），优先于速度向量 */
+    public knockbackDirX: number = 0;
+    public knockbackDirZ: number = 0;
     /** 已命中的敌人节点（穿透时避免重复伤害） */
     private _hitNodes: Set<Node> = new Set();
+
+    // === Manual Hit Detection (替代物理触发，防隧穿 + 降开销) ===
+    /** 启用手动碰撞检测（跳过 RigidBody/BoxCollider） */
+    public useManualHitDetection: boolean = false;
+    /** 敌人命中半径（手动检测用） */
+    public hitRadius: number = 0.8;
+    /** 上一帧位置（线段检测用） */
+    private _prevPos: Vec3 = new Vec3();
+    /** 上次命中火花时间戳（节流用） */
+    private _lastHitSparkTime: number = 0;
 
     // === Pool Recycling ===
     /** 若非空，销毁时回收到 ProjectilePool 而非 destroy */
@@ -81,6 +94,11 @@ export class Bullet extends BaseComponent implements IPoolable {
         this.resetState();
     }
 
+    /** 设置子弹最大生存时间 */
+    public set maxLifetime(v: number) {
+        this._maxLifetime = v;
+    }
+
     /** 重置子弹状态（对象池复用时调用） */
     public resetState(): void {
         this._lifetime = 0;
@@ -97,7 +115,14 @@ export class Bullet extends BaseComponent implements IPoolable {
         this.pierce = false;
         this.knockbackForce = 0;
         this.knockbackStun = 0.1;
+        this.knockbackDirX = 0;
+        this.knockbackDirZ = 0;
         this._hitNodes.clear();
+        this.useManualHitDetection = false;
+        this.hitRadius = 0.8;
+        this._prevPos.set(0, 0, 0);
+        this._lastHitSparkTime = 0;
+        this._maxLifetime = 3;
     }
 
     /** 回收子弹：有 poolKey 则归池，否则 destroy */
@@ -111,6 +136,14 @@ export class Bullet extends BaseComponent implements IPoolable {
         } else {
             this.node.destroy();
         }
+    }
+
+    /** 禁用物理组件（手动检测模式下降低物理开销） */
+    public disablePhysics(): void {
+        const col = this.node.getComponent(BoxCollider);
+        if (col) col.enabled = false;
+        const rb = this.node.getComponent(RigidBody);
+        if (rb) rb.enabled = false;
     }
 
     protected initialize(): void {
@@ -155,6 +188,9 @@ export class Bullet extends BaseComponent implements IPoolable {
         }
 
         const pos = this.node.position;
+        // 保存上一帧位置用于线段碰撞检测
+        this._prevPos.set(pos);
+
         const currentPos = Bullet._tmpPos;
         currentPos.set(
             pos.x + this._velocity.x * dt,
@@ -162,6 +198,11 @@ export class Bullet extends BaseComponent implements IPoolable {
             pos.z + this._velocity.z * dt
         );
         this.node.setPosition(currentPos);
+
+        // 手动碰撞检测（防隧穿，替代物理触发）
+        if (this.useManualHitDetection) {
+            this.checkManualHits();
+        }
 
         // Face direction
         if (this._velocity.lengthSqr() > 0.1) {
@@ -206,53 +247,131 @@ export class Bullet extends BaseComponent implements IPoolable {
         const unit = other.getComponent(Unit);
 
         if (unit && unit.unitType === UnitType.ENEMY) {
-            // 记录已命中（穿透时避免重复伤害）
-            this._hitNodes.add(other);
-
-            // 1. AOE Logic
-            if (this.explosionRadius > 0) {
-                // Decoupled: Emit event for Manager to handle
-                this.eventManager.emit(GameEvents.APPLY_AOE_EFFECT, {
-                    center: this.node.position.clone(),
-                    radius: this.explosionRadius,
-                    damage: this.damage,
-                    slowPercent: this.slowPercent,
-                    slowDuration: this.slowDuration,
-                });
-            } else {
-                // Single Target
-                this.applyDamage(unit);
-            }
-
-            // 击退效果
-            if (this.knockbackForce > 0 && this._velocity.lengthSqr() > 0.01) {
-                const lenXZ = Math.sqrt(
-                    this._velocity.x * this._velocity.x + this._velocity.z * this._velocity.z
-                );
-                if (lenXZ > 0.0001) {
-                    unit.applyKnockback(
-                        this._velocity.x / lenXZ,
-                        this._velocity.z / lenXZ,
-                        this.knockbackForce,
-                        this.knockbackStun
-                    );
-                }
-            }
-
-            this.createHitEffect();
-
-            // 穿透模式：不回收，继续飞行
-            if (this.pierce) return;
-
-            // 2. Chain Logic (Bounce)
-            if (this.chainCount > 0 && this.chainRange > 0) {
-                this.handleChainBounce(unit.node);
-                // Do NOT destroy bullet if bouncing
-                return;
-            }
-
-            this.recycle();
+            this.handleHit(unit);
         }
+    }
+
+    // ==================== 手动碰撞检测（防隧穿） ====================
+
+    /** 线段(prevPos→currentPos)与敌人球体的碰撞检测 */
+    private checkManualHits(): void {
+        if (this._lifetime < 0.02) return;
+
+        const enemies = EnemyQuery.getEnemies();
+        const curPos = this.node.position;
+        const rSq = this.hitRadius * this.hitRadius;
+
+        for (let i = 0, len = enemies.length; i < len; i++) {
+            const enemy = enemies[i];
+            if (!enemy.isValid) continue;
+            if (this.pierce && this._hitNodes.has(enemy)) continue;
+
+            const unit = enemy.getComponent(Unit);
+            if (!unit || !unit.isAlive || unit.unitType !== UnitType.ENEMY) continue;
+
+            // 线段-球体距离检测（XZ 平面）
+            const ex = enemy.position.x;
+            const ez = enemy.position.z;
+            if (this.segmentPointDistSqXZ(this._prevPos, curPos, ex, ez) < rSq) {
+                this.handleHit(unit);
+                // 非穿透模式命中后立即退出
+                if (!this.pierce) return;
+            }
+        }
+    }
+
+    /** XZ 平面上点到线段的距离平方 */
+    private segmentPointDistSqXZ(a: Vec3, b: Vec3, px: number, pz: number): number {
+        const abx = b.x - a.x;
+        const abz = b.z - a.z;
+        const apx = px - a.x;
+        const apz = pz - a.z;
+        const abLenSq = abx * abx + abz * abz;
+
+        if (abLenSq < 0.0001) {
+            // 线段退化为点
+            return apx * apx + apz * apz;
+        }
+
+        // 投影参数 t，钳制到 [0, 1]
+        let t = (apx * abx + apz * abz) / abLenSq;
+        if (t < 0) t = 0;
+        else if (t > 1) t = 1;
+
+        const closestX = a.x + abx * t;
+        const closestZ = a.z + abz * t;
+        const dx = px - closestX;
+        const dz = pz - closestZ;
+        return dx * dx + dz * dz;
+    }
+
+    // ==================== 共享命中处理 ====================
+
+    /** 处理命中单个敌人（物理触发和手动检测共用） */
+    private handleHit(unit: Unit): void {
+        const enemyNode = unit.node;
+
+        // 记录已命中（穿透时避免重复伤害）
+        this._hitNodes.add(enemyNode);
+
+        // 1. AOE Logic
+        if (this.explosionRadius > 0) {
+            // Decoupled: Emit event for Manager to handle
+            this.eventManager.emit(GameEvents.APPLY_AOE_EFFECT, {
+                center: this.node.position.clone(),
+                radius: this.explosionRadius,
+                damage: this.damage,
+                slowPercent: this.slowPercent,
+                slowDuration: this.slowDuration,
+            });
+        } else {
+            // Single Target
+            this.applyDamage(unit);
+        }
+
+        // 击退效果
+        if (this.knockbackForce > 0) {
+            let dirX = this.knockbackDirX;
+            let dirZ = this.knockbackDirZ;
+            let lenXZ = Math.sqrt(dirX * dirX + dirZ * dirZ);
+
+            // 回退到当前弹道方向
+            if (lenXZ <= 0.0001) {
+                dirX = this._velocity.x;
+                dirZ = this._velocity.z;
+                lenXZ = Math.sqrt(dirX * dirX + dirZ * dirZ);
+            }
+
+            // 仍无有效方向时，回退到"子弹 -> 目标"方向
+            if (lenXZ <= 0.0001) {
+                dirX = unit.node.position.x - this.node.position.x;
+                dirZ = unit.node.position.z - this.node.position.z;
+                lenXZ = Math.sqrt(dirX * dirX + dirZ * dirZ);
+            }
+
+            if (lenXZ > 0.0001) {
+                unit.applyKnockback(
+                    dirX / lenXZ,
+                    dirZ / lenXZ,
+                    this.knockbackForce,
+                    this.knockbackStun
+                );
+            }
+        }
+
+        this.createHitEffect();
+
+        // 穿透模式：不回收，继续飞行
+        if (this.pierce) return;
+
+        // 2. Chain Logic (Bounce)
+        if (this.chainCount > 0 && this.chainRange > 0) {
+            this.handleChainBounce(unit.node);
+            // Do NOT destroy bullet if bouncing
+            return;
+        }
+
+        this.recycle();
     }
 
     private handleChainBounce(currentHitNode: Node): void {
@@ -331,8 +450,14 @@ export class Bullet extends BaseComponent implements IPoolable {
 
     private createHitEffect(): void {
         if (!this.node.parent) return;
-        // Throttle: 90% of hits create sparks (performance on mobile)
-        if (Math.random() > 0.9) return;
+        // 穿透 / 手动检测子弹：时间节流（最多每 0.1s 一次火花）
+        if (this.pierce || this.useManualHitDetection) {
+            if (this._lifetime - this._lastHitSparkTime < 0.1) return;
+            this._lastHitSparkTime = this._lifetime;
+        } else {
+            // 普通子弹：90% 概率生成火花
+            if (Math.random() > 0.9) return;
+        }
         WeaponVFX.createHitSpark(this.node.parent, this.node.position.clone());
     }
 

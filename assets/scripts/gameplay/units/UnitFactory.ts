@@ -76,7 +76,8 @@ export class UnitFactory {
 
         // Physics Setup
         const rb = node.addComponent(RigidBody);
-        rb.type = RigidBody.Type.DYNAMIC; // Dynamic for physics movement
+        // Enemy uses script-driven movement; KINEMATIC avoids heavy dynamic solver cost in crowds.
+        rb.type = RigidBody.Type.KINEMATIC;
         rb.useGravity = false;
         rb.linearDamping = GameConfig.PHYSICS.UNIT_LINEAR_DAMPING; // Low damping
         rb.angularFactor = new Vec3(0, 0, 0); // Lock rotation
@@ -87,7 +88,9 @@ export class UnitFactory {
         col.size = new Vec3(1, 1, 1);
         col.isTrigger = false; // Solid for collision
         col.setGroup(1 << 3); // ENEMY
-        col.setMask(0xffffffff); // Collide with all
+        // Collide only with DEFAULT (buildings/hero/soldier) and BULLET.
+        // Excluding ENEMY-ENEMY collisions greatly reduces physics cost and crowd jitter.
+        col.setMask((1 << 0) | (1 << 4));
 
         const hpMultiplier = options.hpMultiplier ?? 1;
         const attackMultiplier = options.attackMultiplier ?? 1;

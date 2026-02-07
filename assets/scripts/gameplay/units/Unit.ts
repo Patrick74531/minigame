@@ -334,7 +334,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
 
         // 若有刚体，清掉线速度，避免和手动位移互相干扰
         const rb = this.node.getComponent(RigidBody);
-        if (rb) {
+        if (rb && rb.type === RigidBody.Type.DYNAMIC) {
             Unit._tmpKbVec.set(0, 0, 0);
             rb.setLinearVelocity(Unit._tmpKbVec);
         }
@@ -345,7 +345,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         this._stunTimer = 0;
         this._knockbackVel.set(0, 0, 0);
         const rb = this.node.getComponent(RigidBody);
-        if (rb) {
+        if (rb && rb.type === RigidBody.Type.DYNAMIC) {
             Unit._tmpKbVec.set(0, 0, 0);
             rb.setLinearVelocity(Unit._tmpKbVec);
         }

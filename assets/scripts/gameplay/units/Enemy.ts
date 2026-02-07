@@ -20,6 +20,7 @@ const { ccclass, property } = _decorator;
 export class Enemy extends Unit {
     /** Distance to Base to trigger "Reached Base" logic */
     private readonly ARRIVAL_DISTANCE = 0.6;
+    private static readonly _tmpLookAt = new Vec3();
 
     // Target position (Base)
     private _targetPos: Vec3 = new Vec3(0, 0, 0);
@@ -81,7 +82,7 @@ export class Enemy extends Unit {
 
         // 清除 RigidBody 残余速度，避免物理引擎干扰 setPosition 移动
         const rb = this.node.getComponent(RigidBody);
-        if (rb) {
+        if (rb && rb.type === RigidBody.Type.DYNAMIC) {
             rb.setLinearVelocity(Vec3.ZERO);
         }
 
@@ -118,9 +119,8 @@ export class Enemy extends Unit {
         );
 
         // Face target
-        this.node.lookAt(
-            new Vec3(this._targetPos.x, GameConfig.PHYSICS.ENEMY_Y, this._targetPos.z)
-        );
+        Enemy._tmpLookAt.set(this._targetPos.x, GameConfig.PHYSICS.ENEMY_Y, this._targetPos.z);
+        this.node.lookAt(Enemy._tmpLookAt);
     }
 
     private onCollisionEnter(event: ICollisionEvent): void {
@@ -203,9 +203,8 @@ export class Enemy extends Unit {
                     this._state = UnitState.ATTACKING;
                     // Face the target
                     const targetPos = this._target.getWorldPosition();
-                    this.node.lookAt(
-                        new Vec3(targetPos.x, GameConfig.PHYSICS.ENEMY_Y, targetPos.z)
-                    );
+                    Enemy._tmpLookAt.set(targetPos.x, GameConfig.PHYSICS.ENEMY_Y, targetPos.z);
+                    this.node.lookAt(Enemy._tmpLookAt);
                 } else {
                     // Chase target? Or give up?
                     // For now, if out of range, resume moving to Base (ignore chasing for simple enemies)
