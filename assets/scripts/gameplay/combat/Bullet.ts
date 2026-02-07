@@ -436,13 +436,15 @@ export class Bullet extends BaseComponent implements IPoolable {
 
     private applyDamage(unit: Unit): void {
         let finalDamage = this.damage;
+        let isCrit = false;
 
         // 暴击判定
         if (this.critRate > 0 && Math.random() < this.critRate) {
             finalDamage = Math.floor(finalDamage * this.critDamage);
+            isCrit = true;
         }
 
-        unit.takeDamage(finalDamage);
+        unit.takeDamage(finalDamage, undefined, isCrit);
         if (this.slowPercent > 0) {
             unit.applySlow(this.slowPercent, this.slowDuration);
         }

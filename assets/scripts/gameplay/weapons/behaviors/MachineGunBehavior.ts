@@ -55,13 +55,13 @@ export class MachineGunBehavior extends WeaponBehavior {
     private static readonly CASING_INTERVAL = [0, 3, 2, 2, 1];
 
     // 击退参数 [knockbackSpeed, stunDuration]
-    // 目标：Lv1 就能清晰感知击退，Lv5 连续命中可形成明显压制
+    // 目标：Lv1 仅轻微僵直，Lv5 连续命中可形成适度压制
     private static readonly KNOCKBACK_PARAMS: [number, number][] = [
-        [18, 0.2], // Lv1: 明显后退
-        [22, 0.22], // Lv2
-        [26, 0.24], // Lv3
-        [30, 0.26], // Lv4
-        [34, 0.3], // Lv5: 持续扫射强压制
+        [2, 0.06], // Lv1: 微微僵直
+        [3, 0.08], // Lv2: 轻微后退
+        [5, 0.1], // Lv3: 可感知击退
+        [7, 0.12], // Lv4: 明显击退
+        [10, 0.15], // Lv5: 适度压制
     ];
 
     // 连射计数器（用于弹壳节奏、交替偏移等）

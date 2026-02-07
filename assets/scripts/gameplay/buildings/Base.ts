@@ -37,8 +37,8 @@ export class Base extends Building {
         this.hudManager.updateBaseHp(this.currentHp, this.maxHp);
     }
 
-    public takeDamage(damage: number, attacker?: any): void {
-        super.takeDamage(damage, attacker);
+    public takeDamage(damage: number, attacker?: any, isCrit: boolean = false): void {
+        super.takeDamage(damage, attacker, isCrit);
 
         // Update HUD
         this.hudManager.updateBaseHp(this.currentHp, this.maxHp);

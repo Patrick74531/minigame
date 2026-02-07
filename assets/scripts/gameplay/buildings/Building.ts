@@ -8,6 +8,7 @@ import { GameEvents } from '../../data/GameEvents';
 import { GameConfig } from '../../data/GameConfig';
 import { HealthBar } from '../../ui/HealthBar';
 import { IAttackable } from '../../core/interfaces/IAttackable';
+import { DamageNumberFactory } from '../effects/DamageNumberFactory';
 import { Soldier } from '../units/Soldier';
 
 const { ccclass, property } = _decorator;
@@ -297,11 +298,19 @@ export class Building extends BaseComponent implements IAttackable {
     /**
      * 受到伤害
      * @param damage 伤害值
+     * @param _attacker 攻击者
+     * @param isCrit 是否暴击
      */
-    public takeDamage(damage: number, _attacker?: any): void {
+    public takeDamage(damage: number, _attacker?: any, isCrit: boolean = false): void {
         if (!this.isAlive) return;
 
         this.currentHp = Math.max(0, this.currentHp - damage);
+
+        // 显示浮动伤害数字
+        const parent = this.node.parent;
+        if (parent) {
+            DamageNumberFactory.show(parent, this.node.worldPosition, damage, isCrit, this.node);
+        }
 
         if (this._healthBar) {
             this._healthBar.updateHealth(this.currentHp, this.maxHp);

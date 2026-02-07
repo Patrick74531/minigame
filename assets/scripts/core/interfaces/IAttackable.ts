@@ -14,8 +14,9 @@ export interface IAttackable {
      * Apply damage to this object
      * @param amount Amount of damage to deal
      * @param attacker The object dealing the damage (optional)
+     * @param isCrit Whether this damage is a critical hit (optional)
      */
-    takeDamage(amount: number, attacker?: any): void;
+    takeDamage(amount: number, attacker?: any, isCrit?: boolean): void;
 
     /**
      * Get the world position of the object for targeting calculations

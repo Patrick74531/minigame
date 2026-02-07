@@ -7,6 +7,7 @@ import { IPoolable } from '../../core/managers/PoolManager';
 import { IAttackable } from '../../core/interfaces/IAttackable';
 import { Vec3, RigidBody } from 'cc';
 import { HealthBar } from '../../ui/HealthBar';
+import { DamageNumberFactory } from '../effects/DamageNumberFactory';
 
 const { ccclass, property } = _decorator;
 
@@ -147,12 +148,16 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
      * 受到伤害
      * @param damage 伤害值
      * @param attacker 攻击者
+     * @param isCrit 是否暴击
      */
-    public takeDamage(damage: number, _attacker?: any): void {
+    public takeDamage(damage: number, _attacker?: any, isCrit: boolean = false): void {
         if (!this.isAlive) return;
 
         this._stats.currentHp = Math.max(0, this._stats.currentHp - damage);
         this.updateHealthBar();
+
+        // 显示浮动伤害数字
+        this.showDamageNumber(damage, isCrit);
 
         this.eventManager.emit(GameEvents.UNIT_DAMAGED, {
             node: this.node,
@@ -163,6 +168,13 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         if (this._stats.currentHp <= 0) {
             this.die();
         }
+    }
+
+    /** 显示浮动伤害数字 */
+    private showDamageNumber(damage: number, isCrit: boolean): void {
+        const parent = this.node.parent;
+        if (!parent) return;
+        DamageNumberFactory.show(parent, this.node.worldPosition, damage, isCrit, this.node);
     }
 
     /**
@@ -264,8 +276,8 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         this._knockbackVel.x += nx * force;
         this._knockbackVel.z += nz * force;
 
-        // 命中当帧立即推开，确保击退肉眼可见
-        const impactDistance = Math.min(0.9, Math.max(0.22, force * 0.03));
+        // 命中当帧立即推开（小幅位移，主要靠速度衰减体现击退）
+        const impactDistance = Math.min(0.15, Math.max(0.02, force * 0.012));
         const pos = this.node.position;
         this.node.setPosition(pos.x + nx * impactDistance, pos.y, pos.z + nz * impactDistance);
 
