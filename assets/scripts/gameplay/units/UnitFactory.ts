@@ -23,6 +23,7 @@ import { HealthBar } from '../../ui/HealthBar';
 import { GameConfig } from '../../data/GameConfig';
 import { HeroAnimationController } from './HeroAnimationController';
 import { AnimRootScaleLock } from '../visuals/AnimRootScaleLock';
+import { EnemyPaperDollAnimator } from '../visuals/EnemyPaperDollAnimator';
 import { resolveHeroModelConfig } from './HeroModelConfig';
 
 export interface EnemySpawnOptions {
@@ -110,6 +111,8 @@ export class UnitFactory {
 
         // Set Target
         enemy.setTargetPosition(targetPos);
+
+        this.attachEnemyPaperVisual(node);
 
         // 血条
         const hb = node.addComponent(HealthBar);
@@ -449,5 +452,11 @@ export class UnitFactory {
         for (const child of node.children) {
             this.applyLayerRecursive(child, layer);
         }
+    }
+
+    private static attachEnemyPaperVisual(root: Node): void {
+        if (!root.isValid) return;
+        if (root.getComponent(EnemyPaperDollAnimator)) return;
+        root.addComponent(EnemyPaperDollAnimator);
     }
 }

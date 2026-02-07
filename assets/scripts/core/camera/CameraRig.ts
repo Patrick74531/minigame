@@ -12,12 +12,14 @@ export class CameraRig {
             console.warn('[CameraRig] Main Camera not found!');
             return;
         }
+        mainCamera.fov = 36;
 
         let follow = mainCamera.node.getComponent(CameraFollow);
         if (!follow) {
             follow = mainCamera.node.addComponent(CameraFollow);
         }
 
+        follow.smoothSpeed = 0.16;
         follow.offset = offset;
         follow.target = target;
         follow.snap();

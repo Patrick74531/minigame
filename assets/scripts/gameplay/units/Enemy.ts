@@ -118,9 +118,11 @@ export class Enemy extends Unit {
             pos.z + dirZ * speed * dt
         );
 
-        // Face target
-        Enemy._tmpLookAt.set(this._targetPos.x, GameConfig.PHYSICS.ENEMY_Y, this._targetPos.z);
-        this.node.lookAt(Enemy._tmpLookAt);
+        // Face target (paper-doll enemy uses billboard visuals, so root rotation is unnecessary).
+        if (!this.usesPaperDollVisual()) {
+            Enemy._tmpLookAt.set(this._targetPos.x, GameConfig.PHYSICS.ENEMY_Y, this._targetPos.z);
+            this.node.lookAt(Enemy._tmpLookAt);
+        }
     }
 
     private onCollisionEnter(event: ICollisionEvent): void {
@@ -209,10 +211,12 @@ export class Enemy extends Unit {
                 // If we have a target, check if it is still in range
                 if (this.isTargetInRange(this._target)) {
                     this._state = UnitState.ATTACKING;
-                    // Face the target
-                    const targetPos = this._target.getWorldPosition();
-                    Enemy._tmpLookAt.set(targetPos.x, GameConfig.PHYSICS.ENEMY_Y, targetPos.z);
-                    this.node.lookAt(Enemy._tmpLookAt);
+                    // Face the target for non-paper visuals.
+                    if (!this.usesPaperDollVisual()) {
+                        const targetPos = this._target.getWorldPosition();
+                        Enemy._tmpLookAt.set(targetPos.x, GameConfig.PHYSICS.ENEMY_Y, targetPos.z);
+                        this.node.lookAt(Enemy._tmpLookAt);
+                    }
                 } else {
                     // Chase target? Or give up?
                     // For now, if out of range, resume moving to Base (ignore chasing for simple enemies)
@@ -314,6 +318,10 @@ export class Enemy extends Unit {
 
     protected onDeath(): void {
         // Handled by manager
+    }
+
+    private usesPaperDollVisual(): boolean {
+        return !!this.node.getChildByName('EnemyPaperRoot');
     }
 
     private get eventManager(): EventManager {
