@@ -40,6 +40,8 @@ const { ccclass, property } = _decorator;
 export class Hero extends Unit {
     // 移动输入向量 (x, y) -1 ~ 1
     private _inputVector: Vec2 = new Vec2(0, 0);
+    private _facingDir: Vec3 = new Vec3();
+    private _hasFacingDir: boolean = false;
 
     private _weapon: RangedWeapon | null = null;
     private _mover: CharacterMover | null = null;
@@ -60,6 +62,7 @@ export class Hero extends Unit {
     /** buff 卡片累计倍率 / 加算（分层叠加） */
     private _buffMultipliers: Record<string, number> = {};
     private _buffAdditives: Record<string, number> = {};
+    private static readonly _tmpLookAt = new Vec3();
 
     public onDespawn(): void {
         if (this.gameManager.hero === this.node) {
@@ -99,6 +102,7 @@ export class Hero extends Unit {
         if (!this._mover) {
             this._mover = this.node.addComponent(CharacterMover);
         }
+        this._mover.rotateWithMovement = false;
 
         this._stackVisualizer = this.node.getComponent(StackVisualizer);
         if (!this._stackVisualizer) {
@@ -166,6 +170,7 @@ export class Hero extends Unit {
         super.onSpawn();
         this._state = UnitState.IDLE;
         this._inputVector.set(0, 0);
+        this._hasFacingDir = false;
         this.gameManager.hero = this.node;
     }
 
@@ -227,6 +232,7 @@ export class Hero extends Unit {
 
         // 始终索敌（移动时也能锁定目标并开火）
         this.updateTargeting();
+        this.updateFacingDirection();
 
         // 移动输入覆盖状态，但保留目标用于射击
         if (isMoving) {
@@ -240,6 +246,7 @@ export class Hero extends Unit {
         }
 
         super.update(dt);
+        this.applyFacingDirection();
     }
 
     /** 获取当前有效攻击范围（优先使用武器射程） */
@@ -310,6 +317,42 @@ export class Hero extends Unit {
         if (this._inputVector.lengthSqr() > 0.01) {
             this._mover.move(this._inputVector, dt);
         }
+    }
+
+    private updateFacingDirection(): void {
+        // 优先：有射击目标时朝目标
+        if (this._target && this._target.isAlive) {
+            const myPos = this.node.position;
+            const targetPos = this._target.node.position;
+            const dx = targetPos.x - myPos.x;
+            const dz = targetPos.z - myPos.z;
+            const len = Math.sqrt(dx * dx + dz * dz);
+            if (len > 0.0001) {
+                this._facingDir.set(dx / len, 0, dz / len);
+                this._hasFacingDir = true;
+                return;
+            }
+        }
+
+        // 回退：没在射击目标时，朝摇杆移动方向
+        const moveLenSq = this._inputVector.lengthSqr();
+        if (moveLenSq > 0.01) {
+            const dx = this._inputVector.x;
+            const dz = -this._inputVector.y;
+            const len = Math.sqrt(dx * dx + dz * dz);
+            if (len > 0.0001) {
+                this._facingDir.set(dx / len, 0, dz / len);
+                this._hasFacingDir = true;
+            }
+        }
+    }
+
+    private applyFacingDirection(): void {
+        if (!this._hasFacingDir) return;
+        const pos = this.node.position;
+        const lookAt = Hero._tmpLookAt;
+        lookAt.set(pos.x + this._facingDir.x, pos.y, pos.z + this._facingDir.z);
+        this.node.lookAt(lookAt);
     }
 
     protected performAttack(): void {

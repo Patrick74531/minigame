@@ -12,7 +12,8 @@ export class CameraRig {
             console.warn('[CameraRig] Main Camera not found!');
             return;
         }
-        mainCamera.fov = 36;
+        // Slightly wider FOV to keep battlefield readability after lowering camera pitch.
+        mainCamera.fov = 42;
 
         let follow = mainCamera.node.getComponent(CameraFollow);
         if (!follow) {

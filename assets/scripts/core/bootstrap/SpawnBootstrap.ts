@@ -38,8 +38,8 @@ export class SpawnBootstrap {
         );
 
         SpawnBootstrap.waveManager.initialize(containers.enemy, base);
-        // Paper-doll style: steeper top-down angle for cleaner billboard rendering
-        CameraRig.setupFollow(base.scene, hero, new Vec3(0, 11, 5.5));
+        // Less top-down: lower pitch and pull back for clearer character/enemy fronts.
+        CameraRig.setupFollow(base.scene, hero, new Vec3(0, 8.2, 9.8));
 
         SpawnBootstrap.buildingManager.setHeroNode(hero);
         BuildingPadSpawner.spawnPads(containers.building, SpawnBootstrap.buildingManager);

@@ -9,6 +9,9 @@ export class CharacterMover extends Component {
     public moveSpeed: number = 5;
 
     @property
+    public rotateWithMovement: boolean = true;
+
+    @property
     public radius: number = 0.3;
 
     @property
@@ -80,7 +83,7 @@ export class CharacterMover extends Component {
         this.node.setPosition(finalX, currentPos.y, finalZ); // Keep Y strictly constant
 
         // Face movement
-        if (moveLen > 0.1) {
+        if (this.rotateWithMovement && moveLen > 0.1) {
             const lookTarget = new Vec3(
                 finalX + dx, // Look at "desired" direction slightly better feel
                 currentPos.y,
