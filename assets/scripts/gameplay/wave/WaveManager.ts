@@ -116,7 +116,7 @@ export class WaveManager {
                 }
             }
         }
-        console.log(`[WaveManager] AOE Applied to ${this._enemies.length} potential targets.`);
+        // console.log removed for performance — AOE fires frequently
     }
 
     // === 公共接口 ===

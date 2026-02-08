@@ -3,6 +3,7 @@ import {
     Billboard,
     Color,
     Component,
+    director,
     MeshRenderer,
     Node,
     Rect,
@@ -18,6 +19,13 @@ import {
 } from 'cc';
 import { Enemy } from '../units/Enemy';
 import { UnitState } from '../units/Unit';
+import { GameManager } from '../../core/managers/GameManager';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import {
+    EnemyAttackPerformedPayload,
+    EnemyAttackStateChangedPayload,
+    EnemyVisualEvents,
+} from './EnemyVisualEvents';
 
 const { ccclass, property } = _decorator;
 
@@ -26,6 +34,14 @@ type PartKey = 'body' | 'head' | 'leftArm' | 'rightArm' | 'leftLeg' | 'rightLeg'
 interface PartFrameSpec {
     required: boolean;
     candidates: string[];
+}
+
+interface AttackPoseSample {
+    rightArm: number;
+    leftArm: number;
+    head: number;
+    bodyLean: number;
+    bob: number;
 }
 
 const PART_FRAME_SPECS: Record<PartKey, PartFrameSpec> = {
@@ -56,6 +72,13 @@ const PART_FRAME_SPECS: Record<PartKey, PartFrameSpec> = {
 };
 
 const PART_KEYS: PartKey[] = ['body', 'head', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
+const ZERO_ATTACK_POSE: AttackPoseSample = {
+    rightArm: 0,
+    leftArm: 0,
+    head: 0,
+    bodyLean: 0,
+    bob: 0,
+};
 
 @ccclass('EnemyPaperDollAnimator')
 export class EnemyPaperDollAnimator extends Component {
@@ -80,14 +103,100 @@ export class EnemyPaperDollAnimator extends Component {
     @property
     public headSwayAngle: number = 4;
 
+    @property
+    public attackBlendDamping: number = 12;
+
+    @property
+    public attackWindupRatio: number = 0.35;
+
+    @property
+    public attackHitRatio: number = 0.45;
+
+    @property
+    public attackWindupAngle: number = 32;
+
+    @property
+    public attackStrikeAngle: number = 58;
+
+    @property
+    public attackOffhandAngle: number = 18;
+
+    @property
+    public attackBodyLeanAngle: number = 5;
+
+    @property
+    public attackHeadTiltAngle: number = 7;
+
+    @property
+    public attackBobAmount: number = 3.2;
+
+    @property
+    public attackPulseAngle: number = 12;
+
+    @property
+    public attackPulseDecay: number = 11;
+
+    @property
+    public activeAnimationFps: number = 30;
+
+    @property
+    public idleAnimationFps: number = 14;
+
+    @property
+    public farAnimationFps: number = 10;
+
+    @property
+    public farLodDistance: number = 16;
+
+    @property
+    public enableMeshLod: boolean = true;
+
+    @property
+    public meshLodNearDistance: number = 11;
+
+    @property
+    public meshLodFarDistance: number = 15;
+
+    @property
+    public lodCheckInterval: number = 0.15;
+
+    @property
+    public enableExtremeCrowdMode: boolean = true;
+
+    @property
+    public maxPaperDollsNearHero: number = 32;
+
+    @property
+    public crowdBudgetCheckInterval: number = 0.2;
+
     private static readonly _frameCache = new Map<string, SpriteFrame>();
     private static readonly _tmpColorElite = new Color(255, 236, 170, 255);
     private static readonly _tmpColorNormal = new Color(255, 255, 255, 255);
+    private static readonly _instances = new Set<EnemyPaperDollAnimator>();
+    private static readonly _paperBudgetWinners = new Set<EnemyPaperDollAnimator>();
+    private static _budgetAccum: number = 0;
+    private static _budgetLastFrame: number = -1;
+    private static _budgetDirty: boolean = true;
+    private static _budgetLastCount: number = -1;
+    private static _budgetScored: Array<{ animator: EnemyPaperDollAnimator; distSq: number }> = [];
 
     private _enemy: Enemy | null = null;
     private _isReady: boolean = false;
     private _phase: number = 0;
     private _moveBlend: number = 0;
+    private _attackBlend: number = 0;
+    private _isAttacking: boolean = false;
+    private _attackInterval: number = 1;
+    private _attackClock: number = 0;
+    private _attackPulse: number = 0;
+    private _animTickAccum: number = 0;
+    private _gameManagerRef: GameManager | null = null;
+    private _meshRenderer: MeshRenderer | null = null;
+    private _visualRoot: Node | null = null;
+    private _paperVisible: boolean = true;
+    private _lodCheckAccum: number = 0;
+    private _lastExtremeMode: boolean = false;
+    private _lastExtremeBudget: number = 45;
     private _lastWorldPos: Vec3 = new Vec3();
 
     private _rigRoot: Node | null = null;
@@ -98,6 +207,21 @@ export class EnemyPaperDollAnimator extends Component {
     private _rightLegNode: Node | null = null;
     private _sprites: Sprite[] = [];
 
+    protected onEnable(): void {
+        EnemyPaperDollAnimator._instances.add(this);
+        EnemyPaperDollAnimator._budgetDirty = true;
+        this.node.on(EnemyVisualEvents.ATTACK_STATE_CHANGED, this.onAttackStateChanged, this);
+        this.node.on(EnemyVisualEvents.ATTACK_PERFORMED, this.onAttackPerformed, this);
+    }
+
+    protected onDisable(): void {
+        EnemyPaperDollAnimator._instances.delete(this);
+        EnemyPaperDollAnimator._paperBudgetWinners.delete(this);
+        EnemyPaperDollAnimator._budgetDirty = true;
+        this.node.off(EnemyVisualEvents.ATTACK_STATE_CHANGED, this.onAttackStateChanged, this);
+        this.node.off(EnemyVisualEvents.ATTACK_PERFORMED, this.onAttackPerformed, this);
+    }
+
     protected start(): void {
         this._enemy = this.node.getComponent(Enemy);
         this._lastWorldPos.set(this.node.worldPosition);
@@ -106,26 +230,321 @@ export class EnemyPaperDollAnimator extends Component {
 
     protected update(dt: number): void {
         if (!this._isReady || !this._rigRoot) return;
+        if (!this.gameManager.isPlaying) return;
+        this.updateVisualLod(dt);
+        if (!this._paperVisible) {
+            return;
+        }
+        const tickDt = this.consumeAnimationTick(dt);
+        if (tickDt <= 0) {
+            return;
+        }
 
-        const moving = this.resolveMoving(dt);
+        const moving = this.resolveMoving(tickDt);
         const moveTarget = moving ? 1 : 0;
-        const blendSpeed = Math.min(1, dt * 8);
+        const blendSpeed = Math.min(1, tickDt * 8);
         this._moveBlend += (moveTarget - this._moveBlend) * blendSpeed;
+        const attacking = this.resolveAttacking();
+        const attackTarget = attacking ? 1 : 0;
+        const attackBlendSpeed = Math.min(1, tickDt * Math.max(this.attackBlendDamping, 0.01));
+        this._attackBlend += (attackTarget - this._attackBlend) * attackBlendSpeed;
 
         const speedWeight = 0.35 + 0.65 * this._moveBlend;
-        this._phase += dt * this.walkFrequency * Math.PI * 2 * speedWeight;
+        this._phase += tickDt * this.walkFrequency * Math.PI * 2 * speedWeight;
+        if (attacking) {
+            this._attackClock += tickDt;
+        }
+        this._attackPulse = Math.max(
+            0,
+            this._attackPulse - tickDt * Math.max(this.attackPulseDecay, 0)
+        );
 
-        const swing = Math.sin(this._phase) * this.limbSwingAngle * this._moveBlend;
-        const headSway = Math.sin(this._phase * 0.5) * this.headSwayAngle * this._moveBlend;
-        const bobMove = Math.sin(this._phase * 2) * this.bobAmount * this._moveBlend;
+        const locomotionBlend = this._moveBlend * (1 - this._attackBlend * 0.82);
+        const swing = Math.sin(this._phase) * this.limbSwingAngle * locomotionBlend;
+        const headSway = Math.sin(this._phase * 0.5) * this.headSwayAngle * locomotionBlend;
+        const bobMove = Math.sin(this._phase * 2) * this.bobAmount * locomotionBlend;
         const bobIdle = Math.sin(this._phase * 0.6) * 1.4 * (1 - this._moveBlend);
+        const hasAttackMotion = attacking || this._attackBlend > 0.001 || this._attackPulse > 0.001;
+        const attackPose = hasAttackMotion
+            ? this.sampleAttackPose(this.resolveAttackPhase())
+            : ZERO_ATTACK_POSE;
 
-        this._rigRoot.setPosition(0, bobMove + bobIdle, 0);
+        let rigY = bobMove + bobIdle + attackPose.bob * this.attackBobAmount * this._attackBlend;
+        let rigAngle = attackPose.bodyLean * this._attackBlend;
+        let leftArmAngle = this.mix(-swing * 0.9, attackPose.leftArm, this._attackBlend);
+        let rightArmAngle = this.mix(swing * 0.9, attackPose.rightArm, this._attackBlend);
+        const headAngle = this.mix(headSway, attackPose.head, this._attackBlend);
+
+        if (this._attackPulse > 0) {
+            rightArmAngle += this._attackPulse * this.attackPulseAngle;
+            leftArmAngle -= this._attackPulse * this.attackPulseAngle * 0.35;
+            rigY += this._attackPulse * this.attackBobAmount * 0.35;
+            rigAngle += this._attackPulse * this.attackBodyLeanAngle * 0.2;
+        }
+
+        this._rigRoot.setPosition(0, rigY, 0);
+        this._rigRoot.angle = rigAngle;
         if (this._leftLegNode) this._leftLegNode.angle = swing;
         if (this._rightLegNode) this._rightLegNode.angle = -swing;
-        if (this._leftArmNode) this._leftArmNode.angle = -swing * 0.9;
-        if (this._rightArmNode) this._rightArmNode.angle = swing * 0.9;
-        if (this._headNode) this._headNode.angle = headSway;
+        if (this._leftArmNode) this._leftArmNode.angle = leftArmAngle;
+        if (this._rightArmNode) this._rightArmNode.angle = rightArmAngle;
+        if (this._headNode) this._headNode.angle = headAngle;
+    }
+
+    private onAttackStateChanged(payload?: EnemyAttackStateChangedPayload): void {
+        const isAttacking = !!payload?.isAttacking;
+        if (payload && payload.attackInterval > 0) {
+            this._attackInterval = payload.attackInterval;
+        }
+        if (isAttacking && !this._isAttacking) {
+            this._attackClock = 0;
+        }
+        if (!isAttacking) {
+            this._attackPulse = 0;
+        }
+        this._isAttacking = isAttacking;
+    }
+
+    private onAttackPerformed(payload?: EnemyAttackPerformedPayload): void {
+        if (payload && payload.attackInterval > 0) {
+            this._attackInterval = payload.attackInterval;
+        }
+        this._attackClock = this.resolveNormalizedHitRatio() * this._attackInterval;
+        this._attackPulse = 1;
+    }
+
+    private resolveAttacking(): boolean {
+        if (this._enemy) {
+            return this._enemy.state === UnitState.ATTACKING;
+        }
+        return this._isAttacking;
+    }
+
+    private consumeAnimationTick(dt: number): number {
+        const enemyState = this._enemy?.state;
+        const active = enemyState === UnitState.MOVING || enemyState === UnitState.ATTACKING;
+        let fps = Math.max(1, active ? this.activeAnimationFps : this.idleAnimationFps);
+        const heroNode = this.gameManager.hero;
+        if (heroNode && heroNode.isValid) {
+            const myPos = this.node.worldPosition;
+            const heroPos = heroNode.worldPosition;
+            const dx = heroPos.x - myPos.x;
+            const dz = heroPos.z - myPos.z;
+            const distSq = dx * dx + dz * dz;
+            const farDist = Math.max(0.1, this.farLodDistance);
+            if (distSq > farDist * farDist) {
+                fps = Math.min(fps, Math.max(1, this.farAnimationFps));
+            }
+        }
+
+        const step = 1 / fps;
+        this._animTickAccum += dt;
+        if (this._animTickAccum < step) {
+            return 0;
+        }
+        const tickDt = Math.min(this._animTickAccum, step * 2);
+        this._animTickAccum = 0;
+        return tickDt;
+    }
+
+    private updateVisualLod(dt: number): void {
+        if (!this._visualRoot) return;
+        const currentBudget = Math.max(1, Math.floor(this.maxPaperDollsNearHero));
+        if (
+            this._lastExtremeMode !== this.enableExtremeCrowdMode ||
+            this._lastExtremeBudget !== currentBudget
+        ) {
+            this._lastExtremeMode = this.enableExtremeCrowdMode;
+            this._lastExtremeBudget = currentBudget;
+            EnemyPaperDollAnimator._budgetDirty = true;
+        }
+        if (!this.enableMeshLod && !this.enableExtremeCrowdMode) {
+            this.applyPaperVisible(true);
+            return;
+        }
+
+        this._lodCheckAccum += dt;
+        const checkInterval = Math.max(0.02, this.lodCheckInterval);
+        if (this._lodCheckAccum < checkInterval) {
+            return;
+        }
+        this._lodCheckAccum = 0;
+
+        const heroNode = this.gameManager.hero;
+        if (!heroNode || !heroNode.isValid) {
+            this.applyPaperVisible(true);
+            return;
+        }
+
+        const distanceAllowed = this.resolveDistanceLodAllowed(heroNode);
+        const budgetAllowed = this.resolveCrowdBudgetAllowed(dt, heroNode);
+        this.applyPaperVisible(distanceAllowed && budgetAllowed);
+    }
+
+    private applyPaperVisible(visible: boolean): void {
+        if (this._paperVisible === visible) {
+            return;
+        }
+        this._paperVisible = visible;
+        if (this._visualRoot && this._visualRoot.isValid) {
+            this._visualRoot.active = visible;
+        }
+        if (this._meshRenderer && this._meshRenderer.isValid) {
+            this._meshRenderer.enabled = !visible;
+        }
+        this._animTickAccum = 0;
+        if (visible) {
+            this._lastWorldPos.set(this.node.worldPosition);
+        }
+    }
+
+    private resolveDistanceLodAllowed(heroNode: Node): boolean {
+        if (!this.enableMeshLod) {
+            return true;
+        }
+        const myPos = this.node.worldPosition;
+        const heroPos = heroNode.worldPosition;
+        const dx = heroPos.x - myPos.x;
+        const dz = heroPos.z - myPos.z;
+        const distSq = dx * dx + dz * dz;
+        const nearDist = Math.max(0.1, this.meshLodNearDistance);
+        const farDist = Math.max(nearDist, this.meshLodFarDistance);
+        const nearSq = nearDist * nearDist;
+        const farSq = farDist * farDist;
+        if (this._paperVisible) {
+            return distSq <= farSq;
+        }
+        return distSq < nearSq;
+    }
+
+    private resolveCrowdBudgetAllowed(dt: number, heroNode: Node): boolean {
+        if (!this.enableExtremeCrowdMode) {
+            return true;
+        }
+        const budget = Math.max(1, Math.floor(this.maxPaperDollsNearHero));
+        const interval = Math.max(0.05, this.crowdBudgetCheckInterval);
+        EnemyPaperDollAnimator.refreshPaperBudget(heroNode, budget, interval, dt);
+        return EnemyPaperDollAnimator._paperBudgetWinners.has(this);
+    }
+
+    private static refreshPaperBudget(
+        heroNode: Node,
+        maxCount: number,
+        interval: number,
+        dt: number
+    ): void {
+        const frame = director.getTotalFrames();
+        if (this._budgetLastFrame < 0) {
+            this._budgetLastFrame = frame;
+            this._budgetAccum += dt;
+        } else if (frame !== this._budgetLastFrame) {
+            const frameGap = Math.max(1, frame - this._budgetLastFrame);
+            this._budgetLastFrame = frame;
+            this._budgetAccum += dt * frameGap;
+        }
+
+        if (this._budgetLastCount !== maxCount) {
+            this._budgetLastCount = maxCount;
+            this._budgetDirty = true;
+        }
+
+        if (!this._budgetDirty && this._budgetAccum < interval) {
+            return;
+        }
+        this._budgetDirty = false;
+        this._budgetAccum = 0;
+        this._paperBudgetWinners.clear();
+
+        const heroPos = heroNode.worldPosition;
+        const scored = this._budgetScored;
+        let count = 0;
+        for (const animator of this._instances) {
+            if (!animator.enableExtremeCrowdMode) continue;
+            if (!animator._isReady || !animator.node.isValid || !animator.node.activeInHierarchy) {
+                continue;
+            }
+            const pos = animator.node.worldPosition;
+            const dx = heroPos.x - pos.x;
+            const dz = heroPos.z - pos.z;
+            if (count < scored.length) {
+                scored[count].animator = animator;
+                scored[count].distSq = dx * dx + dz * dz;
+            } else {
+                scored.push({ animator, distSq: dx * dx + dz * dz });
+            }
+            count++;
+        }
+        scored.length = count;
+
+        scored.sort((a, b) => a.distSq - b.distSq);
+        const keep = Math.min(maxCount, count);
+        for (let i = 0; i < keep; i++) {
+            this._paperBudgetWinners.add(scored[i].animator);
+        }
+    }
+
+    private get gameManager(): GameManager {
+        if (!this._gameManagerRef) {
+            this._gameManagerRef =
+                ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+        }
+        return this._gameManagerRef;
+    }
+
+    private resolveAttackPhase(): number {
+        const interval = Math.max(0.05, this._attackInterval);
+        return (this._attackClock % interval) / interval;
+    }
+
+    private sampleAttackPose(phase: number): AttackPoseSample {
+        const windupEnd = this.resolveNormalizedWindupRatio();
+        const hitEnd = Math.max(windupEnd + 0.05, Math.min(0.95, this.resolveNormalizedHitRatio()));
+
+        if (phase < windupEnd) {
+            const t = phase / Math.max(windupEnd, 0.0001);
+            return {
+                rightArm: this.mix(0, -this.attackWindupAngle, t),
+                leftArm: this.mix(0, this.attackOffhandAngle * 0.45, t),
+                head: this.mix(0, -this.attackHeadTiltAngle * 0.3, t),
+                bodyLean: this.mix(0, this.attackBodyLeanAngle * 0.35, t),
+                bob: Math.sin(t * Math.PI) * 0.22,
+            };
+        }
+
+        if (phase < hitEnd) {
+            const t = (phase - windupEnd) / Math.max(hitEnd - windupEnd, 0.0001);
+            return {
+                rightArm: this.mix(-this.attackWindupAngle, this.attackStrikeAngle, t),
+                leftArm: this.mix(this.attackOffhandAngle * 0.45, -this.attackOffhandAngle, t),
+                head: this.mix(-this.attackHeadTiltAngle * 0.3, this.attackHeadTiltAngle, t),
+                bodyLean: this.mix(this.attackBodyLeanAngle * 0.35, this.attackBodyLeanAngle, t),
+                bob: 0.4 + Math.sin(t * Math.PI) * 0.25,
+            };
+        }
+
+        const t = (phase - hitEnd) / Math.max(1 - hitEnd, 0.0001);
+        const inv = 1 - t;
+        const ease = 1 - inv * inv;
+        return {
+            rightArm: this.mix(this.attackStrikeAngle, 0, ease),
+            leftArm: this.mix(-this.attackOffhandAngle, 0, ease),
+            head: this.mix(this.attackHeadTiltAngle, 0, ease),
+            bodyLean: this.mix(this.attackBodyLeanAngle, 0, ease),
+            bob: (1 - ease) * 0.2,
+        };
+    }
+
+    private resolveNormalizedWindupRatio(): number {
+        return Math.max(0.05, Math.min(0.85, this.attackWindupRatio));
+    }
+
+    private resolveNormalizedHitRatio(): number {
+        return Math.max(0.1, Math.min(0.95, this.attackHitRatio));
+    }
+
+    private mix(from: number, to: number, t: number): number {
+        const clamped = Math.max(0, Math.min(1, t));
+        return from + (to - from) * clamped;
     }
 
     private async buildVisualAsync(): Promise<void> {
@@ -143,6 +562,7 @@ export class EnemyPaperDollAnimator extends Component {
 
         const visualRoot = new Node('EnemyPaperRoot');
         this.node.addChild(visualRoot);
+        this._visualRoot = visualRoot;
         const referenceScale = Math.max(this.scaleReference, 0.0001);
         const localVisualScale = this.visualScale / referenceScale;
         visualRoot.setPosition(0, this.yOffset / referenceScale, 0);
@@ -201,10 +621,11 @@ export class EnemyPaperDollAnimator extends Component {
 
         this.applyEliteTint();
 
-        const mesh = this.node.getComponent(MeshRenderer);
-        if (mesh) {
-            mesh.enabled = false;
+        this._meshRenderer = this.node.getComponent(MeshRenderer);
+        if (this._meshRenderer) {
+            this._meshRenderer.enabled = false;
         }
+        this._paperVisible = true;
         this._isReady = true;
     }
 

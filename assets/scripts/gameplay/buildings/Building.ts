@@ -220,6 +220,7 @@ export class Building extends BaseComponent implements IAttackable {
 
     protected update(dt: number): void {
         if (!this.isAlive) return;
+        if (!this.gameManager.isPlaying) return;
 
         // 产兵逻辑
         if (this._activeUnits < this.maxUnits) {
@@ -303,6 +304,8 @@ export class Building extends BaseComponent implements IAttackable {
      */
     public takeDamage(damage: number, _attacker?: any, isCrit: boolean = false): void {
         if (!this.isAlive) return;
+        damage = Math.floor(damage);
+        if (damage <= 0) return;
 
         this.currentHp = Math.max(0, this.currentHp - damage);
 

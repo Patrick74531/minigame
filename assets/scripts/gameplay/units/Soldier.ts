@@ -1,4 +1,4 @@
-import { _decorator, Node, Vec3 } from 'cc';
+import { _decorator, Node, Vec3, RigidBody } from 'cc';
 import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
 import { HealthBar } from '../../ui/HealthBar';
@@ -17,6 +17,12 @@ export class Soldier extends Unit {
     private _fallbackTimer: number = 0;
     /** 产兵所属建筑 UUID */
     public ownerBuildingId: string | null = null;
+    /** 缓存 RigidBody 引用，避免每帧 getComponent */
+    private _rbCached: RigidBody | null = null;
+    private _rbLookedUp: boolean = false;
+    /** 复用临时向量 */
+    private static readonly _tmpVel = new Vec3();
+    private static readonly _tmpLookAt = new Vec3();
 
     protected initialize(): void {
         super.initialize();
@@ -49,6 +55,7 @@ export class Soldier extends Unit {
 
     protected update(dt: number): void {
         if (!this.isAlive) return;
+        if (!this.gameManager.isPlaying) return;
 
         // 调用父类更新
         super.update(dt);
@@ -95,23 +102,30 @@ export class Soldier extends Unit {
         const targetPos = this._target.node.position;
         const dx = targetPos.x - myPos.x;
         const dz = targetPos.z - myPos.z; // 3D
-        const distance = Math.sqrt(dx * dx + dz * dz);
+        const distSq = dx * dx + dz * dz;
+        const rangeSq = this._stats.attackRange * this._stats.attackRange;
 
-        if (distance <= this._stats.attackRange) {
-            // e.g. 0.6
+        if (distSq <= rangeSq) {
             this._state = UnitState.ATTACKING;
             return;
         }
 
         // 向目标移动
+        const distance = Math.sqrt(distSq);
         const speed = this._stats.moveSpeed;
         const dirX = dx / distance;
         const dirZ = dz / distance;
 
-        if (this.node.getComponent('cc.RigidBody')) {
-            (this.node.getComponent('cc.RigidBody') as any).setLinearVelocity(
-                new Vec3(dirX * speed, 0, dirZ * speed)
-            );
+        // 缓存 RigidBody 查找
+        if (!this._rbLookedUp) {
+            this._rbCached = this.node.getComponent(RigidBody);
+            this._rbLookedUp = true;
+        }
+
+        if (this._rbCached) {
+            const vel = Soldier._tmpVel;
+            vel.set(dirX * speed, 0, dirZ * speed);
+            this._rbCached.setLinearVelocity(vel);
         } else {
             this.node.setPosition(
                 myPos.x + dirX * speed * dt,
@@ -120,8 +134,9 @@ export class Soldier extends Unit {
             );
         }
 
-        // Face target
-        this.node.lookAt(new Vec3(targetPos.x, 0, targetPos.z));
+        // Face target（复用静态向量）
+        Soldier._tmpLookAt.set(targetPos.x, 0, targetPos.z);
+        this.node.lookAt(Soldier._tmpLookAt);
     }
 
     protected performAttack(): void {

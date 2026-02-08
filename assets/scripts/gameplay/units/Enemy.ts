@@ -9,8 +9,9 @@ import { IAttackable } from '../../core/interfaces/IAttackable';
 import { CombatService } from '../../core/managers/CombatService';
 import { Soldier } from './Soldier';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import { EnemyVisualEvents } from '../visuals/EnemyVisualEvents';
 
-const { ccclass, property } = _decorator;
+const { ccclass } = _decorator;
 
 /**
  * Enemy Unit
@@ -21,11 +22,24 @@ export class Enemy extends Unit {
     /** Distance to Base to trigger "Reached Base" logic */
     private readonly ARRIVAL_DISTANCE = 0.6;
     private static readonly _tmpLookAt = new Vec3();
+    private static readonly NEAR_LOGIC_STEP = 1 / 24;
+    private static readonly FAR_LOGIC_STEP = 1 / 12;
+    private static readonly FAR_LOGIC_DIST_SQ = 18 * 18;
 
     // Target position (Base)
     private _targetPos: Vec3 = new Vec3(0, 0, 0);
     private _isElite: boolean = false;
     private _coinDropMultiplier: number = 1;
+    private _isAttackVisualActive: boolean = false;
+    private _logicAccum: number = 0;
+    /** 缓存 paper-doll 视觉判断（避免每 tick getChildByName） */
+    private _usesPaperDoll: boolean | null = null;
+    /** 缓存 RigidBody（避免每 tick getComponent） */
+    private _rbCachedEnemy: RigidBody | null = null;
+    private _rbEnemyLookedUp: boolean = false;
+    /** 缓存 GameManager / EventManager 引用 */
+    private _gmRef: GameManager | null = null;
+    private _emRef: EventManager | null = null;
 
     protected initialize(): void {
         super.initialize();
@@ -49,6 +63,9 @@ export class Enemy extends Unit {
         this._target = null;
         this._isElite = false;
         this._coinDropMultiplier = 1;
+        this._scanTimer = 0;
+        this._logicAccum = Math.random() * Enemy.NEAR_LOGIC_STEP;
+        this.resetAttackVisualState();
     }
 
     private setupPhysics(): void {
@@ -81,9 +98,12 @@ export class Enemy extends Unit {
         if (!this.isAlive) return;
 
         // 清除 RigidBody 残余速度，避免物理引擎干扰 setPosition 移动
-        const rb = this.node.getComponent(RigidBody);
-        if (rb && rb.type === RigidBody.Type.DYNAMIC) {
-            rb.setLinearVelocity(Vec3.ZERO);
+        if (!this._rbEnemyLookedUp) {
+            this._rbCachedEnemy = this.node.getComponent(RigidBody);
+            this._rbEnemyLookedUp = true;
+        }
+        if (this._rbCachedEnemy && this._rbCachedEnemy.type === RigidBody.Type.DYNAMIC) {
+            this._rbCachedEnemy.setLinearVelocity(Vec3.ZERO);
         }
 
         // If Attacking, Don't move
@@ -119,7 +139,7 @@ export class Enemy extends Unit {
         );
 
         // Face target (paper-doll enemy uses billboard visuals, so root rotation is unnecessary).
-        if (!this.usesPaperDollVisual()) {
+        if (!this.isPaperDoll()) {
             Enemy._tmpLookAt.set(this._targetPos.x, GameConfig.PHYSICS.ENEMY_Y, this._targetPos.z);
             this.node.lookAt(Enemy._tmpLookAt);
         }
@@ -172,6 +192,7 @@ export class Enemy extends Unit {
      * Arrived at Base
      */
     private onReachBase(): void {
+        this.resetAttackVisualState();
         this.eventManager.emit(GameEvents.ENEMY_REACHED_BASE, {
             enemy: this.node,
             damage: 10,
@@ -184,7 +205,12 @@ export class Enemy extends Unit {
     protected performAttack(): void {
         if (this._target && this._target.isAlive) {
             // Deal damage
-            this._target.takeDamage(this._stats.attack, this);
+            const damage = this._stats.attack;
+            this._target.takeDamage(damage, this);
+            this.node.emit(EnemyVisualEvents.ATTACK_PERFORMED, {
+                attackInterval: this._stats.attackInterval,
+                damage,
+            });
             // console.log(`[Enemy] Attacked ${this._target.node.name}`);
         } else {
             // Nothing to attack
@@ -199,7 +225,16 @@ export class Enemy extends Unit {
     private _scanTimer: number = 0;
 
     protected update(dt: number): void {
-        super.update(dt);
+        if (!this.gameManager.isPlaying) return;
+        const logicStep = this.resolveLogicStep();
+        this._logicAccum += dt;
+        if (this._logicAccum < logicStep) {
+            return;
+        }
+        const tickDt = Math.min(this._logicAccum, logicStep * 2);
+        this._logicAccum = 0;
+
+        super.update(tickDt);
         if (!this.isAlive) return;
 
         // Check if current target is dead or invalid
@@ -212,7 +247,7 @@ export class Enemy extends Unit {
                 if (this.isTargetInRange(this._target)) {
                     this._state = UnitState.ATTACKING;
                     // Face the target for non-paper visuals.
-                    if (!this.usesPaperDollVisual()) {
+                    if (!this.isPaperDoll()) {
                         const targetPos = this._target.getWorldPosition();
                         Enemy._tmpLookAt.set(targetPos.x, GameConfig.PHYSICS.ENEMY_Y, targetPos.z);
                         this.node.lookAt(Enemy._tmpLookAt);
@@ -230,13 +265,15 @@ export class Enemy extends Unit {
 
         // Scan for new targets periodically if not attacking
         if (this._state !== UnitState.ATTACKING) {
-            this._scanTimer += dt;
+            this._scanTimer += tickDt;
             if (this._scanTimer >= 0.2) {
                 // 5 times a second
                 this._scanTimer = 0;
                 this.scanForTargets();
             }
         }
+
+        this.syncAttackVisualState();
     }
 
     protected isTargetInRange(target: IAttackable): boolean {
@@ -317,18 +354,66 @@ export class Enemy extends Unit {
     // public setTarget(...): void { super.setTarget(...); ... }
 
     protected onDeath(): void {
-        // Handled by manager
+        this.resetAttackVisualState();
     }
 
-    private usesPaperDollVisual(): boolean {
-        return !!this.node.getChildByName('EnemyPaperRoot');
+    private resolveLogicStep(): number {
+        if (this._state === UnitState.ATTACKING || (this._target && this._target.isAlive)) {
+            return Enemy.NEAR_LOGIC_STEP;
+        }
+
+        const heroNode = this.gameManager.hero;
+        if (!heroNode || !heroNode.isValid) {
+            return Enemy.NEAR_LOGIC_STEP;
+        }
+
+        const myPos = this.node.position;
+        const dx = heroNode.position.x - myPos.x;
+        const dz = heroNode.position.z - myPos.z;
+        const distSq = dx * dx + dz * dz;
+        return distSq > Enemy.FAR_LOGIC_DIST_SQ ? Enemy.FAR_LOGIC_STEP : Enemy.NEAR_LOGIC_STEP;
     }
 
-    private get eventManager(): EventManager {
-        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
+    private syncAttackVisualState(): void {
+        const isAttacking =
+            this._state === UnitState.ATTACKING && !!this._target && this._target.isAlive;
+        if (isAttacking === this._isAttackVisualActive) {
+            return;
+        }
+        this._isAttackVisualActive = isAttacking;
+        this.node.emit(EnemyVisualEvents.ATTACK_STATE_CHANGED, {
+            isAttacking,
+            attackInterval: this._stats.attackInterval,
+        });
     }
 
-    private get gameManager(): GameManager {
-        return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+    private resetAttackVisualState(): void {
+        this._isAttackVisualActive = false;
+        this.node.emit(EnemyVisualEvents.ATTACK_STATE_CHANGED, {
+            isAttacking: false,
+            attackInterval: this._stats.attackInterval,
+        });
+    }
+
+    private isPaperDoll(): boolean {
+        if (this._usesPaperDoll === null) {
+            this._usesPaperDoll = !!this.node.getChildByName('EnemyPaperRoot');
+        }
+        return this._usesPaperDoll;
+    }
+
+    protected get eventManager(): EventManager {
+        if (!this._emRef) {
+            this._emRef =
+                ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
+        }
+        return this._emRef;
+    }
+
+    protected get gameManager(): GameManager {
+        if (!this._gmRef) {
+            this._gmRef = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+        }
+        return this._gmRef;
     }
 }

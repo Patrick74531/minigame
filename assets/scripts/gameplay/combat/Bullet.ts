@@ -64,6 +64,10 @@ export class Bullet extends BaseComponent implements IPoolable {
     private _prevPos: Vec3 = new Vec3();
     /** 上次命中火花时间戳（节流用） */
     private _lastHitSparkTime: number = 0;
+    /** 手动碰撞检测节流累加器 */
+    private _manualHitAccum: number = 0;
+    /** 手动碰撞检测间隔（秒）— 高频子弹无需每帧检测 */
+    private static readonly MANUAL_HIT_INTERVAL = 1 / 30;
 
     // === Pool Recycling ===
     /** 若非空，销毁时回收到 ProjectilePool 而非 destroy */
@@ -122,6 +126,7 @@ export class Bullet extends BaseComponent implements IPoolable {
         this.hitRadius = 0.8;
         this._prevPos.set(0, 0, 0);
         this._lastHitSparkTime = 0;
+        this._manualHitAccum = 0;
         this._maxLifetime = 3;
     }
 
@@ -199,9 +204,13 @@ export class Bullet extends BaseComponent implements IPoolable {
         );
         this.node.setPosition(currentPos);
 
-        // 手动碰撞检测（防隧穿，替代物理触发）
+        // 手动碰撞检测（防隧穿，替代物理触发）— 节流以降低 CPU 开销
         if (this.useManualHitDetection) {
-            this.checkManualHits();
+            this._manualHitAccum += dt;
+            if (this._manualHitAccum >= Bullet.MANUAL_HIT_INTERVAL) {
+                this._manualHitAccum = 0;
+                this.checkManualHits();
+            }
         }
 
         // Face direction
@@ -253,6 +262,17 @@ export class Bullet extends BaseComponent implements IPoolable {
 
     // ==================== 手动碰撞检测（防隧穿） ====================
 
+    /** Unit 组件缓存（避免每次 getComponent 开销） */
+    private static _unitCache: WeakMap<Node, Unit | null> = new WeakMap();
+    private static getCachedUnit(node: Node): Unit | null {
+        let u = Bullet._unitCache.get(node);
+        if (u === undefined) {
+            u = node.getComponent(Unit);
+            Bullet._unitCache.set(node, u);
+        }
+        return u;
+    }
+
     /** 线段(prevPos→currentPos)与敌人球体的碰撞检测 */
     private checkManualHits(): void {
         if (this._lifetime < 0.02) return;
@@ -261,22 +281,43 @@ export class Bullet extends BaseComponent implements IPoolable {
         const curPos = this.node.position;
         const rSq = this.hitRadius * this.hitRadius;
 
+        // 预计算线段常量，避免在内层循环重复计算
+        const ax = this._prevPos.x,
+            az = this._prevPos.z;
+        const abx = curPos.x - ax,
+            abz = curPos.z - az;
+        const abLenSq = abx * abx + abz * abz;
+
         for (let i = 0, len = enemies.length; i < len; i++) {
             const enemy = enemies[i];
             if (!enemy.isValid) continue;
             if (this.pierce && this._hitNodes.has(enemy)) continue;
 
-            const unit = enemy.getComponent(Unit);
-            if (!unit || !unit.isAlive || unit.unitType !== UnitType.ENEMY) continue;
-
-            // 线段-球体距离检测（XZ 平面）
+            // 内联距离检测（避免函数调用开销）
             const ex = enemy.position.x;
             const ez = enemy.position.z;
-            if (this.segmentPointDistSqXZ(this._prevPos, curPos, ex, ez) < rSq) {
-                this.handleHit(unit);
-                // 非穿透模式命中后立即退出
-                if (!this.pierce) return;
+            const apx = ex - ax;
+            const apz = ez - az;
+
+            let distSq: number;
+            if (abLenSq < 0.0001) {
+                distSq = apx * apx + apz * apz;
+            } else {
+                let t = (apx * abx + apz * abz) / abLenSq;
+                if (t < 0) t = 0;
+                else if (t > 1) t = 1;
+                const cx = ax + abx * t - ex;
+                const cz = az + abz * t - ez;
+                distSq = cx * cx + cz * cz;
             }
+            if (distSq >= rSq) continue;
+
+            const unit = Bullet.getCachedUnit(enemy);
+            if (!unit || !unit.isAlive || unit.unitType !== UnitType.ENEMY) continue;
+
+            this.handleHit(unit);
+            // 非穿透模式命中后立即退出
+            if (!this.pierce) return;
         }
     }
 

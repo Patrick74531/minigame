@@ -1,6 +1,7 @@
 import { _decorator } from 'cc';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { EventManager } from '../../core/managers/EventManager';
+import { GameManager } from '../../core/managers/GameManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../data/GameEvents';
 import { IPoolable } from '../../core/managers/PoolManager';
@@ -63,6 +64,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
     protected _state: UnitState = UnitState.IDLE;
     protected _target: IAttackable | null = null;
     protected _attackTimer: number = 0;
+    private _gameManagerRef: GameManager | null = null;
 
     // === 访问器 ===
 
@@ -74,6 +76,12 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
     protected _knockbackVel: Vec3 = new Vec3();
     /** 复用临时向量（避免每帧 GC） */
     private static readonly _tmpKbVec = new Vec3();
+    /** 缓存 RigidBody（避免每帧 getComponent） */
+    private _rbCachedUnit: RigidBody | null = null;
+    private _rbUnitLookedUp: boolean = false;
+    /** 缓存 HealthBar（避免每次受伤时 getComponent） */
+    private _healthBarCached: HealthBar | null = null;
+    private _healthBarLookedUp: boolean = false;
 
     public get stats(): UnitStats {
         return this._stats;
@@ -211,9 +219,12 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
     }
 
     protected updateHealthBar(): void {
-        const bar = this.node.getComponent(HealthBar);
-        if (bar) {
-            bar.updateHealth(this._stats.currentHp, this._stats.maxHp);
+        if (!this._healthBarLookedUp) {
+            this._healthBarCached = this.node.getComponent(HealthBar);
+            this._healthBarLookedUp = true;
+        }
+        if (this._healthBarCached) {
+            this._healthBarCached.updateHealth(this._stats.currentHp, this._stats.maxHp);
         }
     }
 
@@ -304,6 +315,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
 
     protected update(dt: number): void {
         if (!this.isAlive) return;
+        if (!this.gameManager.isPlaying) return;
 
         this.updateStatusEffects(dt);
 
@@ -328,6 +340,15 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         }
     }
 
+    /** 获取缓存的 RigidBody */
+    private getCachedRb(): RigidBody | null {
+        if (!this._rbUnitLookedUp) {
+            this._rbCachedUnit = this.node.getComponent(RigidBody);
+            this._rbUnitLookedUp = true;
+        }
+        return this._rbCachedUnit;
+    }
+
     /** 硬直期间：直接位移（setPosition）驱动击退，每帧衰减 */
     private applyKnockbackMovement(dt: number): void {
         // 先位移再衰减：确保低帧率下第一帧也有可见击退
@@ -346,7 +367,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         this._knockbackVel.z *= damping;
 
         // 若有刚体，清掉线速度，避免和手动位移互相干扰
-        const rb = this.node.getComponent(RigidBody);
+        const rb = this.getCachedRb();
         if (rb && rb.type === RigidBody.Type.DYNAMIC) {
             Unit._tmpKbVec.set(0, 0, 0);
             rb.setLinearVelocity(Unit._tmpKbVec);
@@ -357,7 +378,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
     private clearKnockbackState(): void {
         this._stunTimer = 0;
         this._knockbackVel.set(0, 0, 0);
-        const rb = this.node.getComponent(RigidBody);
+        const rb = this.getCachedRb();
         if (rb && rb.type === RigidBody.Type.DYNAMIC) {
             Unit._tmpKbVec.set(0, 0, 0);
             rb.setLinearVelocity(Unit._tmpKbVec);
@@ -377,5 +398,13 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
                 this._state = UnitState.IDLE;
             }
         }
+    }
+
+    protected get gameManager(): GameManager {
+        if (!this._gameManagerRef) {
+            this._gameManagerRef =
+                ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+        }
+        return this._gameManagerRef;
     }
 }

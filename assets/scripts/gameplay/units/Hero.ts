@@ -270,7 +270,7 @@ export class Hero extends Unit {
             }
         } else {
             const enemies = EnemyQuery.getEnemies();
-            let minDist = effectiveRange;
+            let minDistSq = effectiveRange * effectiveRange;
             const myPos = this.node.position;
 
             for (const enemy of enemies) {
@@ -280,10 +280,10 @@ export class Hero extends Unit {
                 if (!u || !u.isAlive) continue;
                 const dx = enemy.position.x - myPos.x;
                 const dz = enemy.position.z - myPos.z;
-                const dist = Math.sqrt(dx * dx + dz * dz);
+                const distSq = dx * dx + dz * dz;
 
-                if (dist < minDist) {
-                    minDist = dist;
+                if (distSq < minDistSq) {
+                    minDistSq = distSq;
                     nearest = enemy;
                 }
             }
@@ -432,7 +432,7 @@ export class Hero extends Unit {
         }
     }
 
-    private get gameManager(): GameManager {
+    protected get gameManager(): GameManager {
         return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
     }
 

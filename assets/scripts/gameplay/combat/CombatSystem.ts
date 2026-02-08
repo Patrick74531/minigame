@@ -6,6 +6,7 @@ import { GameEvents } from '../../data/GameEvents';
 import { CombatService, CombatProvider } from '../../core/managers/CombatService';
 import { GameConfig } from '../../data/GameConfig';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import { GameManager } from '../../core/managers/GameManager';
 
 const { ccclass, property } = _decorator;
 
@@ -49,6 +50,8 @@ export class CombatSystem extends Component implements CombatProvider {
     }
 
     protected update(dt: number): void {
+        if (!this.gameManager.isPlaying) return;
+
         this._targetCheckTimer += dt;
         if (this._targetCheckTimer >= this.targetCheckInterval) {
             this._targetCheckTimer = 0;
@@ -114,9 +117,9 @@ export class CombatSystem extends Component implements CombatProvider {
     // === 目标分配 ===
 
     private assignTargets(): void {
-        // 清理死亡单位
-        this._enemies = this._enemies.filter(e => e.isAlive && e.node.isValid);
-        this._soldiers = this._soldiers.filter(s => s.isAlive && s.node.isValid);
+        // 原地压缩清理死亡单位（避免 filter() 分配新数组）
+        CombatSystem.compactArray(this._enemies);
+        CombatSystem.compactArray(this._soldiers);
 
         for (const soldier of this._soldiers) {
             if (!soldier.target || !soldier.target.isAlive) {
@@ -126,6 +129,19 @@ export class CombatSystem extends Component implements CombatProvider {
                 }
             }
         }
+    }
+
+    /** 原地移除无效元素（swap-remove，O(n)，零分配） */
+    private static compactArray<T extends { isAlive: boolean; node: { isValid: boolean } }>(
+        arr: T[]
+    ): void {
+        let write = 0;
+        for (let read = 0; read < arr.length; read++) {
+            if (arr[read].isAlive && arr[read].node.isValid) {
+                arr[write++] = arr[read];
+            }
+        }
+        arr.length = write;
     }
 
     private findNearestEnemy(soldier: Soldier): Enemy | null {
@@ -211,5 +227,9 @@ export class CombatSystem extends Component implements CombatProvider {
 
     private get eventManager(): EventManager {
         return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
+    }
+
+    private get gameManager(): GameManager {
+        return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
     }
 }

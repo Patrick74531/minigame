@@ -29,6 +29,12 @@ export class DamageNumberFactory {
     private static _accumCrit: WeakMap<Node, boolean> = new WeakMap();
     private static _globalTime: number = 0;
 
+    // 节点池：避免频繁 new Node + addComponent
+    private static readonly _pool: Node[] = [];
+    private static readonly MAX_POOL_SIZE = 30;
+    private static readonly MAX_CONCURRENT = 20;
+    private static _activeCount: number = 0;
+
     /** 每帧调用以更新全局时间（可选，回退为 Date.now） */
     public static tick(dt: number): void {
         this._globalTime += dt;
@@ -72,19 +78,28 @@ export class DamageNumberFactory {
         // 伤害取整
         damage = Math.round(damage);
 
-        // 根节点
-        const root = new Node('DmgNum');
-        parent.addChild(root);
+        // 限制同屏伤害数字总数
+        if (DamageNumberFactory._activeCount >= DamageNumberFactory.MAX_CONCURRENT) return;
+
+        // 从池中取节点或创建新节点
+        let root = DamageNumberFactory._pool.pop() ?? null;
+        if (root && root.isValid) {
+            root.active = true;
+            root.removeAllChildren();
+            parent.addChild(root);
+        } else {
+            root = new Node('DmgNum');
+            parent.addChild(root);
+            root.addComponent(RenderRoot2D);
+            root.addComponent(Billboard);
+        }
+        DamageNumberFactory._activeCount++;
 
         // 随机水平偏移，避免数字重叠
         const offsetX = (Math.random() - 0.5) * 0.6;
         const offsetZ = (Math.random() - 0.5) * 0.3;
         const startY = worldPos.y + 1.8;
         root.setWorldPosition(worldPos.x + offsetX, startY, worldPos.z + offsetZ);
-
-        // Billboard 让数字始终面朝相机
-        root.addComponent(RenderRoot2D);
-        root.addComponent(Billboard);
 
         const baseScale = isCrit ? 0.032 : 0.022;
         root.setScale(baseScale, baseScale, baseScale);
@@ -118,6 +133,20 @@ export class DamageNumberFactory {
         const duration = isCrit ? 1.0 : 0.7;
         const endY = startY + floatHeight;
 
+        const recycleRoot = root;
+        const recycleFn = () => {
+            DamageNumberFactory._activeCount = Math.max(0, DamageNumberFactory._activeCount - 1);
+            if (recycleRoot.isValid) {
+                recycleRoot.removeFromParent();
+                recycleRoot.active = false;
+                if (DamageNumberFactory._pool.length < DamageNumberFactory.MAX_POOL_SIZE) {
+                    DamageNumberFactory._pool.push(recycleRoot);
+                } else {
+                    recycleRoot.destroy();
+                }
+            }
+        };
+
         if (isCrit) {
             // 暴击：先放大弹跳再上飘
             const peakScale = baseScale * 1.6;
@@ -128,7 +157,7 @@ export class DamageNumberFactory {
                 .to(duration - 0.18, {
                     position: new Vec3(worldPos.x + offsetX, endY, worldPos.z + offsetZ),
                 })
-                .call(() => root.destroy())
+                .call(recycleFn)
                 .start();
         } else {
             // 普通：直接上飘
@@ -136,7 +165,7 @@ export class DamageNumberFactory {
                 .to(duration, {
                     position: new Vec3(worldPos.x + offsetX, endY, worldPos.z + offsetZ),
                 })
-                .call(() => root.destroy())
+                .call(recycleFn)
                 .start();
         }
 

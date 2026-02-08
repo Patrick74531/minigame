@@ -1,4 +1,4 @@
-import { _decorator, Node } from 'cc';
+import { _decorator, Node, PhysicsSystem } from 'cc';
 import { Singleton } from '../base/Singleton';
 import { EventManager } from './EventManager';
 import { GameEvents } from '../../data/GameEvents';
@@ -89,6 +89,7 @@ export class GameManager extends Singleton<GameManager>() {
         }
 
         this._gameState = GameState.PLAYING;
+        PhysicsSystem.instance.enable = true;
         this._coins = GameConfig.ECONOMY.INITIAL_COINS;
 
         this.eventManager.emit(GameEvents.GAME_START);
@@ -101,6 +102,7 @@ export class GameManager extends Singleton<GameManager>() {
         if (this._gameState !== GameState.PLAYING) return;
 
         this._gameState = GameState.PAUSED;
+        PhysicsSystem.instance.enable = false;
         this.eventManager.emit(GameEvents.GAME_PAUSE);
     }
 
@@ -111,6 +113,7 @@ export class GameManager extends Singleton<GameManager>() {
         if (this._gameState !== GameState.PAUSED) return;
 
         this._gameState = GameState.PLAYING;
+        PhysicsSystem.instance.enable = true;
         this.eventManager.emit(GameEvents.GAME_RESUME);
     }
 
@@ -122,6 +125,7 @@ export class GameManager extends Singleton<GameManager>() {
         if (this._gameState === GameState.GAME_OVER) return;
 
         this._gameState = GameState.GAME_OVER;
+        PhysicsSystem.instance.enable = false;
         this.eventManager.emit(GameEvents.GAME_OVER, { victory });
     }
 
