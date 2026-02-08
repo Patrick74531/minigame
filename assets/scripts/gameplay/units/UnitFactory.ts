@@ -43,6 +43,8 @@ export interface EnemySpawnOptions {
  * 负责创建和配置所有单位实体
  */
 export class UnitFactory {
+    private static readonly HERO_RUN_SPEED = 1.0;
+    private static readonly HERO_IDLE_SPEED = 0.25;
     private static _materials: Map<string, Material> = new Map();
     private static _heroPrefabs: Map<string, Prefab> = new Map();
     private static _heroPrefabLoading: Set<string> = new Set();
@@ -295,15 +297,21 @@ export class UnitFactory {
                 const existing = anim.clips && anim.clips.length > 0 ? anim.clips[0] : null;
                 if (existing) {
                     const runClip = existing;
-                    controller.setRunClip(runClip.name);
-                    // Run-only mode: idle uses run clip for now.
-                    controller.setIdleClip(runClip.name);
+                    const runState = this.bindClipState(
+                        anim,
+                        runClip,
+                        this.buildHeroStateName(config.key, 'run')
+                    );
+                    controller.setRunClip(runState);
+                    // Idle uses run temporarily until idle clip is attached to the same skeleton.
+                    controller.setIdleClip(runState);
                     anim.defaultClip = runClip;
                     anim.playOnLoad = true;
-                    anim.play(runClip.name);
+                    anim.play(runState);
                 } else {
                     this.ensureRunClip(anim, controller);
                 }
+                this.ensureIdleClip(anim, controller);
             }
 
             const hb = root.getComponent(HealthBar);
@@ -329,13 +337,17 @@ export class UnitFactory {
 
         const cached = this._heroRunClipCache.get(config.key);
         if (cached) {
-            this.addClipIfNeeded(anim, cached);
+            const runState = this.bindClipState(
+                anim,
+                cached,
+                this.buildHeroStateName(config.key, 'run')
+            );
             anim.defaultClip = cached;
             anim.playOnLoad = true;
-            anim.play(cached.name);
+            anim.play(runState);
             if (controller) {
-                controller.setRunClip(cached.name);
-                controller.setIdleClip(cached.name);
+                controller.setRunClip(runState);
+                controller.setIdleClip(runState);
             }
             return;
         }
@@ -354,13 +366,17 @@ export class UnitFactory {
                 return;
             }
             this._heroRunClipCache.set(config.key, clip);
-            this.addClipIfNeeded(anim, clip);
+            const runState = this.bindClipState(
+                anim,
+                clip,
+                this.buildHeroStateName(config.key, 'run')
+            );
             anim.defaultClip = clip;
             anim.playOnLoad = true;
-            anim.play(clip.name);
+            anim.play(runState);
             if (controller) {
-                controller.setRunClip(clip.name);
-                controller.setIdleClip(clip.name);
+                controller.setRunClip(runState);
+                controller.setIdleClip(runState);
             }
         });
     }
@@ -377,11 +393,13 @@ export class UnitFactory {
 
         const cached = this._heroIdleClipCache.get(config.key);
         if (cached) {
-            this.addClipIfNeeded(anim, cached);
-            anim.defaultClip = cached;
-            anim.playOnLoad = true;
+            const idleState = this.bindClipState(
+                anim,
+                cached,
+                this.buildHeroStateName(config.key, 'idle')
+            );
             if (controller) {
-                controller.setIdleClip(cached.name);
+                controller.setIdleClip(idleState);
             }
             return;
         }
@@ -394,22 +412,22 @@ export class UnitFactory {
             this._heroIdleClipLoading.delete(config.key);
             if (!clip) {
                 console.warn('[UnitFactory] Failed to load hero idle clip:', err);
-                const runClip = this._heroRunClipCache.get(config.key);
-                if (runClip && controller) {
-                    controller.setIdleClip(runClip.name);
+                if (controller) {
+                    controller.setIdleClip(this.buildHeroStateName(config.key, 'run'));
                 }
                 return;
             }
             if (!anim.node || !anim.node.isValid) {
                 return;
             }
-            const aliased = this.aliasClip(clip, config.key, 'idle');
-            this._heroIdleClipCache.set(config.key, aliased);
-            this.addClipIfNeeded(anim, aliased);
-            anim.defaultClip = aliased;
-            anim.playOnLoad = true;
+            this._heroIdleClipCache.set(config.key, clip);
+            const idleState = this.bindClipState(
+                anim,
+                clip,
+                this.buildHeroStateName(config.key, 'idle')
+            );
             if (controller) {
-                controller.setIdleClip(aliased.name);
+                controller.setIdleClip(idleState);
             }
         });
     }
@@ -542,16 +560,37 @@ export class UnitFactory {
         tryLoad(0, null);
     }
 
-    private static aliasClip(
+    private static buildHeroStateName(key: string, role: 'run' | 'idle'): string {
+        return `${key}__${role}`;
+    }
+
+    private static bindClipState(
+        anim: SkeletalAnimation,
         clip: AnimationClip,
-        key: string,
-        role: 'run' | 'idle'
-    ): AnimationClip {
-        const alias = `${key}__${role}`;
-        if (clip.name !== alias) {
-            clip.name = alias;
+        stateName: string
+    ): string {
+        this.addClipIfNeeded(anim, clip);
+        const existing = anim.getState(stateName);
+        if (existing) {
+            this.tuneHeroStateSpeed(stateName, existing);
+            return existing.name;
         }
-        return clip;
+        const created = anim.createState(clip, stateName);
+        if (created) {
+            this.tuneHeroStateSpeed(stateName, created);
+            return created.name;
+        }
+        return clip.name;
+    }
+
+    private static tuneHeroStateSpeed(
+        stateName: string,
+        state: NonNullable<ReturnType<SkeletalAnimation['getState']>>
+    ): void {
+        const speed = stateName.endsWith('__idle') ? this.HERO_IDLE_SPEED : this.HERO_RUN_SPEED;
+        if (Math.abs(state.speed - speed) > 0.0001) {
+            state.speed = speed;
+        }
     }
 
     private static addClipIfNeeded(anim: SkeletalAnimation, clip: AnimationClip): void {

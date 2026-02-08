@@ -56,21 +56,7 @@ export class HeroAnimationController extends Component {
 
     private playClip(target: string): void {
         if (!this._anim) return;
-        const state = this._anim.play(target);
-        if (state) {
-            this._current = target;
-            return;
-        }
-
-        const fallback =
-            this._anim.clips && this._anim.clips.length > 0 ? this._anim.clips[0] : null;
-        if (fallback) {
-            this._anim.play(fallback.name);
-            this._current = fallback.name;
-            console.warn(
-                `[HeroAnimationController] Failed to play clip "${target}", fallback to "${fallback.name}".`,
-                this._anim.clips.map(c => c && c.name).filter(Boolean)
-            );
-        }
+        this._anim.play(target);
+        this._current = target;
     }
 }

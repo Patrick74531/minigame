@@ -380,6 +380,9 @@ export const GameConfig = {
                     run: {
                         path: 'character/Firing Rifle Run Compressed/out/mixamo.com',
                     },
+                    idle: {
+                        path: 'character/Firing Rifle Idle Compressed/out/mixamo.com',
+                    },
                 },
                 transform: {
                     scale: 2.0,
