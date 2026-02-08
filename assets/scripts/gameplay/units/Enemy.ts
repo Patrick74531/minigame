@@ -25,6 +25,7 @@ export class Enemy extends Unit {
     private static readonly NEAR_LOGIC_STEP = 1 / 24;
     private static readonly FAR_LOGIC_STEP = 1 / 12;
     private static readonly FAR_LOGIC_DIST_SQ = 18 * 18;
+    private static readonly MIN_ATTACK_RANGE = 0.3;
 
     // Target position (Base)
     private _targetPos: Vec3 = new Vec3(0, 0, 0);
@@ -32,6 +33,7 @@ export class Enemy extends Unit {
     private _coinDropMultiplier: number = 1;
     private _isAttackVisualActive: boolean = false;
     private _logicAccum: number = 0;
+    private _aggroRange: number = GameConfig.ENEMY.AGGRO_RANGE;
     /** 缓存 paper-doll 视觉判断（避免每 tick getChildByName） */
     private _usesPaperDoll: boolean | null = null;
     /** 缓存 RigidBody（避免每 tick getComponent） */
@@ -63,6 +65,7 @@ export class Enemy extends Unit {
         this._target = null;
         this._isElite = false;
         this._coinDropMultiplier = 1;
+        this._aggroRange = GameConfig.ENEMY.AGGRO_RANGE;
         this._scanTimer = 0;
         this._logicAccum = Math.random() * Enemy.NEAR_LOGIC_STEP;
         this.resetAttackVisualState();
@@ -84,6 +87,15 @@ export class Enemy extends Unit {
     public setVariant(config: { isElite?: boolean; coinDropMultiplier?: number }): void {
         this._isElite = config.isElite ?? false;
         this._coinDropMultiplier = config.coinDropMultiplier ?? 1;
+    }
+
+    public setCombatProfile(config: { aggroRange?: number; attackRange?: number }): void {
+        if (config.aggroRange !== undefined) {
+            this._aggroRange = Math.max(Enemy.MIN_ATTACK_RANGE, config.aggroRange);
+        }
+        if (config.attackRange !== undefined) {
+            this._stats.attackRange = Math.max(Enemy.MIN_ATTACK_RANGE, config.attackRange);
+        }
     }
 
     public get isElite(): boolean {
@@ -115,14 +127,22 @@ export class Enemy extends Unit {
         }
 
         const pos = this.node.position;
+        const targetNode = this._target && this._target.isAlive ? this._target.node : null;
+        const movingToBase = !targetNode;
+        const moveTargetX = targetNode ? targetNode.position.x : this._targetPos.x;
+        const moveTargetZ = targetNode ? targetNode.position.z : this._targetPos.z;
+
         // 3D: Distance to target on XZ plane
-        const dx = this._targetPos.x - pos.x;
-        const dz = this._targetPos.z - pos.z;
+        const dx = moveTargetX - pos.x;
+        const dz = moveTargetZ - pos.z;
         const distToTarget = Math.sqrt(dx * dx + dz * dz);
 
         // Check if reached Base
-        if (distToTarget < this.ARRIVAL_DISTANCE) {
+        if (movingToBase && distToTarget < this.ARRIVAL_DISTANCE) {
             this.onReachBase();
+            return;
+        }
+        if (distToTarget <= 0.0001) {
             return;
         }
 
@@ -140,7 +160,7 @@ export class Enemy extends Unit {
 
         // Face target (paper-doll enemy uses billboard visuals, so root rotation is unnecessary).
         if (!this.isPaperDoll()) {
-            Enemy._tmpLookAt.set(this._targetPos.x, GameConfig.PHYSICS.ENEMY_Y, this._targetPos.z);
+            Enemy._tmpLookAt.set(moveTargetX, GameConfig.PHYSICS.ENEMY_Y, moveTargetZ);
             this.node.lookAt(Enemy._tmpLookAt);
         }
     }
@@ -163,7 +183,7 @@ export class Enemy extends Unit {
         const heroUnit = other.node.getComponent(Unit);
         if (heroUnit && heroUnit.unitType === UnitType.HERO && heroUnit.isAlive) {
             this.setTarget(heroUnit);
-            this._state = UnitState.ATTACKING;
+            this._state = this.isTargetInRange(heroUnit) ? UnitState.ATTACKING : UnitState.MOVING;
             return;
         }
 
@@ -171,7 +191,7 @@ export class Enemy extends Unit {
         const building = other.node.getComponent(Building);
         if (building && building.isAlive) {
             this.setTarget(building);
-            this._state = UnitState.ATTACKING;
+            this._state = this.isTargetInRange(building) ? UnitState.ATTACKING : UnitState.MOVING;
         }
     }
 
@@ -221,7 +241,6 @@ export class Enemy extends Unit {
 
     // === Aggro Logic ===
 
-    private readonly AGGRO_RANGE = 3.0;
     private _scanTimer: number = 0;
 
     protected update(dt: number): void {
@@ -243,8 +262,11 @@ export class Enemy extends Unit {
                 this._target = null;
                 this._state = UnitState.MOVING;
             } else {
-                // If we have a target, check if it is still in range
-                if (this.isTargetInRange(this._target)) {
+                if (!this.isTargetInAggroRange(this._target)) {
+                    this._target = null;
+                    this._state = UnitState.MOVING;
+                } else if (this.isTargetInRange(this._target)) {
+                    // If we have a target, check if it is still in attack range
                     this._state = UnitState.ATTACKING;
                     // Face the target for non-paper visuals.
                     if (!this.isPaperDoll()) {
@@ -253,11 +275,6 @@ export class Enemy extends Unit {
                         this.node.lookAt(Enemy._tmpLookAt);
                     }
                 } else {
-                    // Chase target? Or give up?
-                    // For now, if out of range, resume moving to Base (ignore chasing for simple enemies)
-                    // Or we could implement chasing logic here.
-                    // Let's stick to "Move to Base, but attack if blocked/close"
-                    this._target = null;
                     this._state = UnitState.MOVING;
                 }
             }
@@ -282,9 +299,22 @@ export class Enemy extends Unit {
         const dx = targetPos.x - myPos.x;
         const dz = targetPos.z - myPos.z;
         const distSq = dx * dx + dz * dz;
-        // Check overlap or generic attack range.
-        // For walls (buildings), we might want collision check, but distance matches AGGRO_RANGE logic.
-        return distSq <= this.AGGRO_RANGE * this.AGGRO_RANGE;
+        return distSq <= this.getAttackRangeSq();
+    }
+
+    private getAttackRangeSq(): number {
+        const attackRange = Math.max(Enemy.MIN_ATTACK_RANGE, this._stats.attackRange);
+        return attackRange * attackRange;
+    }
+
+    private isTargetInAggroRange(target: IAttackable): boolean {
+        const myPos = this.node.position;
+        const targetPos = target.node.position;
+        const dx = targetPos.x - myPos.x;
+        const dz = targetPos.z - myPos.z;
+        const distSq = dx * dx + dz * dz;
+        const aggroRange = Math.max(Enemy.MIN_ATTACK_RANGE, this._aggroRange);
+        return distSq <= aggroRange * aggroRange;
     }
 
     /**
@@ -292,7 +322,7 @@ export class Enemy extends Unit {
      */
     protected scanForTargets(): void {
         const myPos = this.node.position;
-        const aggroSq = this.AGGRO_RANGE * this.AGGRO_RANGE;
+        const aggroSq = this._aggroRange * this._aggroRange;
 
         // 1. Check for nearby Hero (highest priority melee target)
         const heroNode = this.gameManager.hero;
@@ -304,7 +334,9 @@ export class Enemy extends Unit {
                 const distSq = dx * dx + dz * dz;
                 if (distSq < aggroSq) {
                     this.setTarget(heroUnit);
-                    this._state = UnitState.ATTACKING;
+                    this._state = this.isTargetInRange(heroUnit)
+                        ? UnitState.ATTACKING
+                        : UnitState.MOVING;
                     return;
                 }
             }
@@ -313,10 +345,12 @@ export class Enemy extends Unit {
         // 2. Check for nearby Soldiers
         const provider = CombatService.provider;
         if (provider && provider.findSoldierInRange) {
-            const soldier = provider.findSoldierInRange(myPos, this.AGGRO_RANGE) as Soldier | null;
+            const soldier = provider.findSoldierInRange(myPos, this._aggroRange) as Soldier | null;
             if (soldier && soldier.isAlive) {
                 this.setTarget(soldier);
-                this._state = UnitState.ATTACKING;
+                this._state = this.isTargetInRange(soldier)
+                    ? UnitState.ATTACKING
+                    : UnitState.MOVING;
                 return;
             }
         }
@@ -345,7 +379,9 @@ export class Enemy extends Unit {
 
             if (nearest) {
                 this.setTarget(nearest);
-                this._state = UnitState.ATTACKING;
+                this._state = this.isTargetInRange(nearest)
+                    ? UnitState.ATTACKING
+                    : UnitState.MOVING;
             }
         }
     }

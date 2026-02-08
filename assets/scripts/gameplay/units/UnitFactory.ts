@@ -1,5 +1,4 @@
 import {
-    _decorator,
     Node,
     MeshRenderer,
     primitives,
@@ -33,6 +32,10 @@ export interface EnemySpawnOptions {
     isElite?: boolean;
     scaleMultiplier?: number;
     coinDropMultiplier?: number;
+    /** 攻击范围（可造成伤害的距离） */
+    attackRange?: number;
+    /** 索敌范围（发现/锁定目标距离） */
+    aggroRange?: number;
 }
 
 /**
@@ -100,13 +103,16 @@ export class UnitFactory {
         enemy.initStats({
             maxHp: GameConfig.ENEMY.BASE_HP * hpMultiplier,
             attack: GameConfig.ENEMY.BASE_ATTACK * attackMultiplier,
-            attackRange: GameConfig.ENEMY.ATTACK_RANGE,
+            attackRange: options.attackRange ?? GameConfig.ENEMY.ATTACK_RANGE,
             attackInterval: GameConfig.ENEMY.ATTACK_INTERVAL,
             moveSpeed: GameConfig.ENEMY.MOVE_SPEED * speedMultiplier,
         });
         enemy.setVariant({
             isElite,
             coinDropMultiplier: options.coinDropMultiplier ?? 1,
+        });
+        enemy.setCombatProfile({
+            aggroRange: options.aggroRange ?? GameConfig.ENEMY.AGGRO_RANGE,
         });
 
         // Set Target

@@ -328,8 +328,10 @@ export const GameConfig = {
         BASE_HP: 30,
         /** 攻击间隔（秒） */
         ATTACK_INTERVAL: 1.2,
-        /** 攻击范围 */
-        ATTACK_RANGE: 1.2,
+        /** 攻击范围（近战默认：需要贴近目标） */
+        ATTACK_RANGE: 0.85,
+        /** 索敌范围（仅用于锁定目标，不代表可造成伤害） */
+        AGGRO_RANGE: 3.0,
         /** 死亡掉落金币 */
         COIN_DROP: 5,
         /** 死亡掉落随机浮动 */
