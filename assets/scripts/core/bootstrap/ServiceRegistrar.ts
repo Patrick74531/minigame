@@ -35,6 +35,12 @@ export class ServiceRegistrar {
         ServiceRegistry.register('WaveRuntime', WaveManager.instance);
         ServiceRegistry.register('WaveService', WaveService.instance);
         ServiceRegistry.register('PoolManager', PoolManager.instance);
+        // 注册士兵工厂池（预热 5 个实例，避免首波实例化卡顿）
+        PoolManager.instance.registerFactoryPool(
+            'soldier_basic',
+            () => UnitFactory.createSoldier(null),
+            5
+        );
         // Fallback spawner when soldier pool is not registered
         ServiceRegistry.register('SoldierSpawner', (parent: Node, x: number, z: number) =>
             UnitFactory.createSoldier(parent, x, z)

@@ -16,7 +16,8 @@ export interface IPoolable {
 /** 池配置 */
 interface PoolConfig {
     pool: NodePool;
-    prefab: Prefab;
+    prefab: Prefab | null;
+    factory: (() => Node) | null;
     initialSize: number;
 }
 
@@ -56,12 +57,46 @@ export class PoolManager extends Singleton<PoolManager>() {
         const config: PoolConfig = {
             pool,
             prefab,
+            factory: null,
             initialSize,
         };
 
         // 预创建对象
         for (let i = 0; i < initialSize; i++) {
             const node = instantiate(prefab);
+            pool.put(node);
+        }
+
+        this._pools.set(poolName, config);
+    }
+
+    /**
+     * 注册工厂池（用于代码创建的节点，如 Soldier）
+     * @param poolName 池名称
+     * @param factory 节点工厂函数（返回未挂载的 Node）
+     * @param initialSize 初始预创建数量
+     */
+    public registerFactoryPool(
+        poolName: string,
+        factory: () => Node,
+        initialSize: number = 0
+    ): void {
+        if (this._pools.has(poolName)) {
+            console.warn(`[PoolManager] Pool "${poolName}" already exists, skipping registration`);
+            return;
+        }
+
+        const pool = new NodePool();
+        const config: PoolConfig = {
+            pool,
+            prefab: null,
+            factory,
+            initialSize,
+        };
+
+        for (let i = 0; i < initialSize; i++) {
+            const node = factory();
+            node.active = false;
             pool.put(node);
         }
 
@@ -85,9 +120,13 @@ export class PoolManager extends Singleton<PoolManager>() {
 
         if (config.pool.size() > 0) {
             node = config.pool.get()!;
-        } else {
-            // 池为空，创建新实例
+        } else if (config.prefab) {
             node = instantiate(config.prefab);
+        } else if (config.factory) {
+            node = config.factory();
+        } else {
+            console.error(`[PoolManager] Pool "${poolName}" has no prefab or factory`);
+            return null;
         }
 
         if (parent) {
@@ -174,7 +213,15 @@ export class PoolManager extends Singleton<PoolManager>() {
         }
 
         for (let i = 0; i < count; i++) {
-            const node = instantiate(config.prefab);
+            let node: Node;
+            if (config.prefab) {
+                node = instantiate(config.prefab);
+            } else if (config.factory) {
+                node = config.factory();
+                node.active = false;
+            } else {
+                break;
+            }
             config.pool.put(node);
         }
     }

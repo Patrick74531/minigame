@@ -78,12 +78,20 @@ export class HealthBar extends Component {
     protected onEnable(): void {
         if (this._root && this._root.isValid) {
             this._root.active = true;
+            // 重新挂载到 owner 的父节点（可能被 onDisable 移除过）
+            if (!this._root.parent && this.node.parent) {
+                this.node.parent.addChild(this._root);
+            }
         }
     }
 
     protected onDisable(): void {
         if (this._root && this._root.isValid) {
             this._root.active = false;
+            // 从父节点移除，避免 owner 被池化/销毁后 root 成为幽灵节点
+            if (this._root.parent) {
+                this._root.removeFromParent();
+            }
         }
     }
 
@@ -96,6 +104,12 @@ export class HealthBar extends Component {
 
     protected lateUpdate(dt: number): void {
         if (!this._root || !this._root.isValid || !this.node.isValid) return;
+
+        // owner 没有父节点时（被池化回收 / 正在被销毁），隐藏血条
+        if (!this.node.parent || !this.node.parent.isValid) {
+            if (this._root.active) this._root.active = false;
+            return;
+        }
 
         this.updateAnchorProbe(dt);
         this.updateRootTransform();

@@ -18,6 +18,7 @@ import { HeroLevelSystem } from './gameplay/units/HeroLevelSystem';
 import { LevelUpVFX } from './gameplay/effects/LevelUpVFX';
 import { GameEvents } from './data/GameEvents';
 import { EventManager } from './core/managers/EventManager';
+import { ResourcePreloader } from './core/bootstrap/ResourcePreloader';
 
 const { ccclass, property } = _decorator;
 
@@ -56,6 +57,9 @@ export class GameController extends Component {
     private _waveLoop: WaveLoop | null = null;
 
     protected onLoad(): void {
+        // 预加载关键资源（贴图/Prefab/动画），避免首波帧率抖动
+        ResourcePreloader.preloadAll();
+
         console.log('╔════════════════════════════════════════════════════╗');
         console.log('║       KingShit MVP - Modular Version               ║');
         console.log('╚════════════════════════════════════════════════════╝');

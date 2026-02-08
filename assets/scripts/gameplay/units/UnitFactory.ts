@@ -120,12 +120,12 @@ export class UnitFactory {
 
         this.attachEnemyPaperVisual(node);
 
-        // 血条
+        // 血条（敌人使用 paper-doll，无骨骼头节点，关闭锚点探测避免浪费 CPU）
         const hb = node.addComponent(HealthBar);
         hb.width = 80;
         hb.height = 8;
         hb.yOffset = 1.8;
-        hb.autoDetectHeadAnchor = true;
+        hb.autoDetectHeadAnchor = false;
         hb.headPadding = 0.14;
 
         return node;
@@ -134,11 +134,11 @@ export class UnitFactory {
     /**
      * 创建士兵
      */
-    public static createSoldier(parent: Node, x: number, z: number): Node {
+    public static createSoldier(parent: Node | null, x: number = 0, z: number = 0): Node {
         const node = this.createCubeNode('Soldier', new Color(60, 140, 220, 255));
         node.setPosition(x, GameConfig.PHYSICS.SOLDIER_Y, z); // Spawn high safe
         node.setScale(0.3, 0.3, 0.3);
-        parent.addChild(node);
+        if (parent) parent.addChild(node);
 
         // Physics for Soldier
         const rb = node.addComponent(RigidBody);
