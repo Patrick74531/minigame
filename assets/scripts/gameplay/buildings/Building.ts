@@ -242,6 +242,7 @@ export class Building extends BaseComponent implements IAttackable {
         }
 
         let soldier = this.poolManager.spawn(this.soldierPoolName, this._unitContainer);
+        let spawnedFromPool = !!soldier;
 
         // 3D 坐标系：XZ平面为地面，Y轴向上
         const spawnOffsetX = 1.0;
@@ -255,6 +256,7 @@ export class Building extends BaseComponent implements IAttackable {
                 ServiceRegistry.get<(parent: Node, x: number, z: number) => Node>('SoldierSpawner');
             if (fallback) {
                 soldier = fallback(this._unitContainer, 0, 0);
+                spawnedFromPool = false;
             } else {
                 console.warn('[Building] SoldierSpawner not registered, cannot spawn soldier.');
                 return;
@@ -280,6 +282,7 @@ export class Building extends BaseComponent implements IAttackable {
         const soldierComp = soldier.getComponent(Soldier);
         if (soldierComp) {
             soldierComp.ownerBuildingId = this.node.uuid;
+            soldierComp.setSpawnSource(this.soldierPoolName, spawnedFromPool);
         }
 
         this._activeUnits++;

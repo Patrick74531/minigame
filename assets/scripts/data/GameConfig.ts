@@ -662,23 +662,23 @@ export const GameConfig = {
                 description: '高射速曳光机枪，以炽热弹幕切割敌人',
                 iconColor: '#FF4500',
                 levels: [
-                    { damage: 8, attackInterval: 0.12, range: 8, projectileSpeed: 28, spread: 4 },
+                    { damage: 8, attackInterval: 0.12, range: 6.5, projectileSpeed: 28, spread: 4 },
                     {
                         damage: 10,
                         attackInterval: 0.1,
-                        range: 8.5,
+                        range: 7,
                         projectileSpeed: 30,
                         spread: 5,
                     },
-                    { damage: 12, attackInterval: 0.08, range: 9, projectileSpeed: 32, spread: 6 },
+                    { damage: 12, attackInterval: 0.08, range: 7.5, projectileSpeed: 32, spread: 6 },
                     {
                         damage: 15,
                         attackInterval: 0.06,
-                        range: 9.5,
+                        range: 8,
                         projectileSpeed: 34,
                         spread: 7,
                     },
-                    { damage: 18, attackInterval: 0.04, range: 10, projectileSpeed: 36, spread: 8 },
+                    { damage: 18, attackInterval: 0.04, range: 8.5, projectileSpeed: 36, spread: 8 },
                 ],
             },
             flamethrower: {
@@ -690,7 +690,7 @@ export const GameConfig = {
                     {
                         damage: 15,
                         attackInterval: 0.3,
-                        range: 4,
+                        range: 3,
                         projectileSpeed: 10,
                         gravity: 8,
                         burnDuration: 1.5,
@@ -698,7 +698,7 @@ export const GameConfig = {
                     {
                         damage: 20,
                         attackInterval: 0.27,
-                        range: 4.5,
+                        range: 3.5,
                         projectileSpeed: 11,
                         gravity: 8,
                         burnDuration: 2.0,
@@ -706,7 +706,7 @@ export const GameConfig = {
                     {
                         damage: 26,
                         attackInterval: 0.24,
-                        range: 5,
+                        range: 4,
                         projectileSpeed: 12,
                         gravity: 7,
                         burnDuration: 2.5,
@@ -714,7 +714,7 @@ export const GameConfig = {
                     {
                         damage: 33,
                         attackInterval: 0.21,
-                        range: 5.5,
+                        range: 4.5,
                         projectileSpeed: 13,
                         gravity: 7,
                         burnDuration: 3.0,
@@ -722,7 +722,7 @@ export const GameConfig = {
                     {
                         damage: 42,
                         attackInterval: 0.18,
-                        range: 6,
+                        range: 5,
                         projectileSpeed: 14,
                         gravity: 6,
                         burnDuration: 3.5,
@@ -738,7 +738,7 @@ export const GameConfig = {
                     {
                         damage: 40,
                         attackInterval: 1.2,
-                        range: 8,
+                        range: 9,
                         projectileSpeed: 18,
                         explosionRadius: 1.5,
                         spinSpeed: 15,
@@ -746,7 +746,7 @@ export const GameConfig = {
                     {
                         damage: 55,
                         attackInterval: 1.1,
-                        range: 8.5,
+                        range: 9.5,
                         projectileSpeed: 19,
                         explosionRadius: 1.8,
                         spinSpeed: 18,
@@ -754,7 +754,7 @@ export const GameConfig = {
                     {
                         damage: 72,
                         attackInterval: 1.0,
-                        range: 9,
+                        range: 10,
                         projectileSpeed: 20,
                         explosionRadius: 2.1,
                         spinSpeed: 20,
@@ -762,7 +762,7 @@ export const GameConfig = {
                     {
                         damage: 92,
                         attackInterval: 0.9,
-                        range: 9.5,
+                        range: 10.5,
                         projectileSpeed: 21,
                         explosionRadius: 2.5,
                         spinSpeed: 22,
@@ -770,7 +770,7 @@ export const GameConfig = {
                     {
                         damage: 115,
                         attackInterval: 0.8,
-                        range: 10,
+                        range: 11,
                         projectileSpeed: 22,
                         explosionRadius: 3.0,
                         spinSpeed: 25,

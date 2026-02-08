@@ -65,6 +65,10 @@ export class HealthBar extends Component {
 
     private static readonly _tmpWorldPos = new Vec3();
     private static readonly _tmpWorldScale = new Vec3();
+    private static readonly _fgColorGreen = new Color(0, 255, 0, 255);
+    private static readonly _fgColorYellow = new Color(255, 255, 0, 255);
+    private static readonly _fgColorRed = new Color(255, 0, 0, 255);
+    private static readonly _maxInheritedScale = 2.5;
 
     protected onLoad(): void {
         this.createVisuals();
@@ -146,22 +150,29 @@ export class HealthBar extends Component {
     public updateHealth(current: number, max: number): void {
         if (!this._fgGraphics) return;
 
-        const ratio = Math.max(0, Math.min(1, current / max));
+        const safeMax = max > 0 ? max : 1;
+        const ratio = Math.max(0, Math.min(1, current / safeMax));
         this._fgGraphics.node.setScale(ratio, 1, 1);
 
-        // Color change? Green -> Yellow -> Red
-        if (ratio > 0.5) {
-            this._fgGraphics.fillColor = new Color(0, 255, 0, 255);
-        } else if (ratio > 0.2) {
-            this._fgGraphics.fillColor = new Color(255, 255, 0, 255);
-        } else {
-            this._fgGraphics.fillColor = new Color(255, 0, 0, 255);
+        // Foreground geometry is static; redraw only when color band changes.
+        const targetColor =
+            ratio > 0.5
+                ? HealthBar._fgColorGreen
+                : ratio > 0.2
+                  ? HealthBar._fgColorYellow
+                  : HealthBar._fgColorRed;
+        const currentColor = this._fgGraphics.fillColor;
+        if (
+            currentColor.r !== targetColor.r ||
+            currentColor.g !== targetColor.g ||
+            currentColor.b !== targetColor.b ||
+            currentColor.a !== targetColor.a
+        ) {
+            this._fgGraphics.fillColor = targetColor;
+            this._fgGraphics.clear();
+            this._fgGraphics.rect(0, 0, this.width, this.height);
+            this._fgGraphics.fill();
         }
-
-        // Re-fill to apply color change
-        this._fgGraphics.clear();
-        this._fgGraphics.rect(0, 0, this.width, this.height);
-        this._fgGraphics.fill();
     }
 
     private updateAnchorProbe(dt: number): void {
@@ -295,6 +306,18 @@ export class HealthBar extends Component {
         const worldX = HealthBar._tmpWorldPos.x;
         const worldY = HealthBar._tmpWorldPos.y;
         const worldZ = HealthBar._tmpWorldPos.z;
+        if (
+            !Number.isFinite(worldX) ||
+            !Number.isFinite(worldY) ||
+            !Number.isFinite(worldZ) ||
+            !Number.isFinite(offsetY)
+        ) {
+            this._root.active = false;
+            return;
+        }
+        if (!this._root.active) {
+            this._root.active = true;
+        }
 
         if (
             Math.abs(worldX - this._lastOwnerX) < 0.0001 &&
@@ -315,13 +338,17 @@ export class HealthBar extends Component {
     private updateRootScale(): void {
         if (!this._root) return;
 
-        let scale = this.baseWorldScale;
+        let scale = Math.max(0.0001, this.baseWorldScale);
         if (this.followInWorldSpace && this.inheritOwnerScaleInWorldSpace) {
             this.node.getWorldScale(HealthBar._tmpWorldScale);
             const ws = HealthBar._tmpWorldScale;
-            const avgScale = (Math.abs(ws.x) + Math.abs(ws.y) + Math.abs(ws.z)) / 3;
-            scale *= Math.max(0.05, avgScale);
+            const rawAvgScale = (Math.abs(ws.x) + Math.abs(ws.y) + Math.abs(ws.z)) / 3;
+            const avgScale = Number.isFinite(rawAvgScale)
+                ? Math.max(0.05, Math.min(HealthBar._maxInheritedScale, rawAvgScale))
+                : 1;
+            scale *= avgScale;
         }
+        if (!Number.isFinite(scale) || scale <= 0) return;
 
         if (Math.abs(scale - this._lastAppliedScale) < 0.0001) {
             return;

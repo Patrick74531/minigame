@@ -3,8 +3,10 @@ import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
 import { HealthBar } from '../../ui/HealthBar';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
+import { PoolManager } from '../../core/managers/PoolManager';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
-const { ccclass, property } = _decorator;
+const { ccclass } = _decorator;
 
 /**
  * 士兵单位
@@ -17,6 +19,10 @@ export class Soldier extends Unit {
     private _fallbackTimer: number = 0;
     /** 产兵所属建筑 UUID */
     public ownerBuildingId: string | null = null;
+    /** 出生来源对象池名（用于死亡回池） */
+    public spawnPoolName: string | null = null;
+    /** 是否来自对象池 */
+    public spawnedFromPool: boolean = false;
     /** 缓存 RigidBody 引用，避免每帧 getComponent */
     private _rbCached: RigidBody | null = null;
     private _rbLookedUp: boolean = false;
@@ -51,6 +57,13 @@ export class Soldier extends Unit {
         this._state = UnitState.IDLE;
         this.currentTarget = null;
         this.ownerBuildingId = null;
+        this.spawnPoolName = null;
+        this.spawnedFromPool = false;
+    }
+
+    public setSpawnSource(poolName: string | null, fromPool: boolean): void {
+        this.spawnPoolName = poolName;
+        this.spawnedFromPool = fromPool;
     }
 
     protected update(dt: number): void {
@@ -146,6 +159,17 @@ export class Soldier extends Unit {
 
     protected onDeath(): void {
         this.currentTarget = null;
+        const bar = this.node.getComponent(HealthBar);
+        if (bar && bar.isValid) {
+            bar.enabled = false;
+        }
+        if (!this.node || !this.node.isValid) return;
+
+        if (this.spawnedFromPool && this.spawnPoolName) {
+            this.poolManager.despawn(this.spawnPoolName, this.node);
+            return;
+        }
+        this.node.destroy();
     }
 
     /**
@@ -177,5 +201,9 @@ export class Soldier extends Unit {
                 this.engageTarget(unit);
             }
         }
+    }
+
+    private get poolManager(): PoolManager {
+        return ServiceRegistry.get<PoolManager>('PoolManager') ?? PoolManager.instance;
     }
 }
