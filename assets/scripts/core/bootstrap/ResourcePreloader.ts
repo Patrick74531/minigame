@@ -1,5 +1,6 @@
 import { resources, Texture2D, Prefab, AnimationClip } from 'cc';
 import { resolveHeroModelConfig } from '../../gameplay/units/HeroModelConfig';
+import { GameConfig } from '../../data/GameConfig';
 
 /**
  * ResourcePreloader
@@ -20,6 +21,7 @@ export class ResourcePreloader {
         this.preloadEnemyPaperDollTextures();
         this.preloadWeaponVFXTextures();
         this.preloadHeroAssets();
+        this.preloadHeroWeaponVisuals();
     }
 
     // === Enemy Paper-Doll 贴图 ===
@@ -71,6 +73,23 @@ export class ResourcePreloader {
         const idlePaths = [config.idleClipPath, ...config.idleClipFallbacks].filter(Boolean);
         for (const p of idlePaths) {
             resources.preload(p as string, AnimationClip);
+        }
+    }
+
+    private static preloadHeroWeaponVisuals(): void {
+        const visuals = (GameConfig.HERO as unknown as { WEAPON_VISUALS?: unknown }).WEAPON_VISUALS;
+        if (!visuals || typeof visuals !== 'object') return;
+
+        const entries = visuals as Record<
+            string,
+            { prefab?: { path?: string; fallbacks?: string[]; uuid?: string } }
+        >;
+        for (const key of Object.keys(entries)) {
+            const prefabCfg = entries[key]?.prefab;
+            const paths = [prefabCfg?.path, ...(prefabCfg?.fallbacks ?? [])].filter(Boolean);
+            for (const p of paths) {
+                resources.preload(p as string, Prefab);
+            }
         }
     }
 }

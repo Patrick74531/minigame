@@ -11,9 +11,11 @@ import {
     Prefab,
     instantiate,
     resources,
+    assetManager,
     SkeletalAnimation,
     AnimationClip,
     Renderer,
+    Texture2D,
 } from 'cc';
 import { Enemy } from './Enemy';
 import { Soldier } from './Soldier';
@@ -21,9 +23,11 @@ import { Hero } from './Hero';
 import { HealthBar } from '../../ui/HealthBar';
 import { GameConfig } from '../../data/GameConfig';
 import { HeroAnimationController } from './HeroAnimationController';
+import { HeroWeaponMountController } from './HeroWeaponMountController';
 import { AnimRootScaleLock } from '../visuals/AnimRootScaleLock';
 import { EnemyPaperDollAnimator } from '../visuals/EnemyPaperDollAnimator';
 import { resolveHeroModelConfig } from './HeroModelConfig';
+import { WeaponType } from '../weapons/WeaponTypes';
 
 export interface EnemySpawnOptions {
     hpMultiplier?: number;
@@ -45,6 +49,11 @@ export interface EnemySpawnOptions {
 export class UnitFactory {
     private static readonly HERO_RUN_SPEED = 1.0;
     private static readonly HERO_IDLE_SPEED = 0.25;
+    private static readonly HERO_WEAPON_SOCKET_NAME = 'HeroWeaponSocket';
+    private static readonly HERO_WEAPON_TYPES: WeaponType[] = [
+        WeaponType.MACHINE_GUN,
+        WeaponType.FLAMETHROWER,
+    ];
     private static _materials: Map<string, Material> = new Map();
     private static _heroPrefabs: Map<string, Prefab> = new Map();
     private static _heroPrefabLoading: Set<string> = new Set();
@@ -52,6 +61,38 @@ export class UnitFactory {
     private static _heroRunClipLoading: Set<string> = new Set();
     private static _heroIdleClipCache: Map<string, AnimationClip> = new Map();
     private static _heroIdleClipLoading: Set<string> = new Set();
+    private static _weaponColorTexture: Texture2D | null = null;
+    private static _weaponColorTextureLoading: boolean = false;
+    private static _weaponColorTextureWaiting: Set<Node> = new Set();
+    private static _weaponUnlitMaterial: Material | null = null;
+
+    private static get heroWeaponVisuals(): Record<
+        string,
+        {
+            handBone?: string;
+            prefab?: { path?: string; fallbacks?: string[]; uuid?: string };
+            transform?: {
+                position?: { x?: number; y?: number; z?: number };
+                rotation?: { x?: number; y?: number; z?: number };
+                scale?: number;
+            };
+        }
+    > {
+        const raw = (GameConfig.HERO as unknown as { WEAPON_VISUALS?: unknown }).WEAPON_VISUALS;
+        if (!raw || typeof raw !== 'object') return {};
+        return raw as Record<
+            string,
+            {
+                handBone?: string;
+                prefab?: { path?: string; fallbacks?: string[]; uuid?: string };
+                transform?: {
+                    position?: { x?: number; y?: number; z?: number };
+                    rotation?: { x?: number; y?: number; z?: number };
+                    scale?: number;
+                };
+            }
+        >;
+    }
 
     /**
      * 创建敌人
@@ -266,6 +307,7 @@ export class UnitFactory {
             model.setRotationFromEuler(0, config.transformRotY, 0);
             this.applyLayerRecursive(model, root.layer);
             root.addChild(model);
+            this.attachHeroWeaponVisuals(root, model);
 
             const hasRenderer = model.getComponentsInChildren(Renderer).length > 0;
             const mesh = root.getComponent(MeshRenderer);
@@ -606,6 +648,302 @@ export class UnitFactory {
             return;
         }
         anim.addClip(clip);
+    }
+
+    private static attachHeroWeaponVisuals(root: Node, model: Node): void {
+        if (!root || !root.isValid || !model || !model.isValid) return;
+
+        let handNode: Node | null = null;
+        const visuals = this.heroWeaponVisuals;
+        for (const type of this.HERO_WEAPON_TYPES) {
+            const cfg = visuals[type];
+            const handName = cfg?.handBone;
+            if (handName) {
+                handNode = this.findChildByName(model, handName);
+                if (handNode) break;
+            }
+        }
+
+        if (!handNode) {
+            handNode = this.findRightHandBone(model);
+        }
+        if (!handNode) {
+            console.warn('[UnitFactory] Hero right hand bone not found for weapon mount.');
+            return;
+        }
+
+        const legacySocketInModel = this.findChildByName(model, this.HERO_WEAPON_SOCKET_NAME);
+        if (legacySocketInModel && legacySocketInModel.parent !== root) {
+            legacySocketInModel.destroy();
+        }
+
+        let socket = root.getChildByName(this.HERO_WEAPON_SOCKET_NAME);
+        if (!socket) {
+            socket = new Node(this.HERO_WEAPON_SOCKET_NAME);
+            root.addChild(socket);
+        }
+
+        let mountController = root.getComponent(HeroWeaponMountController);
+        if (!mountController) {
+            mountController = root.addComponent(HeroWeaponMountController);
+        }
+        mountController.bindSocket(socket, handNode);
+
+        const setupOne = (
+            type: WeaponType,
+            key: string,
+            defaultPath: string,
+            prefabNameFallback: string
+        ) => {
+            const cfg = visuals[key];
+            const paths = this.buildPrefabPaths({
+                prefabPath: cfg?.prefab?.path ?? defaultPath,
+                prefabFallbacks: cfg?.prefab?.fallbacks ?? [],
+            });
+            const preferredName =
+                this.pathBaseName(cfg?.prefab?.path) ?? this.pathBaseName(defaultPath);
+            this.loadWeaponPrefab(
+                paths,
+                preferredName ?? prefabNameFallback,
+                cfg?.prefab?.uuid,
+                (err, prefab) => {
+                    if (!prefab) {
+                        console.warn(
+                            `[UnitFactory] Failed to load hero weapon visual for ${type}:`,
+                            err
+                        );
+                        return;
+                    }
+                    if (!socket || !socket.isValid || !root.isValid) return;
+                    // Prefab异步回调时，再次强制把挂点贴手，减少首帧落地可见时间。
+                    socket.setWorldPosition(handNode.worldPosition);
+                    socket.setWorldRotation(handNode.worldRotation);
+                    mountController?.requestImmediateSnap();
+
+                    let weaponNode = socket.getChildByName(`WeaponVisual_${type}`);
+                    if (!weaponNode) {
+                        weaponNode = instantiate(prefab);
+                        weaponNode.name = `WeaponVisual_${type}`;
+                        socket.addChild(weaponNode);
+                    }
+
+                    const transform = cfg?.transform;
+                    const pos = transform?.position;
+                    const rot = transform?.rotation;
+                    const scale = transform?.scale ?? 1;
+                    weaponNode.setPosition(pos?.x ?? 0, pos?.y ?? 0, pos?.z ?? 0);
+                    weaponNode.setRotationFromEuler(rot?.x ?? 0, rot?.y ?? 0, rot?.z ?? 0);
+                    weaponNode.setScale(scale, scale, scale);
+                    this.applyLayerRecursive(weaponNode, root.layer);
+                    // Keep original GLTF material/texture first, for quick visual validation.
+                    mountController?.bindWeaponNode(type, weaponNode);
+                    mountController?.requestImmediateSnap();
+                }
+            );
+        };
+
+        setupOne(
+            WeaponType.MACHINE_GUN,
+            WeaponType.MACHINE_GUN,
+            'weapons/blaster-d/blaster-d',
+            'blaster-d'
+        );
+        setupOne(
+            WeaponType.FLAMETHROWER,
+            WeaponType.FLAMETHROWER,
+            'weapons/blaster-e/blaster-e',
+            'blaster-e'
+        );
+
+        // 首帧对齐，避免加载回调前后出现一帧的错误位置。
+        socket.setWorldPosition(handNode.worldPosition);
+        socket.setWorldRotation(handNode.worldRotation);
+    }
+
+    private static loadWeaponPrefab(
+        paths: string[],
+        prefabNameFallback: string,
+        prefabUuid: string | undefined,
+        done: (err: Error | null, prefab: Prefab | null) => void
+    ): void {
+        const tryLoadByDir = (prevErr: Error | null) => {
+            resources.loadDir('weapons', Prefab, (dirErr, prefabs) => {
+                if (!dirErr && prefabs && prefabs.length > 0) {
+                    const matched =
+                        prefabs.find(
+                            p =>
+                                p &&
+                                (p.name === prefabNameFallback ||
+                                    p.name === `${prefabNameFallback}.prefab`)
+                        ) ??
+                        prefabs.find(p => p && p.name.indexOf(prefabNameFallback) !== -1) ??
+                        null;
+                    if (matched) {
+                        done(null, matched);
+                        return;
+                    }
+                }
+                done((dirErr as Error) ?? prevErr, null);
+            });
+        };
+
+        const tryLoadByPath = () => {
+            this.loadWithFallbacks(paths, Prefab, (err, prefab) => {
+                if (prefab) {
+                    done(null, prefab);
+                    return;
+                }
+                tryLoadByDir(err);
+            });
+        };
+
+        if (!prefabUuid) {
+            tryLoadByPath();
+            return;
+        }
+
+        assetManager.loadAny({ uuid: prefabUuid }, (uuidErr, asset) => {
+            if (!uuidErr && asset instanceof Prefab) {
+                done(null, asset);
+                return;
+            }
+            // UUID 失败后回退路径方案，兼容资源重导入导致 UUID 变化
+            tryLoadByPath();
+        });
+    }
+
+    private static findChildByName(root: Node, name: string): Node | null {
+        if (root.name === name) return root;
+        for (const child of root.children) {
+            const found = this.findChildByName(child, name);
+            if (found) return found;
+        }
+        return null;
+    }
+
+    private static pathBaseName(path?: string): string | null {
+        if (!path) return null;
+        const trimmed = path.trim();
+        if (!trimmed) return null;
+        const idx = trimmed.lastIndexOf('/');
+        const base = idx >= 0 ? trimmed.slice(idx + 1) : trimmed;
+        return base || null;
+    }
+
+    private static findRightHandBone(root: Node): Node | null {
+        const exactNames = [
+            'mixamorig:RightHand',
+            'mixamorig_RightHand',
+            'RightHand',
+            'right_hand',
+            'Hand.R',
+            'hand_r',
+        ];
+        for (const name of exactNames) {
+            const node = this.findChildByName(root, name);
+            if (node) return node;
+        }
+
+        const allNodes: Node[] = [];
+        this.collectChildren(root, allNodes);
+        let best: Node | null = null;
+        let bestScore = -1;
+
+        for (const node of allNodes) {
+            const score = this.scoreRightHandName(node.name);
+            if (score > bestScore) {
+                best = node;
+                bestScore = score;
+            }
+        }
+        return bestScore >= 3 ? best : null;
+    }
+
+    private static collectChildren(root: Node, out: Node[]): void {
+        out.push(root);
+        for (const child of root.children) {
+            this.collectChildren(child, out);
+        }
+    }
+
+    private static scoreRightHandName(name: string): number {
+        if (!name) return 0;
+        const raw = name.toLowerCase();
+        const compact = raw.replace(/[^a-z0-9]/g, '');
+        let score = 0;
+        if (compact.includes('righthand')) score += 6;
+        if (compact.includes('hand') && compact.includes('right')) score += 4;
+        if (compact.includes('handr') || compact.includes('rhand')) score += 3;
+        if (compact.includes('right')) score += 1;
+        if (compact.includes('hand')) score += 1;
+        return score;
+    }
+
+    private static applyWeaponVisualMaterial(root: Node): void {
+        if (this._weaponColorTexture) {
+            this.bindWeaponMaterial(root, this._weaponColorTexture);
+            return;
+        }
+
+        this._weaponColorTextureWaiting.add(root);
+        if (this._weaponColorTextureLoading) return;
+        this._weaponColorTextureLoading = true;
+
+        const paths = ['weapons/Textures/colormap/texture', 'weapons/Textures/colormap'];
+        const tryLoad = (idx: number) => {
+            if (idx >= paths.length) {
+                // fallback: direct UUID load for texture sub-asset
+                assetManager.loadAny(
+                    { uuid: 'c950b245-9056-4bf7-abe8-91cd0ff9bd1a@6c48a' },
+                    (err, asset) => {
+                        this._weaponColorTextureLoading = false;
+                        if (err || !(asset instanceof Texture2D)) return;
+                        this._weaponColorTexture = asset;
+                        for (const waitingRoot of this._weaponColorTextureWaiting) {
+                            if (!waitingRoot || !waitingRoot.isValid) continue;
+                            this.bindWeaponMaterial(waitingRoot, asset);
+                        }
+                        this._weaponColorTextureWaiting.clear();
+                    }
+                );
+                return;
+            }
+
+            resources.load(paths[idx], Texture2D, (err, tex) => {
+                if (err || !tex) {
+                    tryLoad(idx + 1);
+                    return;
+                }
+
+                this._weaponColorTexture = tex;
+                this._weaponColorTextureLoading = false;
+
+                for (const waitingRoot of this._weaponColorTextureWaiting) {
+                    if (!waitingRoot || !waitingRoot.isValid) continue;
+                    this.bindWeaponMaterial(waitingRoot, tex);
+                }
+                this._weaponColorTextureWaiting.clear();
+            });
+        };
+
+        tryLoad(0);
+    }
+
+    private static bindWeaponMaterial(root: Node, tex: Texture2D): void {
+        if (!this._weaponUnlitMaterial) {
+            const mat = new Material();
+            mat.initialize({ effectName: 'builtin-unlit' });
+            mat.setProperty('mainColor', new Color(255, 255, 255, 255));
+            mat.setProperty('mainTexture', tex);
+            this._weaponUnlitMaterial = mat;
+        } else {
+            this._weaponUnlitMaterial.setProperty('mainTexture', tex);
+        }
+
+        const renderers = root.getComponentsInChildren(MeshRenderer);
+        for (const renderer of renderers) {
+            renderer.material = this._weaponUnlitMaterial;
+        }
     }
 
     private static applyLayerRecursive(node: Node, layer: number): void {
