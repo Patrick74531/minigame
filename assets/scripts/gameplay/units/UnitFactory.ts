@@ -67,7 +67,7 @@ export class UnitFactory {
             isElite ? new Color(235, 245, 160, 255) : new Color(220, 60, 60, 255)
         );
         const scaleMultiplier = options.scaleMultiplier ?? 1;
-        const baseScale = 0.35;
+        const baseScale = 0.38;
         node.setPosition(x, GameConfig.PHYSICS.ENEMY_Y, z); // Raised
         node.setScale(
             baseScale * scaleMultiplier,
@@ -294,11 +294,16 @@ export class UnitFactory {
                 }
                 const existing = anim.clips && anim.clips.length > 0 ? anim.clips[0] : null;
                 if (existing) {
-                    controller.setRunClip(existing.name);
+                    const runClip = existing;
+                    controller.setRunClip(runClip.name);
+                    // Run-only mode: idle uses run clip for now.
+                    controller.setIdleClip(runClip.name);
+                    anim.defaultClip = runClip;
+                    anim.playOnLoad = true;
+                    anim.play(runClip.name);
                 } else {
                     this.ensureRunClip(anim, controller);
                 }
-                this.ensureIdleClip(anim, controller);
             }
 
             const hb = root.getComponent(HealthBar);
@@ -325,8 +330,12 @@ export class UnitFactory {
         const cached = this._heroRunClipCache.get(config.key);
         if (cached) {
             this.addClipIfNeeded(anim, cached);
+            anim.defaultClip = cached;
+            anim.playOnLoad = true;
+            anim.play(cached.name);
             if (controller) {
                 controller.setRunClip(cached.name);
+                controller.setIdleClip(cached.name);
             }
             return;
         }
@@ -335,7 +344,7 @@ export class UnitFactory {
         this._heroRunClipLoading.add(config.key);
 
         const paths = this.buildClipPaths(config.runClipPath, config.runClipFallbacks);
-        this.loadWithFallbacks(paths, AnimationClip, (err, clip) => {
+        this.loadClipWithFallbacks(paths, (err, clip) => {
             this._heroRunClipLoading.delete(config.key);
             if (!clip) {
                 console.warn('[UnitFactory] Failed to load hero run clip:', err);
@@ -346,8 +355,12 @@ export class UnitFactory {
             }
             this._heroRunClipCache.set(config.key, clip);
             this.addClipIfNeeded(anim, clip);
+            anim.defaultClip = clip;
+            anim.playOnLoad = true;
+            anim.play(clip.name);
             if (controller) {
                 controller.setRunClip(clip.name);
+                controller.setIdleClip(clip.name);
             }
         });
     }
@@ -377,21 +390,26 @@ export class UnitFactory {
         this._heroIdleClipLoading.add(config.key);
 
         const paths = this.buildClipPaths(config.idleClipPath, config.idleClipFallbacks);
-        this.loadWithFallbacks(paths, AnimationClip, (err, clip) => {
+        this.loadClipWithFallbacks(paths, (err, clip) => {
             this._heroIdleClipLoading.delete(config.key);
             if (!clip) {
                 console.warn('[UnitFactory] Failed to load hero idle clip:', err);
+                const runClip = this._heroRunClipCache.get(config.key);
+                if (runClip && controller) {
+                    controller.setIdleClip(runClip.name);
+                }
                 return;
             }
             if (!anim.node || !anim.node.isValid) {
                 return;
             }
-            this._heroIdleClipCache.set(config.key, clip);
-            this.addClipIfNeeded(anim, clip);
-            anim.defaultClip = clip;
+            const aliased = this.aliasClip(clip, config.key, 'idle');
+            this._heroIdleClipCache.set(config.key, aliased);
+            this.addClipIfNeeded(anim, aliased);
+            anim.defaultClip = aliased;
             anim.playOnLoad = true;
             if (controller) {
-                controller.setIdleClip(clip.name);
+                controller.setIdleClip(aliased.name);
             }
         });
     }
@@ -459,8 +477,93 @@ export class UnitFactory {
         tryLoad(0, null);
     }
 
+    private static loadClipWithFallbacks(
+        paths: string[],
+        done: (err: Error | null, clip: AnimationClip | null) => void
+    ): void {
+        if (!paths.length) {
+            done(new Error('No clip paths provided'), null);
+            return;
+        }
+
+        const expanded: string[] = [];
+        const seen = new Set<string>();
+        for (const path of paths) {
+            if (!path || seen.has(path)) continue;
+            seen.add(path);
+            expanded.push(path);
+            if (!path.endsWith('.animation')) {
+                const withExt = `${path}.animation`;
+                if (!seen.has(withExt)) {
+                    seen.add(withExt);
+                    expanded.push(withExt);
+                }
+            }
+        }
+
+        const dirTried = new Set<string>();
+        const tryLoad = (index: number, lastErr: Error | null) => {
+            if (index >= expanded.length) {
+                done(lastErr, null);
+                return;
+            }
+
+            const path = expanded[index];
+            resources.load(path, AnimationClip, (err, clip) => {
+                if (!err && clip) {
+                    done(null, clip);
+                    return;
+                }
+
+                const slash = path.lastIndexOf('/');
+                const dir = slash > 0 ? path.slice(0, slash) : path;
+                const expected =
+                    slash >= 0 ? path.slice(slash + 1).replace(/\.animation$/, '') : '';
+                if (dir && !dirTried.has(dir)) {
+                    dirTried.add(dir);
+                    resources.loadDir(dir, AnimationClip, (dirErr, clips) => {
+                        if (!dirErr && clips && clips.length > 0) {
+                            const matched =
+                                clips.find(c => c && c.name === expected) ??
+                                clips.find(c => c && c.name === `${expected}.animation`) ??
+                                clips[0];
+                            done(null, matched);
+                            return;
+                        }
+                        tryLoad(index + 1, (dirErr as Error) ?? (err as Error) ?? lastErr);
+                    });
+                    return;
+                }
+
+                tryLoad(index + 1, (err as Error) ?? lastErr);
+            });
+        };
+
+        tryLoad(0, null);
+    }
+
+    private static aliasClip(
+        clip: AnimationClip,
+        key: string,
+        role: 'run' | 'idle'
+    ): AnimationClip {
+        const alias = `${key}__${role}`;
+        if (clip.name !== alias) {
+            clip.name = alias;
+        }
+        return clip;
+    }
+
     private static addClipIfNeeded(anim: SkeletalAnimation, clip: AnimationClip): void {
-        if (anim.clips && anim.clips.some(existing => existing && existing.name === clip.name)) {
+        if (
+            anim.clips &&
+            anim.clips.some(
+                existing =>
+                    !!existing &&
+                    (existing === clip ||
+                        (!!existing.uuid && !!clip.uuid && existing.uuid === clip.uuid))
+            )
+        ) {
             return;
         }
         anim.addClip(clip);

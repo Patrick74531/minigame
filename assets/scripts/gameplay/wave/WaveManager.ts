@@ -369,6 +369,10 @@ export class WaveManager {
 
         const baseX = this._baseNode?.position.x ?? GameConfig.MAP.BASE_SPAWN.x;
         const baseY = this._baseNode?.position.z ?? GameConfig.MAP.BASE_SPAWN.z;
+        const portalsCfg = GameConfig.WAVE.INFINITE.SPAWN_PORTALS;
+        const maxMargin = Math.max(0, Math.min(limits.x, limits.z) - 0.5);
+        const edgeMargin = Math.min(maxMargin, Math.max(0, portalsCfg?.EDGE_MARGIN ?? 4));
+        const distanceFactor = Math.max(0.3, Math.min(1, portalsCfg?.DISTANCE_FACTOR ?? 0.9));
 
         let nearestIdx = 0;
         let nearestDistSq = Infinity;
@@ -395,8 +399,96 @@ export class WaveManager {
             })
             // 第一个口优先“基地对角最远角”
             .sort((a, b) => b.distSq - a.distSq);
+        const minX = -limits.x + edgeMargin;
+        const maxX = limits.x - edgeMargin;
+        const minY = -limits.z + edgeMargin;
+        const maxY = limits.z - edgeMargin;
+        const safeMinX = minX < maxX ? minX : -limits.x;
+        const safeMaxX = minX < maxX ? maxX : limits.x;
+        const safeMinY = minY < maxY ? minY : -limits.z;
+        const safeMaxY = minY < maxY ? maxY : limits.z;
 
-        return candidates.map(item => item.point);
+        const directionalPortals = candidates
+            .map(item => {
+                const dirX = item.point.x - baseX;
+                const dirY = item.point.y - baseY;
+                const len = Math.hypot(dirX, dirY);
+                if (len <= 0.0001) return null;
+                const nx = dirX / len;
+                const ny = dirY / len;
+                const maxDistance = this.resolveRayDistanceToBounds(
+                    baseX,
+                    baseY,
+                    nx,
+                    ny,
+                    safeMinX,
+                    safeMaxX,
+                    safeMinY,
+                    safeMaxY
+                );
+                if (!Number.isFinite(maxDistance) || maxDistance <= 0.01) return null;
+                return {
+                    nx,
+                    ny,
+                    maxDistance,
+                };
+            })
+            .filter(
+                (
+                    item
+                ): item is {
+                    nx: number;
+                    ny: number;
+                    maxDistance: number;
+                } => !!item
+            );
+
+        if (directionalPortals.length === 0) {
+            return candidates.map(item => item.point);
+        }
+
+        let sharedDistance = Infinity;
+        for (const portal of directionalPortals) {
+            sharedDistance = Math.min(sharedDistance, portal.maxDistance);
+        }
+        if (!Number.isFinite(sharedDistance) || sharedDistance <= 0.01) {
+            return candidates.map(item => item.point);
+        }
+
+        const spawnDistance = sharedDistance * distanceFactor;
+        return directionalPortals.map(portal => ({
+            x: baseX + portal.nx * spawnDistance,
+            y: baseY + portal.ny * spawnDistance,
+        }));
+    }
+
+    private resolveRayDistanceToBounds(
+        originX: number,
+        originY: number,
+        dirX: number,
+        dirY: number,
+        minX: number,
+        maxX: number,
+        minY: number,
+        maxY: number
+    ): number {
+        let maxDistance = Infinity;
+
+        if (Math.abs(dirX) > 0.0001) {
+            const tx = dirX > 0 ? (maxX - originX) / dirX : (minX - originX) / dirX;
+            if (tx > 0) {
+                maxDistance = Math.min(maxDistance, tx);
+            }
+        }
+
+        if (Math.abs(dirY) > 0.0001) {
+            const ty = dirY > 0 ? (maxY - originY) / dirY : (minY - originY) / dirY;
+            if (ty > 0) {
+                maxDistance = Math.min(maxDistance, ty);
+            }
+        }
+
+        return maxDistance;
     }
 
     /**

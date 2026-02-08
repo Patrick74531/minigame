@@ -83,13 +83,16 @@ const ZERO_ATTACK_POSE: AttackPoseSample = {
 @ccclass('EnemyPaperDollAnimator')
 export class EnemyPaperDollAnimator extends Component {
     @property
-    public yOffset: number = 0.45;
+    public yOffset: number = 0.5;
 
     @property
-    public visualScale: number = 0.0042;
+    public visualScale: number = 0.0048;
 
     @property
     public scaleReference: number = 0.35;
+
+    @property
+    public idleTiltAngle: number = -4;
 
     @property
     public walkFrequency: number = 2.8;
@@ -270,7 +273,7 @@ export class EnemyPaperDollAnimator extends Component {
             : ZERO_ATTACK_POSE;
 
         let rigY = bobMove + bobIdle + attackPose.bob * this.attackBobAmount * this._attackBlend;
-        let rigAngle = attackPose.bodyLean * this._attackBlend;
+        let rigAngle = this.idleTiltAngle + attackPose.bodyLean * this._attackBlend;
         let leftArmAngle = this.mix(-swing * 0.9, attackPose.leftArm, this._attackBlend);
         let rightArmAngle = this.mix(swing * 0.9, attackPose.rightArm, this._attackBlend);
         const headAngle = this.mix(headSway, attackPose.head, this._attackBlend);

@@ -33,8 +33,7 @@ export class HeroAnimationController extends Component {
         if (!this._anim || !this._runClip) return;
         const shouldRun = this._hero ? this._hero.state === UnitState.MOVING : true;
         if (shouldRun && this._current !== this._runClip) {
-            this._anim.play(this._runClip);
-            this._current = this._runClip;
+            this.playClip(this._runClip);
         }
     }
 
@@ -43,8 +42,7 @@ export class HeroAnimationController extends Component {
         if (!this._anim || !this._idleClip) return;
         const shouldIdle = this._hero ? this._hero.state !== UnitState.MOVING : true;
         if (shouldIdle && this._current !== this._idleClip) {
-            this._anim.play(this._idleClip);
-            this._current = this._idleClip;
+            this.playClip(this._idleClip);
         }
     }
 
@@ -53,7 +51,26 @@ export class HeroAnimationController extends Component {
         const shouldRun = this._hero.state === UnitState.MOVING;
         const target = shouldRun ? this._runClip : this._idleClip;
         if (!target || target === this._current) return;
-        this._anim.play(target);
-        this._current = target;
+        this.playClip(target);
+    }
+
+    private playClip(target: string): void {
+        if (!this._anim) return;
+        const state = this._anim.play(target);
+        if (state) {
+            this._current = target;
+            return;
+        }
+
+        const fallback =
+            this._anim.clips && this._anim.clips.length > 0 ? this._anim.clips[0] : null;
+        if (fallback) {
+            this._anim.play(fallback.name);
+            this._current = fallback.name;
+            console.warn(
+                `[HeroAnimationController] Failed to play clip "${target}", fallback to "${fallback.name}".`,
+                this._anim.clips.map(c => c && c.name).filter(Boolean)
+            );
+        }
     }
 }

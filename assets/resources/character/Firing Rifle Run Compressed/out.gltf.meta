@@ -1,0 +1,183 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "11ccee25-2753-4385-9d7f-c6d750592b13",
+  "files": [
+    "__original-animation-0.bin"
+  ],
+  "subMetas": {
+    "99380": {
+      "importer": "gltf-material",
+      "uuid": "11ccee25-2753-4385-9d7f-c6d750592b13@99380",
+      "displayName": "",
+      "id": "99380",
+      "name": "Material.001.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "ef8a8": {
+      "importer": "gltf-mesh",
+      "uuid": "11ccee25-2753-4385-9d7f-c6d750592b13@ef8a8",
+      "displayName": "",
+      "id": "ef8a8",
+      "name": "Mesh_0.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 9913
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "18d6f": {
+      "importer": "gltf-animation",
+      "uuid": "11ccee25-2753-4385-9d7f-c6d750592b13@18d6f",
+      "displayName": "",
+      "id": "18d6f",
+      "name": "mixamo.com.animation",
+      "userData": {
+        "gltfIndex": 0,
+        "wrapMode": 2,
+        "sample": 30,
+        "span": {
+          "from": 0,
+          "to": 0.4000000059604645
+        },
+        "events": []
+      },
+      "ver": "1.0.18",
+      "imported": true,
+      "files": [
+        ".bin"
+      ],
+      "subMetas": {}
+    },
+    "438fe": {
+      "importer": "gltf-skeleton",
+      "uuid": "11ccee25-2753-4385-9d7f-c6d750592b13@438fe",
+      "displayName": "",
+      "id": "438fe",
+      "name": "UnnamedSkeleton.skeleton",
+      "userData": {
+        "gltfIndex": 0,
+        "jointsLength": 34
+      },
+      "ver": "1.0.1",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "7d6ab": {
+      "importer": "texture",
+      "uuid": "11ccee25-2753-4385-9d7f-c6d750592b13@7d6ab",
+      "displayName": "",
+      "id": "7d6ab",
+      "name": "base_color_texture.texture",
+      "userData": {
+        "wrapModeS": "repeat",
+        "wrapModeT": "repeat",
+        "minfilter": "linear",
+        "magfilter": "linear",
+        "mipfilter": "none",
+        "anisotropy": 0,
+        "isUuid": false,
+        "imageUuidOrDatabaseUri": "db://assets/resources/character/Firing Rifle Run Compressed/Image_0.jpg"
+      },
+      "ver": "1.0.22",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "7359a": {
+      "importer": "gltf-scene",
+      "uuid": "11ccee25-2753-4385-9d7f-c6d750592b13@7359a",
+      "displayName": "",
+      "id": "7359a",
+      "name": "out.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [
+      {
+        "name": "base_color_texture",
+        "uri": "db://assets/resources/character/Firing Rifle Run Compressed/Image_0.jpg"
+      }
+    ],
+    "animationImportSettings": [
+      {
+        "name": "mixamo.com",
+        "duration": 0.4000000059604645,
+        "fps": 30,
+        "splits": [
+          {
+            "name": "mixamo.com",
+            "from": 0,
+            "to": 0.4000000059604645,
+            "wrapMode": 2,
+            "previousId": "18d6f"
+          }
+        ]
+      }
+    ],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "11ccee25-2753-4385-9d7f-c6d750592b13@ef8a8"
+      ],
+      "skeletons": [
+        "11ccee25-2753-4385-9d7f-c6d750592b13@438fe"
+      ],
+      "textures": [
+        "11ccee25-2753-4385-9d7f-c6d750592b13@7d6ab"
+      ],
+      "materials": [
+        "11ccee25-2753-4385-9d7f-c6d750592b13@99380"
+      ],
+      "scenes": [
+        "11ccee25-2753-4385-9d7f-c6d750592b13@7359a"
+      ]
+    }
+  }
+}

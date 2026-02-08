@@ -365,26 +365,20 @@ export const GameConfig = {
         /**
          * 模型资源配置
          * 说明：
-         * - glb 必须放在 assets/resources 下
-         * - Prefab 子资源路径格式：character/<glb_name>/<glb_name>
-         * - AnimationClip 子资源路径格式：character/<glb_name>/<clip_name>
+         * - 角色模型资源必须放在 assets/resources 下
+         * - Prefab 子资源路径格式：character/<model_name>/<prefab_name>
+         * - AnimationClip 子资源路径格式：character/<model_name>/<clip_name>
          */
-        MODEL_PRESET: 'meshy',
+        MODEL_PRESET: 'firingRifle',
         MODEL_PRESETS: {
-            meshy: {
-                key: 'meshy',
+            firingRifle: {
+                key: 'firingRifle',
                 prefab: {
-                    path: 'character/Meshy_AI_Animation_Running_withSkin/Meshy_AI_Animation_Running_withSkin',
-                    fallbacks: ['character/Meshy_AI_Animation_Running_withSkin'],
+                    path: 'character/Firing Rifle Run Compressed/out/out',
                 },
                 clips: {
                     run: {
-                        path: 'character/Meshy_AI_Animation_Running_withSkin/Armature|running|baselayer',
-                        fallbacks: ['character/Meshy_AI_Animation_Running_withSkin'],
-                    },
-                    idle: {
-                        path: 'character/Meshy_AI_Animation_Idle_withSkin/Armature|Idle|baselayer',
-                        fallbacks: ['character/Meshy_AI_Animation_Idle_withSkin'],
+                        path: 'character/Firing Rifle Run Compressed/out/mixamo.com',
                     },
                 },
                 transform: {
@@ -483,14 +477,19 @@ export const GameConfig = {
             SPAWN_RANGE: 8,
             /**
              * 固定刷怪口设置
-             * - 基于地图四角，自动剔除“最靠近基地”的角，保留其余 3 角作为刷怪口
-             * - 波次推进时逐步解锁刷怪口数量
+             * - 基于“离基地最近角之外”的三个方向生成刷怪口
+             * - 三个刷怪口与基地保持等距，并按波次逐步解锁
+             * - 通过边缘留白避免刷在地图最角落
              */
             SPAWN_PORTALS: {
                 /** 第 2 个刷怪口解锁波次（含） */
                 OPEN_WAVE_2: 4,
                 /** 第 3 个刷怪口解锁波次（含） */
                 OPEN_WAVE_3: 8,
+                /** 刷怪口距离地图边缘的最小留白（世界坐标） */
+                EDGE_MARGIN: 4.0,
+                /** 共享刷怪半径比例（1 = 顶到边缘留白线） */
+                DISTANCE_FACTOR: 0.9,
                 /** 每个刷怪口的随机抖动半径 */
                 JITTER_RADIUS: 1.2,
             },
