@@ -406,7 +406,7 @@ export const GameConfig = {
                 handBone: 'mixamorig:RightHand',
                 prefab: {
                     path: 'weapons/blaster-h/blaster-h',
-                    fallbacks: ['weapons/blaster-h'],
+                    fallbacks: [],
                 },
                 transform: {
                     position: { x: 0.03, y: 0.01, z: -0.14 },
@@ -418,7 +418,7 @@ export const GameConfig = {
                 handBone: 'mixamorig:RightHand',
                 prefab: {
                     path: 'weapons/blaster-h/blaster-h',
-                    fallbacks: ['weapons/blaster-h'],
+                    fallbacks: [],
                 },
                 transform: {
                     position: { x: 0.03, y: 0.01, z: -0.14 },

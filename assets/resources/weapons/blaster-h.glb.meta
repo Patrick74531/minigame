@@ -23,12 +23,32 @@
       ],
       "subMetas": {}
     },
-    "96c50": {
-      "importer": "texture",
-      "uuid": "cfe98100-9bc2-4e54-9c37-a44664510c46@96c50",
+    "2b33f": {
+      "importer": "gltf-embeded-image",
+      "uuid": "cfe98100-9bc2-4e54-9c37-a44664510c46@2b33f",
       "displayName": "",
-      "id": "96c50",
-      "name": "colormap.texture",
+      "id": "2b33f",
+      "name": "colormap.image",
+      "userData": {
+        "gltfIndex": 0,
+        "fixAlphaTransparencyArtifacts": true,
+        "hasAlpha": true,
+        "type": "texture"
+      },
+      "ver": "1.0.3",
+      "imported": true,
+      "files": [
+        ".json",
+        ".png"
+      ],
+      "subMetas": {}
+    },
+    "e39f7": {
+      "importer": "texture",
+      "uuid": "cfe98100-9bc2-4e54-9c37-a44664510c46@e39f7",
+      "displayName": "",
+      "id": "e39f7",
+      "name": "UnnamedTexture.texture",
       "userData": {
         "wrapModeS": "repeat",
         "wrapModeT": "repeat",
@@ -36,8 +56,8 @@
         "magfilter": "linear",
         "mipfilter": "linear",
         "anisotropy": 0,
-        "isUuid": false,
-        "imageUuidOrDatabaseUri": "db://assets/resources/weapons/Textures/colormap.png"
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "cfe98100-9bc2-4e54-9c37-a44664510c46@2b33f"
       },
       "ver": "1.0.22",
       "imported": true,
@@ -83,7 +103,7 @@
     "imageMetas": [
       {
         "name": "colormap",
-        "uri": "db://assets/resources/weapons/Textures/colormap.png"
+        "uri": "cfe98100-9bc2-4e54-9c37-a44664510c46@2b33f"
       }
     ],
     "lods": {
@@ -110,7 +130,7 @@
       ],
       "skeletons": [],
       "textures": [
-        "cfe98100-9bc2-4e54-9c37-a44664510c46@96c50"
+        "cfe98100-9bc2-4e54-9c37-a44664510c46@e39f7"
       ],
       "materials": [
         "cfe98100-9bc2-4e54-9c37-a44664510c46@9991c"

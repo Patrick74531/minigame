@@ -102,9 +102,26 @@ export class HeroWeaponMountController extends Component {
 
     private applyWeaponType(type: WeaponType | null): void {
         const effectiveType = type ?? WeaponType.MACHINE_GUN;
+        const targets = new Set<Node>();
         this._weaponNodes.forEach((node, key) => {
             if (!node || !node.isValid) return;
-            node.active = key === effectiveType;
+            if (key === effectiveType) {
+                targets.add(node);
+            }
+        });
+        if (targets.size === 0) {
+            for (const node of this._weaponNodes.values()) {
+                if (!node || !node.isValid) continue;
+                targets.add(node);
+                break;
+            }
+        }
+
+        const visited = new Set<Node>();
+        this._weaponNodes.forEach(node => {
+            if (!node || !node.isValid || visited.has(node)) return;
+            node.active = targets.has(node);
+            visited.add(node);
         });
         this._lastActiveType = effectiveType;
     }

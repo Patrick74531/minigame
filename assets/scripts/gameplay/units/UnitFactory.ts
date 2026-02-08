@@ -698,70 +698,53 @@ export class UnitFactory {
         }
         mountController.bindSocket(socket, handNode);
 
-        const setupOne = (
-            type: WeaponType,
-            key: string,
-            defaultPath: string,
-            prefabNameFallback: string
-        ) => {
-            const cfg = visuals[key];
-            const paths = this.buildPrefabPaths({
-                prefabPath: cfg?.prefab?.path ?? defaultPath,
-                prefabFallbacks: cfg?.prefab?.fallbacks ?? [],
-            });
-            const preferredName =
-                this.pathBaseName(cfg?.prefab?.path) ?? this.pathBaseName(defaultPath);
-            this.loadWeaponPrefab(
-                paths,
-                preferredName ?? prefabNameFallback,
-                cfg?.prefab?.uuid,
-                (err, prefab) => {
-                    if (!prefab) {
-                        console.warn(
-                            `[UnitFactory] Failed to load hero weapon visual for ${type}:`,
-                            err
-                        );
-                        return;
-                    }
-                    if (!socket || !socket.isValid || !root.isValid) return;
-                    // Prefab异步回调时，再次强制把挂点贴手，减少首帧落地可见时间。
-                    socket.setWorldPosition(handNode.worldPosition);
-                    socket.setWorldRotation(handNode.worldRotation);
-                    mountController?.requestImmediateSnap();
-
-                    let weaponNode = socket.getChildByName(`WeaponVisual_${type}`);
-                    if (!weaponNode) {
-                        weaponNode = instantiate(prefab);
-                        weaponNode.name = `WeaponVisual_${type}`;
-                        socket.addChild(weaponNode);
-                    }
-
-                    const transform = cfg?.transform;
-                    const pos = transform?.position;
-                    const rot = transform?.rotation;
-                    const scale = transform?.scale ?? 1;
-                    weaponNode.setPosition(pos?.x ?? 0, pos?.y ?? 0, pos?.z ?? 0);
-                    weaponNode.setRotationFromEuler(rot?.x ?? 0, rot?.y ?? 0, rot?.z ?? 0);
-                    weaponNode.setScale(scale, scale, scale);
-                    this.applyLayerRecursive(weaponNode, root.layer);
-                    // Keep original GLTF material/texture first, for quick visual validation.
-                    mountController?.bindWeaponNode(type, weaponNode);
-                    mountController?.requestImmediateSnap();
+        const sharedCfg =
+            visuals[WeaponType.MACHINE_GUN] ?? visuals[WeaponType.FLAMETHROWER] ?? null;
+        const defaultPath = 'weapons/blaster-h/blaster-h';
+        const paths = this.buildPrefabPaths({
+            prefabPath: sharedCfg?.prefab?.path ?? defaultPath,
+            prefabFallbacks: sharedCfg?.prefab?.fallbacks ?? [],
+        });
+        const preferredName =
+            this.pathBaseName(sharedCfg?.prefab?.path) ?? this.pathBaseName(defaultPath);
+        this.loadWeaponPrefab(
+            paths,
+            preferredName ?? 'blaster-h',
+            sharedCfg?.prefab?.uuid,
+            (err, prefab) => {
+                if (!prefab) {
+                    console.warn('[UnitFactory] Failed to load shared hero weapon visual:', err);
+                    return;
                 }
-            );
-        };
+                if (!socket || !socket.isValid || !root.isValid) return;
 
-        setupOne(
-            WeaponType.MACHINE_GUN,
-            WeaponType.MACHINE_GUN,
-            'weapons/blaster-d/blaster-d',
-            'blaster-d'
-        );
-        setupOne(
-            WeaponType.FLAMETHROWER,
-            WeaponType.FLAMETHROWER,
-            'weapons/blaster-e/blaster-e',
-            'blaster-e'
+                // Prefab异步回调时，再次强制把挂点贴手，减少首帧落地可见时间。
+                socket.setWorldPosition(handNode.worldPosition);
+                socket.setWorldRotation(handNode.worldRotation);
+                mountController?.requestImmediateSnap();
+
+                let weaponNode = socket.getChildByName('WeaponVisual_Shared');
+                if (!weaponNode) {
+                    weaponNode = instantiate(prefab);
+                    weaponNode.name = 'WeaponVisual_Shared';
+                    socket.addChild(weaponNode);
+                }
+
+                const transform = sharedCfg?.transform;
+                const pos = transform?.position;
+                const rot = transform?.rotation;
+                const scale = transform?.scale ?? 1;
+                weaponNode.setPosition(pos?.x ?? 0, pos?.y ?? 0, pos?.z ?? 0);
+                weaponNode.setRotationFromEuler(rot?.x ?? 0, rot?.y ?? 0, rot?.z ?? 0);
+                weaponNode.setScale(scale, scale, scale);
+                this.applyLayerRecursive(weaponNode, root.layer);
+
+                // 同一个模型绑定到所有武器类型，不做视觉区分。
+                for (const type of this.HERO_WEAPON_TYPES) {
+                    mountController?.bindWeaponNode(type, weaponNode);
+                }
+                mountController?.requestImmediateSnap();
+            }
         );
 
         // 首帧对齐，避免加载回调前后出现一帧的错误位置。
