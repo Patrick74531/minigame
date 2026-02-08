@@ -349,7 +349,7 @@ export const GameConfig = {
     // === 英雄系统 ===
     HERO: {
         /** 基础血量 */
-        BASE_HP: 80,
+        BASE_HP: 60,
         /** 基础攻击力 */
         BASE_ATTACK: 12,
         /** 攻击间隔（秒） */
@@ -440,7 +440,7 @@ export const GameConfig = {
          * cap:      属性上限（可选）
          */
         GROWTH: {
-            maxHp: { multiply: 1.1 },
+            maxHp: { multiply: 1.03 },
             attack: { multiply: 1.08 },
             critRate: { add: 0.012, cap: 0.5 },
             critDamage: { add: 0.06 },

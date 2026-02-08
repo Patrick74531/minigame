@@ -125,6 +125,8 @@ export class UnitFactory {
         hb.width = 80;
         hb.height = 8;
         hb.yOffset = 1.8;
+        hb.autoDetectHeadAnchor = true;
+        hb.headPadding = 0.14;
 
         return node;
     }
@@ -200,6 +202,8 @@ export class UnitFactory {
         hb.width = 100;
         hb.height = 10;
         hb.yOffset = 2.0;
+        hb.autoDetectHeadAnchor = true;
+        hb.headPadding = 0.18;
 
         this.attachHeroModel(node);
 
@@ -291,6 +295,11 @@ export class UnitFactory {
                     this.ensureRunClip(anim, controller);
                 }
                 this.ensureIdleClip(anim, controller);
+            }
+
+            const hb = root.getComponent(HealthBar);
+            if (hb) {
+                hb.requestAnchorRefresh();
             }
         };
 
@@ -464,5 +473,9 @@ export class UnitFactory {
         if (!root.isValid) return;
         if (root.getComponent(EnemyPaperDollAnimator)) return;
         root.addComponent(EnemyPaperDollAnimator);
+        const hb = root.getComponent(HealthBar);
+        if (hb) {
+            hb.requestAnchorRefresh();
+        }
     }
 }

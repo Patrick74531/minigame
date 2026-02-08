@@ -10,6 +10,8 @@ import {
     LabelOutline,
 } from 'cc';
 
+export type DamageNumberStyle = 'default' | 'enemyHit';
+
 /**
  * 浮动伤害数字工厂
  * 在受击单位头顶生成上飘渐隐的伤害数字
@@ -19,6 +21,7 @@ import {
 export class DamageNumberFactory {
     // 复用的常量颜色
     private static readonly COLOR_NORMAL = new Color(255, 255, 255, 255);
+    private static readonly COLOR_ENEMY_HIT = new Color(255, 70, 70, 255);
     private static readonly COLOR_CRIT = new Color(255, 60, 30, 255);
     private static readonly COLOR_CRIT_OUTLINE = new Color(255, 200, 0, 255);
 
@@ -27,6 +30,7 @@ export class DamageNumberFactory {
     private static _lastShowTime: WeakMap<Node, number> = new WeakMap();
     private static _accumDamage: WeakMap<Node, number> = new WeakMap();
     private static _accumCrit: WeakMap<Node, boolean> = new WeakMap();
+    private static _accumEnemyHit: WeakMap<Node, boolean> = new WeakMap();
     private static _globalTime: number = 0;
 
     // 节点池：避免频繁 new Node + addComponent
@@ -52,7 +56,8 @@ export class DamageNumberFactory {
         worldPos: Vec3,
         damage: number,
         isCrit: boolean = false,
-        sourceNode?: Node
+        sourceNode?: Node,
+        style: DamageNumberStyle = 'default'
     ): void {
         // 节流：同一单位短时间内累计伤害，只显示一次
         if (sourceNode) {
@@ -63,15 +68,21 @@ export class DamageNumberFactory {
                 const prev = this._accumDamage.get(sourceNode) ?? 0;
                 this._accumDamage.set(sourceNode, prev + damage);
                 if (isCrit) this._accumCrit.set(sourceNode, true);
+                if (style === 'enemyHit') this._accumEnemyHit.set(sourceNode, true);
                 return;
             }
             // 取出累计伤害
             const accum = this._accumDamage.get(sourceNode) ?? 0;
             const accumCrit = this._accumCrit.get(sourceNode) ?? false;
+            const accumEnemyHit = this._accumEnemyHit.get(sourceNode) ?? false;
             damage += accum;
             isCrit = isCrit || accumCrit;
+            if (accumEnemyHit) {
+                style = 'enemyHit';
+            }
             this._accumDamage.set(sourceNode, 0);
             this._accumCrit.set(sourceNode, false);
+            this._accumEnemyHit.set(sourceNode, false);
             this._lastShowTime.set(sourceNode, now);
         }
 
@@ -101,7 +112,8 @@ export class DamageNumberFactory {
         const startY = worldPos.y + 1.8;
         root.setWorldPosition(worldPos.x + offsetX, startY, worldPos.z + offsetZ);
 
-        const baseScale = isCrit ? 0.032 : 0.022;
+        const isEnemyHitStyle = !isCrit && style === 'enemyHit';
+        const baseScale = isCrit ? 0.032 : isEnemyHitStyle ? 0.017 : 0.022;
         root.setScale(baseScale, baseScale, baseScale);
 
         // 标签节点
@@ -110,13 +122,17 @@ export class DamageNumberFactory {
 
         const label = labelNode.addComponent(Label);
         label.string = isCrit ? `${damage}!` : `${damage}`;
-        label.fontSize = isCrit ? 52 : 36;
-        label.lineHeight = isCrit ? 56 : 40;
+        label.fontSize = isCrit ? 52 : isEnemyHitStyle ? 30 : 36;
+        label.lineHeight = isCrit ? 56 : isEnemyHitStyle ? 34 : 40;
         label.isBold = true;
         label.overflow = Label.Overflow.NONE;
         label.horizontalAlign = Label.HorizontalAlign.CENTER;
         label.verticalAlign = Label.VerticalAlign.CENTER;
-        label.color = isCrit ? DamageNumberFactory.COLOR_CRIT : DamageNumberFactory.COLOR_NORMAL;
+        label.color = isCrit
+            ? DamageNumberFactory.COLOR_CRIT
+            : isEnemyHitStyle
+              ? DamageNumberFactory.COLOR_ENEMY_HIT
+              : DamageNumberFactory.COLOR_NORMAL;
 
         if (isCrit) {
             const outline = labelNode.addComponent(LabelOutline);
@@ -129,8 +145,8 @@ export class DamageNumberFactory {
         opacity.opacity = 255;
 
         // ====== 动画 ======
-        const floatHeight = isCrit ? 2.0 : 1.4;
-        const duration = isCrit ? 1.0 : 0.7;
+        const floatHeight = isCrit ? 2.0 : isEnemyHitStyle ? 1.05 : 1.4;
+        const duration = isCrit ? 1.0 : isEnemyHitStyle ? 0.55 : 0.7;
         const endY = startY + floatHeight;
 
         const recycleRoot = root;

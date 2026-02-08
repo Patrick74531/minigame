@@ -8,7 +8,7 @@ import { IPoolable } from '../../core/managers/PoolManager';
 import { IAttackable } from '../../core/interfaces/IAttackable';
 import { Vec3, RigidBody } from 'cc';
 import { HealthBar } from '../../ui/HealthBar';
-import { DamageNumberFactory } from '../effects/DamageNumberFactory';
+import { DamageNumberFactory, type DamageNumberStyle } from '../effects/DamageNumberFactory';
 
 const { ccclass, property } = _decorator;
 
@@ -81,7 +81,6 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
     private _rbUnitLookedUp: boolean = false;
     /** 缓存 HealthBar（避免每次受伤时 getComponent） */
     private _healthBarCached: HealthBar | null = null;
-    private _healthBarLookedUp: boolean = false;
 
     public get stats(): UnitStats {
         return this._stats;
@@ -166,7 +165,9 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         this.updateHealthBar();
 
         // 显示浮动伤害数字
-        this.showDamageNumber(damage, isCrit);
+        const style: DamageNumberStyle =
+            _attacker && _attacker.unitType === UnitType.ENEMY ? 'enemyHit' : 'default';
+        this.showDamageNumber(damage, isCrit, style);
 
         this.eventManager.emit(GameEvents.UNIT_DAMAGED, {
             node: this.node,
@@ -180,10 +181,14 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
     }
 
     /** 显示浮动伤害数字 */
-    private showDamageNumber(damage: number, isCrit: boolean): void {
+    private showDamageNumber(
+        damage: number,
+        isCrit: boolean,
+        style: DamageNumberStyle = 'default'
+    ): void {
         const parent = this.node.parent;
         if (!parent) return;
-        DamageNumberFactory.show(parent, this.node.worldPosition, damage, isCrit, this.node);
+        DamageNumberFactory.show(parent, this.node.worldPosition, damage, isCrit, this.node, style);
     }
 
     /**
@@ -219,9 +224,8 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
     }
 
     protected updateHealthBar(): void {
-        if (!this._healthBarLookedUp) {
+        if (!this._healthBarCached || !this._healthBarCached.isValid) {
             this._healthBarCached = this.node.getComponent(HealthBar);
-            this._healthBarLookedUp = true;
         }
         if (this._healthBarCached) {
             this._healthBarCached.updateHealth(this._stats.currentHp, this._stats.maxHp);

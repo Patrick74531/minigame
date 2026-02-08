@@ -8,7 +8,7 @@ import { GameEvents } from '../../data/GameEvents';
 import { GameConfig } from '../../data/GameConfig';
 import { HealthBar } from '../../ui/HealthBar';
 import { IAttackable } from '../../core/interfaces/IAttackable';
-import { DamageNumberFactory } from '../effects/DamageNumberFactory';
+import { DamageNumberFactory, type DamageNumberStyle } from '../effects/DamageNumberFactory';
 import { Soldier } from '../units/Soldier';
 
 const { ccclass, property } = _decorator;
@@ -312,7 +312,16 @@ export class Building extends BaseComponent implements IAttackable {
         // 显示浮动伤害数字
         const parent = this.node.parent;
         if (parent) {
-            DamageNumberFactory.show(parent, this.node.worldPosition, damage, isCrit, this.node);
+            const style: DamageNumberStyle =
+                _attacker && _attacker.unitType === 'enemy' ? 'enemyHit' : 'default';
+            DamageNumberFactory.show(
+                parent,
+                this.node.worldPosition,
+                damage,
+                isCrit,
+                this.node,
+                style
+            );
         }
 
         if (this._healthBar) {
