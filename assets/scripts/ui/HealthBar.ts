@@ -44,6 +44,14 @@ export class HealthBar extends Component {
     @property
     public inheritOwnerScaleInWorldSpace: boolean = true;
 
+    /** 仅在受伤时显示血条（敌人等），满血时自动隐藏 */
+    @property
+    public showOnlyWhenDamaged: boolean = false;
+
+    /** showOnlyWhenDamaged 模式下，受伤后持续显示的秒数 */
+    @property
+    public damagedShowDuration: number = 3.0;
+
     private _fgGraphics: Graphics | null = null;
     private _bgGraphics: Graphics | null = null;
     private _root: Node | null = null;
@@ -53,6 +61,10 @@ export class HealthBar extends Component {
     private _probeElapsed: number = 0;
     private _forceProbe: boolean = true;
     private _headNode: Node | null = null;
+    /** showOnlyWhenDamaged 计时器，> 0 时显示血条 */
+    private _damagedShowTimer: number = 0;
+    /** 当前是否因 showOnlyWhenDamaged 而隐藏 */
+    private _hiddenByDamageRule: boolean = false;
 
     private _lastOwnerX: number = Number.NaN;
     private _lastOwnerY: number = Number.NaN;
@@ -73,14 +85,25 @@ export class HealthBar extends Component {
     protected onLoad(): void {
         this.createVisuals();
         this.requestAnchorRefresh();
+        // showOnlyWhenDamaged 模式下初始隐藏
+        if (this.showOnlyWhenDamaged && this._root) {
+            this._root.active = false;
+            this._hiddenByDamageRule = true;
+        }
     }
 
     protected onEnable(): void {
         if (this._root && this._root.isValid) {
-            this._root.active = true;
             // 重新挂载到 owner 的父节点（可能被 onDisable 移除过）
             if (!this._root.parent && this.node.parent) {
                 this.node.parent.addChild(this._root);
+            }
+            // showOnlyWhenDamaged 模式下重新启用时保持隐藏
+            if (this.showOnlyWhenDamaged) {
+                this._hiddenByDamageRule = true;
+                this._root.active = false;
+            } else {
+                this._root.active = true;
             }
         }
     }
@@ -110,6 +133,19 @@ export class HealthBar extends Component {
             if (this._root.active) this._root.active = false;
             return;
         }
+
+        // showOnlyWhenDamaged 自动隐藏倒计时
+        if (this.showOnlyWhenDamaged && !this._hiddenByDamageRule) {
+            this._damagedShowTimer -= dt;
+            if (this._damagedShowTimer <= 0) {
+                this._hiddenByDamageRule = true;
+                this._root.active = false;
+                return;
+            }
+        }
+
+        // 被 showOnlyWhenDamaged 隐藏时不更新
+        if (this._hiddenByDamageRule) return;
 
         this.updateAnchorProbe(dt);
         this.updateRootTransform();
@@ -166,6 +202,17 @@ export class HealthBar extends Component {
 
         const safeMax = max > 0 ? max : 1;
         const ratio = Math.max(0, Math.min(1, current / safeMax));
+
+        // showOnlyWhenDamaged: 受伤时显示，满血后隐藏
+        if (this.showOnlyWhenDamaged) {
+            if (ratio < 1) {
+                this._damagedShowTimer = this.damagedShowDuration;
+                if (this._hiddenByDamageRule && this._root) {
+                    this._root.active = true;
+                    this._hiddenByDamageRule = false;
+                }
+            }
+        }
         this._fgGraphics.node.setScale(ratio, 1, 1);
 
         // Foreground geometry is static; redraw only when color band changes.
@@ -329,7 +376,7 @@ export class HealthBar extends Component {
             this._root.active = false;
             return;
         }
-        if (!this._root.active) {
+        if (!this._root.active && !this._hiddenByDamageRule) {
             this._root.active = true;
         }
 

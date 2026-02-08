@@ -113,7 +113,7 @@ export class DamageNumberFactory {
         root.setWorldPosition(worldPos.x + offsetX, startY, worldPos.z + offsetZ);
 
         const isEnemyHitStyle = !isCrit && style === 'enemyHit';
-        const baseScale = isCrit ? 0.032 : isEnemyHitStyle ? 0.017 : 0.022;
+        const baseScale = isCrit ? 0.016 : isEnemyHitStyle ? 0.009 : 0.011;
         root.setScale(baseScale, baseScale, baseScale);
 
         // 标签节点
@@ -122,8 +122,8 @@ export class DamageNumberFactory {
 
         const label = labelNode.addComponent(Label);
         label.string = isCrit ? `${damage}!` : `${damage}`;
-        label.fontSize = isCrit ? 52 : isEnemyHitStyle ? 30 : 36;
-        label.lineHeight = isCrit ? 56 : isEnemyHitStyle ? 34 : 40;
+        label.fontSize = isCrit ? 40 : isEnemyHitStyle ? 26 : 30;
+        label.lineHeight = isCrit ? 44 : isEnemyHitStyle ? 30 : 34;
         label.isBold = true;
         label.overflow = Label.Overflow.NONE;
         label.horizontalAlign = Label.HorizontalAlign.CENTER;
@@ -134,10 +134,14 @@ export class DamageNumberFactory {
               ? DamageNumberFactory.COLOR_ENEMY_HIT
               : DamageNumberFactory.COLOR_NORMAL;
 
+        // 所有伤害数字加描边，提高可读性
+        const outline = labelNode.addComponent(LabelOutline);
         if (isCrit) {
-            const outline = labelNode.addComponent(LabelOutline);
             outline.color = DamageNumberFactory.COLOR_CRIT_OUTLINE;
             outline.width = 3;
+        } else {
+            outline.color = new Color(0, 0, 0, 180);
+            outline.width = 2;
         }
 
         // 透明度控制
@@ -145,8 +149,8 @@ export class DamageNumberFactory {
         opacity.opacity = 255;
 
         // ====== 动画 ======
-        const floatHeight = isCrit ? 2.0 : isEnemyHitStyle ? 1.05 : 1.4;
-        const duration = isCrit ? 1.0 : isEnemyHitStyle ? 0.55 : 0.7;
+        const floatHeight = isCrit ? 1.2 : isEnemyHitStyle ? 0.6 : 0.8;
+        const duration = isCrit ? 0.8 : isEnemyHitStyle ? 0.45 : 0.55;
         const endY = startY + floatHeight;
 
         const recycleRoot = root;

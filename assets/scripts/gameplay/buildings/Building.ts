@@ -115,11 +115,15 @@ export class Building extends BaseComponent implements IAttackable {
 
     private setupHealthBar(): void {
         this._healthBar = this.node.addComponent(HealthBar);
-        // Optional: Custom configurations based on building type
+        this._healthBar.width = 60;
+        this._healthBar.height = 6;
+        this._healthBar.baseWorldScale = 0.012;
+        this._healthBar.inheritOwnerScaleInWorldSpace = false;
+        this._healthBar.autoDetectHeadAnchor = false;
         if (this.buildingType === BuildingType.WALL) {
-            this._healthBar.yOffset = 2.0;
+            this._healthBar.yOffset = 1.6;
         } else {
-            this._healthBar.yOffset = 3.0;
+            this._healthBar.yOffset = 2.2;
         }
     }
 
