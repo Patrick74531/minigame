@@ -5,6 +5,8 @@ import { GameEvents } from '../../data/GameEvents';
 import { GameConfig } from '../../data/GameConfig';
 import { HeroWeaponManager } from '../weapons/HeroWeaponManager';
 import { WeaponType } from '../weapons/WeaponTypes';
+import { Hero } from './Hero';
+import { UnitState } from './Unit';
 
 const { ccclass } = _decorator;
 
@@ -150,12 +152,17 @@ export class HeroWeaponMountController extends Component {
             const boneDistSq = Vec3.squaredDistance(heroWorldPos, boneWorldPos);
 
             if (boneDistSq <= this.maxBoneDistanceSq) {
-                HeroWeaponMountController._tmpFollowRot.set(bone.worldRotation);
-                const finalPos = this.applyWorldRightOffset(
-                    boneWorldPos.x + rightMoveOffset.x,
-                    boneWorldPos.y + runOffsetY + rightMoveOffset.y,
-                    boneWorldPos.z + rightMoveOffset.z
-                );
+                const followRot = this.followBoneRotation
+                    ? bone.worldRotation
+                    : this.node.worldRotation;
+                HeroWeaponMountController._tmpFollowRot.set(followRot);
+                const finalPos = this.followBonePosition
+                    ? this.applyWorldRightOffset(
+                          boneWorldPos.x + rightMoveOffset.x,
+                          boneWorldPos.y + runOffsetY + rightMoveOffset.y,
+                          boneWorldPos.z + rightMoveOffset.z
+                      )
+                    : this.getRootFallbackPosition(runOffsetY, rightMoveOffset);
                 this._socketRoot.setWorldPosition(finalPos);
                 this._socketRoot.setWorldRotation(HeroWeaponMountController._tmpFollowRot);
                 return;
@@ -165,13 +172,9 @@ export class HeroWeaponMountController extends Component {
             this._followBone = null;
         }
 
-        const heroPos = this.node.worldPosition;
-        const fallbackPos = this.applyWorldRightOffset(
-            heroPos.x + rightMoveOffset.x,
-            heroPos.y + 0.9 + runOffsetY + rightMoveOffset.y,
-            heroPos.z + rightMoveOffset.z
+        this._socketRoot.setWorldPosition(
+            this.getRootFallbackPosition(runOffsetY, rightMoveOffset)
         );
-        this._socketRoot.setWorldPosition(fallbackPos);
         this._socketRoot.setWorldRotation(this.node.worldRotation);
     }
 
@@ -190,11 +193,7 @@ export class HeroWeaponMountController extends Component {
         this._followBone = null;
         const runOffsetY = this.getRunSocketOffsetY();
         const rightMoveOffset = this.getRightMoveSocketOffset();
-        const recoveryPos = this.applyWorldRightOffset(
-            HeroWeaponMountController._tmpHeroWorldPos.x + rightMoveOffset.x,
-            HeroWeaponMountController._tmpHeroWorldPos.y + 0.9 + runOffsetY + rightMoveOffset.y,
-            HeroWeaponMountController._tmpHeroWorldPos.z + rightMoveOffset.z
-        );
+        const recoveryPos = this.getRootFallbackPosition(runOffsetY, rightMoveOffset);
         this._socketRoot.setWorldPosition(recoveryPos);
         this._socketRoot.setWorldRotation(this.node.worldRotation);
     }
@@ -210,6 +209,15 @@ export class HeroWeaponMountController extends Component {
         out.y += right.y * offset;
         out.z += right.z * offset;
         return out;
+    }
+
+    private getRootFallbackPosition(runOffsetY: number, rightMoveOffset: Vec3): Vec3 {
+        const heroPos = this.node.worldPosition;
+        return this.applyWorldRightOffset(
+            heroPos.x + rightMoveOffset.x,
+            heroPos.y + 0.9 + runOffsetY + rightMoveOffset.y,
+            heroPos.z + rightMoveOffset.z
+        );
     }
 
     private isNodeUnderRoot(node: Node, root: Node): boolean {
@@ -247,13 +255,13 @@ export class HeroWeaponMountController extends Component {
     }
 
     private getRunSocketOffsetY(): number {
-        return this._isMovingByDelta ? this.runSocketOffsetY : 0;
+        return this.isMovingForOffsets() ? this.runSocketOffsetY : 0;
     }
 
     private getRightMoveSocketOffset(): Vec3 {
         const out = HeroWeaponMountController._tmpRightMoveOffset;
         out.set(0, 0, 0);
-        if (!this._isMovingByDelta) return out;
+        if (!this.isMovingForOffsets()) return out;
 
         const dx = this._lastMoveDelta.x;
         const dz = this._lastMoveDelta.z;
@@ -274,6 +282,14 @@ export class HeroWeaponMountController extends Component {
             typeof o.z === 'number' ? o.z : 0
         );
         return out;
+    }
+
+    private isMovingForOffsets(): boolean {
+        const hero = this.node.getComponent(Hero);
+        if (hero) {
+            return hero.state === UnitState.MOVING;
+        }
+        return this._isMovingByDelta;
     }
 
     private findChildByName(root: Node, name: string): Node | null {
@@ -386,6 +402,22 @@ export class HeroWeaponMountController extends Component {
         if (!runtime || typeof runtime !== 'object') return 0;
         const raw = (runtime as { WORLD_RIGHT_OFFSET?: number }).WORLD_RIGHT_OFFSET;
         return typeof raw === 'number' ? raw : 0;
+    }
+
+    private get followBonePosition(): boolean {
+        const runtime = (GameConfig.HERO as unknown as { WEAPON_VISUAL_RUNTIME?: unknown })
+            .WEAPON_VISUAL_RUNTIME;
+        if (!runtime || typeof runtime !== 'object') return false;
+        const raw = (runtime as { FOLLOW_BONE_POSITION?: boolean }).FOLLOW_BONE_POSITION;
+        return raw === true;
+    }
+
+    private get followBoneRotation(): boolean {
+        const runtime = (GameConfig.HERO as unknown as { WEAPON_VISUAL_RUNTIME?: unknown })
+            .WEAPON_VISUAL_RUNTIME;
+        if (!runtime || typeof runtime !== 'object') return false;
+        const raw = (runtime as { FOLLOW_BONE_ROTATION?: boolean }).FOLLOW_BONE_ROTATION;
+        return raw === true;
     }
 
     private get rightMoveDetectX(): number {

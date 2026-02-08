@@ -307,6 +307,17 @@ export class UnitFactory {
             model.setRotationFromEuler(0, config.transformRotY, 0);
             this.applyLayerRecursive(model, root.layer);
             root.addChild(model);
+
+            // Retrieve SkeletalAnimation BEFORE attaching weapon visuals.
+            // Switch to real-time mode so bone node worldPositions are updated
+            // every frame by the CPU. Without this, baked mode (the default)
+            // leaves bone transforms at the rest/bind pose, causing the weapon
+            // socket to follow a near-origin position and land on the ground.
+            const anim = this.getModelSkeletalAnimation(model);
+            if (anim) {
+                anim.useBakedAnimation = false;
+            }
+
             this.attachHeroWeaponVisuals(root, model);
 
             const hasRenderer = model.getComponentsInChildren(Renderer).length > 0;
@@ -314,8 +325,6 @@ export class UnitFactory {
             if (mesh && hasRenderer) {
                 mesh.enabled = false;
             }
-
-            const anim = this.getModelSkeletalAnimation(model);
 
             const hero = root.getComponent(Hero);
             let controller = root.getComponent(HeroAnimationController);

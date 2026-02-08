@@ -409,7 +409,7 @@ export const GameConfig = {
                     fallbacks: ['weapons/blaster-h'],
                 },
                 transform: {
-                    position: { x: 0.08, y: -0.52, z: -0.42 },
+                    position: { x: 0.03, y: 0.01, z: -0.14 },
                     rotation: { x: 0, y: 0, z: 90 },
                     scale: 1.6,
                 },
@@ -421,7 +421,7 @@ export const GameConfig = {
                     fallbacks: ['weapons/blaster-h'],
                 },
                 transform: {
-                    position: { x: 0.08, y: -0.52, z: -0.42 },
+                    position: { x: 0.03, y: 0.01, z: -0.14 },
                     rotation: { x: 0, y: 0, z: 90 },
                     scale: 1.6,
                 },
@@ -435,9 +435,9 @@ export const GameConfig = {
         /** 武器挂点运行时修正（按状态附加） */
         WEAPON_VISUAL_RUNTIME: {
             /** 仅在 run 状态附加的 Y 偏移（负值 = 更低） */
-            RUN_SOCKET_OFFSET_Y: -0.22,
+            RUN_SOCKET_OFFSET_Y: 0.08,
             /** 基于角色世界右方向的恒定偏移（用于从左肩移到右肩） */
-            WORLD_RIGHT_OFFSET: 0.22,
+            WORLD_RIGHT_OFFSET: 0.08,
             /** 手骨到英雄根节点的最大合理距离平方（超出视为绑定异常） */
             MAX_BONE_DISTANCE_SQ: 16,
             /** 挂点到英雄根节点的最大合理距离平方（超出强制回拉） */
@@ -446,6 +446,10 @@ export const GameConfig = {
             MOVEMENT_DETECT_EPSILON_SQ: 0.0004,
             /** 启动阶段强制追手骨的帧数（用于缩短武器落地可见时间） */
             STARTUP_SNAP_FRAMES: 12,
+            /** 是否使用骨骼位置跟随（true = 位置跟手骨，参数调节更直观） */
+            FOLLOW_BONE_POSITION: true,
+            /** 是否使用骨骼旋转跟随（false = 跟角色朝向，避免骨骼姿态引入90度偏转） */
+            FOLLOW_BONE_ROTATION: false,
             /** 向右移动时，额外把枪往屏幕外侧推一点 */
             RIGHT_MOVE_SOCKET_OFFSET: { x: 0.0, y: 0.0, z: 0.0 },
             /** 判定“向右移动”的最小 X 位移阈值 */
