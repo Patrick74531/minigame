@@ -47,6 +47,7 @@ export class WaveManager {
     private _eliteSpawned: number = 0;
     private _enemySpawnTimer: number = 0;
     private _waveConfig: WaveConfig | null = null;
+    private _spawnPortals: Array<{ x: number; y: number }> = [];
 
     // === 初始化 ===
 
@@ -56,6 +57,7 @@ export class WaveManager {
         this._baseNode = baseNode;
         this._enemies = [];
         this._currentWave = 0;
+        this._spawnPortals = this.resolveSpawnPortals();
 
         // Listen for AOE impacts
         this.eventManager.on(GameEvents.APPLY_AOE_EFFECT, this.onApplyAoE, this);
@@ -259,7 +261,7 @@ export class WaveManager {
     private spawnEnemy(isElite: boolean): void {
         if (!this._enemyContainer) return;
 
-        const pos = this.getEdgePosition();
+        const pos = this.getSpawnPosition();
         const elite = GameConfig.ENEMY.ELITE;
         const enemy = UnitFactory.createEnemy(
             this._enemyContainer,
@@ -315,18 +317,86 @@ export class WaveManager {
     }
 
     private getEdgePosition(): { x: number; y: number } {
-        const range = GameConfig.WAVE.INFINITE.SPAWN_RANGE;
-        const side = Math.floor(Math.random() * 4);
-        switch (side) {
-            case 0:
-                return { x: Math.random() * range * 2 - range, y: range + 1 };
-            case 1:
-                return { x: Math.random() * range * 2 - range, y: -range - 1 };
-            case 2:
-                return { x: -range - 1, y: Math.random() * range * 2 - range };
-            default:
-                return { x: range + 1, y: Math.random() * range * 2 - range };
+        // fallback：理论上不会走到（已有固定刷怪口）
+        const limits = GameConfig.MAP.LIMITS;
+        return { x: limits.x, y: limits.z };
+    }
+
+    private getSpawnPosition(): { x: number; y: number } {
+        if (this._spawnPortals.length === 0) {
+            this._spawnPortals = this.resolveSpawnPortals();
         }
+        if (this._spawnPortals.length === 0) {
+            return this.getEdgePosition();
+        }
+
+        const activeCount = this.resolveActivePortalCount(this._currentWave);
+        const portalIdx = Math.floor(Math.random() * activeCount);
+        const portal = this._spawnPortals[portalIdx];
+        const jitterRadius = GameConfig.WAVE.INFINITE.SPAWN_PORTALS?.JITTER_RADIUS ?? 0;
+        if (jitterRadius <= 0) {
+            return { x: portal.x, y: portal.y };
+        }
+
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.sqrt(Math.random()) * jitterRadius;
+        const x = portal.x + Math.cos(angle) * radius;
+        const y = portal.y + Math.sin(angle) * radius;
+        const limits = GameConfig.MAP.LIMITS;
+        return {
+            x: Math.max(-limits.x, Math.min(limits.x, x)),
+            y: Math.max(-limits.z, Math.min(limits.z, y)),
+        };
+    }
+
+    private resolveActivePortalCount(waveNumber: number): number {
+        const portalsCfg = GameConfig.WAVE.INFINITE.SPAWN_PORTALS;
+        const openWave2 = portalsCfg?.OPEN_WAVE_2 ?? 4;
+        const openWave3 = portalsCfg?.OPEN_WAVE_3 ?? 8;
+        if (waveNumber >= openWave3) return Math.min(3, this._spawnPortals.length);
+        if (waveNumber >= openWave2) return Math.min(2, this._spawnPortals.length);
+        return Math.min(1, this._spawnPortals.length);
+    }
+
+    private resolveSpawnPortals(): Array<{ x: number; y: number }> {
+        const limits = GameConfig.MAP.LIMITS;
+        const corners = [
+            { x: -limits.x, y: -limits.z },
+            { x: limits.x, y: -limits.z },
+            { x: -limits.x, y: limits.z },
+            { x: limits.x, y: limits.z },
+        ];
+
+        const baseX = this._baseNode?.position.x ?? GameConfig.MAP.BASE_SPAWN.x;
+        const baseY = this._baseNode?.position.z ?? GameConfig.MAP.BASE_SPAWN.z;
+
+        let nearestIdx = 0;
+        let nearestDistSq = Infinity;
+        for (let i = 0; i < corners.length; i++) {
+            const dx = corners[i].x - baseX;
+            const dy = corners[i].y - baseY;
+            const distSq = dx * dx + dy * dy;
+            if (distSq < nearestDistSq) {
+                nearestDistSq = distSq;
+                nearestIdx = i;
+            }
+        }
+
+        const candidates = corners
+            .map((point, idx) => ({ idx, point }))
+            .filter(item => item.idx !== nearestIdx)
+            .map(item => {
+                const dx = item.point.x - baseX;
+                const dy = item.point.y - baseY;
+                return {
+                    point: item.point,
+                    distSq: dx * dx + dy * dy,
+                };
+            })
+            // 第一个口优先“基地对角最远角”
+            .sort((a, b) => b.distSq - a.distSq);
+
+        return candidates.map(item => item.point);
     }
 
     /**

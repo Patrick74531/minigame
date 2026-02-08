@@ -1,4 +1,18 @@
-import { _decorator, Component, Node, Color, Billboard, RenderRoot2D, Graphics, Vec3 } from 'cc';
+import {
+    _decorator,
+    Component,
+    Node,
+    Color,
+    Billboard,
+    RenderRoot2D,
+    Graphics,
+    Vec3,
+    Camera,
+    Canvas,
+    geometry,
+    director,
+    view,
+} from 'cc';
 
 const { ccclass, property } = _decorator;
 
@@ -52,6 +66,22 @@ export class HealthBar extends Component {
     @property
     public damagedShowDuration: number = 3.0;
 
+    /** 不在主相机视野内时隐藏（避免屏幕边缘/离屏幽灵血条） */
+    @property
+    public hideWhenOffscreen: boolean = true;
+
+    /** 视野裁剪边距（按屏幕比例） */
+    @property
+    public offscreenPadding: number = 0.12;
+
+    /** 视野检测频率（秒） */
+    @property
+    public offscreenCheckInterval: number = 0.08;
+
+    /** owner 死亡或血量空时强制隐藏 */
+    @property
+    public hideWhenOwnerDead: boolean = true;
+
     private _fgGraphics: Graphics | null = null;
     private _bgGraphics: Graphics | null = null;
     private _root: Node | null = null;
@@ -74,9 +104,14 @@ export class HealthBar extends Component {
     private _headHintsCache: string[] | null = null;
     private _headHintsSource: string = '';
     private _customAnchorResolver: HealthBarAnchorResolver | null = null;
+    private _cameraRef: Camera | null = null;
+    private _offscreenTimer: number = 0;
+    private _cachedOnScreen: boolean = true;
 
     private static readonly _tmpWorldPos = new Vec3();
     private static readonly _tmpWorldScale = new Vec3();
+    private static readonly _tmpScreenPos = new Vec3();
+    private static readonly _tmpFrustumSphere = new geometry.Sphere();
     private static readonly _fgColorGreen = new Color(0, 255, 0, 255);
     private static readonly _fgColorYellow = new Color(255, 255, 0, 255);
     private static readonly _fgColorRed = new Color(255, 0, 0, 255);
@@ -93,6 +128,8 @@ export class HealthBar extends Component {
     }
 
     protected onEnable(): void {
+        this._cachedOnScreen = true;
+        this._offscreenTimer = 0;
         if (this._root && this._root.isValid) {
             // 重新挂载到 owner 的父节点（可能被 onDisable 移除过）
             if (!this._root.parent && this.node.parent) {
@@ -103,6 +140,8 @@ export class HealthBar extends Component {
                 this._hiddenByDamageRule = true;
                 this._root.active = false;
             } else {
+                // 先对齐位置，再激活，避免闪烁到旧位置
+                this.snapRootToOwner();
                 this._root.active = true;
             }
         }
@@ -134,6 +173,11 @@ export class HealthBar extends Component {
             return;
         }
 
+        if (this.hideWhenOwnerDead && !this.isOwnerAlive()) {
+            this._root.active = false;
+            return;
+        }
+
         // showOnlyWhenDamaged 自动隐藏倒计时
         if (this.showOnlyWhenDamaged && !this._hiddenByDamageRule) {
             this._damagedShowTimer -= dt;
@@ -148,7 +192,7 @@ export class HealthBar extends Component {
         if (this._hiddenByDamageRule) return;
 
         this.updateAnchorProbe(dt);
-        this.updateRootTransform();
+        this.updateRootTransform(dt);
     }
 
     public setAnchorResolver(resolver: HealthBarAnchorResolver | null): void {
@@ -163,6 +207,30 @@ export class HealthBar extends Component {
         this._headNode = null;
     }
 
+    /**
+     * 立即将 _root 对齐到 owner 当前世界坐标（避免闪烁到错误位置）。
+     * 必须在将 _root.active 设为 true **之前** 调用。
+     */
+    private snapRootToOwner(): void {
+        if (!this._root || !this.node.isValid) return;
+        if (!this.followInWorldSpace) {
+            this._root.setPosition(0, this.yOffset, 0);
+            return;
+        }
+        this.node.getWorldPosition(HealthBar._tmpWorldPos);
+        const wx = HealthBar._tmpWorldPos.x;
+        const wy = HealthBar._tmpWorldPos.y;
+        const wz = HealthBar._tmpWorldPos.z;
+        const offsetY = Math.max(this.yOffset, this._resolvedYOffset || 0);
+        if (Number.isFinite(wx) && Number.isFinite(wy) && Number.isFinite(wz)) {
+            this._root.setWorldPosition(wx, wy + offsetY, wz);
+            this._lastOwnerX = wx;
+            this._lastOwnerY = wy;
+            this._lastOwnerZ = wz;
+            this._lastAppliedYOffset = offsetY;
+        }
+    }
+
     private createVisuals(): void {
         if (this._root && this._root.isValid) return;
 
@@ -173,7 +241,8 @@ export class HealthBar extends Component {
             ? (this.node.parent ?? this.node.scene ?? this.node)
             : this.node;
         host.addChild(root);
-        root.setPosition(0, this.yOffset, 0);
+        // 立即对齐到 owner 世界坐标（不使用 (0,yOffset,0) 避免闪烁到场景原点）
+        this.snapRootToOwner();
 
         root.addComponent(RenderRoot2D);
         root.addComponent(Billboard);
@@ -203,11 +272,20 @@ export class HealthBar extends Component {
         const safeMax = max > 0 ? max : 1;
         const ratio = Math.max(0, Math.min(1, current / safeMax));
 
+        if (this.hideWhenOwnerDead && ratio <= 0) {
+            if (this._root) {
+                this._root.active = false;
+            }
+            return;
+        }
+
         // showOnlyWhenDamaged: 受伤时显示，满血后隐藏
         if (this.showOnlyWhenDamaged) {
             if (ratio < 1) {
                 this._damagedShowTimer = this.damagedShowDuration;
                 if (this._hiddenByDamageRule && this._root) {
+                    // 关键：先对齐位置，再激活，防止闪烁到场景原点
+                    this.snapRootToOwner();
                     this._root.active = true;
                     this._hiddenByDamageRule = false;
                 }
@@ -348,7 +426,7 @@ export class HealthBar extends Component {
         return HealthBar._tmpWorldPos.y;
     }
 
-    private updateRootTransform(): void {
+    private updateRootTransform(dt: number): void {
         if (!this._root) return;
 
         if (this.followInWorldSpace && this._root.parent === this.node && this.node.parent) {
@@ -376,6 +454,33 @@ export class HealthBar extends Component {
             this._root.active = false;
             return;
         }
+        // 先进行 offscreen 检查，确认在屏幕内后再激活 root，
+        // 避免在 offscreen 检查之前意外激活导致闪烁。
+        if (this.hideWhenOffscreen) {
+            this._offscreenTimer += dt;
+            const interval = Math.max(0.02, this.offscreenCheckInterval);
+            if (this._offscreenTimer >= interval || !this._cachedOnScreen) {
+                this._offscreenTimer = 0;
+                const padding = Math.max(
+                    0,
+                    this.offscreenPadding + (this._cachedOnScreen ? 0 : 0.05)
+                );
+                this._cachedOnScreen = this.isWorldPointOnScreen(
+                    worldX,
+                    worldY + offsetY,
+                    worldZ,
+                    padding
+                );
+            }
+            if (!this._cachedOnScreen) {
+                if (this._root.active) this._root.active = false;
+                return;
+            }
+        } else {
+            this._cachedOnScreen = true;
+        }
+
+        // offscreen 检查通过后，安全地激活 root
         if (!this._root.active && !this._hiddenByDamageRule) {
             this._root.active = true;
         }
@@ -417,5 +522,117 @@ export class HealthBar extends Component {
 
         this._lastAppliedScale = scale;
         this._root.setScale(scale, scale, scale);
+    }
+
+    private isWorldPointOnScreen(x: number, y: number, z: number, padding: number): boolean {
+        const cam = this.resolveMainCamera();
+        if (!cam) return true;
+
+        const camLike2 = cam as unknown as {
+            frustum?: unknown;
+        };
+        if (camLike2.frustum) {
+            const geomLike = geometry as unknown as {
+                intersect?: { sphereFrustum?: (sphere: unknown, frustum: unknown) => boolean };
+            };
+            const sphereFrustum = geomLike.intersect?.sphereFrustum;
+            if (typeof sphereFrustum === 'function') {
+                const sphere = HealthBar._tmpFrustumSphere;
+                sphere.center.set(x, y, z);
+                sphere.radius = 0.2;
+                if (!sphereFrustum(sphere, camLike2.frustum)) {
+                    return false;
+                }
+            }
+        }
+
+        const camLike = cam as unknown as {
+            worldToScreen?: (out: Vec3, worldPos: Vec3) => void;
+        };
+        const worldToScreen = camLike.worldToScreen;
+        if (typeof worldToScreen !== 'function') return true;
+
+        const world = HealthBar._tmpWorldPos;
+        world.set(x, y, z);
+        const screen = HealthBar._tmpScreenPos;
+        // Cocos 3.x API: worldToScreen(out, worldPos)
+        worldToScreen.call(cam, screen, world);
+        if (
+            !Number.isFinite(screen.x) ||
+            !Number.isFinite(screen.y) ||
+            !Number.isFinite(screen.z)
+        ) {
+            return false;
+        }
+        if (screen.z < 0) return false;
+
+        const size = view.getVisibleSize();
+        if (!size || size.width <= 0 || size.height <= 0) return true;
+
+        const padX = size.width * padding;
+        const padY = size.height * padding;
+        return (
+            screen.x >= -padX &&
+            screen.x <= size.width + padX &&
+            screen.y >= -padY &&
+            screen.y <= size.height + padY
+        );
+    }
+
+    private resolveMainCamera(): Camera | null {
+        if (this._cameraRef && this._cameraRef.isValid && this._cameraRef.enabledInHierarchy) {
+            return this._cameraRef;
+        }
+
+        const scene = director.getScene();
+        if (!scene) return null;
+        const cameras = scene.getComponentsInChildren(Camera);
+        const firstWorldCamera = cameras.find(
+            cam =>
+                !!cam &&
+                cam.isValid &&
+                cam.enabledInHierarchy &&
+                !this.isUnderCanvas(cam.node) &&
+                cam.node.name.toLowerCase().includes('main')
+        );
+        if (firstWorldCamera) {
+            this._cameraRef = firstWorldCamera;
+            return firstWorldCamera;
+        }
+
+        const worldCamera = cameras.find(
+            cam => !!cam && cam.isValid && cam.enabledInHierarchy && !this.isUnderCanvas(cam.node)
+        );
+        if (worldCamera) {
+            this._cameraRef = worldCamera;
+            return worldCamera;
+        }
+
+        for (const cam of cameras) {
+            if (!cam || !cam.isValid || !cam.enabledInHierarchy) continue;
+            this._cameraRef = cam;
+            return cam;
+        }
+        this._cameraRef = null;
+        return null;
+    }
+
+    private isUnderCanvas(node: Node): boolean {
+        let current: Node | null = node;
+        while (current) {
+            if (current.getComponent(Canvas)) return true;
+            current = current.parent;
+        }
+        return false;
+    }
+
+    private isOwnerAlive(): boolean {
+        const ownerUnit = this.node.getComponent('Unit') as { isAlive?: boolean } | null;
+        if (ownerUnit && ownerUnit.isAlive === false) return false;
+
+        const ownerBuilding = this.node.getComponent('Building') as { isAlive?: boolean } | null;
+        if (ownerBuilding && ownerBuilding.isAlive === false) return false;
+
+        return this.node.activeInHierarchy;
     }
 }

@@ -391,6 +391,13 @@ export class Enemy extends Unit {
 
     protected onDeath(): void {
         this.resetAttackVisualState();
+        // 延迟销毁节点，让金币掉落/视觉事件有时间处理
+        // 避免死亡敌人节点及其 HealthBarRoot 永久残留在场景中
+        this.scheduleOnce(() => {
+            if (this.node && this.node.isValid) {
+                this.node.destroy();
+            }
+        }, 0.1);
     }
 
     private resolveLogicStep(): number {

@@ -198,6 +198,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         if (this._state === UnitState.DEAD) return;
 
         this._state = UnitState.DEAD;
+        this.setHealthBarEnabled(false);
 
         this.eventManager.emit(GameEvents.UNIT_DIED, {
             unitType: this.unitType,
@@ -220,6 +221,7 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         this._speedModifier = 1.0;
         this._slowTimer = 0;
         this.clearKnockbackState();
+        this.setHealthBarEnabled(true);
         this.updateHealthBar();
     }
 
@@ -229,6 +231,15 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         }
         if (this._healthBarCached) {
             this._healthBarCached.updateHealth(this._stats.currentHp, this._stats.maxHp);
+        }
+    }
+
+    private setHealthBarEnabled(enabled: boolean): void {
+        if (!this._healthBarCached || !this._healthBarCached.isValid) {
+            this._healthBarCached = this.node.getComponent(HealthBar);
+        }
+        if (this._healthBarCached && this._healthBarCached.enabled !== enabled) {
+            this._healthBarCached.enabled = enabled;
         }
     }
 

@@ -481,6 +481,19 @@ export const GameConfig = {
             BONUS_PER_WAVE: 20,
             BONUS_GROWTH_PER_WAVE: 4,
             SPAWN_RANGE: 8,
+            /**
+             * 固定刷怪口设置
+             * - 基于地图四角，自动剔除“最靠近基地”的角，保留其余 3 角作为刷怪口
+             * - 波次推进时逐步解锁刷怪口数量
+             */
+            SPAWN_PORTALS: {
+                /** 第 2 个刷怪口解锁波次（含） */
+                OPEN_WAVE_2: 4,
+                /** 第 3 个刷怪口解锁波次（含） */
+                OPEN_WAVE_3: 8,
+                /** 每个刷怪口的随机抖动半径 */
+                JITTER_RADIUS: 1.2,
+            },
             ELITE: {
                 START_WAVE: 3,
                 INTERVAL: 2,
@@ -670,7 +683,13 @@ export const GameConfig = {
                         projectileSpeed: 30,
                         spread: 5,
                     },
-                    { damage: 12, attackInterval: 0.08, range: 7.5, projectileSpeed: 32, spread: 6 },
+                    {
+                        damage: 12,
+                        attackInterval: 0.08,
+                        range: 7.5,
+                        projectileSpeed: 32,
+                        spread: 6,
+                    },
                     {
                         damage: 15,
                         attackInterval: 0.06,
@@ -678,7 +697,13 @@ export const GameConfig = {
                         projectileSpeed: 34,
                         spread: 7,
                     },
-                    { damage: 18, attackInterval: 0.04, range: 8.5, projectileSpeed: 36, spread: 8 },
+                    {
+                        damage: 18,
+                        attackInterval: 0.04,
+                        range: 8.5,
+                        projectileSpeed: 36,
+                        spread: 8,
+                    },
                 ],
             },
             flamethrower: {
