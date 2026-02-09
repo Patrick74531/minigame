@@ -26,6 +26,7 @@ export class BuildingFactory {
         node.setPosition(x, 0, z); // 3D 坐标：Y=0 在地面
         node.setScale(0.45, 0.45, 0.45);
         parent.addChild(node);
+        this.attachBarracksBarnVisual(node);
 
         const building = node.addComponent(Building);
         building.setConfig({
@@ -219,6 +220,9 @@ export class BuildingFactory {
 
         // 2. Component Logic
         if (config.role === 'barracks' || config.role === 'building') {
+            if (buildingId === 'barracks') {
+                this.attachBarracksBarnVisual(node);
+            }
             const building = node.addComponent(Building);
             const isBarracks = config.role === 'barracks';
             building.setConfig({
@@ -243,6 +247,8 @@ export class BuildingFactory {
         } else if (config.role === 'tower') {
             if (buildingId === 'frost_tower') {
                 this.attachFrostTowerSunflowerVisual(node);
+            } else if (buildingId === 'lightning_tower') {
+                this.attachLightningTowerRadarVisual(node);
             }
             const tower = node.addComponent(Tower);
             tower.setConfig({
@@ -333,6 +339,38 @@ export class BuildingFactory {
         preview.visualScale = 0.036;
         preview.fps = 8;
         preview.frameCountOverride = 0;
+        preview.hideOwnerMeshOnReady = true;
+    }
+
+    private static attachBarracksBarnVisual(node: Node): void {
+        const preview = node.getComponent(SunflowerPreview) ?? node.addComponent(SunflowerPreview);
+        preview.resourcePath = 'building/barn.webp';
+        preview.yOffset = 0.95;
+        preview.visualScale = 0.03;
+        preview.fps = 1;
+        preview.frameCountOverride = 1;
+        preview.faceCamera = false;
+        preview.alignToCameraOnStart = false;
+        preview.spriteYRotation = 180;
+        preview.spriteZRotation = 0;
+        preview.flipX = false;
+        preview.flipY = false;
+        preview.hideOwnerMeshOnReady = true;
+    }
+
+    private static attachLightningTowerRadarVisual(node: Node): void {
+        const preview = node.getComponent(SunflowerPreview) ?? node.addComponent(SunflowerPreview);
+        preview.resourcePath = 'building/radar.webp';
+        preview.yOffset = 1.05;
+        preview.visualScale = 0.024;
+        preview.fps = 1;
+        preview.frameCountOverride = 1;
+        preview.faceCamera = false;
+        preview.alignToCameraOnStart = false;
+        preview.spriteYRotation = 0;
+        preview.spriteZRotation = 0;
+        preview.flipX = false;
+        preview.flipY = false;
         preview.hideOwnerMeshOnReady = true;
     }
 }

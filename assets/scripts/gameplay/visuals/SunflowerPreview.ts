@@ -38,6 +38,24 @@ export class SunflowerPreview extends Component {
     @property({ tooltip: '成功加载向日葵贴图后，隐藏当前节点上的立方体 MeshRenderer' })
     public hideOwnerMeshOnReady: boolean = false;
 
+    @property({ tooltip: '是否始终朝向相机（Billboard）' })
+    public faceCamera: boolean = true;
+
+    @property({ tooltip: '仅在创建时朝向相机一次（之后保持静态）' })
+    public alignToCameraOnStart: boolean = false;
+
+    @property({ tooltip: '精灵局部 Y 轴旋转（度），用于修正左右朝向' })
+    public spriteYRotation: number = 180;
+
+    @property({ tooltip: '精灵在面向相机平面内的额外旋转角度（度），用于控制图像朝向' })
+    public spriteZRotation: number = 0;
+
+    @property({ tooltip: '是否水平翻转精灵（修正左右朝向）' })
+    public flipX: boolean = false;
+
+    @property({ tooltip: '是否垂直翻转精灵' })
+    public flipY: boolean = false;
+
     private _cameraNode: Node | null = null;
     private _visualRoot: Node | null = null;
     private _sprite: Sprite | null = null;
@@ -66,17 +84,14 @@ export class SunflowerPreview extends Component {
 
     protected lateUpdate(): void {
         if (!this._ready || !this._visualRoot) return;
+        if (!this.faceCamera) return;
         const cameraNode = this.resolveCameraNode();
         if (!cameraNode) return;
         this._visualRoot.lookAt(cameraNode.worldPosition);
     }
 
     private async buildVisualAsync(): Promise<void> {
-        const texture = await this.loadTextureWithFallbacks([
-            this.resourcePath,
-            `${this.resourcePath}/texture`,
-            `${this.resourcePath}.webp`,
-        ]);
+        const texture = await this.loadTextureWithFallbacks(this.buildTextureCandidatePaths());
         if (!texture || !this.node.isValid) return;
 
         this._frames = this.buildFramesFromTexture(texture);
@@ -97,9 +112,11 @@ export class SunflowerPreview extends Component {
         const sprite = spriteNode.addComponent(Sprite);
         sprite.sizeMode = Sprite.SizeMode.RAW;
         sprite.trim = false;
+        sprite.flipX = this.flipX;
+        sprite.flipY = this.flipY;
         this._sprite = sprite;
         sprite.spriteFrame = this._frames[0];
-        spriteNode.setRotationFromEuler(0, 180, 0);
+        spriteNode.setRotationFromEuler(0, this.spriteYRotation, this.spriteZRotation);
 
         const uiTransform = spriteNode.getComponent(UITransform);
         if (uiTransform) {
@@ -109,6 +126,13 @@ export class SunflowerPreview extends Component {
         this._frameIndex = 0;
         this._frameTimer = 0;
 
+        if (this.alignToCameraOnStart) {
+            const cameraNode = this.resolveCameraNode();
+            if (cameraNode) {
+                this._visualRoot.lookAt(cameraNode.worldPosition);
+            }
+        }
+
         if (this.hideOwnerMeshOnReady) {
             const meshRenderer = this.node.getComponent(MeshRenderer);
             if (meshRenderer) {
@@ -117,6 +141,34 @@ export class SunflowerPreview extends Component {
         }
 
         this._ready = true;
+    }
+
+    private buildTextureCandidatePaths(): string[] {
+        const rawPath = this.resourcePath.trim();
+        const basePath = rawPath.replace(/\.(png|webp|jpg|jpeg)$/i, '');
+        const candidates: string[] = [];
+
+        const pushUnique = (path: string): void => {
+            if (!path) return;
+            if (candidates.includes(path)) return;
+            candidates.push(path);
+        };
+
+        // Respect explicit path first.
+        pushUnique(rawPath);
+        pushUnique(`${rawPath}/texture`);
+
+        // Then try extensionless + common texture sub-asset path.
+        pushUnique(basePath);
+        pushUnique(`${basePath}/texture`);
+
+        // Finally try common image extensions under the same base path.
+        pushUnique(`${basePath}.png`);
+        pushUnique(`${basePath}.webp`);
+        pushUnique(`${basePath}.jpg`);
+        pushUnique(`${basePath}.jpeg`);
+
+        return candidates;
     }
 
     private buildFramesFromTexture(texture: Texture2D): SpriteFrame[] {

@@ -130,6 +130,7 @@ export class MapGenerator extends Component {
 
         this.createGroundTiles(data, floorColor);
         this.createDirtFieldPatch(cols, rows);
+        this.createMountainBoundary(cols, rows);
 
         const offsetX = (cols * this.tileSize) / 2;
         const offsetZ = (rows * this.tileSize) / 2;
@@ -143,6 +144,117 @@ export class MapGenerator extends Component {
                 this.createTileCube(posX, 0.2, posZ, enemyColor, 0.2, false);
             }
         }
+    }
+
+    private createMountainBoundary(cols: number, rows: number): void {
+        for (let x = -1; x <= cols; x++) {
+            this.createMountainSegment(x, -1, cols, rows, true);
+            this.createMountainSegment(x, rows, cols, rows, true);
+        }
+        for (let z = 0; z < rows; z++) {
+            this.createMountainSegment(-1, z, cols, rows, false);
+            this.createMountainSegment(cols, z, cols, rows, false);
+        }
+    }
+
+    private createMountainSegment(
+        gridX: number,
+        gridZ: number,
+        cols: number,
+        rows: number,
+        isHorizontalEdge: boolean
+    ): void {
+        const center = this.gridToWorldCenter(gridX, gridZ, cols, rows);
+        const seed = gridX * 131.9 + gridZ * 89.7;
+        const noiseA = this.hash01(seed);
+        const noiseB = this.hash01(seed + 19.73);
+        const noiseC = this.hash01(seed + 51.21);
+
+        const height = this.tileSize * (1.15 + noiseA * 1.05);
+        const along = this.tileSize * (1.05 + noiseB * 0.5);
+        const thick = this.tileSize * (1.2 + noiseC * 0.65);
+        const tangentJitter = (this.hash01(seed + 7.17) - 0.5) * this.tileSize * 0.35;
+        const outerPush = this.tileSize * 0.32;
+
+        let x = center.x;
+        let z = center.z;
+        if (isHorizontalEdge) {
+            x += tangentJitter;
+            z += gridZ < 0 ? -outerPush : outerPush;
+        } else {
+            z += tangentJitter;
+            x += gridX < 0 ? -outerPush : outerPush;
+        }
+
+        const scaleX = isHorizontalEdge ? along : thick;
+        const scaleZ = isHorizontalEdge ? thick : along;
+        const color = this.pickMountainColor(seed);
+        this.createMountainBlock(x, z, scaleX, height, scaleZ, color);
+
+        if (this.hash01(seed + 103.3) > 0.58) {
+            const capHeight = height * (0.35 + this.hash01(seed + 61.2) * 0.22);
+            const capScaleX = scaleX * (0.5 + this.hash01(seed + 43.9) * 0.2);
+            const capScaleZ = scaleZ * (0.5 + this.hash01(seed + 24.4) * 0.2);
+            const capOffsetX = (this.hash01(seed + 66.6) - 0.5) * this.tileSize * 0.45;
+            const capOffsetZ = (this.hash01(seed + 27.9) - 0.5) * this.tileSize * 0.45;
+            this.createMountainBlock(
+                x + capOffsetX,
+                z + capOffsetZ,
+                capScaleX,
+                capHeight,
+                capScaleZ,
+                this.pickMountainColor(seed + 211.7),
+                height
+            );
+        }
+    }
+
+    private createMountainBlock(
+        x: number,
+        z: number,
+        scaleX: number,
+        scaleY: number,
+        scaleZ: number,
+        color: Color,
+        baseY: number = 0
+    ): void {
+        const node = new Node('BoundaryMountain');
+        (this._buildRoot ?? this.node).addChild(node);
+        node.setPosition(x, baseY + scaleY * 0.5, z);
+        node.setScale(scaleX, scaleY, scaleZ);
+        node.layer = (this._buildRoot ?? this.node).layer;
+
+        const renderer = node.addComponent(MeshRenderer);
+        renderer.mesh = this.getSharedTileMesh();
+        renderer.material = this.getColorMaterial(color);
+
+        const collider = node.addComponent(BoxCollider);
+        collider.setGroup(1);
+    }
+
+    private pickMountainColor(seed: number): Color {
+        const palette: readonly Color[] = [
+            new Color(78, 86, 67, 255),
+            new Color(89, 96, 74, 255),
+            new Color(102, 108, 82, 255),
+            new Color(114, 118, 92, 255),
+        ];
+        const idx = Math.floor(this.hash01(seed + 3.14) * palette.length) % palette.length;
+        return palette[idx];
+    }
+
+    private gridToWorldCenter(
+        gridX: number,
+        gridZ: number,
+        cols: number,
+        rows: number
+    ): { x: number; z: number } {
+        const offsetX = (cols * this.tileSize) / 2;
+        const offsetZ = (rows * this.tileSize) / 2;
+        return {
+            x: gridX * this.tileSize - offsetX + this.tileSize / 2,
+            z: gridZ * this.tileSize - offsetZ + this.tileSize / 2,
+        };
     }
 
     public generateTestMap(): void {

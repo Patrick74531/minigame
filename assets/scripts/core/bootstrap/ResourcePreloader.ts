@@ -83,6 +83,12 @@ export class ResourcePreloader {
         resources.preload('building/sunflower/texture', Texture2D);
         resources.preload('building/sunflower', Texture2D);
         resources.preload('building/sunflower.webp', Texture2D);
+        resources.preload('building/barn/texture', Texture2D);
+        resources.preload('building/barn', Texture2D);
+        resources.preload('building/barn.webp', Texture2D);
+        resources.preload('building/radar.webp', Texture2D);
+        resources.preload('building/radar/texture', Texture2D);
+        resources.preload('building/radar', Texture2D);
     }
 
     // === Hero 模型 + 动画 ===
