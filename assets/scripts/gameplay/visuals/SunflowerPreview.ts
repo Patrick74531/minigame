@@ -3,6 +3,7 @@ import {
     Camera,
     Component,
     director,
+    MeshRenderer,
     Node,
     Rect,
     RenderRoot2D,
@@ -33,6 +34,9 @@ export class SunflowerPreview extends Component {
 
     @property({ tooltip: '0 表示自动按 width/height 推断；>0 则使用手动帧数' })
     public frameCountOverride: number = 0;
+
+    @property({ tooltip: '成功加载向日葵贴图后，隐藏当前节点上的立方体 MeshRenderer' })
+    public hideOwnerMeshOnReady: boolean = false;
 
     private _cameraNode: Node | null = null;
     private _visualRoot: Node | null = null;
@@ -71,6 +75,7 @@ export class SunflowerPreview extends Component {
         const texture = await this.loadTextureWithFallbacks([
             this.resourcePath,
             `${this.resourcePath}/texture`,
+            `${this.resourcePath}.webp`,
         ]);
         if (!texture || !this.node.isValid) return;
 
@@ -103,6 +108,14 @@ export class SunflowerPreview extends Component {
 
         this._frameIndex = 0;
         this._frameTimer = 0;
+
+        if (this.hideOwnerMeshOnReady) {
+            const meshRenderer = this.node.getComponent(MeshRenderer);
+            if (meshRenderer) {
+                meshRenderer.enabled = false;
+            }
+        }
+
         this._ready = true;
     }
 

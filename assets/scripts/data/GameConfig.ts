@@ -198,7 +198,7 @@ export const GameConfig = {
                 role: 'tower',
                 visual: {
                     colorHex: '#3C64DC',
-                    scale: { x: 0.4, y: 0.8, z: 0.4 },
+                    scale: { x: 0.52, y: 1.02, z: 0.52 },
                 },
                 stats: {
                     hp: 280,

@@ -2,15 +2,15 @@
   "ver": "1.0.27",
   "importer": "image",
   "imported": true,
-  "uuid": "e550e300-dba3-47fd-9759-a9a685ebb225",
+  "uuid": "45867054-d7f7-4a47-abba-f57fe19358b9",
   "files": [
     ".json",
-    ".png"
+    ".webp"
   ],
   "subMetas": {
     "6c48a": {
       "importer": "texture",
-      "uuid": "e550e300-dba3-47fd-9759-a9a685ebb225@6c48a",
+      "uuid": "45867054-d7f7-4a47-abba-f57fe19358b9@6c48a",
       "displayName": "sunflower",
       "id": "6c48a",
       "name": "texture",
@@ -22,7 +22,7 @@
         "mipfilter": "none",
         "anisotropy": 0,
         "isUuid": true,
-        "imageUuidOrDatabaseUri": "e550e300-dba3-47fd-9759-a9a685ebb225",
+        "imageUuidOrDatabaseUri": "45867054-d7f7-4a47-abba-f57fe19358b9",
         "visible": false
       },
       "ver": "1.0.22",
@@ -37,6 +37,6 @@
     "type": "texture",
     "fixAlphaTransparencyArtifacts": false,
     "hasAlpha": true,
-    "redirect": "e550e300-dba3-47fd-9759-a9a685ebb225@6c48a"
+    "redirect": "45867054-d7f7-4a47-abba-f57fe19358b9@6c48a"
   }
 }

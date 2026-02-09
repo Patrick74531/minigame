@@ -5,6 +5,7 @@ import { GameConfig } from '../../data/GameConfig';
 import { BuildingRegistry } from './BuildingRegistry';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { Base } from './Base';
+import { SunflowerPreview } from '../visuals/SunflowerPreview';
 
 /**
  * 建筑工厂
@@ -148,8 +149,10 @@ export class BuildingFactory {
         const frostConfig = this.buildingRegistry.get('frost_tower');
         const node = this.createCubeNode('FrostTower', new Color(60, 100, 220, 255)); // Blue
         node.setPosition(x, 0, z);
-        node.setScale(0.4, 0.8, 0.4);
+        const scale = frostConfig?.visual?.scale || { x: 0.52, y: 1.02, z: 0.52 };
+        node.setScale(scale.x, scale.y, scale.z);
         parent.addChild(node);
+        this.attachFrostTowerSunflowerVisual(node);
 
         const tower = node.addComponent(Tower);
         tower.setConfig({
@@ -236,6 +239,9 @@ export class BuildingFactory {
                 building.setUnitContainer(unitContainer);
             }
         } else if (config.role === 'tower') {
+            if (buildingId === 'frost_tower') {
+                this.attachFrostTowerSunflowerVisual(node);
+            }
             const tower = node.addComponent(Tower);
             tower.setConfig({
                 type: BuildingType.TOWER,
@@ -312,5 +318,15 @@ export class BuildingFactory {
         if (buildingId === 'base') return BuildingType.BASE;
         if (role === 'barracks' || buildingId === 'barracks') return BuildingType.BARRACKS;
         return BuildingType.BARRACKS;
+    }
+
+    private static attachFrostTowerSunflowerVisual(node: Node): void {
+        const preview = node.getComponent(SunflowerPreview) ?? node.addComponent(SunflowerPreview);
+        preview.resourcePath = 'building/sunflower';
+        preview.yOffset = 1.15;
+        preview.visualScale = 0.036;
+        preview.fps = 8;
+        preview.frameCountOverride = 0;
+        preview.hideOwnerMeshOnReady = true;
     }
 }

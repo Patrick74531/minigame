@@ -181,12 +181,17 @@ export class Tower extends Building {
         console.log(`[Tower] Shooting at ${target.name}`);
 
         // Attack Animation (Squash and Stretch)
-        const initialScale = new Vec3(0.4, 0.8, 0.4);
+        const initialScale = this.node.scale.clone();
+        const squashScale = new Vec3(
+            initialScale.x * 1.15,
+            initialScale.y * 0.82,
+            initialScale.z * 1.15
+        );
         Tween.stopAllByTarget(this.node);
         this.node.setScale(initialScale);
 
         tween(this.node)
-            .to(0.05, { scale: new Vec3(0.5, 0.6, 0.5) }, { easing: 'elasticIn' })
+            .to(0.05, { scale: squashScale }, { easing: 'elasticIn' })
             .to(0.2, { scale: initialScale }, { easing: 'backOut' })
             .start();
 

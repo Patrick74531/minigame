@@ -2,8 +2,6 @@ import { Node } from 'cc';
 import { MapGenerator } from '../../gameplay/map/MapGenerator';
 import { CombatSystem } from '../../gameplay/combat/CombatSystem';
 import { WaveLoop } from '../../gameplay/wave/WaveLoop';
-import { SunflowerPreview } from '../../gameplay/visuals/SunflowerPreview';
-import { GameConfig } from '../../data/GameConfig';
 
 export type GameplayNodes = {
     mapGenerator: MapGenerator;
@@ -32,15 +30,6 @@ export class GameplayBootstrap {
         const waveNode = new Node('WaveLoop');
         container.addChild(waveNode);
         const waveLoop = waveNode.addComponent(WaveLoop);
-
-        const sunflowerPreviewNode = new Node('SunflowerPreview');
-        container.addChild(sunflowerPreviewNode);
-        sunflowerPreviewNode.setPosition(
-            GameConfig.MAP.BASE_SPAWN.x + 1.5,
-            0,
-            GameConfig.MAP.BASE_SPAWN.z + 1.5
-        );
-        sunflowerPreviewNode.addComponent(SunflowerPreview);
 
         return { mapGenerator, combatSystem, waveLoop, waveNode };
     }
