@@ -1,4 +1,16 @@
-import { Node, MeshRenderer, primitives, utils, Material, Color } from 'cc';
+import {
+    Node,
+    MeshRenderer,
+    primitives,
+    utils,
+    Material,
+    Color,
+    Prefab,
+    resources,
+    instantiate,
+    Renderer,
+    assetManager,
+} from 'cc';
 import { Building, BuildingType } from './Building';
 import { Tower } from './Tower';
 import { GameConfig } from '../../data/GameConfig';
@@ -13,10 +25,21 @@ import { SunflowerPreview } from '../visuals/SunflowerPreview';
  */
 export class BuildingFactory {
     private static _materials: Map<string, Material> = new Map();
+    private static _barracksModelPrefab: Prefab | null = null;
+    private static _barracksModelLoading: boolean = false;
+    private static _pendingBarracksModelNodes: Node[] = [];
+    private static readonly BARRACKS_MODEL_PREFAB_PATHS = [
+        'building/barn_3d',
+        'building/barn_3d/barn_3d',
+    ];
+    private static readonly BARRACKS_MODEL_PREFAB_UUIDS = [
+        'b988ccf3-7c10-4afe-adca-643852d64a68@24a58',
+    ];
+    private static readonly BARRACKS_MODEL_NODE_NAME = 'BarracksBarnModel';
+    private static readonly BARRACKS_MODEL_SCALE = 6.0;
+    private static readonly BARRACKS_MODEL_Y_OFFSET = 1.3;
+    private static readonly BARRACKS_MODEL_Y_ROTATION = 180;
 
-    /**
-     * 创建兵营
-     */
     /**
      * 创建兵营
      */
@@ -98,9 +121,6 @@ export class BuildingFactory {
         return node;
     }
 
-    /**
-     * 清理材质缓存
-     */
     /**
      * 创建防御塔
      */
@@ -343,19 +363,105 @@ export class BuildingFactory {
     }
 
     private static attachBarracksBarnVisual(node: Node): void {
-        const preview = node.getComponent(SunflowerPreview) ?? node.addComponent(SunflowerPreview);
-        preview.resourcePath = 'building/barn.webp';
-        preview.yOffset = 0.95;
-        preview.visualScale = 0.03;
-        preview.fps = 1;
-        preview.frameCountOverride = 1;
-        preview.faceCamera = false;
-        preview.alignToCameraOnStart = false;
-        preview.spriteYRotation = 180;
-        preview.spriteZRotation = 0;
-        preview.flipX = false;
-        preview.flipY = false;
-        preview.hideOwnerMeshOnReady = true;
+        this.attachBarracksBarnModelAsync(node);
+    }
+
+    private static attachBarracksBarnModelAsync(node: Node): void {
+        if (!node || !node.isValid) return;
+        if (this.tryAttachBarracksModel(node)) return;
+
+        this._pendingBarracksModelNodes.push(node);
+        if (this._barracksModelLoading) return;
+
+        this._barracksModelLoading = true;
+        this.loadBarracksModelPrefabByPath(0);
+    }
+
+    private static tryAttachBarracksModel(node: Node): boolean {
+        if (!this._barracksModelPrefab) return false;
+        this.applyBarracksModel(node, this._barracksModelPrefab);
+        return true;
+    }
+
+    private static loadBarracksModelPrefabByPath(index: number): void {
+        if (index >= this.BARRACKS_MODEL_PREFAB_PATHS.length) {
+            this.loadBarracksModelPrefabByUuid(0);
+            return;
+        }
+
+        const path = this.BARRACKS_MODEL_PREFAB_PATHS[index];
+        resources.load(path, Prefab, (err, prefab) => {
+            if (err || !prefab) {
+                this.loadBarracksModelPrefabByPath(index + 1);
+                return;
+            }
+            this.onBarracksPrefabLoaded(prefab);
+        });
+    }
+
+    private static loadBarracksModelPrefabByUuid(index: number): void {
+        if (index >= this.BARRACKS_MODEL_PREFAB_UUIDS.length) {
+            this._barracksModelLoading = false;
+            this._pendingBarracksModelNodes.length = 0;
+            return;
+        }
+        const uuid = this.BARRACKS_MODEL_PREFAB_UUIDS[index];
+        assetManager.loadAny({ uuid }, (err, asset) => {
+            if (err || !(asset instanceof Prefab)) {
+                this.loadBarracksModelPrefabByUuid(index + 1);
+                return;
+            }
+            this.onBarracksPrefabLoaded(asset);
+        });
+    }
+
+    private static onBarracksPrefabLoaded(prefab: Prefab): void {
+        this._barracksModelLoading = false;
+        this._barracksModelPrefab = prefab;
+        const pending = this._pendingBarracksModelNodes.splice(0);
+        for (const n of pending) {
+            if (!n || !n.isValid) continue;
+            this.applyBarracksModel(n, prefab);
+        }
+    }
+
+    private static applyBarracksModel(node: Node, prefab: Prefab): void {
+        const existing = node.getChildByName(this.BARRACKS_MODEL_NODE_NAME);
+        if (existing && existing.isValid) return;
+
+        const preview = node.getComponent(SunflowerPreview);
+        if (preview) {
+            preview.enabled = false;
+        }
+        const visualRoot = node.getChildByName('SunflowerVisualRoot');
+        if (visualRoot && visualRoot.isValid) {
+            visualRoot.destroy();
+        }
+
+        const model = instantiate(prefab);
+        model.name = this.BARRACKS_MODEL_NODE_NAME;
+        model.setPosition(0, this.BARRACKS_MODEL_Y_OFFSET, 0);
+        model.setScale(
+            this.BARRACKS_MODEL_SCALE,
+            this.BARRACKS_MODEL_SCALE,
+            this.BARRACKS_MODEL_SCALE
+        );
+        model.setRotationFromEuler(0, this.BARRACKS_MODEL_Y_ROTATION, 0);
+        this.applyLayerRecursive(model, node.layer);
+        node.addChild(model);
+
+        const hasRenderer = model.getComponentsInChildren(Renderer).length > 0;
+        const ownerMesh = node.getComponent(MeshRenderer);
+        if (ownerMesh && hasRenderer) {
+            ownerMesh.enabled = false;
+        }
+    }
+
+    private static applyLayerRecursive(root: Node, layer: number): void {
+        root.layer = layer;
+        for (const child of root.children) {
+            this.applyLayerRecursive(child, layer);
+        }
     }
 
     private static attachLightningTowerRadarVisual(node: Node): void {

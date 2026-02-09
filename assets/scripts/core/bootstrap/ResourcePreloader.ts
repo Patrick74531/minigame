@@ -21,6 +21,7 @@ export class ResourcePreloader {
         this.preloadEnemyPaperDollTextures();
         this.preloadSoldierGooseTextures();
         this.preloadWeaponVFXTextures();
+        this.preloadBuildingModelPrefabs();
         this.preloadHeroAssets();
         this.preloadHeroWeaponVisuals();
     }
@@ -83,12 +84,20 @@ export class ResourcePreloader {
         resources.preload('building/sunflower/texture', Texture2D);
         resources.preload('building/sunflower', Texture2D);
         resources.preload('building/sunflower.webp', Texture2D);
-        resources.preload('building/barn/texture', Texture2D);
-        resources.preload('building/barn', Texture2D);
-        resources.preload('building/barn.webp', Texture2D);
         resources.preload('building/radar.webp', Texture2D);
         resources.preload('building/radar/texture', Texture2D);
         resources.preload('building/radar', Texture2D);
+    }
+
+    private static readonly BUILDING_MODEL_PREFAB_PATHS = [
+        'building/barn_3d',
+        'building/barn_3d/barn_3d',
+    ];
+
+    private static preloadBuildingModelPrefabs(): void {
+        for (const path of this.BUILDING_MODEL_PREFAB_PATHS) {
+            resources.preload(path, Prefab);
+        }
     }
 
     // === Hero 模型 + 动画 ===

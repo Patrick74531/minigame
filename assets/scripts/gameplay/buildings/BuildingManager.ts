@@ -28,12 +28,7 @@ export class BuildingManager {
         return this._instance;
     }
 
-    /**
-     * 初始化建造管理器
-     */
     private _unitContainer: Node | null = null;
-
-    // ... (keep usage of _buildingContainer)
 
     /**
      * 初始化建造管理器
@@ -43,7 +38,6 @@ export class BuildingManager {
         this._unitContainer = unitContainer;
         this._pads = [];
 
-        // 监听建造完成事件
         // 监听建造完成事件
         this.eventManager.on(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
         this.eventManager.on(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
@@ -75,10 +69,7 @@ export class BuildingManager {
     /**
      * 每帧更新
      */
-    /**
-     * 每帧更新
-     */
-    public update(dt: number): void {
+    public update(_dt: number): void {
         // Logic moved to BuildingPad.onTriggerStay (Physics System)
     }
 

@@ -35,10 +35,18 @@ export class HeroLevelSystem {
     // === 缓存的每级经验表（避免重复计算） ===
     private _xpTable: number[] = [];
 
-    public get level(): number { return this._level; }
-    public get currentXp(): number { return this._currentXp; }
-    public get maxXp(): number { return this.getXpForLevel(this._level); }
-    public get isMaxLevel(): boolean { return this._level >= GameConfig.HERO_LEVEL.MAX_LEVEL; }
+    public get level(): number {
+        return this._level;
+    }
+    public get currentXp(): number {
+        return this._currentXp;
+    }
+    public get maxXp(): number {
+        return this.getXpForLevel(this._level);
+    }
+    public get isMaxLevel(): boolean {
+        return this._level >= GameConfig.HERO_LEVEL.MAX_LEVEL;
+    }
 
     /**
      * 初始化：绑定英雄节点，监听击杀事件
@@ -112,7 +120,10 @@ export class HeroLevelSystem {
      * @param level 目标等级
      * @returns 累计乘算倍率和累计加算值
      */
-    public getStatGrowth(statKey: string, level: number): { multiplier: number; additive: number; cap?: number } {
+    public getStatGrowth(
+        statKey: string,
+        level: number
+    ): { multiplier: number; additive: number; cap?: number } {
         const growth = GameConfig.HERO_LEVEL.GROWTH[statKey];
         if (!growth) return { multiplier: 1, additive: 0 };
 

@@ -79,7 +79,9 @@ export class ProjectilePool {
     /** 清空所有池 */
     public static clearAll(): void {
         this._pools.forEach(pool => {
-            pool.forEach(n => { if (n.isValid) n.destroy(); });
+            pool.forEach(n => {
+                if (n.isValid) n.destroy();
+            });
         });
         this._pools.clear();
         this._factories.clear();
