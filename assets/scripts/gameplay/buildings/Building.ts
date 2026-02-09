@@ -37,6 +37,7 @@ export interface BuildingUpgradeConfig {
     statMultiplier: number;
     spawnIntervalMultiplier: number;
     maxUnitsPerLevel: number;
+    spawnBatchPerLevel?: number;
 }
 
 /**
@@ -45,6 +46,8 @@ export interface BuildingUpgradeConfig {
  */
 @ccclass('Building')
 export class Building extends BaseComponent implements IAttackable {
+    private static _latestBaseLevel: number = 1;
+
     @property
     public buildingType: BuildingType = BuildingType.BARRACKS;
 
@@ -62,6 +65,7 @@ export class Building extends BaseComponent implements IAttackable {
     public statMultiplier: number = 1.2;
     public spawnIntervalMultiplier: number = 0.93;
     public maxUnitsPerLevel: number = 0;
+    public spawnBatchPerLevel: number = 0;
 
     @property
     public spawnInterval: number = 3;
@@ -80,6 +84,8 @@ export class Building extends BaseComponent implements IAttackable {
 
     /** 产兵父节点 */
     private _unitContainer: Node | null = null;
+    /** 当前已知的基地等级（用于兵营批量产兵） */
+    private _baseLevel: number = 1;
 
     /** 血条组件 */
     private _healthBar: HealthBar | null = null;
@@ -100,9 +106,11 @@ export class Building extends BaseComponent implements IAttackable {
         this.currentHp = this.maxHp;
         this._activeUnits = 0;
         this._spawnTimer = 0;
+        this._baseLevel = Building._latestBaseLevel;
 
         // Register Unit Died Event
         this.eventManager.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
+        this.eventManager.on(GameEvents.BASE_UPGRADE_READY, this.onBaseUpgradeReady, this);
 
         // Setup Physics (Obstacle)
         this.setupPhysics();
@@ -173,6 +181,9 @@ export class Building extends BaseComponent implements IAttackable {
         if (config.spawnIntervalMultiplier !== undefined)
             this.spawnIntervalMultiplier = config.spawnIntervalMultiplier;
         if (config.maxUnitsPerLevel !== undefined) this.maxUnitsPerLevel = config.maxUnitsPerLevel;
+        if (config.spawnBatchPerLevel !== undefined) {
+            this.spawnBatchPerLevel = Math.max(0, config.spawnBatchPerLevel);
+        }
     }
 
     /**
@@ -188,7 +199,8 @@ export class Building extends BaseComponent implements IAttackable {
 
         // Scale core stats
         this.maxHp = Math.floor(this.maxHp * this.statMultiplier);
-        if (this.spawnInterval > 0) {
+        // Barracks upgrade should scale batch quantity, not spawn cadence.
+        if (this.spawnInterval > 0 && this.buildingType !== BuildingType.BARRACKS) {
             this.spawnInterval = Math.max(0.5, this.spawnInterval * this.spawnIntervalMultiplier);
         }
         if (this.maxUnitsPerLevel > 0) {
@@ -232,14 +244,25 @@ export class Building extends BaseComponent implements IAttackable {
 
             if (this._spawnTimer >= this.spawnInterval) {
                 this._spawnTimer = 0;
-                this.spawnSoldier();
+                this.spawnSoldierBatch();
             }
         }
     }
 
     // === 产兵逻辑 ===
 
-    private spawnSoldier(): void {
+    private spawnSoldierBatch(): void {
+        if (this.buildingType !== BuildingType.BARRACKS) return;
+        const remainCapacity = this.maxUnits - this._activeUnits;
+        if (remainCapacity <= 0) return;
+
+        const batchCount = Math.min(this.resolveSpawnBatchCount(), remainCapacity);
+        for (let i = 0; i < batchCount; i++) {
+            this.spawnSoldier(i, batchCount);
+        }
+    }
+
+    private spawnSoldier(slotIndex: number = 0, totalInBatch: number = 1): void {
         if (!this._unitContainer) {
             console.warn('[Building] Unit container not set');
             return;
@@ -248,9 +271,7 @@ export class Building extends BaseComponent implements IAttackable {
         let soldier = this.poolManager.spawn(this.soldierPoolName, this._unitContainer);
         let spawnedFromPool = !!soldier;
 
-        // 3D 坐标系：XZ平面为地面，Y轴向上
-        const spawnOffsetX = 1.0;
-        const spawnOffsetZ = 1.0;
+        const spawnOffset = this.resolveSpawnOffset(slotIndex, totalInBatch);
 
         if (!soldier) {
             console.warn(
@@ -267,9 +288,9 @@ export class Building extends BaseComponent implements IAttackable {
             }
         } else {
             soldier.setPosition(
-                this.node.position.x + spawnOffsetX,
+                this.node.position.x + spawnOffset.x,
                 0, // 地面高度
-                this.node.position.z + spawnOffsetZ
+                this.node.position.z + spawnOffset.z
             );
         }
 
@@ -277,9 +298,9 @@ export class Building extends BaseComponent implements IAttackable {
 
         // Ensure correct spawn position for fallback path too
         soldier.setPosition(
-            this.node.position.x + spawnOffsetX,
+            this.node.position.x + spawnOffset.x,
             0, // 地面高度
-            this.node.position.z + spawnOffsetZ
+            this.node.position.z + spawnOffset.z
         );
 
         // Track ownership for accurate unit counting
@@ -287,6 +308,7 @@ export class Building extends BaseComponent implements IAttackable {
         if (soldierComp) {
             soldierComp.ownerBuildingId = this.node.uuid;
             soldierComp.setSpawnSource(this.soldierPoolName, spawnedFromPool);
+            soldierComp.applyBarracksLevel(this.level);
         }
 
         this._activeUnits++;
@@ -295,6 +317,35 @@ export class Building extends BaseComponent implements IAttackable {
             unitType: 'soldier',
             node: soldier,
         });
+    }
+
+    private resolveSpawnBatchCount(): number {
+        const cfg = GameConfig.BUILDING.BASE_UPGRADE;
+        const baseCount = Math.max(1, Math.floor(cfg.SOLDIER_BATCH_BASE));
+        const perLevel = Math.max(0, Math.floor(cfg.SOLDIER_BATCH_BONUS_PER_LEVEL));
+        const maxCount = Math.max(baseCount, Math.floor(cfg.SOLDIER_BATCH_MAX));
+        const levelBonus = Math.max(0, this._baseLevel - 1);
+        const barracksBonus =
+            this.buildingType === BuildingType.BARRACKS
+                ? Math.max(0, this.level - 1) * Math.max(0, Math.floor(this.spawnBatchPerLevel))
+                : 0;
+        const count = baseCount + levelBonus * perLevel + barracksBonus;
+        return Math.min(maxCount, count);
+    }
+
+    private resolveSpawnOffset(slotIndex: number, totalInBatch: number): { x: number; z: number } {
+        const baseX = 1.0;
+        const baseZ = 1.0;
+        if (totalInBatch <= 1) {
+            return { x: baseX, z: baseZ };
+        }
+
+        const radius = 0.32 + Math.min(0.35, totalInBatch * 0.06);
+        const angle = (Math.PI * 2 * slotIndex) / Math.max(1, totalInBatch);
+        return {
+            x: baseX + Math.cos(angle) * radius,
+            z: baseZ + Math.sin(angle) * radius,
+        };
     }
 
     // === 伤害处理 ===
@@ -366,6 +417,13 @@ export class Building extends BaseComponent implements IAttackable {
             if (soldier && soldier.ownerBuildingId !== this.node.uuid) return;
             this._activeUnits = Math.max(0, this._activeUnits - 1);
         }
+    }
+
+    private onBaseUpgradeReady(data: { baseLevel: number }): void {
+        const nextLevel = Math.max(1, Math.floor(data?.baseLevel ?? 1));
+        if (nextLevel <= 0) return;
+        Building._latestBaseLevel = Math.max(Building._latestBaseLevel, nextLevel);
+        this._baseLevel = Building._latestBaseLevel;
     }
 
     private get eventManager(): EventManager {

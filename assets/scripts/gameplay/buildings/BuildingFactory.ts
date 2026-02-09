@@ -1,4 +1,4 @@
-import { _decorator, Node, MeshRenderer, primitives, utils, Material, Color } from 'cc';
+import { Node, MeshRenderer, primitives, utils, Material, Color } from 'cc';
 import { Building, BuildingType } from './Building';
 import { Tower } from './Tower';
 import { GameConfig } from '../../data/GameConfig';
@@ -44,6 +44,7 @@ export class BuildingFactory {
             statMultiplier: barracksConfig?.upgrades?.statMultiplier ?? 1.2,
             spawnIntervalMultiplier: barracksConfig?.upgrades?.spawnIntervalMultiplier ?? 0.92,
             maxUnitsPerLevel: barracksConfig?.upgrades?.maxUnitsPerLevel ?? 1,
+            spawnBatchPerLevel: barracksConfig?.upgrades?.spawnBatchPerLevel ?? 1,
         });
 
         return node;
@@ -229,6 +230,7 @@ export class BuildingFactory {
                 statMultiplier: config.upgrades?.statMultiplier ?? 1.2,
                 spawnIntervalMultiplier: config.upgrades?.spawnIntervalMultiplier ?? 0.93,
                 maxUnitsPerLevel: config.upgrades?.maxUnitsPerLevel ?? 0,
+                spawnBatchPerLevel: isBarracks ? (config.upgrades?.spawnBatchPerLevel ?? 1) : 0,
             });
             if (unitContainer) {
                 building.setUnitContainer(unitContainer);

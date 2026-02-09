@@ -26,6 +26,7 @@ import { HeroAnimationController } from './HeroAnimationController';
 import { HeroWeaponMountController } from './HeroWeaponMountController';
 import { AnimRootScaleLock } from '../visuals/AnimRootScaleLock';
 import { EnemyPaperDollAnimator } from '../visuals/EnemyPaperDollAnimator';
+import { SoldierGooseAnimator } from '../visuals/SoldierGooseAnimator';
 import { resolveHeroModelConfig } from './HeroModelConfig';
 import { WeaponType } from '../weapons/WeaponTypes';
 
@@ -211,6 +212,8 @@ export class UnitFactory {
             attackInterval: GameConfig.SOLDIER.ATTACK_INTERVAL,
             moveSpeed: GameConfig.SOLDIER.MOVE_SPEED,
         });
+
+        this.attachSoldierGooseVisual(node);
 
         return node;
     }
@@ -952,6 +955,13 @@ export class UnitFactory {
         const hb = root.getComponent(HealthBar);
         if (hb) {
             hb.requestAnchorRefresh();
+        }
+    }
+
+    private static attachSoldierGooseVisual(root: Node): void {
+        if (!root.isValid) return;
+        if (!root.getComponent(SoldierGooseAnimator)) {
+            root.addComponent(SoldierGooseAnimator);
         }
     }
 }

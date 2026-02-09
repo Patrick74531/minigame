@@ -118,6 +118,12 @@ export const GameConfig = {
             COLLECT_RATE: 2,
             /** 收集间隔（秒） */
             COLLECT_INTERVAL: 0.1,
+            /** 兵营单批次产兵基础数量 */
+            SOLDIER_BATCH_BASE: 1,
+            /** 基地每升 1 级，兵营单批次额外产兵数量 */
+            SOLDIER_BATCH_BONUS_PER_LEVEL: 1,
+            /** 兵营单批次产兵上限（防止峰值过高） */
+            SOLDIER_BATCH_MAX: 5,
             /** 基地每次升级对英雄的增益 */
             HERO_BUFF: {
                 HP_MULTIPLIER: 1.12,
@@ -156,6 +162,7 @@ export const GameConfig = {
                     statMultiplier: 1.18,
                     spawnIntervalMultiplier: 0.92,
                     maxUnitsPerLevel: 1,
+                    spawnBatchPerLevel: 1,
                 },
             },
             tower: {
@@ -316,6 +323,26 @@ export const GameConfig = {
         ATTACK_INTERVAL: 1,
         /** 攻击范围 (3D units) */
         ATTACK_RANGE: 1.5,
+        /**
+         * 兵营等级对新生成士兵的成长曲线（level 从 1 开始）
+         * 公式示例：
+         * - HP倍率 = 1 + HP_LINEAR*n + HP_QUADRATIC*n^2，n = level - 1
+         * - 攻击倍率 = 1 + ATTACK_LINEAR*n + ATTACK_QUADRATIC*n^2
+         * - 攻击间隔倍率 = max(ATTACK_INTERVAL_MIN_MULTIPLIER, 1 - ATTACK_INTERVAL_DECAY_PER_LEVEL*n)
+         */
+        BARRACKS_GROWTH: {
+            HP_LINEAR: 0.2,
+            HP_QUADRATIC: 0.015,
+            ATTACK_LINEAR: 0.12,
+            ATTACK_QUADRATIC: 0.02,
+            ATTACK_INTERVAL_DECAY_PER_LEVEL: 0.05,
+            ATTACK_INTERVAL_MIN_MULTIPLIER: 0.72,
+            ATTACK_RANGE_LINEAR: 0.03,
+            MOVE_SPEED_LINEAR: 0.035,
+            SIZE_LINEAR: 0.08,
+            SIZE_QUADRATIC: 0.008,
+            SIZE_MAX_MULTIPLIER: 1.55,
+        },
     },
 
     // === 敌人系统 ===
@@ -896,7 +923,7 @@ export const GameConfig = {
         /** 伤害数字显示时间 */
         DAMAGE_NUMBER_DURATION: 0.8,
         /** 战斗系统的目标检测间隔 */
-        TARGET_CHECK_INTERVAL: 0.5,
+        TARGET_CHECK_INTERVAL: 0.2,
     },
 } as const;
 

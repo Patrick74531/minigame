@@ -64,17 +64,25 @@ export class CombatSystem extends Component implements CombatProvider {
     private onUnitSpawned(data: { unitType: string; node: any }): void {
         if (data.unitType === 'enemy') {
             const enemy = data.node.getComponent(Enemy);
-            if (enemy) this.registerEnemy(enemy);
+            if (enemy) {
+                this.registerEnemy(enemy);
+                this.scheduleImmediateRetarget();
+            }
         } else if (data.unitType === 'soldier') {
             const soldier = data.node.getComponent(Soldier);
-            if (soldier) this.registerSoldier(soldier);
+            if (soldier) {
+                this.registerSoldier(soldier);
+            }
         }
     }
 
     private onUnitDied(data: { unitType: string; node: any }): void {
         if (data.unitType === 'enemy') {
             const enemy = data.node.getComponent(Enemy);
-            if (enemy) this.unregisterEnemy(enemy);
+            if (enemy) {
+                this.unregisterEnemy(enemy);
+                this.scheduleImmediateRetarget();
+            }
         } else if (data.unitType === 'soldier') {
             const soldier = data.node.getComponent(Soldier);
             if (soldier) this.unregisterSoldier(soldier);
@@ -83,7 +91,10 @@ export class CombatSystem extends Component implements CombatProvider {
 
     private onEnemyReachedBase(data: { enemy: any }): void {
         const enemy = data.enemy?.getComponent?.(Enemy);
-        if (enemy) this.unregisterEnemy(enemy);
+        if (enemy) {
+            this.unregisterEnemy(enemy);
+            this.scheduleImmediateRetarget();
+        }
     }
 
     // === 单位注册 ===
@@ -105,6 +116,7 @@ export class CombatSystem extends Component implements CombatProvider {
         if (this._soldiers.indexOf(soldier) === -1) {
             this._soldiers.push(soldier);
         }
+        this.tryAssignNearestEnemy(soldier);
     }
 
     public unregisterSoldier(soldier: Soldier): void {
@@ -122,13 +134,22 @@ export class CombatSystem extends Component implements CombatProvider {
         CombatSystem.compactArray(this._soldiers);
 
         for (const soldier of this._soldiers) {
-            if (!soldier.target || !soldier.target.isAlive) {
-                const nearestEnemy = this.findNearestEnemy(soldier);
-                if (nearestEnemy) {
-                    soldier.engageTarget(nearestEnemy);
-                }
+            if (!soldier.target || !soldier.target.isAlive || !soldier.target.node?.isValid) {
+                this.tryAssignNearestEnemy(soldier);
             }
         }
+    }
+
+    private tryAssignNearestEnemy(soldier: Soldier): void {
+        if (!soldier || !soldier.isAlive || !soldier.node || !soldier.node.isValid) return;
+        const nearestEnemy = this.findNearestEnemy(soldier);
+        if (nearestEnemy) {
+            soldier.engageTarget(nearestEnemy);
+        }
+    }
+
+    private scheduleImmediateRetarget(): void {
+        this._targetCheckTimer = this.targetCheckInterval;
     }
 
     /** 原地移除无效元素（swap-remove，O(n)，零分配） */

@@ -19,6 +19,7 @@ export class ResourcePreloader {
         this._started = true;
 
         this.preloadEnemyPaperDollTextures();
+        this.preloadSoldierGooseTextures();
         this.preloadWeaponVFXTextures();
         this.preloadHeroAssets();
         this.preloadHeroWeaponVisuals();
@@ -38,6 +39,18 @@ export class ResourcePreloader {
     private static preloadEnemyPaperDollTextures(): void {
         for (const path of this.ENEMY_TEXTURE_PATHS) {
             // 尝试两种路径格式（与 EnemyPaperDollAnimator.loadFrameFromTexture 一致）
+            resources.preload(path, Texture2D);
+            resources.preload(`${path}/texture`, Texture2D);
+        }
+    }
+
+    private static readonly SOLDIER_GOOSE_TEXTURE_PATHS = [
+        'footman/goose/Run',
+        'footman/goose/Flap',
+    ];
+
+    private static preloadSoldierGooseTextures(): void {
+        for (const path of this.SOLDIER_GOOSE_TEXTURE_PATHS) {
             resources.preload(path, Texture2D);
             resources.preload(`${path}/texture`, Texture2D);
         }

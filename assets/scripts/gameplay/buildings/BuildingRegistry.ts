@@ -60,6 +60,7 @@ export interface BuildingTypeConfig {
         statMultiplier?: number; // default 1.2
         spawnIntervalMultiplier?: number;
         maxUnitsPerLevel?: number;
+        spawnBatchPerLevel?: number;
         attackMultiplier?: number;
         rangeMultiplier?: number;
         intervalMultiplier?: number;

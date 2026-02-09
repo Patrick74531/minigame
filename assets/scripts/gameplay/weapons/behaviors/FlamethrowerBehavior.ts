@@ -1,39 +1,36 @@
-import { Node, Vec3, Color, tween } from 'cc';
-import { _decorator, Component } from 'cc';
+import { Node, Vec3, Color } from 'cc';
 import { WeaponBehavior } from '../WeaponBehavior';
 import { WeaponType, WeaponLevelStats } from '../WeaponTypes';
 import { WeaponVFX } from '../WeaponVFX';
-import { Bullet } from '../../combat/Bullet';
 import { GameConfig } from '../../../data/GameConfig';
-import { Unit } from '../../units/Unit';
+import { Unit, UnitType } from '../../units/Unit';
+import { EnemyQuery } from '../../../core/managers/EnemyQuery';
 
-const { ccclass } = _decorator;
-
-/**
- * 堆肥喷火器 — 废油抛物线 (性能优化版)
- *
- * 核心优化：
- * - 用大号 Billboard 面片代替 3D 方块（少量大贴图 = 视觉欺骗大火焰）
- * - 去掉 MotionStreak + 去掉子节点发光层（1 DrawCall / 火球）
- * - 材质缓存 + GPU Instancing
- * - 着地灼烧圈用池化节点
- *
- * Lv.1: 单个深红火球
- * Lv.2: 火球变大变亮
- * Lv.3: 2 发火球 + 着地灼烧圈
- * Lv.4: 3 发火球，火焰更亮
- * Lv.5: 4 发散射，白黄火焰 + 大灼烧
- */
+/** 堆肥喷火器 — 纯代码持续火束版 */
 export class FlamethrowerBehavior extends WeaponBehavior {
     public readonly type = WeaponType.FLAMETHROWER;
 
-    private static readonly BLOBS_PER_LEVEL = [1, 1, 2, 3, 4];
-    private static readonly COLORS: Color[] = [
-        new Color(140, 20, 0, 255),
-        new Color(200, 50, 0, 255),
-        new Color(255, 100, 10, 255),
-        new Color(255, 160, 30, 255),
-        new Color(255, 220, 80, 255),
+    private static readonly MAX_TARGETS = [2, 3, 4, 5, 6];
+    private static readonly CORE_COLORS: Color[] = [
+        new Color(255, 215, 95, 232),
+        new Color(255, 222, 105, 236),
+        new Color(255, 228, 116, 240),
+        new Color(255, 235, 130, 244),
+        new Color(255, 240, 145, 248),
+    ];
+    private static readonly GLOW_COLORS: Color[] = [
+        new Color(255, 118, 26, 168),
+        new Color(255, 128, 30, 178),
+        new Color(255, 138, 34, 188),
+        new Color(255, 148, 42, 198),
+        new Color(255, 160, 54, 210),
+    ];
+    private static readonly FLASH_COLORS: Color[] = [
+        new Color(255, 195, 82, 220),
+        new Color(255, 204, 90, 224),
+        new Color(255, 212, 100, 228),
+        new Color(255, 220, 110, 232),
+        new Color(255, 228, 124, 236),
     ];
 
     public fire(
@@ -43,106 +40,110 @@ export class FlamethrowerBehavior extends WeaponBehavior {
         level: number,
         parent: Node
     ): void {
+        if (!target || !target.isValid) return;
+
+        WeaponVFX.initialize();
+
         const spawnPos = owner.position.clone();
-        spawnPos.y += GameConfig.PHYSICS.PROJECTILE_SPAWN_OFFSET_Y;
+        spawnPos.y += GameConfig.PHYSICS.PROJECTILE_SPAWN_OFFSET_Y - 0.1;
 
+        const dx = target.position.x - spawnPos.x;
+        const dz = target.position.z - spawnPos.z;
+        const len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 0.001) return;
+
+        const dirX = dx / len;
+        const dirZ = dz / len;
         const idx = Math.min(level - 1, 4);
-        const blobCount = FlamethrowerBehavior.BLOBS_PER_LEVEL[idx];
-        const gravity = (stats['gravity'] ?? 8) as number;
-        const color = FlamethrowerBehavior.COLORS[idx];
+        const range = Math.max(1.6, stats.range);
+        const streamLength = Math.max(1.6, Math.min(range, len + 0.95));
+        const streamWidth = 0.46 + level * 0.08;
+        const streamDuration = Math.max(0.2, stats.attackInterval * 1.4);
+        const streamEnd = new Vec3(
+            spawnPos.x + dirX * streamLength,
+            spawnPos.y,
+            spawnPos.z + dirZ * streamLength
+        );
 
-        // 大号 Billboard 面片 — 单个面片看起来就像一坨火焰
-        const blobSize = 0.2 + level * 0.06;
+        WeaponVFX.createCodeBeam(parent, spawnPos, streamEnd, {
+            width: streamWidth,
+            duration: streamDuration,
+            beamColor: FlamethrowerBehavior.GLOW_COLORS[idx],
+            coreColor: FlamethrowerBehavior.CORE_COLORS[idx],
+            intensity: 1.15 + level * 0.2,
+        });
+        WeaponVFX.createMuzzleFlash(
+            parent,
+            spawnPos,
+            FlamethrowerBehavior.FLASH_COLORS[idx],
+            0.15 + level * 0.025
+        );
+        if (Math.random() < 0.35) {
+            WeaponVFX.createGroundBurn(
+                parent,
+                streamEnd,
+                0.12 + level * 0.02,
+                FlamethrowerBehavior.GLOW_COLORS[idx],
+                0.18
+            );
+        }
 
-        for (let i = 0; i < blobCount; i++) {
-            const spreadAngle =
-                blobCount > 1 ? ((i / (blobCount - 1) - 0.5) * 15 * Math.PI) / 180 : 0;
+        const hitRadiusAtEnd = 0.56 + level * 0.12;
+        const hits = this.collectConeHits(spawnPos, dirX, dirZ, streamLength, hitRadiusAtEnd);
+        if (hits.length === 0) return;
 
-            // 大号扁平方块 = 视觉欺骗火球（1 DrawCall）
-            const node = new Node('Flame_Blob');
-            node.layer = 1 << 0;
-            WeaponVFX.addBoxMesh(node, blobSize, blobSize, blobSize, WeaponVFX.getUnlitMat(color));
-            parent.addChild(node);
-            node.setPosition(spawnPos);
+        const ownerUnit = owner.getComponent(Unit);
+        const critRate = ownerUnit ? ownerUnit.stats.critRate : 0;
+        const critDamage = ownerUnit ? ownerUnit.stats.critDamage : 1.5;
+        const targetCap = FlamethrowerBehavior.MAX_TARGETS[idx];
+        const hitCount = Math.min(targetCap, hits.length);
 
-            const bullet = node.addComponent(Bullet);
-            bullet.damage = Math.ceil(stats.damage / blobCount);
-            bullet.speed = stats.projectileSpeed * (0.9 + Math.random() * 0.2);
-            bullet.setTarget(target);
-            // 从持有者读取暴击属性
-            const ownerUnit = owner.getComponent(Unit);
-            if (ownerUnit) {
-                bullet.critRate = ownerUnit.stats.critRate;
-                bullet.critDamage = ownerUnit.stats.critDamage;
+        for (let i = 0; i < hitCount; i++) {
+            const hit = hits[i];
+            const distanceT = hit.dist / streamLength;
+            const nearBonus = 1 - distanceT * 0.35;
+            let damage = Math.max(1, Math.floor(stats.damage * nearBonus));
+            let isCrit = false;
+            if (critRate > 0 && Math.random() < critRate) {
+                damage = Math.floor(damage * critDamage);
+                isCrit = true;
             }
 
-            // 抛物线初速度
-            bullet.velocity.y += 3.5 + level * 0.6 + Math.random() * 1.5;
-
-            // 角度偏移
-            if (spreadAngle !== 0) {
-                const vel = bullet.velocity;
-                const cos = Math.cos(spreadAngle);
-                const sin = Math.sin(spreadAngle);
-                const vx = vel.x * cos - vel.z * sin;
-                const vz = vel.x * sin + vel.z * cos;
-                vel.set(vx, vel.y, vz);
-            }
-
-            // 重力 + 着地灼烧
-            const gravComp = node.addComponent(FlameGravity);
-            gravComp.gravity = gravity;
-            gravComp.level = level;
-            gravComp.parentRef = parent;
-
-            // 飞行中膨胀动画（视觉欺骗：少量大面片 = 大火焰）
-            const baseScale = 0.8 + level * 0.2;
-            node.setScale(baseScale * 0.5, baseScale * 0.5, baseScale * 0.5);
-            tween(node)
-                .to(
-                    0.3,
-                    { scale: new Vec3(baseScale, baseScale, baseScale) },
-                    { easing: 'sineOut' }
-                )
-                .start();
+            hit.unit.takeDamage(damage, undefined, isCrit);
+            hit.unit.applyKnockback(dirX, dirZ, 0.9 + level * 0.25, 0.05);
         }
     }
-}
 
-/**
- * 重力 + 着地灼烧组件
- */
-@ccclass('FlameGravity')
-class FlameGravity extends Component {
-    public gravity: number = 8;
-    public level: number = 1;
-    public parentRef: Node | null = null;
-    private _burnSpawned: boolean = false;
+    private collectConeHits(
+        origin: Vec3,
+        dirX: number,
+        dirZ: number,
+        maxDist: number,
+        maxRadius: number
+    ): Array<{ unit: Unit; dist: number }> {
+        const hits: Array<{ unit: Unit; dist: number }> = [];
+        const enemies = EnemyQuery.getEnemies();
+        const baseRadius = 0.18;
 
-    protected update(dt: number): void {
-        const bullet = this.node.getComponent(Bullet);
-        if (!bullet) return;
-        bullet.velocity.y -= this.gravity * dt;
+        for (const enemy of enemies) {
+            if (!enemy || !enemy.isValid) continue;
+            const unit = enemy.getComponent(Unit);
+            if (!unit || !unit.isAlive || unit.unitType !== UnitType.ENEMY) continue;
 
-        // 着地灼烧（只触发一次，池化节点）
-        if (!this._burnSpawned && this.node.position.y < 0.1 && this.parentRef && this.level >= 3) {
-            this._burnSpawned = true;
-            const pos = this.node.position.clone();
-            pos.y = 0.05;
-            const burnRadius = 0.5 + this.level * 0.25;
-            const burnColor = new Color(
-                Math.min(255, 200 + this.level * 10),
-                Math.min(255, 50 + this.level * 20),
-                0,
-                150
-            );
-            WeaponVFX.createGroundBurn(
-                this.parentRef,
-                pos,
-                burnRadius,
-                burnColor,
-                0.8 + this.level * 0.3
-            );
+            const ex = enemy.position.x - origin.x;
+            const ez = enemy.position.z - origin.z;
+            const distOnAxis = ex * dirX + ez * dirZ;
+            if (distOnAxis < 0 || distOnAxis > maxDist) continue;
+
+            // 2D 叉积长度 = 到火束中心线的垂距
+            const perpDist = Math.abs(ex * dirZ - ez * dirX);
+            const radiusAtDist = baseRadius + (distOnAxis / maxDist) * maxRadius;
+            if (perpDist > radiusAtDist) continue;
+
+            hits.push({ unit, dist: distOnAxis });
         }
+
+        hits.sort((a, b) => a.dist - b.dist);
+        return hits;
     }
 }

@@ -4,7 +4,7 @@ import { GameConfig } from '../../data/GameConfig';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameManager } from '../../core/managers/GameManager';
 import { GameEvents } from '../../data/GameEvents';
-import { Building } from '../buildings/Building';
+import { Building, BuildingType } from '../buildings/Building';
 import { IAttackable } from '../../core/interfaces/IAttackable';
 import { CombatService } from '../../core/managers/CombatService';
 import { Soldier } from './Soldier';
@@ -342,7 +342,17 @@ export class Enemy extends Unit {
             }
         }
 
-        // 2. Check for nearby Soldiers
+        // 2. 防御建筑嘲讽（仅对敌人生效）
+        const tauntBuilding = this.findNearestBuildingInAggro(myPos, aggroSq, true);
+        if (tauntBuilding) {
+            this.setTarget(tauntBuilding);
+            this._state = this.isTargetInRange(tauntBuilding)
+                ? UnitState.ATTACKING
+                : UnitState.MOVING;
+            return;
+        }
+
+        // 3. Check for nearby Soldiers
         const provider = CombatService.provider;
         if (provider && provider.findSoldierInRange) {
             const soldier = provider.findSoldierInRange(myPos, this._aggroRange) as Soldier | null;
@@ -355,35 +365,51 @@ export class Enemy extends Unit {
             }
         }
 
-        // 3. Check for nearby Buildings
+        // 4. Check for nearby Buildings
+        const nearestBuilding = this.findNearestBuildingInAggro(myPos, aggroSq, false);
+        if (nearestBuilding) {
+            this.setTarget(nearestBuilding);
+            this._state = this.isTargetInRange(nearestBuilding)
+                ? UnitState.ATTACKING
+                : UnitState.MOVING;
+        }
+    }
+
+    private findNearestBuildingInAggro(
+        myPos: Vec3,
+        aggroSq: number,
+        defensiveOnly: boolean
+    ): Building | null {
         const buildingNodes = this.gameManager.activeBuildings;
-        if (buildingNodes && buildingNodes.length > 0) {
-            let nearest: Building | null = null;
-            let minDistSq = aggroSq;
+        if (!buildingNodes || buildingNodes.length <= 0) return null;
 
-            for (const bNode of buildingNodes) {
-                if (!bNode.isValid) continue;
+        let nearest: Building | null = null;
+        let minDistSq = aggroSq;
 
-                const dx = bNode.position.x - myPos.x;
-                const dz = bNode.position.z - myPos.z;
-                const distSq = dx * dx + dz * dz;
+        for (const bNode of buildingNodes) {
+            if (!bNode || !bNode.isValid) continue;
+            const bComp = bNode.getComponent(Building);
+            if (!bComp || !bComp.isAlive) continue;
+            if (defensiveOnly && !this.isDefensiveTauntBuilding(bComp)) continue;
 
-                if (distSq < minDistSq) {
-                    const bComp = bNode.getComponent(Building);
-                    if (bComp && bComp.isAlive) {
-                        minDistSq = distSq;
-                        nearest = bComp;
-                    }
-                }
-            }
-
-            if (nearest) {
-                this.setTarget(nearest);
-                this._state = this.isTargetInRange(nearest)
-                    ? UnitState.ATTACKING
-                    : UnitState.MOVING;
+            const dx = bNode.position.x - myPos.x;
+            const dz = bNode.position.z - myPos.z;
+            const distSq = dx * dx + dz * dz;
+            if (distSq < minDistSq) {
+                minDistSq = distSq;
+                nearest = bComp;
             }
         }
+
+        return nearest;
+    }
+
+    private isDefensiveTauntBuilding(building: Building): boolean {
+        return (
+            building.buildingType === BuildingType.TOWER ||
+            building.buildingType === BuildingType.WALL ||
+            building.buildingType === BuildingType.BASE
+        );
     }
 
     // Override setTarget to handle state change?
