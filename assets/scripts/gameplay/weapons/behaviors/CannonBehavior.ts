@@ -1,4 +1,4 @@
-import { Node, Color, Vec3, PhysicsSystem } from 'cc';
+import { Node, Color, Vec3, Mat4, PhysicsSystem } from 'cc';
 import { WeaponBehavior } from '../WeaponBehavior';
 import { WeaponType, WeaponLevelStats } from '../WeaponTypes';
 import { WeaponVFX } from '../WeaponVFX';
@@ -34,7 +34,7 @@ export class CannonBehavior extends WeaponBehavior {
         target: Node,
         stats: WeaponLevelStats,
         level: number,
-        parent: Node
+        _parent: Node
     ): void {
         if (!target || !target.isValid) return;
 
@@ -89,8 +89,14 @@ export class CannonBehavior extends WeaponBehavior {
             spawnPos.y,
             spawnPos.z + dirZ * beamLength
         );
+        const invOwnerWorld = new Mat4();
+        Mat4.invert(invOwnerWorld, owner.worldMatrix);
+        const localStart = new Vec3();
+        const localEnd = new Vec3();
+        Vec3.transformMat4(localStart, spawnPos, invOwnerWorld);
+        Vec3.transformMat4(localEnd, endPos, invOwnerWorld);
 
-        WeaponVFX.createDestructionRay(parent, spawnPos, endPos, {
+        WeaponVFX.createDestructionRay(owner, localStart, localEnd, {
             width: baseWidth,
             duration: baseDuration * 1.35,
             beamColor,

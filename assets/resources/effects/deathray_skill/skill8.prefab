@@ -302,8 +302,8 @@
   {
     "__type__": "cc.CurveRange",
     "mode": 3,
-    "constantMin": 3.2,
-    "constantMax": 3.8,
+    "constantMin": 2.2,
+    "constantMax": 2.8,
     "multiplier": 1
   },
   {
