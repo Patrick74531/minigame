@@ -28,10 +28,36 @@ export enum TileType {
 @ccclass('MapGenerator')
 export class MapGenerator extends Component {
     private static readonly GENERATED_ROOT_NAME = '__GeneratedMap';
-    private static readonly GROUND_TEXTURE_PATHS = [
-        'floor/tileable_grass_00/texture',
-        'floor/tileable_grass_00',
-        'floor/tileable_grass_00.webp',
+    private static readonly GRASS_TEXTURE_VARIANTS: ReadonlyArray<ReadonlyArray<string>> = [
+        [
+            'floor/tileable_grass_01/texture',
+            'floor/tileable_grass_01',
+            'floor/tileable_grass_01.webp',
+        ],
+        [
+            'floor/tileable_grass_02/texture',
+            'floor/tileable_grass_02',
+            'floor/tileable_grass_02.webp',
+            'floor/tileable_grass_01/texture',
+            'floor/tileable_grass_01',
+            'floor/tileable_grass_01.webp',
+        ],
+        [
+            'floor/tileable_grass_03/texture',
+            'floor/tileable_grass_03',
+            'floor/tileable_grass_03.webp',
+            'floor/tileable_grass_01/texture',
+            'floor/tileable_grass_01',
+            'floor/tileable_grass_01.webp',
+        ],
+        [
+            'floor/tileable_grass_04/texture',
+            'floor/tileable_grass_04',
+            'floor/tileable_grass_04.webp',
+            'floor/tileable_grass_01/texture',
+            'floor/tileable_grass_01',
+            'floor/tileable_grass_01.webp',
+        ],
     ];
     private static readonly DIRT_TEXTURE_PATHS = [
         'floor/Dirt_01/texture',
@@ -52,8 +78,12 @@ export class MapGenerator extends Component {
     private _sharedTileMesh: Mesh | null = null;
     private _sharedGroundMesh: Mesh | null = null;
     private _buildRoot: Node | null = null;
-    private _groundMaterial: Material | null = null;
-    private _groundTexLoading: boolean = false;
+    private _grassMaterials: Array<Material | null> = new Array(
+        MapGenerator.GRASS_TEXTURE_VARIANTS.length
+    ).fill(null);
+    private _grassTexLoading: boolean[] = new Array(
+        MapGenerator.GRASS_TEXTURE_VARIANTS.length
+    ).fill(false);
     private _dirtFieldMaterial: Material | null = null;
     private _dirtTexLoading: boolean = false;
 
@@ -98,7 +128,7 @@ export class MapGenerator extends Component {
         const floorColor = new Color(98, 133, 75, 255);
         const enemyColor = new Color(168, 73, 73, 255);
 
-        this.createGroundPlane(cols, rows, floorColor);
+        this.createGroundTiles(data, floorColor);
         this.createDirtFieldPatch(cols, rows);
 
         const offsetX = (cols * this.tileSize) / 2;
@@ -150,16 +180,103 @@ export class MapGenerator extends Component {
         }
     }
 
-    private createGroundPlane(cols: number, rows: number, color: Color): void {
-        const node = new Node('GroundPlane');
-        (this._buildRoot ?? this.node).addChild(node);
-        node.setPosition(0, 0, 0);
-        node.setScale(cols * this.tileSize, 1, rows * this.tileSize);
-        node.layer = (this._buildRoot ?? this.node).layer;
+    private createGroundTiles(data: number[][], fallbackColor: Color): void {
+        const rows = data.length;
+        const cols = data[0].length;
+        const offsetX = (cols * this.tileSize) / 2;
+        const offsetZ = (rows * this.tileSize) / 2;
 
-        const renderer = node.addComponent(MeshRenderer);
-        renderer.mesh = this.getSharedGroundMesh();
-        renderer.material = this.getGroundMaterial(cols, rows, color);
+        for (let z = 0; z < rows; z++) {
+            for (let x = 0; x < cols; x++) {
+                if (data[z][x] === TileType.EMPTY) continue;
+
+                const node = new Node(`GroundTile_${x}_${z}`);
+                (this._buildRoot ?? this.node).addChild(node);
+
+                const worldX = x * this.tileSize - offsetX + this.tileSize / 2;
+                const worldZ = z * this.tileSize - offsetZ + this.tileSize / 2;
+                node.setPosition(worldX, 0, worldZ);
+                node.setScale(this.tileSize, 1, this.tileSize);
+                node.setRotationFromEuler(0, this.pickGrassRotationDegrees(x, z), 0);
+                node.layer = (this._buildRoot ?? this.node).layer;
+
+                const renderer = node.addComponent(MeshRenderer);
+                renderer.mesh = this.getSharedGroundMesh();
+                renderer.material = this.getGrassMaterial(
+                    this.pickGrassVariant(x, z, cols, rows),
+                    fallbackColor
+                );
+            }
+        }
+    }
+
+    private pickGrassVariant(x: number, z: number, cols: number, rows: number): number {
+        const nx = (x + 0.5) / Math.max(1, cols);
+        const nz = (z + 0.5) / Math.max(1, rows);
+        const waveA = Math.sin(nx * Math.PI * 1.7 + nz * Math.PI * 0.95);
+        const waveB = Math.sin(nx * Math.PI * 3.6 - nz * Math.PI * 2.4);
+        const waveC = Math.sin((nx + nz) * Math.PI * 5.2 + 1.7);
+        const noise = (this.hash01(x * 73.7 + z * 41.3) - 0.5) * 0.18;
+        const score = waveA * 0.52 + waveB * 0.33 + waveC * 0.15 + noise;
+        const normalized = Math.max(0, Math.min(1, (score + 1) * 0.5));
+
+        if (normalized < 0.26) return 0;
+        if (normalized < 0.5) return 1;
+        if (normalized < 0.74) return 2;
+        return 3;
+    }
+
+    private pickGrassRotationDegrees(x: number, z: number): number {
+        const rotationBand = Math.floor(this.hash01(x * 97.1 + z * 131.7) * 4) % 4;
+        return rotationBand * 90;
+    }
+
+    private getGrassMaterial(variant: number, fallbackColor: Color): Material {
+        const maxIndex = MapGenerator.GRASS_TEXTURE_VARIANTS.length - 1;
+        const safeVariant = Math.max(0, Math.min(maxIndex, variant));
+        let material = this._grassMaterials[safeVariant];
+
+        if (!material) {
+            material = new Material();
+            material.initialize({
+                effectName: 'builtin-unlit',
+                defines: { USE_TEXTURE: true },
+            });
+            material.setProperty('mainColor', fallbackColor);
+            material.setProperty('tilingOffset', new Vec4(1, 1, 0, 0));
+            this._grassMaterials[safeVariant] = material;
+        }
+
+        if (!this._grassTexLoading[safeVariant]) {
+            this._grassTexLoading[safeVariant] = true;
+            void this.loadGroundTextureWithFallbacks([
+                ...MapGenerator.GRASS_TEXTURE_VARIANTS[safeVariant],
+            ]).then(texture => {
+                this._grassTexLoading[safeVariant] = false;
+                if (!texture) return;
+                const targetMaterial = this._grassMaterials[safeVariant];
+                if (!targetMaterial) return;
+
+                const texAny = texture as Texture2D & {
+                    setWrapMode?: (u: number, v: number) => void;
+                };
+                const wrapMode = (Texture2D as unknown as { WrapMode?: { REPEAT?: number } })
+                    .WrapMode?.REPEAT;
+                if (texAny.setWrapMode && wrapMode !== undefined) {
+                    texAny.setWrapMode(wrapMode, wrapMode);
+                }
+
+                targetMaterial.setProperty('mainTexture', texture);
+                targetMaterial.setProperty('mainColor', new Color(255, 255, 255, 255));
+            });
+        }
+
+        return material;
+    }
+
+    private hash01(seed: number): number {
+        const s = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+        return s - Math.floor(s);
     }
 
     private createDirtFieldPatch(cols: number, rows: number): void {
@@ -183,47 +300,6 @@ export class MapGenerator extends Component {
         const renderer = node.addComponent(MeshRenderer);
         renderer.mesh = this.getSharedGroundMesh();
         renderer.material = this.getDirtFieldMaterial(patchW, patchH);
-    }
-
-    private getGroundMaterial(cols: number, rows: number, fallbackColor: Color): Material {
-        if (!this._groundMaterial) {
-            const mat = new Material();
-            mat.initialize({
-                effectName: 'builtin-unlit',
-                defines: { USE_TEXTURE: true },
-            });
-            mat.setProperty('mainColor', fallbackColor);
-            this._groundMaterial = mat;
-        }
-
-        const tileRepeatX = Math.max(1, cols);
-        const tileRepeatY = Math.max(1, rows);
-        this._groundMaterial.setProperty('tilingOffset', new Vec4(tileRepeatX, tileRepeatY, 0, 0));
-
-        if (!this._groundTexLoading) {
-            this._groundTexLoading = true;
-            void this.loadGroundTextureWithFallbacks(MapGenerator.GROUND_TEXTURE_PATHS).then(
-                texture => {
-                    this._groundTexLoading = false;
-                    if (!texture || !this._groundMaterial) return;
-
-                    // 尝试开启 repeat；若当前引擎实现不支持，仍可正常显示（但可能不平铺）。
-                    const texAny = texture as Texture2D & {
-                        setWrapMode?: (u: number, v: number) => void;
-                    };
-                    const wrapMode = (Texture2D as unknown as { WrapMode?: { REPEAT?: number } })
-                        .WrapMode?.REPEAT;
-                    if (texAny.setWrapMode && wrapMode !== undefined) {
-                        texAny.setWrapMode(wrapMode, wrapMode);
-                    }
-
-                    this._groundMaterial.setProperty('mainTexture', texture);
-                    this._groundMaterial.setProperty('mainColor', new Color(235, 245, 235, 255));
-                }
-            );
-        }
-
-        return this._groundMaterial;
     }
 
     private getDirtFieldMaterial(worldW: number, worldH: number): Material {
