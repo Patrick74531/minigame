@@ -38,19 +38,27 @@ export class CannonBehavior extends WeaponBehavior {
     ): void {
         if (!target || !target.isValid) return;
 
-        const spawnPos = owner.position.clone();
-        spawnPos.y += GameConfig.PHYSICS.PROJECTILE_SPAWN_OFFSET_Y;
+        const beamCfg = GameConfig.VFX?.CANNON_BEAM;
+        const spawnUp =
+            beamCfg?.spawnUpOffset ?? Math.max(0.35, GameConfig.PHYSICS.PROJECTILE_SPAWN_OFFSET_Y);
+        const spawnForward = beamCfg?.spawnForwardOffset ?? 0.85;
 
+        const ownerPos = owner.position.clone();
+        const spawnY = ownerPos.y + spawnUp;
         const targetPos = target.position.clone();
-        targetPos.y = spawnPos.y;
-        const toX = targetPos.x - spawnPos.x;
-        const toZ = targetPos.z - spawnPos.z;
+        targetPos.y = spawnY;
+        const toX = targetPos.x - ownerPos.x;
+        const toZ = targetPos.z - ownerPos.z;
         const toLen = Math.sqrt(toX * toX + toZ * toZ);
         if (toLen < 0.001) return;
         const dirX = toX / toLen;
         const dirZ = toZ / toLen;
+        const spawnPos = new Vec3(
+            ownerPos.x + dirX * spawnForward,
+            spawnY,
+            ownerPos.z + dirZ * spawnForward
+        );
 
-        const beamCfg = GameConfig.VFX?.CANNON_BEAM;
         const beamMaxLevel = beamCfg?.maxLevel ?? 5;
         const beamT = WeaponVFX.levelT(level, beamMaxLevel);
         const beamColor = WeaponVFX.lerpColor(

@@ -51,7 +51,6 @@ export class WeaponVFX {
     private static _deathRayOrbTex: Texture2D | null = null;
     private static _deathRayRuneTex: Texture2D | null = null;
     private static _deathRayMeshTex: Texture2D | null = null;
-    private static _deathRayAuraTex: Texture2D | null = null;
     private static _deathRayTexLoading: boolean = false;
     private static _deathRayPrefab: Prefab | null = null;
     private static _deathRayPrefabLoading: boolean = false;
@@ -75,8 +74,6 @@ export class WeaponVFX {
         ProjectilePool.register('vfx_dray_glow', () => this._createVfxNode('DeadRayGlow'), 16);
         ProjectilePool.register('vfx_dray_flow', () => this._createVfxNode('DeadRayFlow'), 16);
         ProjectilePool.register('vfx_dray_mesh', () => this._createVfxNode('DeadRayMesh'), 16);
-        ProjectilePool.register('vfx_dray_rune', () => this._createVfxNode('DeadRayRune'), 16);
-        ProjectilePool.register('vfx_dray_aura', () => this._createVfxNode('DeadRayAura'), 16);
         ProjectilePool.register('vfx_dray_hit', () => this._createVfxNode('DeadRayHit'), 16);
         // 机枪子弹池 + 弹壳池
         ProjectilePool.register('mg_bullet', () => this._createMGBulletNode(), 40);
@@ -172,15 +169,14 @@ export class WeaponVFX {
             this._deathRayFlowTex &&
             this._deathRayOrbTex &&
             this._deathRayRuneTex &&
-            this._deathRayMeshTex &&
-            this._deathRayAuraTex
+            this._deathRayMeshTex
         ) {
             return;
         }
         if (this._deathRayTexLoading) return;
         this._deathRayTexLoading = true;
 
-        let pending = 6;
+        let pending = 5;
         const done = () => {
             pending--;
             if (pending <= 0) {
@@ -219,10 +215,6 @@ export class WeaponVFX {
         this._loadTexture2D(
             'textures/deathray/ID_6920',
             assign('textures/deathray/ID_6920', texture => (this._deathRayMeshTex = texture))
-        );
-        this._loadTexture2D(
-            'textures/deathray/aura04',
-            assign('textures/deathray/aura04', texture => (this._deathRayAuraTex = texture))
         );
     }
 
@@ -374,6 +366,8 @@ export class WeaponVFX {
 
         const bullet = root.getChildByName('liudong')?.getChildByName('bullet');
         if (bullet) bullet.active = false;
+        const rune = root.getChildByName('rune');
+        if (rune) rune.active = false;
     }
 
     /** 获取子弹贴图（可能为 null，异步加载中） */
@@ -906,7 +900,7 @@ export class WeaponVFX {
             .start();
     }
 
-    /** 破坏死光风格贴图激光（主束 + 流动层 + 起始符文 + 终点爆闪） */
+    /** 破坏死光风格贴图激光（主束 + 流动层 + 终点爆闪） */
     public static createDestructionRay(
         parent: Node,
         start: Vec3,
@@ -942,23 +936,17 @@ export class WeaponVFX {
         const glow = ProjectilePool.get('vfx_dray_glow') ?? this._createVfxNode('DeadRayGlow');
         const flow = ProjectilePool.get('vfx_dray_flow') ?? this._createVfxNode('DeadRayFlow');
         const mesh = ProjectilePool.get('vfx_dray_mesh') ?? this._createVfxNode('DeadRayMesh');
-        const rune = ProjectilePool.get('vfx_dray_rune') ?? this._createVfxNode('DeadRayRune');
-        const aura = ProjectilePool.get('vfx_dray_aura') ?? this._createVfxNode('DeadRayAura');
         const hit = ProjectilePool.get('vfx_dray_hit') ?? this._createVfxNode('DeadRayHit');
 
         parent.addChild(core);
         parent.addChild(glow);
         parent.addChild(flow);
         parent.addChild(mesh);
-        parent.addChild(rune);
-        parent.addChild(aura);
         parent.addChild(hit);
 
         const yawDeg = (Math.atan2(dx, dz) * 180) / Math.PI;
         const midX = (s.x + e.x) * 0.5;
         const midZ = (s.z + e.z) * 0.5;
-        const dirX = dx / len;
-        const dirZ = dz / len;
         const duration = Math.max(0.08, opts.duration);
         const intensity = Math.max(0.8, Math.min(2.4, opts.intensity));
 
@@ -966,8 +954,6 @@ export class WeaponVFX {
         const glowW = Math.max(0.12, opts.width * (0.55 + 0.1 * intensity));
         const flowW = Math.max(0.16, opts.width * (0.82 + 0.12 * intensity));
         const meshW = Math.max(0.1, opts.width * (0.36 + 0.1 * intensity));
-        const runeSize = Math.max(0.22, opts.width * 0.85);
-        const auraSize = Math.max(0.24, opts.width * 0.96);
         const hitSize = Math.max(0.28, opts.width * 1.25);
         const beamMesh = this.getBoxMesh(1, 1, 1);
 
@@ -989,18 +975,6 @@ export class WeaponVFX {
                   this._deathRayMeshTex
               )
             : this.getGlowMat(this.lerpColor(opts.beamColor, opts.coreColor, 0.22));
-        const runeMat = this._deathRayRuneTex
-            ? this._createDynamicSpriteMat(
-                  this.lerpColor(opts.beamColor, Color.WHITE, 0.12),
-                  this._deathRayRuneTex
-              )
-            : this.getGlowMat(this.lerpColor(opts.beamColor, Color.WHITE, 0.12));
-        const auraMat = this._deathRayAuraTex
-            ? this._createDynamicSpriteMat(
-                  this.lerpColor(opts.beamColor, Color.WHITE, 0.08),
-                  this._deathRayAuraTex
-              )
-            : this.getGlowMat(this.lerpColor(opts.beamColor, Color.WHITE, 0.08));
         const hitMat = this._deathRayOrbTex
             ? this._createDynamicSpriteMat(
                   this.lerpColor(opts.coreColor, Color.WHITE, 0.2),
@@ -1012,8 +986,6 @@ export class WeaponVFX {
         this.configureVfxNode(glow, beamMesh, glowMat);
         this.configureVfxNode(flow, beamMesh, flowMat);
         this.configureVfxNode(mesh, beamMesh, meshMat);
-        this.configureVfxNode(rune, beamMesh, runeMat);
-        this.configureVfxNode(aura, beamMesh, auraMat);
         this.configureVfxNode(hit, beamMesh, hitMat);
 
         core.setPosition(midX, s.y, midZ);
@@ -1029,18 +1001,6 @@ export class WeaponVFX {
         flow.setScale(flowW, 0.012, len * 1.01);
         mesh.setScale(meshW, 0.014, len * 1.03);
 
-        const runePos = new Vec3(
-            s.x + dirX * Math.min(0.5, len * 0.12),
-            s.y,
-            s.z + dirZ * Math.min(0.5, len * 0.12)
-        );
-        rune.setPosition(runePos);
-        rune.setRotationFromEuler(0, yawDeg + 90, 0);
-        rune.setScale(runeSize * 0.24, 0.01, runeSize * 0.24);
-        aura.setPosition(runePos);
-        aura.setRotationFromEuler(0, yawDeg + 90, 0);
-        aura.setScale(auraSize * 0.18, 0.01, auraSize * 0.18);
-
         hit.setPosition(e);
         hit.setRotationFromEuler(0, yawDeg + 90, 0);
         hit.setScale(hitSize * 0.14, 0.01, hitSize * 0.14);
@@ -1049,8 +1009,6 @@ export class WeaponVFX {
         Tween.stopAllByTarget(glow);
         Tween.stopAllByTarget(flow);
         Tween.stopAllByTarget(mesh);
-        Tween.stopAllByTarget(rune);
-        Tween.stopAllByTarget(aura);
         Tween.stopAllByTarget(hit);
 
         const state = { t: 0 };
@@ -1069,13 +1027,6 @@ export class WeaponVFX {
                         glow.setScale(glowW * pulseB * shrink, 0.016, len * 1.01);
                         flow.setScale(flowW * (1.06 + pulseA * 0.14) * shrink, 0.012, len * 1.01);
                         mesh.setScale(meshW * (0.86 + pulseB * 0.24) * shrink, 0.014, len * 1.03);
-
-                        const runeScale = runeSize * (0.3 + 0.85 * Math.min(1, t * 2.2));
-                        rune.setScale(runeScale, 0.01, runeScale);
-                        rune.setRotationFromEuler(0, yawDeg + 90 + t * 340, 0);
-                        const auraScale = auraSize * (0.22 + 0.8 * Math.sin(t * Math.PI));
-                        aura.setScale(auraScale, 0.01, auraScale);
-                        aura.setRotationFromEuler(0, yawDeg + 90 - t * 280, 0);
 
                         const hitScale = hitSize * (0.18 + Math.sin(t * Math.PI) * 0.64);
                         hit.setScale(hitScale, 0.01, hitScale);
@@ -1103,12 +1054,6 @@ export class WeaponVFX {
                         uvMesh.x = Math.max(1.3, len * 0.62);
                         uvMesh.z = t * 4.6;
                         meshMat.setProperty('tilingOffset', uvMesh);
-
-                        const uvAura =
-                            (auraMat.getProperty('tilingOffset') as Vec4) ?? new Vec4(1, 1, 0, 0);
-                        uvAura.x = 1.2 + Math.sin(t * Math.PI * 2) * 0.08;
-                        uvAura.z = -t * 1.8;
-                        auraMat.setProperty('tilingOffset', uvAura);
                     },
                 }
             )
@@ -1117,8 +1062,6 @@ export class WeaponVFX {
                 ProjectilePool.put('vfx_dray_glow', glow);
                 ProjectilePool.put('vfx_dray_flow', flow);
                 ProjectilePool.put('vfx_dray_mesh', mesh);
-                ProjectilePool.put('vfx_dray_rune', rune);
-                ProjectilePool.put('vfx_dray_aura', aura);
                 ProjectilePool.put('vfx_dray_hit', hit);
             })
             .start();
@@ -1314,7 +1257,6 @@ export class WeaponVFX {
         this._deathRayOrbTex = null;
         this._deathRayRuneTex = null;
         this._deathRayMeshTex = null;
-        this._deathRayAuraTex = null;
         this._deathRayTexLoading = false;
         this._deathRayPrefab = null;
         this._deathRayPrefabLoading = false;
