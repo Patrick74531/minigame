@@ -9,5 +9,9 @@ export function ensureEffectModulesRegistered(): void {
     _registered = true;
 
     EffectRuntime.register('frostExplosion', FrostExplosionEffect.play.bind(FrostExplosionEffect));
+    EffectRuntime.register(
+        'frostCastSpray',
+        FrostExplosionEffect.playCastSpray.bind(FrostExplosionEffect)
+    );
     EffectRuntime.register('lightningBolt', LightningBoltEffect.play.bind(LightningBoltEffect));
 }

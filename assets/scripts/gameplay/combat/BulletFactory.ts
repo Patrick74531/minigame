@@ -2,35 +2,25 @@ import {
     _decorator,
     Node,
     Prefab,
-    instantiate,
     Vec3,
     Color,
     MeshRenderer,
     primitives,
     utils,
     Material,
-    Texture2D,
-    resources,
-    MotionStreak,
 } from 'cc';
 import { Bullet } from './Bullet';
 import { PoolManager } from '../../core/managers/PoolManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
-const { ccclass, property } = _decorator;
+const { ccclass } = _decorator;
 
 @ccclass('BulletFactory')
 export class BulletFactory {
     private static _bulletPrefab: Prefab | null = null;
-    private static _fallbackTexture: Texture2D | null = null;
 
     public static initialize(): void {
-        // Preload resources if needed
-        resources.load('textures/glow', Texture2D, (err, texture) => {
-            if (!err) {
-                this._fallbackTexture = texture;
-            }
-        });
+        // Reserved for future runtime preloads.
     }
 
     /**
@@ -58,14 +48,6 @@ export class BulletFactory {
         const renderer = node.getComponent(MeshRenderer);
         if (renderer && renderer.material) {
             renderer.material.setProperty('mainColor', stats.color || Color.YELLOW);
-        }
-
-        const streak = node.getComponent(MotionStreak);
-        if (streak) {
-            streak.color = stats.color || Color.YELLOW;
-            if (this._fallbackTexture && !streak.texture) {
-                streak.texture = this._fallbackTexture;
-            }
         }
 
         // Setup Logic
@@ -109,13 +91,6 @@ export class BulletFactory {
         const material = new Material();
         material.initialize({ effectName: 'builtin-unlit' });
         renderer.material = material;
-
-        // Trail
-        const streak = node.addComponent(MotionStreak);
-        streak.fadeTime = 0.3;
-        streak.minSeg = 1;
-        streak.stroke = 0.3;
-        streak.fastMode = true;
 
         // Logic
         node.addComponent(Bullet);

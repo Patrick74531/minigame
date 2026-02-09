@@ -173,6 +173,8 @@ export class BuildingFactory {
         tower.bulletExplosionRadius = frostConfig?.features?.bulletExplosionRadius ?? 2.8;
         tower.bulletSlowPercent = frostConfig?.features?.bulletSlowPercent ?? 0.45;
         tower.bulletSlowDuration = frostConfig?.features?.bulletSlowDuration ?? 2.2;
+        tower.castRainDirectly = frostConfig?.features?.directRainCast ?? true;
+        tower.rainRadiusPerLevel = frostConfig?.features?.rainRadiusPerLevel ?? 0.22;
         tower.setUpgradeConfig({
             maxLevel: frostConfig?.upgrades?.maxLevel ?? GameConfig.BUILDING.DEFAULT_MAX_LEVEL,
             costMultiplier:
@@ -284,6 +286,10 @@ export class BuildingFactory {
                     tower.bulletSlowPercent = config.features.bulletSlowPercent;
                 if (config.features.bulletSlowDuration !== undefined)
                     tower.bulletSlowDuration = config.features.bulletSlowDuration;
+                if (config.features.directRainCast !== undefined)
+                    tower.castRainDirectly = config.features.directRainCast;
+                if (config.features.rainRadiusPerLevel !== undefined)
+                    tower.rainRadiusPerLevel = config.features.rainRadiusPerLevel;
 
                 // Chain Lightning
                 if (config.features.chainCount !== undefined)

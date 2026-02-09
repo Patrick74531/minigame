@@ -1,24 +1,6 @@
-import {
-    Color,
-    Material,
-    MeshRenderer,
-    Node,
-    ParticleSystem,
-    Vec3,
-    primitives,
-    tween,
-    utils,
-} from 'cc';
+import { Color, Material, MeshRenderer, Node, Vec3, primitives, tween, utils } from 'cc';
 import { VisualEffect } from '../VisualEffect';
 import { TextureLoader } from '../runtime/TextureLoader';
-
-type ParticleSystemMutable = ParticleSystem & {
-    startSize?: number;
-    startSpeed?: number;
-    startLifetime?: number;
-    gravityModifier?: number;
-    material?: Material;
-};
 
 export class FrostExplosionEffect {
     private static readonly RAIN_DROP_TEXTURE_PATHS = [
@@ -33,98 +15,98 @@ export class FrostExplosionEffect {
         effectNode.setWorldPosition(payload.position);
 
         const effectComp = effectNode.addComponent(VisualEffect);
-        effectComp.duration = 1.5;
+        effectComp.duration = 1.0;
 
-        this.createShockwaveRing(effectNode, payload.radius);
-        this.createIceParticles(effectNode);
         this.createRainDrizzle(effectNode, payload.radius);
     }
 
-    private static createShockwaveRing(parent: Node, radius: number): void {
-        const ringNode = new Node('ShockwaveRing');
-        parent.addChild(ringNode);
+    public static playCastSpray(payload: { parent: Node; position: Vec3; radius: number }): void {
+        const effectNode = new Node('FrostCastSpray');
+        payload.parent.addChild(effectNode);
+        effectNode.setWorldPosition(payload.position);
 
-        const renderer = ringNode.addComponent(MeshRenderer);
-        renderer.mesh = utils.MeshUtils.createMesh(
-            primitives.plane({ width: 1, length: 1, widthSegments: 1, lengthSegments: 1 })
-        );
+        const effectComp = effectNode.addComponent(VisualEffect);
+        effectComp.duration = 0.55;
 
-        const material = new Material();
-        material.initialize({
-            effectName: 'builtin-unlit',
-            technique: 1,
-            defines: { USE_TEXTURE: true },
-        });
-        material.setProperty('mainColor', new Color(100, 200, 255, 255));
-        renderer.material = material;
-
-        TextureLoader.requestWithFallbacks(
-            [
-                'textures/shockwave_ring/texture',
-                'textures/shockwave_ring',
-                'textures/shockwave_ring.png',
-            ],
-            texture => {
-                if (!texture) return;
-                material.setProperty('mainTexture', texture);
-                if (material.passes && material.passes.length > 0) {
-                    const target = material.passes[0].blendState.targets[0];
-                    target.blend = true;
-                    target.blendSrc = 2;
-                    target.blendDst = 1;
-                    target.blendSrcAlpha = 2;
-                    target.blendDstAlpha = 1;
-                }
-            }
-        );
-
-        const effect = ringNode.addComponent(VisualEffect);
-        effect.duration = 1.0;
-        effect.playScaleAnim(radius * 2, 0.5);
+        this.createCastSpray(effectNode, payload.radius);
     }
 
-    private static createIceParticles(parent: Node): void {
-        const particleNode = new Node('IceParticles');
-        parent.addChild(particleNode);
+    private static createCastSpray(parent: Node, radius: number): void {
+        const sprayCount = Math.min(36, Math.max(16, Math.round(radius * 8)));
+        const sprayMaterials: Material[] = [];
 
-        const particleSystem = particleNode.addComponent(ParticleSystem);
-        const particleMutable = particleSystem as ParticleSystemMutable;
-        particleSystem.duration = 0.5;
-        particleSystem.loop = false;
-        particleSystem.playOnAwake = true;
-        particleSystem.capacity = 50;
-        particleSystem.startColor = new Color(200, 240, 255, 255);
-        particleMutable.startSize = 0.5;
-        particleMutable.startSpeed = 10;
-        particleMutable.startLifetime = 0.8;
-        particleMutable.gravityModifier = 2.0;
+        for (let i = 0; i < sprayCount; i++) {
+            const dropNode = new Node(`SprayDrop_${i}`);
+            parent.addChild(dropNode);
 
-        TextureLoader.requestWithFallbacks(
-            [
-                'textures/frost_particle/texture',
-                'textures/frost_particle',
-                'textures/frost_particle.png',
-            ],
-            texture => {
-                if (!texture) return;
-                if (!particleMutable.material) return;
-                const mat = particleMutable.material;
+            const renderer = dropNode.addComponent(MeshRenderer);
+            renderer.mesh = utils.MeshUtils.createMesh(
+                primitives.plane({ width: 1, length: 1, widthSegments: 1, lengthSegments: 1 })
+            );
+
+            const mat = new Material();
+            mat.initialize({
+                effectName: 'builtin-unlit',
+                technique: 1,
+                defines: { USE_TEXTURE: true },
+            });
+            mat.setProperty('mainColor', new Color(168, 223, 255, 210));
+            renderer.material = mat;
+            sprayMaterials.push(mat);
+
+            const angle = Math.random() * Math.PI * 2;
+            const outward = 0.35 + Math.random() * Math.max(0.25, radius * 0.22);
+            const startPos = new Vec3(
+                (Math.random() - 0.5) * 0.12,
+                0.04 + Math.random() * 0.08,
+                (Math.random() - 0.5) * 0.12
+            );
+            const midPos = new Vec3(
+                Math.cos(angle) * outward * 0.62,
+                0.24 + Math.random() * 0.12,
+                Math.sin(angle) * outward * 0.62
+            );
+            const endPos = new Vec3(
+                Math.cos(angle) * outward,
+                -0.45 - Math.random() * 0.28,
+                Math.sin(angle) * outward
+            );
+
+            dropNode.setPosition(startPos);
+            dropNode.setRotationFromEuler(90, Math.random() * 360, 0);
+            dropNode.setScale(0.1, 1, 0.26 + Math.random() * 0.18);
+
+            tween(dropNode)
+                .delay(Math.random() * 0.04)
+                .to(0.08 + Math.random() * 0.03, { position: midPos }, { easing: 'quadOut' })
+                .to(
+                    0.16 + Math.random() * 0.08,
+                    {
+                        position: endPos,
+                        scale: new Vec3(0.03, 1, 0.08 + Math.random() * 0.06),
+                    },
+                    { easing: 'quadIn' }
+                )
+                .call(() => {
+                    if (dropNode.isValid) dropNode.destroy();
+                })
+                .start();
+        }
+
+        TextureLoader.requestWithFallbacks(this.RAIN_DROP_TEXTURE_PATHS, texture => {
+            if (!texture) return;
+            for (const mat of sprayMaterials) {
                 mat.setProperty('mainTexture', texture);
-                if (mat.passes && mat.passes.length > 0) {
-                    const target = mat.passes[0].blendState.targets[0];
-                    target.blend = true;
-                    target.blendSrc = 2;
-                    target.blendDst = 1;
-                }
+                mat.setProperty('mainColor', new Color(255, 255, 255, 210));
             }
-        );
+        });
     }
 
     private static createRainDrizzle(parent: Node, radius: number): void {
         const rainNode = new Node('RainDrizzle');
         parent.addChild(rainNode);
 
-        const dropCount = Math.max(10, Math.round(radius * 7));
+        const dropCount = Math.min(120, Math.max(28, Math.round(radius * 20)));
         const dropMaterials: Material[] = [];
         for (let i = 0; i < dropCount; i++) {
             const dropNode = new Node(`Drop_${i}`);
@@ -149,7 +131,7 @@ export class FrostExplosionEffect {
             const dist = Math.random() * Math.max(0.8, radius * 0.95);
             const x = Math.cos(angle) * dist;
             const z = Math.sin(angle) * dist;
-            const startY = 2.4 + Math.random() * 1.2;
+            const startY = 2.6 + Math.random() * 1.6;
             const endY = 0.12 + Math.random() * 0.25;
             const startPos = new Vec3(x, startY, z);
             const endPos = new Vec3(
@@ -160,11 +142,11 @@ export class FrostExplosionEffect {
 
             dropNode.setPosition(startPos);
             dropNode.setRotationFromEuler(90, Math.random() * 360, 0);
-            dropNode.setScale(0.12, 1, 0.34 + Math.random() * 0.2);
+            dropNode.setScale(0.11, 1, 0.36 + Math.random() * 0.26);
 
             tween(dropNode)
-                .delay(Math.random() * 0.12)
-                .to(0.32 + Math.random() * 0.16, { position: endPos }, { easing: 'quadIn' })
+                .delay(Math.random() * 0.07)
+                .to(0.24 + Math.random() * 0.12, { position: endPos }, { easing: 'quadIn' })
                 .call(() => {
                     if (dropNode.isValid) dropNode.destroy();
                 })

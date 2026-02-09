@@ -9,14 +9,15 @@ import {
     Material,
     tween,
     Tween,
-    MotionStreak,
-    Texture2D,
-    resources,
 } from 'cc';
 import { Building } from './Building';
 import { Bullet } from '../combat/Bullet';
 import { Unit } from '../units/Unit';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
+import { EventManager } from '../../core/managers/EventManager';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import { GameEvents } from '../../data/GameEvents';
+import { EffectFactory } from '../effects/EffectFactory';
 
 const { ccclass, property } = _decorator;
 
@@ -52,6 +53,13 @@ export class Tower extends Building {
     public chainCount: number = 0;
     @property
     public chainRange: number = 0;
+
+    /** Frost-only mode: skip projectile and cast rain AOE directly on target */
+    @property
+    public castRainDirectly: boolean = false;
+    /** Frost rain radius growth per level (multiplicative): radius * (1 + (level-1)*k) */
+    @property
+    public rainRadiusPerLevel: number = 0.22;
 
     public attackMultiplier: number = 1.2;
     public rangeMultiplier: number = 1.03;
@@ -92,11 +100,6 @@ export class Tower extends Building {
         // Search new target if needed
         if (!this._target) {
             this._target = this.findNearestEnemy();
-            if (this._target) {
-                console.log(
-                    `[Tower] Found target: ${this._target.name}, dist: ${this.getDistance(this._target)}`
-                );
-            }
         }
 
         // Attack
@@ -130,25 +133,6 @@ export class Tower extends Building {
         return nearest;
     }
 
-    private _bulletTexture: Texture2D | null = null;
-
-    protected start(): void {
-        // super.start(); // BaseComponent likely doesn't have start, safer to omit unless confirmed
-
-        // Load Bullet Texture for Motion Streak
-        resources.load('textures/glow', Texture2D, (err, texture) => {
-            if (err) {
-                console.warn(
-                    '[Tower] Failed to load glow texture (ignore if using primitive):',
-                    err
-                );
-                return;
-            }
-            this._bulletTexture = texture;
-            console.log('[Tower] Glow texture loaded successfully');
-        });
-    }
-
     public setTowerUpgradeConfig(config: {
         attackMultiplier?: number;
         rangeMultiplier?: number;
@@ -178,8 +162,6 @@ export class Tower extends Building {
     }
 
     private shoot(target: Node): void {
-        console.log(`[Tower] Shooting at ${target.name}`);
-
         // Attack Animation (Squash and Stretch)
         const initialScale = this.node.scale.clone();
         const squashScale = new Vec3(
@@ -194,6 +176,13 @@ export class Tower extends Building {
             .to(0.05, { scale: squashScale }, { easing: 'elasticIn' })
             .to(0.2, { scale: initialScale }, { easing: 'backOut' })
             .start();
+
+        if (this.castRainDirectly && this.bulletExplosionRadius > 0 && this.bulletSlowPercent > 0) {
+            const rainRadius = this.getCurrentRainRadius();
+            this.playFrostCastSpray(rainRadius);
+            this.emitFrostRainAoE(target, rainRadius);
+            return;
+        }
 
         // Create Bullet
         const bulletNode = new Node('Bullet');
@@ -219,19 +208,6 @@ export class Tower extends Building {
         material.setProperty('mainColor', this.bulletColor);
         renderer.material = material;
 
-        // 2. Trail: Motion Streak
-        if (this._bulletTexture) {
-            const streak = bulletNode.addComponent(MotionStreak);
-            streak.fadeTime = 0.5;
-            streak.minSeg = 1;
-            streak.stroke = 0.6;
-            streak.color = this.bulletColor; // Match bullet color
-            streak.texture = this._bulletTexture;
-            streak.fastMode = true;
-        } else {
-            console.warn('[Tower] No texture for trail, skipping streak');
-        }
-
         // Logic
         const bullet = bulletNode.addComponent(Bullet);
         bullet.damage = this.attackDamage;
@@ -249,9 +225,41 @@ export class Tower extends Building {
         bullet.setTarget(target);
     }
 
+    private emitFrostRainAoE(target: Node, radiusOverride?: number): void {
+        if (!target || !target.isValid) return;
+
+        const center = target.position.clone();
+        const radius = radiusOverride ?? this.getCurrentRainRadius();
+
+        this.eventManager.emit(GameEvents.APPLY_AOE_EFFECT, {
+            center,
+            radius,
+            damage: this.attackDamage,
+            slowPercent: this.bulletSlowPercent,
+            slowDuration: this.bulletSlowDuration,
+        });
+    }
+
+    private getCurrentRainRadius(): number {
+        const levelBonus = Math.max(0, this.level - 1);
+        const radiusMultiplier = 1 + levelBonus * Math.max(0, this.rainRadiusPerLevel);
+        return Math.max(0.8, this.bulletExplosionRadius * radiusMultiplier);
+    }
+
+    private playFrostCastSpray(rainRadius: number): void {
+        if (!this.node.parent) return;
+        const sprayPos = this.node.worldPosition.clone();
+        sprayPos.y += Math.max(0.9, this.node.scale.y * 0.9);
+        EffectFactory.createFrostCastSpray(this.node.parent, sprayPos, rainRadius);
+    }
+
     private getDistance(target: Node): number {
         const dx = target.position.x - this.node.position.x;
         const dz = target.position.z - this.node.position.z;
         return Math.sqrt(dx * dx + dz * dz);
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }
 }

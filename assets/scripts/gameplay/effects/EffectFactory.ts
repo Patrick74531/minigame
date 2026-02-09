@@ -12,6 +12,11 @@ export class EffectFactory {
         EffectRuntime.play('frostExplosion', { parent, position, radius });
     }
 
+    public static createFrostCastSpray(parent: Node, position: Vec3, radius: number): void {
+        ensureEffectModulesRegistered();
+        EffectRuntime.play('frostCastSpray', { parent, position, radius });
+    }
+
     public static createLightningBolt(parent: Node, startPos: Vec3, endPos: Vec3): void {
         ensureEffectModulesRegistered();
         EffectRuntime.play('lightningBolt', { parent, startPos, endPos });

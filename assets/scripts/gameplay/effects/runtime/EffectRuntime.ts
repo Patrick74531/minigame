@@ -6,6 +6,11 @@ export type EffectPayloadMap = {
         position: Vec3;
         radius: number;
     };
+    frostCastSpray: {
+        parent: Node;
+        position: Vec3;
+        radius: number;
+    };
     lightningBolt: {
         parent: Node;
         startPos: Vec3;

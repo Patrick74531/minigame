@@ -47,6 +47,8 @@ export interface BuildingTypeConfig {
         bulletExplosionRadius?: number;
         bulletSlowPercent?: number;
         bulletSlowDuration?: number;
+        directRainCast?: boolean;
+        rainRadiusPerLevel?: number;
 
         // Chain Lightning
         chainCount?: number;

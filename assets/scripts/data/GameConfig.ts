@@ -211,6 +211,8 @@ export const GameConfig = {
                     bulletExplosionRadius: 2.8,
                     bulletSlowPercent: 0.45,
                     bulletSlowDuration: 2.2,
+                    directRainCast: true,
+                    rainRadiusPerLevel: 0.22,
                 },
                 upgrades: {
                     maxLevel: 5,
