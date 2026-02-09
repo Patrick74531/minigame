@@ -152,7 +152,7 @@ export class EnemyPaperDollAnimator extends Component {
     public farLodDistance: number = 16;
 
     @property
-    public enableMeshLod: boolean = true;
+    public enableMeshLod: boolean = false;
 
     @property
     public meshLodNearDistance: number = 11;
@@ -164,7 +164,7 @@ export class EnemyPaperDollAnimator extends Component {
     public lodCheckInterval: number = 0.15;
 
     @property
-    public enableExtremeCrowdMode: boolean = true;
+    public enableExtremeCrowdMode: boolean = false;
 
     @property
     public maxPaperDollsNearHero: number = 32;
@@ -228,6 +228,11 @@ export class EnemyPaperDollAnimator extends Component {
     protected start(): void {
         this._enemy = this.node.getComponent(Enemy);
         this._lastWorldPos.set(this.node.worldPosition);
+        this._meshRenderer = this.node.getComponent(MeshRenderer);
+        if (this._meshRenderer && this._meshRenderer.isValid) {
+            // Never show fallback cube for enemies; keep paper visual only.
+            this._meshRenderer.enabled = false;
+        }
         void this.buildVisualAsync();
     }
 
@@ -350,50 +355,22 @@ export class EnemyPaperDollAnimator extends Component {
         return tickDt;
     }
 
-    private updateVisualLod(dt: number): void {
+    private updateVisualLod(_dt: number): void {
         if (!this._visualRoot) return;
-        const currentBudget = Math.max(1, Math.floor(this.maxPaperDollsNearHero));
-        if (
-            this._lastExtremeMode !== this.enableExtremeCrowdMode ||
-            this._lastExtremeBudget !== currentBudget
-        ) {
-            this._lastExtremeMode = this.enableExtremeCrowdMode;
-            this._lastExtremeBudget = currentBudget;
-            EnemyPaperDollAnimator._budgetDirty = true;
-        }
-        if (!this.enableMeshLod && !this.enableExtremeCrowdMode) {
-            this.applyPaperVisible(true);
-            return;
-        }
-
-        this._lodCheckAccum += dt;
-        const checkInterval = Math.max(0.02, this.lodCheckInterval);
-        if (this._lodCheckAccum < checkInterval) {
-            return;
-        }
-        this._lodCheckAccum = 0;
-
-        const heroNode = this.gameManager.hero;
-        if (!heroNode || !heroNode.isValid) {
-            this.applyPaperVisible(true);
-            return;
-        }
-
-        const distanceAllowed = this.resolveDistanceLodAllowed(heroNode);
-        const budgetAllowed = this.resolveCrowdBudgetAllowed(dt, heroNode);
-        this.applyPaperVisible(distanceAllowed && budgetAllowed);
+        this.applyPaperVisible(true);
     }
 
     private applyPaperVisible(visible: boolean): void {
+        if (this._meshRenderer && this._meshRenderer.isValid) {
+            // Keep cube mesh disabled even if paper visibility toggles.
+            this._meshRenderer.enabled = false;
+        }
         if (this._paperVisible === visible) {
             return;
         }
         this._paperVisible = visible;
         if (this._visualRoot && this._visualRoot.isValid) {
             this._visualRoot.active = visible;
-        }
-        if (this._meshRenderer && this._meshRenderer.isValid) {
-            this._meshRenderer.enabled = !visible;
         }
         this._animTickAccum = 0;
         if (visible) {
