@@ -62,6 +62,12 @@ export class ResourcePreloader {
         resources.preload('textures/beam_noise', Texture2D);
         resources.preload('textures/bullet/texture', Texture2D);
         resources.preload('textures/bullet', Texture2D);
+        resources.preload('floor/tileable_grass_00/texture', Texture2D);
+        resources.preload('floor/tileable_grass_00', Texture2D);
+        resources.preload('floor/tileable_grass_00.webp', Texture2D);
+        resources.preload('floor/Dirt_01/texture', Texture2D);
+        resources.preload('floor/Dirt_01', Texture2D);
+        resources.preload('floor/Dirt_01.webp', Texture2D);
     }
 
     // === Hero 模型 + 动画 ===
