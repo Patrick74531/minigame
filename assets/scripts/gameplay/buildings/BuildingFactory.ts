@@ -39,6 +39,17 @@ export class BuildingFactory {
     private static readonly BARRACKS_MODEL_SCALE = 6.0;
     private static readonly BARRACKS_MODEL_Y_OFFSET = 1.3;
     private static readonly BARRACKS_MODEL_Y_ROTATION = 180;
+    private static _lightningTowerModelPrefab: Prefab | null = null;
+    private static _lightningTowerModelLoading: boolean = false;
+    private static _pendingLightningTowerModelNodes: Node[] = [];
+    private static readonly LIGHTNING_TOWER_MODEL_PREFAB_PATHS = [
+        'building/radar_3d',
+        'building/radar_3d/radar_3d',
+    ];
+    private static readonly LIGHTNING_TOWER_MODEL_NODE_NAME = 'LightningRadarModel';
+    private static readonly LIGHTNING_TOWER_MODEL_SCALE = 2;
+    private static readonly LIGHTNING_TOWER_MODEL_Y_OFFSET = 1.7;
+    private static readonly LIGHTNING_TOWER_MODEL_Y_ROTATION = 0;
 
     /**
      * 创建兵营
@@ -268,7 +279,7 @@ export class BuildingFactory {
             if (buildingId === 'frost_tower') {
                 this.attachFrostTowerSunflowerVisual(node);
             } else if (buildingId === 'lightning_tower') {
-                this.attachLightningTowerRadarVisual(node);
+                this.attachLightningTowerRadarModel(node);
             }
             const tower = node.addComponent(Tower);
             tower.setConfig({
@@ -464,19 +475,89 @@ export class BuildingFactory {
         }
     }
 
-    private static attachLightningTowerRadarVisual(node: Node): void {
-        const preview = node.getComponent(SunflowerPreview) ?? node.addComponent(SunflowerPreview);
-        preview.resourcePath = 'building/radar.webp';
-        preview.yOffset = 1.05;
-        preview.visualScale = 0.024;
-        preview.fps = 1;
-        preview.frameCountOverride = 1;
-        preview.faceCamera = false;
-        preview.alignToCameraOnStart = false;
-        preview.spriteYRotation = 0;
-        preview.spriteZRotation = 0;
-        preview.flipX = false;
-        preview.flipY = false;
-        preview.hideOwnerMeshOnReady = true;
+    private static attachLightningTowerRadarModel(node: Node): void {
+        this.attachLightningTowerRadarModelAsync(node);
+    }
+
+    private static attachLightningTowerRadarModelAsync(node: Node): void {
+        if (!node || !node.isValid) return;
+        if (this.tryAttachLightningTowerModel(node)) return;
+
+        this._pendingLightningTowerModelNodes.push(node);
+        if (this._lightningTowerModelLoading) return;
+
+        this._lightningTowerModelLoading = true;
+        this.loadLightningTowerModelPrefabByPath(0);
+    }
+
+    private static tryAttachLightningTowerModel(node: Node): boolean {
+        if (!this._lightningTowerModelPrefab) return false;
+        this.applyLightningTowerModel(node, this._lightningTowerModelPrefab);
+        return true;
+    }
+
+    private static onLightningTowerModelPrefabLoaded(prefab: Prefab): void {
+        this._lightningTowerModelLoading = false;
+        this._lightningTowerModelPrefab = prefab;
+        const pending = this._pendingLightningTowerModelNodes.splice(0);
+        for (const n of pending) {
+            if (!n || !n.isValid) continue;
+            this.applyLightningTowerModel(n, prefab);
+        }
+    }
+
+    private static applyLightningTowerModel(node: Node, prefab: Prefab): void {
+        const existing = node.getChildByName(this.LIGHTNING_TOWER_MODEL_NODE_NAME);
+        if (existing && existing.isValid) return;
+
+        const preview = node.getComponent(SunflowerPreview);
+        if (preview) {
+            preview.enabled = false;
+        }
+        const visualRoot = node.getChildByName('SunflowerVisualRoot');
+        if (visualRoot && visualRoot.isValid) {
+            visualRoot.destroy();
+        }
+
+        const model = instantiate(prefab);
+        model.name = this.LIGHTNING_TOWER_MODEL_NODE_NAME;
+        const parentScale = node.scale;
+        const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
+        const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
+        const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
+        // Compensate parent non-uniform scale so the imported model keeps aspect ratio.
+        model.setPosition(0, this.LIGHTNING_TOWER_MODEL_Y_OFFSET / parentScaleY, 0);
+        model.setScale(
+            this.LIGHTNING_TOWER_MODEL_SCALE / parentScaleX,
+            this.LIGHTNING_TOWER_MODEL_SCALE / parentScaleY,
+            this.LIGHTNING_TOWER_MODEL_SCALE / parentScaleZ
+        );
+        model.setRotationFromEuler(0, this.LIGHTNING_TOWER_MODEL_Y_ROTATION, 0);
+        this.applyLayerRecursive(model, node.layer);
+        node.addChild(model);
+
+        const hasRenderer = model.getComponentsInChildren(Renderer).length > 0;
+        const ownerMesh = node.getComponent(MeshRenderer);
+        if (ownerMesh && hasRenderer) {
+            ownerMesh.enabled = false;
+        }
+    }
+
+    private static loadLightningTowerModelPrefabByPath(index: number): void {
+        if (index >= this.LIGHTNING_TOWER_MODEL_PREFAB_PATHS.length) {
+            // Keep cube mesh when 3D model load fails.
+            this._lightningTowerModelLoading = false;
+            this._pendingLightningTowerModelNodes.length = 0;
+            return;
+        }
+
+        const path = this.LIGHTNING_TOWER_MODEL_PREFAB_PATHS[index];
+        resources.load(path, Prefab, (err, prefab) => {
+            if (err || !prefab) {
+                this.loadLightningTowerModelPrefabByPath(index + 1);
+                return;
+            }
+            this.onLightningTowerModelPrefabLoaded(prefab);
+        });
     }
 }

@@ -84,9 +84,7 @@ export class ResourcePreloader {
         resources.preload('building/sunflower/texture', Texture2D);
         resources.preload('building/sunflower', Texture2D);
         resources.preload('building/sunflower.webp', Texture2D);
-        resources.preload('building/radar.webp', Texture2D);
-        resources.preload('building/radar/texture', Texture2D);
-        resources.preload('building/radar', Texture2D);
+        resources.preload('building/radar_3d', Prefab);
     }
 
     private static readonly BUILDING_MODEL_PREFAB_PATHS = [
