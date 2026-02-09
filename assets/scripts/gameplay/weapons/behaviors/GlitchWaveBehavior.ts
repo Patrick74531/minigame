@@ -1,4 +1,4 @@
-import { Node, Color } from 'cc';
+import { Node, Color, Vec3 } from 'cc';
 import { WeaponBehavior } from '../WeaponBehavior';
 import { WeaponType, WeaponLevelStats } from '../WeaponTypes';
 import { WeaponVFX } from '../WeaponVFX';
@@ -9,19 +9,15 @@ import { ServiceRegistry } from '../../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../../data/GameEvents';
 
 /**
- * 模拟回音 — 故障扫描线能量波 (性能优化版)
+ * 模拟回音 — 信号干扰波 (性能优化版)
  *
  * 核心优化：
- * - 用 UI 层扫描线覆盖代替多层 3D 扩散环（零 DrawCall 开销）
- * - 3D 层只保留 1 个池化冲击波环（视觉锚点）
- * - 去掉碎片生成、脉冲球等重开销 VFX
+ * - 用 UI 层干扰扫描覆盖代替大面积纯色块
+ * - 3D 层使用短促干扰束替代大方块冲击波
+ * - 保留低开销震屏与中心闪光
  * - 屏幕震动 + UI 故障闪屏 = 视觉冲击力更强，性能更低
  *
- * Lv.1: 1 个扩散环 + 轻微 UI 闪屏
- * Lv.2: 扩散环 + 中等 UI 闪屏 + 中心闪光
- * Lv.3: 扩散环 + 强 UI 闪屏 + 轻微屏幕震动
- * Lv.4: 扩散环 + 强 UI 闪屏 + 中等屏幕震动
- * Lv.5: 扩散环 + 超强 UI 故障 + 强屏幕震动 + 地面印记
+ * 机制定位：低伤害范围控场（主打减速）
  */
 export class GlitchWaveBehavior extends WeaponBehavior {
     public readonly type = WeaponType.GLITCH_WAVE;
@@ -34,11 +30,11 @@ export class GlitchWaveBehavior extends WeaponBehavior {
     }
 
     private static readonly COLORS: Color[] = [
-        new Color(0, 180, 255, 255),
-        new Color(30, 210, 255, 255),
-        new Color(80, 230, 255, 255),
-        new Color(150, 245, 255, 255),
-        new Color(220, 255, 255, 255),
+        new Color(70, 210, 255, 255),
+        new Color(90, 240, 255, 255),
+        new Color(120, 255, 245, 255),
+        new Color(170, 255, 235, 255),
+        new Color(220, 255, 245, 255),
     ];
 
     public fire(
@@ -52,51 +48,88 @@ export class GlitchWaveBehavior extends WeaponBehavior {
         center.y += 0.5;
 
         const waveRadius = (stats['waveRadius'] ?? 4) as number;
+        const waveSpeed = (stats['waveSpeed'] ?? 8) as number;
+        const slowPercent = Math.max(0, Math.min(0.85, (stats['slowPercent'] ?? 0.3) as number));
+        const slowDuration = Math.max(0.2, (stats['slowDuration'] ?? 1.8) as number);
         const idx = Math.min(level - 1, 4);
         const color = GlitchWaveBehavior.COLORS[idx];
 
-        // AOE 伤害事件
+        // AOE：低伤害 + 减速
         const eventManager =
             ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
         eventManager.emit(GameEvents.APPLY_AOE_EFFECT, {
             center,
             radius: waveRadius,
             damage: stats.damage,
-            slowPercent: 0,
-            slowDuration: 0,
+            slowPercent,
+            slowDuration,
         });
 
-        // === 3D 层：只需 1 个池化冲击波环作为视觉锚点 ===
-        const ringColor = color.clone();
-        ringColor.a = 180;
-        WeaponVFX.createShockRing(parent, center, waveRadius, ringColor, 0.35, 0.06 + level * 0.01);
+        // === 3D 层：干扰束脉冲（替代方块冲击波） ===
+        this.spawnInterferenceBurst(parent, center, waveRadius, waveSpeed, color, level);
 
         // 中心闪光 (Lv.2+)
         if (level >= 2) {
-            WeaponVFX.createMuzzleFlash(parent, center, color, 0.3 + level * 0.1);
+            WeaponVFX.createMuzzleFlash(parent, center, color, 0.22 + level * 0.06);
         }
 
-        // 地面印记 (Lv.5)
-        if (level >= 5) {
-            const burnColor = new Color(0, 150, 200, 100);
-            WeaponVFX.createGroundBurn(parent, center, waveRadius * 0.6, burnColor, 1.0);
-        }
-
-        // === UI 层：故障扫描线覆盖（零 3D 开销） ===
+        // === UI 层：故障扫描线覆盖 ===
         if (GlitchWaveBehavior._uiCanvas) {
-            const intensity = 0.3 + level * 0.14; // Lv.1=0.44, Lv.5=1.0
-            const duration = 0.25 + level * 0.06;
-            GlitchOverlay.flash(
-                GlitchWaveBehavior._uiCanvas,
-                duration,
-                Math.min(intensity, 1),
-                color
-            );
+            const intensity = Math.min(1, 0.36 + level * 0.11); // Lv.1=0.47, Lv.5=0.91
+            const duration = 0.18 + level * 0.05;
+            GlitchOverlay.flash(GlitchWaveBehavior._uiCanvas, duration, intensity, color);
         }
 
         // === 屏幕震动 (Lv.3+) ===
         if (level >= 3) {
-            ScreenShake.shake(0.1 + level * 0.06, 0.12 + level * 0.03);
+            ScreenShake.shake(0.08 + level * 0.045, 0.1 + level * 0.025);
+        }
+    }
+
+    /** 生成短促多束干扰线，做出“信号撕裂”感 */
+    private spawnInterferenceBurst(
+        parent: Node,
+        center: Vec3,
+        radius: number,
+        waveSpeed: number,
+        color: Color,
+        level: number
+    ): void {
+        const beamCount = 3 + level;
+        const duration = Math.max(0.06, 0.22 - waveSpeed * 0.01);
+        const widthBase = 0.1 + level * 0.018;
+
+        for (let i = 0; i < beamCount; i++) {
+            const angle = (Math.PI * 2 * i) / beamCount + (Math.random() - 0.5) * 0.65;
+            const innerR = Math.random() * radius * 0.25;
+            const outerR = radius * (0.72 + Math.random() * 0.35);
+
+            const start = new Vec3(
+                center.x + Math.cos(angle) * innerR,
+                center.y,
+                center.z + Math.sin(angle) * innerR
+            );
+            const end = new Vec3(
+                center.x + Math.cos(angle) * outerR,
+                center.y,
+                center.z + Math.sin(angle) * outerR
+            );
+
+            const beamColor = new Color(
+                Math.min(255, color.r + 25),
+                Math.min(255, color.g + 20),
+                Math.max(0, color.b - 10),
+                220
+            );
+            const coreColor = new Color(235, 255, 255, 235);
+
+            WeaponVFX.createCodeBeam(parent, start, end, {
+                width: widthBase + Math.random() * 0.04,
+                duration: duration + Math.random() * 0.06,
+                beamColor,
+                coreColor,
+                intensity: 1.8 + level * 0.35,
+            });
         }
     }
 }

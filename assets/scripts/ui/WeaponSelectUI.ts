@@ -259,6 +259,8 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         spinSpeed: '旋转速度',
         waveSpeed: '波速',
         waveRadius: '波半径',
+        slowPercent: '减速比例',
+        slowDuration: '减速时长',
     };
 
     private formatStats(def: WeaponDef, level: number): string {
@@ -272,7 +274,13 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
             const value = (stats as any)[key];
             const label = WeaponSelectUI.STAT_LABELS[key] || key;
             if (typeof value === 'number') {
-                lines.push(`${label}: ${value}`);
+                if (key === 'slowPercent') {
+                    lines.push(`${label}: ${Math.round(value * 100)}%`);
+                } else if (key === 'slowDuration') {
+                    lines.push(`${label}: ${value}s`);
+                } else {
+                    lines.push(`${label}: ${value}`);
+                }
             }
         }
         return lines.join('\n');
