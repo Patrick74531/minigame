@@ -13,6 +13,10 @@ import {
     Texture2D,
     ImageAsset,
     resources,
+    Prefab,
+    instantiate,
+    ParticleSystem,
+    Animation,
 } from 'cc';
 import { ProjectilePool } from './vfx/ProjectilePool';
 
@@ -42,6 +46,17 @@ export class WeaponVFX {
     private static _beamPoolReady: boolean = false;
     private static _bulletTex: Texture2D | null = null;
     private static _bulletTexLoading: boolean = false;
+    private static _deathRayCoreTex: Texture2D | null = null;
+    private static _deathRayFlowTex: Texture2D | null = null;
+    private static _deathRayOrbTex: Texture2D | null = null;
+    private static _deathRayRuneTex: Texture2D | null = null;
+    private static _deathRayMeshTex: Texture2D | null = null;
+    private static _deathRayAuraTex: Texture2D | null = null;
+    private static _deathRayTexLoading: boolean = false;
+    private static _deathRayPrefab: Prefab | null = null;
+    private static _deathRayPrefabLoading: boolean = false;
+    private static _deathRayPrefabPool: Node[] = [];
+    private static readonly _DEATH_RAY_PREFAB_POOL_CAP: number = 8;
 
     /** 初始化共享资源 + 预热池（在 GameController.onLoad 调用一次） */
     public static initialize(): void {
@@ -56,11 +71,20 @@ export class WeaponVFX {
         ProjectilePool.register('vfx_beam_core', () => this._createVfxNode('BeamCore'), 2);
         ProjectilePool.register('vfx_beam_glow', () => this._createVfxNode('BeamGlow'), 2);
         ProjectilePool.register('vfx_beam_pulse', () => this._createVfxNode('BeamPulse'), 2);
+        ProjectilePool.register('vfx_dray_core', () => this._createVfxNode('DeadRayCore'), 16);
+        ProjectilePool.register('vfx_dray_glow', () => this._createVfxNode('DeadRayGlow'), 16);
+        ProjectilePool.register('vfx_dray_flow', () => this._createVfxNode('DeadRayFlow'), 16);
+        ProjectilePool.register('vfx_dray_mesh', () => this._createVfxNode('DeadRayMesh'), 16);
+        ProjectilePool.register('vfx_dray_rune', () => this._createVfxNode('DeadRayRune'), 16);
+        ProjectilePool.register('vfx_dray_aura', () => this._createVfxNode('DeadRayAura'), 16);
+        ProjectilePool.register('vfx_dray_hit', () => this._createVfxNode('DeadRayHit'), 16);
         // 机枪子弹池 + 弹壳池
         ProjectilePool.register('mg_bullet', () => this._createMGBulletNode(), 40);
         ProjectilePool.register('mg_casing', () => this._createCasingNode(), 10);
         this._ensureBeamNoiseTexture();
         this._ensureBulletTexture();
+        this._ensureDeathRayTextures();
+        this._ensureDeathRayPrefab();
     }
 
     private static _ensureBeamNoiseTexture(): void {
@@ -113,6 +137,243 @@ export class WeaponVFX {
                 });
             });
         });
+    }
+
+    private static _loadTexture2D(
+        path: string,
+        onComplete: (texture: Texture2D | null) => void
+    ): void {
+        resources.load(`${path}/texture`, Texture2D, (err, texture) => {
+            if (!err && texture) {
+                onComplete(texture);
+                return;
+            }
+            resources.load(path, Texture2D, (err2, texture2) => {
+                if (!err2 && texture2) {
+                    onComplete(texture2);
+                    return;
+                }
+                resources.load(path, ImageAsset, (err3, image) => {
+                    if (err3 || !image) {
+                        onComplete(null);
+                        return;
+                    }
+                    const tex = new Texture2D();
+                    tex.image = image;
+                    onComplete(tex);
+                });
+            });
+        });
+    }
+
+    private static _ensureDeathRayTextures(): void {
+        if (
+            this._deathRayCoreTex &&
+            this._deathRayFlowTex &&
+            this._deathRayOrbTex &&
+            this._deathRayRuneTex &&
+            this._deathRayMeshTex &&
+            this._deathRayAuraTex
+        ) {
+            return;
+        }
+        if (this._deathRayTexLoading) return;
+        this._deathRayTexLoading = true;
+
+        let pending = 6;
+        const done = () => {
+            pending--;
+            if (pending <= 0) {
+                this._deathRayTexLoading = false;
+            }
+        };
+        const assign = (label: string, setter: (texture: Texture2D | null) => void) => {
+            return (texture: Texture2D | null) => {
+                if (!texture) {
+                    console.warn(`[WeaponVFX] Failed to load deathray texture: ${label}`);
+                }
+                setter(texture);
+                done();
+            };
+        };
+
+        this._loadTexture2D(
+            'textures/deathray/l001',
+            assign('textures/deathray/l001', texture => (this._deathRayCoreTex = texture))
+        );
+        this._loadTexture2D(
+            'textures/deathray/FX_Spark_006_TEX_PYS',
+            assign(
+                'textures/deathray/FX_Spark_006_TEX_PYS',
+                texture => (this._deathRayFlowTex = texture)
+            )
+        );
+        this._loadTexture2D(
+            'textures/deathray/magic_orb',
+            assign('textures/deathray/magic_orb', texture => (this._deathRayOrbTex = texture))
+        );
+        this._loadTexture2D(
+            'textures/deathray/ID_6739',
+            assign('textures/deathray/ID_6739', texture => (this._deathRayRuneTex = texture))
+        );
+        this._loadTexture2D(
+            'textures/deathray/ID_6920',
+            assign('textures/deathray/ID_6920', texture => (this._deathRayMeshTex = texture))
+        );
+        this._loadTexture2D(
+            'textures/deathray/aura04',
+            assign('textures/deathray/aura04', texture => (this._deathRayAuraTex = texture))
+        );
+    }
+
+    private static _ensureDeathRayPrefab(): void {
+        if (this._deathRayPrefab || this._deathRayPrefabLoading) return;
+        this._deathRayPrefabLoading = true;
+        resources.load('effects/deathray_skill/skill8', Prefab, (err, prefab) => {
+            this._deathRayPrefabLoading = false;
+            if (err || !prefab) {
+                console.warn('[WeaponVFX] Failed to load deathray prefab skill8:', err);
+                return;
+            }
+            this._deathRayPrefab = prefab;
+        });
+    }
+
+    private static _borrowDeathRayPrefabNode(): Node | null {
+        while (this._deathRayPrefabPool.length > 0) {
+            const cached = this._deathRayPrefabPool.pop();
+            if (cached && cached.isValid) return cached;
+        }
+        if (!this._deathRayPrefab) return null;
+        return instantiate(this._deathRayPrefab);
+    }
+
+    private static _recycleDeathRayPrefabNode(node: Node): void {
+        if (!node || !node.isValid) return;
+        Tween.stopAllByTarget(node);
+        this._setDeathRayPrefabPlayback(node, false);
+        node.removeFromParent();
+        node.setScale(2, 2, 2);
+
+        if (this._deathRayPrefabPool.length < this._DEATH_RAY_PREFAB_POOL_CAP) {
+            this._deathRayPrefabPool.push(node);
+        } else {
+            node.destroy();
+        }
+    }
+
+    private static _playDeathRayPrefab(
+        parent: Node,
+        start: Vec3,
+        end: Vec3,
+        opts: { width: number; duration: number }
+    ): boolean {
+        if (!this._deathRayPrefab) return false;
+        const node = this._borrowDeathRayPrefabNode();
+        if (!node) return false;
+
+        const dx = end.x - start.x;
+        const dz = end.z - start.z;
+        const len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 0.001) {
+            this._recycleDeathRayPrefabNode(node);
+            return false;
+        }
+        const yawDeg = (Math.atan2(dx, dz) * 180) / Math.PI;
+        const isSkill8 =
+            node.name.toLowerCase().includes('skill8') || !!node.getChildByName('root');
+
+        parent.addChild(node);
+        node.setPosition(start);
+        if (isSkill8) {
+            const widthScale = Math.max(0.75, Math.min(1.65, opts.width / 0.24));
+            const lengthScale = Math.max(0.42, len / 12);
+            node.setRotationFromEuler(0, yawDeg, 0);
+            node.setScale(lengthScale, widthScale, widthScale);
+        } else {
+            const widthNorm = Math.max(0.55, Math.min(2, opts.width / 0.28));
+            const lengthNorm = Math.max(0.45, len / 9.2);
+            const scaleY = 2 * (0.7 + widthNorm * 0.3);
+            const scaleZ = 2 * (0.7 + widthNorm * 0.3);
+            node.setRotationFromEuler(0, yawDeg - 90, 0);
+            node.setScale(2 * lengthNorm, scaleY, scaleZ);
+        }
+
+        this._setDeathRayPrefabPlayback(node, true);
+
+        const life = isSkill8
+            ? Math.max(0.95, opts.duration * 9.5)
+            : Math.max(0.28, opts.duration * 4.2);
+        tween(node)
+            .delay(life)
+            .call(() => this._recycleDeathRayPrefabNode(node))
+            .start();
+        return true;
+    }
+
+    private static _collectComponentsSafe<T>(root: Node, ctor: new (...args: never[]) => T): T[] {
+        const result: T[] = [];
+        const stack: Node[] = [root];
+        while (stack.length > 0) {
+            const node = stack.pop();
+            if (!node || !node.isValid) continue;
+            try {
+                const comp = node.getComponent(ctor);
+                if (comp) result.push(comp);
+            } catch {
+                // Imported prefab may contain missing script components; skip safely.
+            }
+            const children = node.children;
+            for (let i = 0; i < children.length; i++) {
+                stack.push(children[i]);
+            }
+        }
+        return result;
+    }
+
+    private static _getComponentSafe<T>(
+        node: Node | null,
+        ctor: new (...args: never[]) => T
+    ): T | null {
+        if (!node || !node.isValid) return null;
+        try {
+            return node.getComponent(ctor);
+        } catch {
+            return null;
+        }
+    }
+
+    private static _setDeathRayPrefabPlayback(node: Node, play: boolean): void {
+        const root = node.getChildByName('root');
+        if (!root) return;
+
+        const fxNames = ['glow', 'fasan', 'hit'];
+        for (const name of fxNames) {
+            const fxNode = root.getChildByName(name);
+            const ps = this._getComponentSafe(fxNode, ParticleSystem);
+            if (!ps) continue;
+            if (play) {
+                ps.stop();
+                ps.clear();
+                ps.play();
+            } else {
+                ps.stop();
+                ps.clear();
+            }
+        }
+
+        const anm = this._getComponentSafe(root, Animation);
+        if (anm) {
+            if (play) {
+                anm.stop();
+                anm.play();
+            } else {
+                anm.stop();
+            }
+        }
+
+        const bullet = root.getChildByName('liudong')?.getChildByName('bullet');
+        if (bullet) bullet.active = false;
     }
 
     /** 获取子弹贴图（可能为 null，异步加载中） */
@@ -170,6 +431,19 @@ export class WeaponVFX {
         mat.setProperty('mainTexture', tex);
         mat.setProperty('mainColor', color);
         this._matCache.set(key, mat);
+        return mat;
+    }
+
+    /** 创建独立贴图材质（用于需要动态修改 UV 的特效） */
+    private static _createDynamicSpriteMat(color: Color, tex: Texture2D): Material {
+        const mat = new Material();
+        mat.initialize({
+            effectName: 'builtin-unlit',
+            technique: 1,
+            defines: { USE_TEXTURE: true },
+        });
+        mat.setProperty('mainTexture', tex);
+        mat.setProperty('mainColor', color);
         return mat;
     }
 
@@ -632,6 +906,224 @@ export class WeaponVFX {
             .start();
     }
 
+    /** 破坏死光风格贴图激光（主束 + 流动层 + 起始符文 + 终点爆闪） */
+    public static createDestructionRay(
+        parent: Node,
+        start: Vec3,
+        end: Vec3,
+        opts: {
+            width: number;
+            duration: number;
+            beamColor: Color;
+            coreColor: Color;
+            intensity: number;
+        }
+    ): void {
+        this._ensureDeathRayPrefab();
+        if (this._playDeathRayPrefab(parent, start, end, opts)) return;
+        if (this._deathRayPrefabLoading) return;
+        if (!this._deathRayPrefab) {
+            console.warn('[WeaponVFX] skill8 prefab unavailable, destruction ray skipped.');
+            return;
+        }
+
+        this._ensureDeathRayTextures();
+
+        const s = start.clone();
+        const e = end.clone();
+        e.y = s.y;
+
+        const dx = e.x - s.x;
+        const dz = e.z - s.z;
+        const len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 0.001) return;
+
+        const core = ProjectilePool.get('vfx_dray_core') ?? this._createVfxNode('DeadRayCore');
+        const glow = ProjectilePool.get('vfx_dray_glow') ?? this._createVfxNode('DeadRayGlow');
+        const flow = ProjectilePool.get('vfx_dray_flow') ?? this._createVfxNode('DeadRayFlow');
+        const mesh = ProjectilePool.get('vfx_dray_mesh') ?? this._createVfxNode('DeadRayMesh');
+        const rune = ProjectilePool.get('vfx_dray_rune') ?? this._createVfxNode('DeadRayRune');
+        const aura = ProjectilePool.get('vfx_dray_aura') ?? this._createVfxNode('DeadRayAura');
+        const hit = ProjectilePool.get('vfx_dray_hit') ?? this._createVfxNode('DeadRayHit');
+
+        parent.addChild(core);
+        parent.addChild(glow);
+        parent.addChild(flow);
+        parent.addChild(mesh);
+        parent.addChild(rune);
+        parent.addChild(aura);
+        parent.addChild(hit);
+
+        const yawDeg = (Math.atan2(dx, dz) * 180) / Math.PI;
+        const midX = (s.x + e.x) * 0.5;
+        const midZ = (s.z + e.z) * 0.5;
+        const dirX = dx / len;
+        const dirZ = dz / len;
+        const duration = Math.max(0.08, opts.duration);
+        const intensity = Math.max(0.8, Math.min(2.4, opts.intensity));
+
+        const coreW = Math.max(0.08, opts.width * (0.28 + 0.06 * intensity));
+        const glowW = Math.max(0.12, opts.width * (0.55 + 0.1 * intensity));
+        const flowW = Math.max(0.16, opts.width * (0.82 + 0.12 * intensity));
+        const meshW = Math.max(0.1, opts.width * (0.36 + 0.1 * intensity));
+        const runeSize = Math.max(0.22, opts.width * 0.85);
+        const auraSize = Math.max(0.24, opts.width * 0.96);
+        const hitSize = Math.max(0.28, opts.width * 1.25);
+        const beamMesh = this.getBoxMesh(1, 1, 1);
+
+        const coreMat = this._deathRayCoreTex
+            ? this._createDynamicSpriteMat(opts.coreColor, this._deathRayCoreTex)
+            : this.getGlowMat(opts.coreColor);
+        const glowMat = this._deathRayFlowTex
+            ? this._createDynamicSpriteMat(opts.beamColor, this._deathRayFlowTex)
+            : this.getGlowMat(opts.beamColor);
+        const flowMat = this._deathRayRuneTex
+            ? this._createDynamicSpriteMat(
+                  this.lerpColor(opts.coreColor, opts.beamColor, 0.38),
+                  this._deathRayRuneTex
+              )
+            : this.getGlowMat(this.lerpColor(opts.coreColor, opts.beamColor, 0.38));
+        const meshMat = this._deathRayMeshTex
+            ? this._createDynamicSpriteMat(
+                  this.lerpColor(opts.beamColor, opts.coreColor, 0.22),
+                  this._deathRayMeshTex
+              )
+            : this.getGlowMat(this.lerpColor(opts.beamColor, opts.coreColor, 0.22));
+        const runeMat = this._deathRayRuneTex
+            ? this._createDynamicSpriteMat(
+                  this.lerpColor(opts.beamColor, Color.WHITE, 0.12),
+                  this._deathRayRuneTex
+              )
+            : this.getGlowMat(this.lerpColor(opts.beamColor, Color.WHITE, 0.12));
+        const auraMat = this._deathRayAuraTex
+            ? this._createDynamicSpriteMat(
+                  this.lerpColor(opts.beamColor, Color.WHITE, 0.08),
+                  this._deathRayAuraTex
+              )
+            : this.getGlowMat(this.lerpColor(opts.beamColor, Color.WHITE, 0.08));
+        const hitMat = this._deathRayOrbTex
+            ? this._createDynamicSpriteMat(
+                  this.lerpColor(opts.coreColor, Color.WHITE, 0.2),
+                  this._deathRayOrbTex
+              )
+            : this.getGlowMat(this.lerpColor(opts.coreColor, Color.WHITE, 0.2));
+
+        this.configureVfxNode(core, beamMesh, coreMat);
+        this.configureVfxNode(glow, beamMesh, glowMat);
+        this.configureVfxNode(flow, beamMesh, flowMat);
+        this.configureVfxNode(mesh, beamMesh, meshMat);
+        this.configureVfxNode(rune, beamMesh, runeMat);
+        this.configureVfxNode(aura, beamMesh, auraMat);
+        this.configureVfxNode(hit, beamMesh, hitMat);
+
+        core.setPosition(midX, s.y, midZ);
+        glow.setPosition(midX, s.y, midZ);
+        flow.setPosition(midX, s.y, midZ);
+        mesh.setPosition(midX, s.y, midZ);
+        core.setRotationFromEuler(0, yawDeg, 0);
+        glow.setRotationFromEuler(0, yawDeg, 0);
+        flow.setRotationFromEuler(0, yawDeg, 0);
+        mesh.setRotationFromEuler(0, yawDeg, 0);
+        core.setScale(coreW, 0.022, len);
+        glow.setScale(glowW, 0.016, len * 1.01);
+        flow.setScale(flowW, 0.012, len * 1.01);
+        mesh.setScale(meshW, 0.014, len * 1.03);
+
+        const runePos = new Vec3(
+            s.x + dirX * Math.min(0.5, len * 0.12),
+            s.y,
+            s.z + dirZ * Math.min(0.5, len * 0.12)
+        );
+        rune.setPosition(runePos);
+        rune.setRotationFromEuler(0, yawDeg + 90, 0);
+        rune.setScale(runeSize * 0.24, 0.01, runeSize * 0.24);
+        aura.setPosition(runePos);
+        aura.setRotationFromEuler(0, yawDeg + 90, 0);
+        aura.setScale(auraSize * 0.18, 0.01, auraSize * 0.18);
+
+        hit.setPosition(e);
+        hit.setRotationFromEuler(0, yawDeg + 90, 0);
+        hit.setScale(hitSize * 0.14, 0.01, hitSize * 0.14);
+
+        Tween.stopAllByTarget(core);
+        Tween.stopAllByTarget(glow);
+        Tween.stopAllByTarget(flow);
+        Tween.stopAllByTarget(mesh);
+        Tween.stopAllByTarget(rune);
+        Tween.stopAllByTarget(aura);
+        Tween.stopAllByTarget(hit);
+
+        const state = { t: 0 };
+        tween(state)
+            .to(
+                duration,
+                { t: 1 },
+                {
+                    onUpdate: () => {
+                        const t = state.t;
+                        const pulseA = 1 + Math.sin(t * Math.PI * 10) * 0.09;
+                        const pulseB = 1 + Math.sin((t * Math.PI + 0.8) * 8) * 0.16;
+                        const shrink = Math.max(0.2, 1 - t * 0.65);
+
+                        core.setScale(coreW * pulseA * shrink, 0.022, len);
+                        glow.setScale(glowW * pulseB * shrink, 0.016, len * 1.01);
+                        flow.setScale(flowW * (1.06 + pulseA * 0.14) * shrink, 0.012, len * 1.01);
+                        mesh.setScale(meshW * (0.86 + pulseB * 0.24) * shrink, 0.014, len * 1.03);
+
+                        const runeScale = runeSize * (0.3 + 0.85 * Math.min(1, t * 2.2));
+                        rune.setScale(runeScale, 0.01, runeScale);
+                        rune.setRotationFromEuler(0, yawDeg + 90 + t * 340, 0);
+                        const auraScale = auraSize * (0.22 + 0.8 * Math.sin(t * Math.PI));
+                        aura.setScale(auraScale, 0.01, auraScale);
+                        aura.setRotationFromEuler(0, yawDeg + 90 - t * 280, 0);
+
+                        const hitScale = hitSize * (0.18 + Math.sin(t * Math.PI) * 0.64);
+                        hit.setScale(hitScale, 0.01, hitScale);
+
+                        const uvCore =
+                            (coreMat.getProperty('tilingOffset') as Vec4) ?? new Vec4(1, 1, 0, 0);
+                        uvCore.x = Math.max(1.2, len * 0.52);
+                        uvCore.z = -t * 3.8;
+                        coreMat.setProperty('tilingOffset', uvCore);
+
+                        const uvGlow =
+                            (glowMat.getProperty('tilingOffset') as Vec4) ?? new Vec4(1, 1, 0, 0);
+                        uvGlow.x = Math.max(1.5, len * 0.86);
+                        uvGlow.z = t * 5.2;
+                        glowMat.setProperty('tilingOffset', uvGlow);
+
+                        const uvFlow =
+                            (flowMat.getProperty('tilingOffset') as Vec4) ?? new Vec4(1, 1, 0, 0);
+                        uvFlow.x = Math.max(1.8, len * 1.1);
+                        uvFlow.z = -t * 6.4;
+                        flowMat.setProperty('tilingOffset', uvFlow);
+
+                        const uvMesh =
+                            (meshMat.getProperty('tilingOffset') as Vec4) ?? new Vec4(1, 1, 0, 0);
+                        uvMesh.x = Math.max(1.3, len * 0.62);
+                        uvMesh.z = t * 4.6;
+                        meshMat.setProperty('tilingOffset', uvMesh);
+
+                        const uvAura =
+                            (auraMat.getProperty('tilingOffset') as Vec4) ?? new Vec4(1, 1, 0, 0);
+                        uvAura.x = 1.2 + Math.sin(t * Math.PI * 2) * 0.08;
+                        uvAura.z = -t * 1.8;
+                        auraMat.setProperty('tilingOffset', uvAura);
+                    },
+                }
+            )
+            .call(() => {
+                ProjectilePool.put('vfx_dray_core', core);
+                ProjectilePool.put('vfx_dray_glow', glow);
+                ProjectilePool.put('vfx_dray_flow', flow);
+                ProjectilePool.put('vfx_dray_mesh', mesh);
+                ProjectilePool.put('vfx_dray_rune', rune);
+                ProjectilePool.put('vfx_dray_aura', aura);
+                ProjectilePool.put('vfx_dray_hit', hit);
+            })
+            .start();
+    }
+
     // ========== 枪口闪光（池化） ==========
 
     public static createMuzzleFlash(parent: Node, pos: Vec3, color: Color, size: number): void {
@@ -817,6 +1309,19 @@ export class WeaponVFX {
         this._beamNoiseLoading = false;
         this._bulletTex = null;
         this._bulletTexLoading = false;
+        this._deathRayCoreTex = null;
+        this._deathRayFlowTex = null;
+        this._deathRayOrbTex = null;
+        this._deathRayRuneTex = null;
+        this._deathRayMeshTex = null;
+        this._deathRayAuraTex = null;
+        this._deathRayTexLoading = false;
+        this._deathRayPrefab = null;
+        this._deathRayPrefabLoading = false;
+        for (const node of this._deathRayPrefabPool) {
+            if (node && node.isValid) node.destroy();
+        }
+        this._deathRayPrefabPool.length = 0;
         this._initialized = false;
     }
 }

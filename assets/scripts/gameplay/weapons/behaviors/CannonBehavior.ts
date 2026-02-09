@@ -19,7 +19,6 @@ export class CannonBehavior extends WeaponBehavior {
     public readonly type = WeaponType.CANNON;
     private static readonly BEAM_LENGTH_MULTIPLIER = 1.35;
     private static readonly MIN_EXTRA_LENGTH = 2.5;
-    private static readonly MAX_IMPACT_FX_POINTS = 3;
     private static readonly PHYSICS_ENEMY_MASK = 1 << 3;
 
     private static readonly COLORS: Color[] = [
@@ -51,23 +50,16 @@ export class CannonBehavior extends WeaponBehavior {
         const dirX = toX / toLen;
         const dirZ = toZ / toLen;
 
-        const idx = Math.min(level - 1, 4);
-        const color = CannonBehavior.COLORS[idx];
-
-        if (level >= 2) {
-            WeaponVFX.createMuzzleFlash(parent, spawnPos, color, 0.2 + level * 0.06);
-        }
-
         const beamCfg = GameConfig.VFX?.CANNON_BEAM;
         const beamMaxLevel = beamCfg?.maxLevel ?? 5;
         const beamT = WeaponVFX.levelT(level, beamMaxLevel);
         const beamColor = WeaponVFX.lerpColor(
-            new Color(...(beamCfg?.beamColorStart ?? [255, 120, 40, 255])),
-            new Color(...(beamCfg?.beamColorEnd ?? [255, 70, 30, 255])),
+            new Color(...(beamCfg?.beamColorStart ?? [116, 82, 255, 232])),
+            new Color(...(beamCfg?.beamColorEnd ?? [180, 126, 255, 240])),
             beamT
         );
         const coreColor = WeaponVFX.lerpColor(
-            new Color(...(beamCfg?.coreColorStart ?? [255, 245, 220, 255])),
+            new Color(...(beamCfg?.coreColorStart ?? [205, 232, 255, 246])),
             new Color(...(beamCfg?.coreColorEnd ?? [255, 255, 255, 255])),
             beamT
         );
@@ -90,19 +82,12 @@ export class CannonBehavior extends WeaponBehavior {
             spawnPos.z + dirZ * beamLength
         );
 
-        WeaponVFX.createCodeBeam(parent, spawnPos, endPos, {
+        WeaponVFX.createDestructionRay(parent, spawnPos, endPos, {
             width: baseWidth,
-            duration: baseDuration,
+            duration: baseDuration * 1.35,
             beamColor,
             coreColor,
-            intensity: baseIntensity,
-        });
-        WeaponVFX.createCodeBeam(parent, spawnPos, endPos, {
-            width: baseWidth * 1.5,
-            duration: baseDuration * 0.85,
-            beamColor: WeaponVFX.lerpColor(beamColor, coreColor, 0.45),
-            coreColor,
-            intensity: baseIntensity * 0.8,
+            intensity: baseIntensity * 1.05,
         });
 
         const explosionRadius = (stats['explosionRadius'] ?? 1.5) as number;
@@ -155,10 +140,6 @@ export class CannonBehavior extends WeaponBehavior {
         const impactPos = primaryImpact.clone();
         impactPos.y = 0.05;
 
-        const ringColor = new Color(255, 150, 50, 200);
-        WeaponVFX.createShockRing(parent, impactPos, explosionRadius, ringColor, 0.35);
-        this.spawnPierceImpactFX(parent, hits, explosionRadius, ringColor);
-
         if (level >= 3) {
             const shakeIntensity = 0.15 + level * 0.08;
             const shakeDuration = 0.1 + level * 0.03;
@@ -166,14 +147,7 @@ export class CannonBehavior extends WeaponBehavior {
         }
 
         if (level >= 4) {
-            const burnColor = new Color(100, 60, 30, 120);
-            WeaponVFX.createGroundBurn(
-                parent,
-                impactPos,
-                explosionRadius * 0.8,
-                burnColor,
-                1.0 + level * 0.2
-            );
+            // 预留：高等级附加地面反馈
         }
     }
 
@@ -310,29 +284,5 @@ export class CannonBehavior extends WeaponBehavior {
 
         hits.sort((a, b) => a.dist - b.dist);
         return hits;
-    }
-
-    private spawnPierceImpactFX(
-        parent: Node,
-        hits: Array<{ unit: Unit; pos: Vec3; dist: number }>,
-        explosionRadius: number,
-        ringColor: Color
-    ): void {
-        if (hits.length < 2) return;
-        const fxCount = Math.min(CannonBehavior.MAX_IMPACT_FX_POINTS, hits.length);
-        if (fxCount <= 1) return;
-
-        for (let i = 0; i < fxCount - 1; i++) {
-            const idx = Math.floor(((hits.length - 1) * i) / (fxCount - 1));
-            const p = hits[idx].pos.clone();
-            p.y = 0.05;
-            WeaponVFX.createShockRing(
-                parent,
-                p,
-                Math.max(0.25, explosionRadius * 0.55),
-                ringColor,
-                0.2
-            );
-        }
     }
 }
