@@ -237,6 +237,7 @@ export class Tower extends Building {
             damage: this.attackDamage,
             slowPercent: this.bulletSlowPercent,
             slowDuration: this.bulletSlowDuration,
+            effectType: 'frost_rain',
         });
     }
 

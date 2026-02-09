@@ -11,6 +11,11 @@ export type EffectPayloadMap = {
         position: Vec3;
         radius: number;
     };
+    glitchInterference: {
+        parent: Node;
+        position: Vec3;
+        radius: number;
+    };
     lightningBolt: {
         parent: Node;
         startPos: Vec3;

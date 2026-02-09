@@ -94,6 +94,7 @@ export class WaveManager {
         damage: number;
         slowPercent: number;
         slowDuration: number;
+        effectType?: 'frost_rain' | 'glitch_interference' | 'generic';
     }): void {
         const radiusSqr = data.radius * data.radius;
         const center = data.center;

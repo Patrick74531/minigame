@@ -4,7 +4,7 @@ import { GameEvents } from '../../data/GameEvents';
 import { EffectFactory } from '../../gameplay/effects/EffectFactory';
 import { ServiceRegistry } from './ServiceRegistry';
 
-const { ccclass, property } = _decorator;
+const { ccclass } = _decorator;
 
 /**
  * 特效管理器
@@ -42,12 +42,17 @@ export class EffectManager {
         damage: number;
         slowPercent: number;
         slowDuration: number;
+        effectType?: 'frost_rain' | 'glitch_interference' | 'generic';
     }): void {
         if (!this._container) return;
 
-        // Determine Effect Type based on data
-        // If slowPercent > 0, it's a Frost effect
-        if (data.slowPercent > 0) {
+        if (data.effectType === 'glitch_interference') {
+            EffectFactory.createGlitchInterference(this._container, data.center, data.radius);
+            return;
+        }
+
+        // Backward-compatible fallback: slow AOE defaults to frost rain
+        if (data.effectType === 'frost_rain' || data.slowPercent > 0) {
             EffectFactory.createFrostExplosion(this._container, data.center, data.radius);
             console.log(`[EffectManager] Playing Frost Explosion at ${data.center}`);
         } else {

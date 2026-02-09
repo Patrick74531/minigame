@@ -1,4 +1,5 @@
 import { FrostExplosionEffect } from '../modules/FrostExplosionEffect';
+import { GlitchInterferenceEffect } from '../modules/GlitchInterferenceEffect';
 import { LightningBoltEffect } from '../modules/LightningBoltEffect';
 import { EffectRuntime } from './EffectRuntime';
 
@@ -12,6 +13,10 @@ export function ensureEffectModulesRegistered(): void {
     EffectRuntime.register(
         'frostCastSpray',
         FrostExplosionEffect.playCastSpray.bind(FrostExplosionEffect)
+    );
+    EffectRuntime.register(
+        'glitchInterference',
+        GlitchInterferenceEffect.play.bind(GlitchInterferenceEffect)
     );
     EffectRuntime.register('lightningBolt', LightningBoltEffect.play.bind(LightningBoltEffect));
 }

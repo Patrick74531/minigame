@@ -86,7 +86,7 @@ export const GameEvents = {
     WEAPON_INVENTORY_CHANGED: 'WEAPON_INVENTORY_CHANGED',
 
     // === 技能/特效系统 ===
-    /** 应用AOE效果 { center: Vec3, radius: number, damage: number, slowPercent: number, slowDuration: number } */
+    /** 应用AOE效果 { center: Vec3, radius: number, damage: number, slowPercent: number, slowDuration: number, effectType?: string } */
     APPLY_AOE_EFFECT: 'APPLY_AOE_EFFECT',
 } as const;
 
@@ -140,5 +140,6 @@ export type GameEventPayloads = {
         damage: number;
         slowPercent: number;
         slowDuration: number;
+        effectType?: 'frost_rain' | 'glitch_interference' | 'generic';
     };
 };

@@ -63,6 +63,7 @@ export class GlitchWaveBehavior extends WeaponBehavior {
             damage: stats.damage,
             slowPercent,
             slowDuration,
+            effectType: 'glitch_interference',
         });
 
         // === 3D 层：干扰束脉冲（替代方块冲击波） ===
