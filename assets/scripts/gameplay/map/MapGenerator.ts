@@ -11,7 +11,9 @@ import {
     Mesh,
     resources,
     Texture2D,
+    ImageAsset,
     Vec4,
+    EffectAsset,
 } from 'cc';
 import { GameConfig } from '../../data/GameConfig';
 
@@ -23,53 +25,37 @@ export enum TileType {
     WALL = 2,
     ENEMY_SPAWN = 3,
     PLAYER_SPAWN = 4,
+    LANE = 5,
 }
 
 @ccclass('MapGenerator')
 export class MapGenerator extends Component {
     private static readonly GENERATED_ROOT_NAME = '__GeneratedMap';
-    private static readonly GRASS_TEXTURE_VARIANTS: ReadonlyArray<ReadonlyArray<string>> = [
-        [
-            'floor/tileable_grass_01/texture',
-            'floor/tileable_grass_01',
-            'floor/tileable_grass_01.webp',
-        ],
-        [
-            'floor/tileable_grass_02/texture',
-            'floor/tileable_grass_02',
-            'floor/tileable_grass_02.webp',
-            'floor/tileable_grass_01/texture',
-            'floor/tileable_grass_01',
-            'floor/tileable_grass_01.webp',
-        ],
-        [
-            'floor/tileable_grass_03/texture',
-            'floor/tileable_grass_03',
-            'floor/tileable_grass_03.webp',
-            'floor/tileable_grass_01/texture',
-            'floor/tileable_grass_01',
-            'floor/tileable_grass_01.webp',
-        ],
-        [
-            'floor/tileable_grass_04/texture',
-            'floor/tileable_grass_04',
-            'floor/tileable_grass_04.webp',
-            'floor/tileable_grass_01/texture',
-            'floor/tileable_grass_01',
-            'floor/tileable_grass_01.webp',
-        ],
+
+    // Texture paths (with Cocos sub-asset fallbacks)
+    private static readonly GRASS_TEX_PATHS: ReadonlyArray<string> = [
+        'floor/tileable_grass_02/texture',
+        'floor/tileable_grass_02',
+        'floor/tileable_grass_02.webp',
+        'floor/tileable_grass_01/texture',
+        'floor/tileable_grass_01',
+        'floor/tileable_grass_01.webp',
     ];
-    private static readonly DIRT_TEXTURE_PATHS = [
-        'floor/Dirt_01/texture',
-        'floor/Dirt_01',
-        'floor/Dirt_01.webp',
+    private static readonly DIRT_TEX_PATHS: ReadonlyArray<string> = [
+        'floor/Dirt_02/texture',
+        'floor/Dirt_02',
+        'floor/Dirt_02.webp',
     ];
+    private static readonly SPLAT_EFFECT_PATH = 'shaders/terrain-splat';
+
+    // Splatmap resolution (pixels)
+    private static readonly SPLAT_SIZE = 256;
 
     @property
-    public mapWidth: number = 20;
+    public mapWidth: number = 28;
 
     @property
-    public mapHeight: number = 20;
+    public mapHeight: number = 28;
 
     @property
     public tileSize: number = 2;
@@ -78,14 +64,7 @@ export class MapGenerator extends Component {
     private _sharedTileMesh: Mesh | null = null;
     private _sharedGroundMesh: Mesh | null = null;
     private _buildRoot: Node | null = null;
-    private _grassMaterials: Array<Material | null> = new Array(
-        MapGenerator.GRASS_TEXTURE_VARIANTS.length
-    ).fill(null);
-    private _grassTexLoading: boolean[] = new Array(
-        MapGenerator.GRASS_TEXTURE_VARIANTS.length
-    ).fill(false);
-    private _dirtFieldMaterial: Material | null = null;
-    private _dirtTexLoading: boolean = false;
+    private _terrainMaterial: Material | null = null;
 
     protected start(): void {
         // 由 GameStartFlow 主动触发 generateProceduralMap
@@ -110,9 +89,38 @@ export class MapGenerator extends Component {
             width,
             height
         );
-        this.clearArea(mapGrid, spawnGrid.x, spawnGrid.z, 1);
+        this.clearArea(mapGrid, spawnGrid.x, spawnGrid.z, 2);
         mapGrid[spawnGrid.z][spawnGrid.x] = TileType.PLAYER_SPAWN;
+
         this.buildMapFromData(mapGrid);
+    }
+
+    private pointToSegmentDistance(p: {x:number, z:number}, v: {x:number, z:number}, w: {x:number, z:number}): number {
+        const l2 = (v.x - w.x)**2 + (v.z - w.z)**2;
+        if (l2 === 0) return Math.sqrt((p.x - v.x)**2 + (p.z - v.z)**2);
+        let t = ((p.x - v.x) * (w.x - v.x) + (p.z - v.z) * (w.z - v.z)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        const projX = v.x + t * (w.x - v.x);
+        const projZ = v.z + t * (w.z - v.z);
+        return Math.sqrt((p.x - projX)**2 + (p.z - projZ)**2);
+    }
+
+    private pointToBezierDistance(p: {x:number, z:number}, p0: {x:number, z:number}, p1: {x:number, z:number}, p2: {x:number, z:number}): number {
+        // Approximate distance by sampling
+        // Analytical distance to Bezier is complex (solving 5th deg polynomial)
+        // Sampling 20 points matches "rasterization" needs for grid
+        let minDist = Number.MAX_VALUE;
+        const samples = 30;
+        for(let i=0; i<=samples; i++) {
+            const t = i / samples;
+            const it = 1 - t;
+            // Quadratic Bezier: (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
+            const bx = it*it*p0.x + 2*it*t*p1.x + t*t*p2.x;
+            const bz = it*it*p0.z + 2*it*t*p1.z + t*t*p2.z;
+            const dist = Math.sqrt((p.x - bx)**2 + (p.z - bz)**2);
+            if(dist < minDist) minDist = dist;
+        }
+        return minDist;
     }
 
     public generateFromImage(_mapName: string): void {
@@ -125,11 +133,11 @@ export class MapGenerator extends Component {
 
         const rows = data.length;
         const cols = data[0].length;
-        const floorColor = new Color(98, 133, 75, 255);
         const enemyColor = new Color(168, 73, 73, 255);
 
-        this.createGroundTiles(data, floorColor);
-        this.createDirtFieldPatch(cols, rows);
+        // Single-plane splatmap ground
+        this.createSplatmapGround(cols, rows);
+
         this.createMountainBoundary(cols, rows);
 
         const offsetX = (cols * this.tileSize) / 2;
@@ -144,6 +152,276 @@ export class MapGenerator extends Component {
                 this.createTileCube(posX, 0.2, posZ, enemyColor, 0.2, false);
             }
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  SPLATMAP GROUND — single plane, 1 draw call
+    // ═══════════════════════════════════════════════════════════
+
+    private createSplatmapGround(cols: number, rows: number): void {
+        const worldW = cols * this.tileSize;
+        const worldH = rows * this.tileSize;
+
+        // Create a single plane mesh covering the entire map
+        const groundNode = new Node('SplatmapGround');
+        (this._buildRoot ?? this.node).addChild(groundNode);
+        groundNode.setPosition(0, 0, 0);
+        groundNode.layer = (this._buildRoot ?? this.node).layer;
+
+        const mesh = utils.MeshUtils.createMesh(
+            primitives.plane({
+                width: worldW,
+                length: worldH,
+                widthSegments: 1,
+                lengthSegments: 1,
+            })
+        );
+
+        const renderer = groundNode.addComponent(MeshRenderer);
+        renderer.mesh = mesh;
+
+        // Generate splatmap texture
+        const splatTex = this.generateSplatmapTexture(cols, rows);
+
+        // Create material with fallback color first
+        const mat = new Material();
+        mat.initialize({
+            effectName: 'builtin-unlit',
+            defines: { USE_TEXTURE: false },
+        });
+        mat.setProperty('mainColor', new Color(98, 133, 75, 255)); // fallback grass
+        renderer.material = mat;
+        this._terrainMaterial = mat;
+
+        // Load effect + textures asynchronously, then swap material
+        void this.initSplatmapMaterial(renderer, splatTex);
+    }
+
+    private async initSplatmapMaterial(renderer: MeshRenderer, splatTex: Texture2D): Promise<void> {
+        // Load grass and dirt textures
+        const [grassTex, dirtTex] = await Promise.all([
+            this.loadGroundTextureWithFallbacks([...MapGenerator.GRASS_TEX_PATHS]),
+            this.loadGroundTextureWithFallbacks([...MapGenerator.DIRT_TEX_PATHS]),
+        ]);
+
+        if (!grassTex || !dirtTex) {
+            console.warn('[MapGenerator] Failed to load grass or dirt texture, keeping fallback color');
+            return;
+        }
+
+        // Set wrap modes to repeat
+        this.setTextureRepeat(grassTex);
+        this.setTextureRepeat(dirtTex);
+
+        // Create splatmap material
+        const mat = new Material();
+        
+        // Load the effect asset first to ensure it's available
+        const effectAsset = await this.loadEffectAsset('shaders/terrain-splat');
+        if (!effectAsset) {
+            console.error('[MapGenerator] Failed to load terrain-splat effect asset');
+            // Fallback to unlit
+            mat.initialize({ effectName: 'builtin-unlit', defines: { USE_TEXTURE: true } });
+            mat.setProperty('mainColor', new Color(98, 133, 75, 255));
+            renderer.material = mat;
+            return;
+        }
+
+        try {
+            mat.initialize({
+                effectAsset: effectAsset,
+                defines: {},
+            });
+        } catch (e) {
+            console.error('[MapGenerator] Failed to initialize material with splat effect:', e);
+            return;
+        }
+
+        // Tiling: reduce tiling for more natural look (less repeated pattern)
+        const tilesAcross = Math.max(this.mapWidth, this.mapHeight) / 4;
+        mat.setProperty('grassTex', grassTex);
+        mat.setProperty('dirtTex', dirtTex);
+        mat.setProperty('splatMap', splatTex);
+        mat.setProperty('grassTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
+        mat.setProperty('dirtTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
+
+        renderer.material = mat;
+        this._terrainMaterial = mat;
+    }
+
+    private setTextureRepeat(tex: Texture2D): void {
+        const texAny = tex as Texture2D & { setWrapMode?: (u: number, v: number) => void };
+        const wm = (Texture2D as unknown as { WrapMode?: { REPEAT?: number } }).WrapMode?.REPEAT;
+        if (texAny.setWrapMode && wm !== undefined) {
+            texAny.setWrapMode(wm, wm);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  SPLATMAP GENERATION — distance field + noise
+    // ═══════════════════════════════════════════════════════════
+
+    private generateSplatmapTexture(cols: number, rows: number): Texture2D {
+        const S = MapGenerator.SPLAT_SIZE;
+        const data = new Uint8Array(S * S * 4); // RGBA
+
+        // Base position in normalized [0,1] space
+        // Base is at Top-Left (low X, high Z in normalized coords if Z increases down?)
+        // Let's assume standard UV: (0,0) is usually Bottom-Left in GL.
+        // But if screen output was TR->BL from (0.05,0.05)->(0.95,0.95),
+        // MOBA layout: Top-Left base to Bottom-Right base
+        // Use actual corners (with minimal padding) so lanes run edge-to-edge
+        // Base positions in normalized [0,1] space
+        // We use (0.05, 0.95) for Top-Left and (0.95, 0.05) for Bottom-Right to get the TL->BR diagonal.
+        const baseNx = 0.05;
+        const baseNz = 0.95;
+        const enemyNx = 0.95;
+        const enemyNz = 0.05;
+
+        // Top/Right Lane: Start TL -> Go along Top edge -> Turn at TR corner (0.95, 0.95) -> Go along Right edge -> End BR
+        const topLane = [
+            { x: baseNx, z: baseNz },
+            { x: 0.06, z: 0.95 },
+            { x: 0.94, z: 0.95 },   // Near TR corner
+            { x: 0.95, z: 0.94 },   // Turn corner
+            { x: enemyNx, z: enemyNz }
+        ];
+
+        // Mid Lane: Diagonal TL -> BR
+        const midLane = [
+            { x: baseNx, z: baseNz },
+            { x: 0.35, z: 0.65 },   // Control point
+            { x: 0.5, z: 0.5 },     // Center
+            { x: 0.65, z: 0.35 },   // Control point
+            { x: enemyNx, z: enemyNz }
+        ];
+
+        // Bot/Left Lane: Start TL -> Go along Left edge -> Turn at BL corner (0.05, 0.05) -> Go along Bottom edge -> End BR
+        const botLane = [ 
+            { x: baseNx, z: baseNz },
+            { x: 0.05, z: 0.94 },   // Near TL corner (go down)
+            { x: 0.05, z: 0.06 },   // Near BL corner (along left edge)
+            { x: 0.06, z: 0.05 },   // Turn corner at BL
+            { x: enemyNx, z: enemyNz } // Along bottom edge
+        ];
+
+        // Lane half-width in normalized space
+        const laneHalfWidth = 0.028;
+        // Smoothstep transition width
+        const edgeSoftness = 0.025;
+
+        for (let py = 0; py < S; py++) {
+            for (let px = 0; px < S; px++) {
+                // Normalized coords [0, 1]
+                const nx = (px + 0.5) / S;
+                const nz = (py + 0.5) / S;
+
+                // Distance to each lane (polyline distance)
+                const dTop = this.distToPolyline(nx, nz, topLane);
+                const dMid = this.distToPolyline(nx, nz, midLane);
+                const dBot = this.distToPolyline(nx, nz, botLane);
+
+                const minDist = Math.min(dTop, dMid, dBot);
+
+                // Perlin-like noise for organic edges
+                const noiseVal = this.fbmNoise(nx * 18.0, nz * 18.0) * 0.018;
+                const adjustedDist = minDist + noiseVal;
+
+                // Smoothstep: 0 at lane center, 1 at edge
+                const t = this.smoothstep(laneHalfWidth - edgeSoftness, laneHalfWidth + edgeSoftness, adjustedDist);
+
+                // mask: 1 = dirt (inside lane), 0 = grass (outside)
+                const mask = 1.0 - t;
+                const byte = Math.floor(Math.max(0, Math.min(1, mask)) * 255);
+
+                const idx = (py * S + px) * 4;
+                data[idx + 0] = byte;  // R
+                data[idx + 1] = byte;  // G
+                data[idx + 2] = byte;  // B
+                data[idx + 3] = 255;   // A
+            }
+        }
+
+        // Create Texture2D from pixel data
+        const tex = new Texture2D();
+        // Use Texture2D.PixelFormat if available, otherwise use raw value for RGBA8888
+        const pixFmt = (Texture2D as unknown as { PixelFormat?: { RGBA8888?: number } }).PixelFormat?.RGBA8888 ?? 35;
+        const img = new ImageAsset({
+            _data: data,
+            _compressed: false,
+            width: S,
+            height: S,
+            format: pixFmt,
+        });
+        tex.image = img;
+        // Set filters: LINEAR = 2
+        const filterLinear = (Texture2D as unknown as { Filter?: { LINEAR?: number } }).Filter?.LINEAR ?? 2;
+        const texAny = tex as Texture2D & {
+            setFilters?: (min: number, mag: number) => void;
+            setWrapMode?: (u: number, v: number) => void;
+        };
+        if (texAny.setFilters) {
+            texAny.setFilters(filterLinear, filterLinear);
+        }
+        // CLAMP_TO_EDGE = 0
+        const clamp = (Texture2D as unknown as { WrapMode?: { CLAMP_TO_EDGE?: number } }).WrapMode?.CLAMP_TO_EDGE ?? 0;
+        if (texAny.setWrapMode) {
+            texAny.setWrapMode(clamp, clamp);
+        }
+        return tex;
+    }
+
+    /** Distance from point (px,pz) to a polyline defined by an array of points */
+    private distToPolyline(px: number, pz: number, points: {x: number, z: number}[]): number {
+        let minDist = Number.MAX_VALUE;
+        for (let i = 0; i < points.length - 1; i++) {
+            const d = this.pointToSegmentDistance(
+                { x: px, z: pz },
+                points[i],
+                points[i + 1]
+            );
+            if (d < minDist) minDist = d;
+        }
+        return minDist;
+    }
+
+    /** Attempt at FBM noise (fractal Brownian motion) for organic edges */
+    private fbmNoise(x: number, z: number): number {
+        let value = 0;
+        let amplitude = 0.5;
+        let frequency = 1.0;
+        for (let i = 0; i < 4; i++) {
+            value += amplitude * (this.valueNoise2D(x * frequency, z * frequency) * 2.0 - 1.0);
+            amplitude *= 0.5;
+            frequency *= 2.0;
+        }
+        return value;
+    }
+
+    /** Simple 2D value noise */
+    private valueNoise2D(x: number, z: number): number {
+        const ix = Math.floor(x);
+        const iz = Math.floor(z);
+        const fx = x - ix;
+        const fz = z - iz;
+
+        // Smoothstep interpolation
+        const ux = fx * fx * (3.0 - 2.0 * fx);
+        const uz = fz * fz * (3.0 - 2.0 * fz);
+
+        const n00 = this.hash01(ix * 127.1 + iz * 311.7);
+        const n10 = this.hash01((ix + 1) * 127.1 + iz * 311.7);
+        const n01 = this.hash01(ix * 127.1 + (iz + 1) * 311.7);
+        const n11 = this.hash01((ix + 1) * 127.1 + (iz + 1) * 311.7);
+
+        const nx0 = n00 + (n10 - n00) * ux;
+        const nx1 = n01 + (n11 - n01) * ux;
+        return nx0 + (nx1 - nx0) * uz;
+    }
+
+    private smoothstep(edge0: number, edge1: number, x: number): number {
+        const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+        return t * t * (3 - 2 * t);
     }
 
     private createMountainBoundary(cols: number, rows: number): void {
@@ -292,167 +570,14 @@ export class MapGenerator extends Component {
         }
     }
 
-    private createGroundTiles(data: number[][], fallbackColor: Color): void {
-        const rows = data.length;
-        const cols = data[0].length;
-        const offsetX = (cols * this.tileSize) / 2;
-        const offsetZ = (rows * this.tileSize) / 2;
 
-        for (let z = 0; z < rows; z++) {
-            for (let x = 0; x < cols; x++) {
-                if (data[z][x] === TileType.EMPTY) continue;
-
-                const node = new Node(`GroundTile_${x}_${z}`);
-                (this._buildRoot ?? this.node).addChild(node);
-
-                const worldX = x * this.tileSize - offsetX + this.tileSize / 2;
-                const worldZ = z * this.tileSize - offsetZ + this.tileSize / 2;
-                node.setPosition(worldX, 0, worldZ);
-                node.setScale(this.tileSize, 1, this.tileSize);
-                node.setRotationFromEuler(0, this.pickGrassRotationDegrees(x, z), 0);
-                node.layer = (this._buildRoot ?? this.node).layer;
-
-                const renderer = node.addComponent(MeshRenderer);
-                renderer.mesh = this.getSharedGroundMesh();
-                renderer.material = this.getGrassMaterial(
-                    this.pickGrassVariant(x, z, cols, rows),
-                    fallbackColor
-                );
-            }
-        }
-    }
-
-    private pickGrassVariant(x: number, z: number, cols: number, rows: number): number {
-        const nx = (x + 0.5) / Math.max(1, cols);
-        const nz = (z + 0.5) / Math.max(1, rows);
-        const waveA = Math.sin(nx * Math.PI * 1.7 + nz * Math.PI * 0.95);
-        const waveB = Math.sin(nx * Math.PI * 3.6 - nz * Math.PI * 2.4);
-        const waveC = Math.sin((nx + nz) * Math.PI * 5.2 + 1.7);
-        const noise = (this.hash01(x * 73.7 + z * 41.3) - 0.5) * 0.18;
-        const score = waveA * 0.52 + waveB * 0.33 + waveC * 0.15 + noise;
-        const normalized = Math.max(0, Math.min(1, (score + 1) * 0.5));
-
-        if (normalized < 0.26) return 0;
-        if (normalized < 0.5) return 1;
-        if (normalized < 0.74) return 2;
-        return 3;
-    }
-
-    private pickGrassRotationDegrees(x: number, z: number): number {
-        const rotationBand = Math.floor(this.hash01(x * 97.1 + z * 131.7) * 4) % 4;
-        return rotationBand * 90;
-    }
-
-    private getGrassMaterial(variant: number, fallbackColor: Color): Material {
-        const maxIndex = MapGenerator.GRASS_TEXTURE_VARIANTS.length - 1;
-        const safeVariant = Math.max(0, Math.min(maxIndex, variant));
-        let material = this._grassMaterials[safeVariant];
-
-        if (!material) {
-            material = new Material();
-            material.initialize({
-                effectName: 'builtin-unlit',
-                defines: { USE_TEXTURE: true },
-            });
-            material.setProperty('mainColor', fallbackColor);
-            material.setProperty('tilingOffset', new Vec4(1, 1, 0, 0));
-            this._grassMaterials[safeVariant] = material;
-        }
-
-        if (!this._grassTexLoading[safeVariant]) {
-            this._grassTexLoading[safeVariant] = true;
-            void this.loadGroundTextureWithFallbacks([
-                ...MapGenerator.GRASS_TEXTURE_VARIANTS[safeVariant],
-            ]).then(texture => {
-                this._grassTexLoading[safeVariant] = false;
-                if (!texture) return;
-                const targetMaterial = this._grassMaterials[safeVariant];
-                if (!targetMaterial) return;
-
-                const texAny = texture as Texture2D & {
-                    setWrapMode?: (u: number, v: number) => void;
-                };
-                const wrapMode = (Texture2D as unknown as { WrapMode?: { REPEAT?: number } })
-                    .WrapMode?.REPEAT;
-                if (texAny.setWrapMode && wrapMode !== undefined) {
-                    texAny.setWrapMode(wrapMode, wrapMode);
-                }
-
-                targetMaterial.setProperty('mainTexture', texture);
-                targetMaterial.setProperty('mainColor', new Color(255, 255, 255, 255));
-            });
-        }
-
-        return material;
-    }
 
     private hash01(seed: number): number {
         const s = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
         return s - Math.floor(s);
     }
 
-    private createDirtFieldPatch(cols: number, rows: number): void {
-        const node = new Node('DirtFieldPatch');
-        (this._buildRoot ?? this.node).addChild(node);
 
-        const mapWorldW = cols * this.tileSize;
-        const mapWorldH = rows * this.tileSize;
-        const patchW = Math.max(this.tileSize * 4, mapWorldW * 0.24);
-        const patchH = Math.max(this.tileSize * 3, mapWorldH * 0.16);
-        const baseX = GameConfig.MAP.BASE_SPAWN.x;
-        const baseZ = GameConfig.MAP.BASE_SPAWN.z;
-        const safeGap = this.tileSize * 2.5;
-        const patchX = baseX;
-        const patchZ = baseZ + patchH * 0.5 + safeGap;
-
-        node.setPosition(patchX, 0.01, patchZ);
-        node.setScale(patchW, 1, patchH);
-        node.layer = (this._buildRoot ?? this.node).layer;
-
-        const renderer = node.addComponent(MeshRenderer);
-        renderer.mesh = this.getSharedGroundMesh();
-        renderer.material = this.getDirtFieldMaterial(patchW, patchH);
-    }
-
-    private getDirtFieldMaterial(worldW: number, worldH: number): Material {
-        if (!this._dirtFieldMaterial) {
-            const mat = new Material();
-            mat.initialize({
-                effectName: 'builtin-unlit',
-                defines: { USE_TEXTURE: true },
-            });
-            mat.setProperty('mainColor', new Color(145, 120, 88, 255));
-            this._dirtFieldMaterial = mat;
-        }
-
-        const repeatX = Math.max(2, worldW / (this.tileSize * 1.5));
-        const repeatY = Math.max(2, worldH / (this.tileSize * 1.5));
-        this._dirtFieldMaterial.setProperty('tilingOffset', new Vec4(repeatX, repeatY, 0, 0));
-
-        if (!this._dirtTexLoading) {
-            this._dirtTexLoading = true;
-            void this.loadGroundTextureWithFallbacks(MapGenerator.DIRT_TEXTURE_PATHS).then(
-                texture => {
-                    this._dirtTexLoading = false;
-                    if (!texture || !this._dirtFieldMaterial) return;
-
-                    const texAny = texture as Texture2D & {
-                        setWrapMode?: (u: number, v: number) => void;
-                    };
-                    const wrapMode = (Texture2D as unknown as { WrapMode?: { REPEAT?: number } })
-                        .WrapMode?.REPEAT;
-                    if (texAny.setWrapMode && wrapMode !== undefined) {
-                        texAny.setWrapMode(wrapMode, wrapMode);
-                    }
-
-                    this._dirtFieldMaterial.setProperty('mainTexture', texture);
-                    this._dirtFieldMaterial.setProperty('mainColor', new Color(255, 255, 255, 255));
-                }
-            );
-        }
-
-        return this._dirtFieldMaterial;
-    }
 
     private getColorMaterial(color: Color): Material {
         const key = `${color.r}_${color.g}_${color.b}_${color.a}`;
@@ -479,6 +604,18 @@ export class MapGenerator extends Component {
             resources.load(path, Texture2D, (err, tex) => {
                 if (err || !tex) return resolve(null);
                 resolve(tex);
+            });
+        });
+    }
+
+    private loadEffectAsset(path: string): Promise<EffectAsset | null> {
+        return new Promise(resolve => {
+            resources.load(path, EffectAsset, (err, asset) => {
+                if (err || !asset) {
+                    console.warn(`[MapGenerator] Effect load failed: ${path}`, err);
+                    return resolve(null);
+                }
+                resolve(asset);
             });
         });
     }
