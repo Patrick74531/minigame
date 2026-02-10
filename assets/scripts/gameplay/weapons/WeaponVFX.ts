@@ -229,7 +229,8 @@ export class WeaponVFX {
         parent: Node,
         start: Vec3,
         end: Vec3,
-        width: number
+        width: number,
+        levelScale: number = 1.0
     ): Node | null {
         this._ensureFlamePrefab();
         if (!this._flamePrefab) return null;
@@ -237,7 +238,7 @@ export class WeaponVFX {
         if (!node) return null;
 
         parent.addChild(node);
-        this._applyFlameTransform(node, start, end, width);
+        this._applyFlameTransform(node, start, end, width, levelScale);
         this._setFlamePrefabPlayback(node, true);
         return node;
     }
@@ -247,10 +248,11 @@ export class WeaponVFX {
         node: Node,
         start: Vec3,
         end: Vec3,
-        width: number
+        width: number,
+        levelScale: number = 1.0
     ): void {
         if (!node || !node.isValid) return;
-        this._applyFlameTransform(node, start, end, width);
+        this._applyFlameTransform(node, start, end, width, levelScale);
     }
 
     /** 停止持续火焰并归池 */
@@ -263,7 +265,8 @@ export class WeaponVFX {
         node: Node,
         start: Vec3,
         end: Vec3,
-        width: number
+        width: number,
+        levelScale: number = 1.0
     ): void {
         const dx = end.x - start.x;
         const dz = end.z - start.z;
@@ -278,8 +281,8 @@ export class WeaponVFX {
         const offsetZ = (dz / len) * forwardOffset;
 
         node.setPosition(start.x + offsetX, start.y, start.z + offsetZ);
-        const widthScale = Math.max(3.0, Math.min(8.0, width / 0.12));
-        const lengthScale = Math.max(3.5, Math.min(14, len / 0.5));
+        const widthScale = Math.max(3.0, Math.min(8.0, width / 0.12)) * levelScale;
+        const lengthScale = Math.max(3.5, Math.min(14, len / 0.5)) * levelScale;
         node.setRotationFromEuler(0, yawDeg, 0);
         node.setScale(lengthScale, widthScale, widthScale);
     }

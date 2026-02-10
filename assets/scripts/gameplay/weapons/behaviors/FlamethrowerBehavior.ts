@@ -90,6 +90,9 @@ export class FlamethrowerBehavior extends WeaponBehavior {
             spawnPos.z + dirZ * streamLength
         );
 
+        // 等级缩放：lv1=0.7, lv2=1.0（基准）, lv3+=逐级放大
+        const levelScale = level <= 1 ? 0.7 : Math.min(1.6, 1.0 + (level - 2) * 0.12);
+
         // === 持续火焰 VFX ===
         if (!this._flameNode || !this._flameNode.isValid) {
             // 首次：创建持续火焰
@@ -97,7 +100,8 @@ export class FlamethrowerBehavior extends WeaponBehavior {
                 parent,
                 spawnPos,
                 streamEnd,
-                streamWidth
+                streamWidth,
+                levelScale
             );
             this._flameParent = parent;
         } else {
@@ -106,7 +110,8 @@ export class FlamethrowerBehavior extends WeaponBehavior {
                 this._flameNode,
                 spawnPos,
                 streamEnd,
-                streamWidth
+                streamWidth,
+                levelScale
             );
         }
 
