@@ -163,10 +163,11 @@ export class WeaponVFX {
 
         parent.addChild(node);
         node.setPosition(start);
-        const widthScale = Math.max(0.75, Math.min(1.65, opts.width / 0.24));
+        const widthScale = Math.max(0.48, Math.min(1.65, opts.width / 0.24));
         const lengthScale = Math.max(0.42, len / 12);
         node.setRotationFromEuler(0, yawDeg, 0);
         node.setScale(lengthScale, widthScale, widthScale);
+        this._applyDeathRayPrefabNodeScale(node, widthScale);
 
         this._setDeathRayPrefabPlayback(node, true);
 
@@ -176,6 +177,25 @@ export class WeaponVFX {
             .call(() => this._recycleDeathRayPrefabNode(node))
             .start();
         return true;
+    }
+
+    private static _setNodeUniformScale(node: Node | null, value: number): void {
+        if (!node || !node.isValid) return;
+        node.setScale(value, value, value);
+    }
+
+    private static _applyDeathRayPrefabNodeScale(node: Node, widthScale: number): void {
+        const root = node.getChildByName('root');
+        if (!root) return;
+
+        // 低等级显著收小两端光球；满级保持接近原效果。
+        const capScale = Math.max(0.3, Math.min(1, widthScale / 1.65));
+        const trailScale = Math.max(0.42, Math.min(1, widthScale / 1.4));
+
+        this._setNodeUniformScale(root.getChildByName('glow'), capScale);
+        this._setNodeUniformScale(root.getChildByName('hit'), capScale);
+        this._setNodeUniformScale(root.getChildByName('juan'), capScale * 0.9);
+        this._setNodeUniformScale(root.getChildByName('fasan'), trailScale);
     }
 
     private static _getComponentSafe<T>(

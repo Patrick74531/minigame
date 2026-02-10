@@ -72,12 +72,20 @@ export class CannonBehavior extends WeaponBehavior {
             beamT
         );
 
-        const baseWidth =
-            (beamCfg?.width?.base ?? 0.22) + level * (beamCfg?.width?.perLevel ?? 0.05);
+        const widthBase = beamCfg?.width?.base ?? 0.22;
+        const widthPerLevel = beamCfg?.width?.perLevel ?? 0.05;
+        const maxWidth = widthBase + beamMaxLevel * widthPerLevel; // 保持满级宽度不变
+        const minWidth = Math.max(0.12, widthBase * 0.6); // 压低低级宽度
+        const widthT = Math.pow(beamT, 1.45); // 低级更细，接近满级时快速拉满
+        const baseWidth = minWidth + (maxWidth - minWidth) * widthT;
         const baseDuration =
             (beamCfg?.duration?.base ?? 0.1) + level * (beamCfg?.duration?.perLevel ?? 0.015);
-        const baseIntensity =
-            (beamCfg?.intensity?.base ?? 2.2) + level * (beamCfg?.intensity?.perLevel ?? 0.5);
+        const intensityBase = beamCfg?.intensity?.base ?? 2.2;
+        const intensityPerLevel = beamCfg?.intensity?.perLevel ?? 0.5;
+        const maxIntensity = intensityBase + beamMaxLevel * intensityPerLevel; // 保持满级强度不变
+        const minIntensity = Math.max(1.4, intensityBase * 0.75); // 低级收敛亮度与收尾球体积
+        const intensityT = Math.pow(beamT, 1.2);
+        const baseIntensity = minIntensity + (maxIntensity - minIntensity) * intensityT;
 
         const baseRange = Math.max(stats.range, toLen);
         const beamLength = Math.max(

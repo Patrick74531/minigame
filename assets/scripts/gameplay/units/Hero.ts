@@ -25,7 +25,7 @@ import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import type { BuffCardEffect } from '../roguelike/BuffCardService';
 import { HeroWeaponManager } from '../weapons/HeroWeaponManager';
 import { WeaponBehaviorFactory } from '../weapons/WeaponBehaviorFactory';
-import { getWeaponLevelStats } from '../weapons/WeaponTypes';
+import { getWeaponLevelStats, type WeaponLevelStats } from '../weapons/WeaponTypes';
 import { HeroLevelSystem } from './HeroLevelSystem';
 import { GameEvents } from '../../data/GameEvents';
 import { EventManager } from '../../core/managers/EventManager';
@@ -256,11 +256,24 @@ export class Hero extends Unit {
         if (active) {
             const def = manager.getWeaponDef(active.type);
             if (def) {
-                const stats = getWeaponLevelStats(def, active.level);
-                return stats.range ?? this._stats.attackRange;
+                const rawStats = getWeaponLevelStats(def, active.level);
+                const effectiveStats = this.getEffectiveWeaponStats(rawStats);
+                return effectiveStats.range ?? this._stats.attackRange;
             }
         }
         return this._stats.attackRange;
+    }
+
+    private getEffectiveWeaponStats(base: WeaponLevelStats): WeaponLevelStats {
+        const baseRange = Math.max(0.0001, this._baseStats.attackRange);
+        const baseInterval = Math.max(0.0001, this._baseStats.attackInterval);
+        const rangeMultiplier = this._stats.attackRange / baseRange;
+        const intervalMultiplier = this._stats.attackInterval / baseInterval;
+        return {
+            ...base,
+            range: Math.max(0.1, base.range * rangeMultiplier),
+            attackInterval: Math.max(0.05, base.attackInterval * intervalMultiplier),
+        };
     }
 
     private updateTargeting(): void {
@@ -365,7 +378,7 @@ export class Hero extends Unit {
             const behavior = WeaponBehaviorFactory.get(active.type);
             const def = manager.getWeaponDef(active.type);
             if (behavior && def) {
-                const stats = getWeaponLevelStats(def, active.level);
+                const stats = this.getEffectiveWeaponStats(getWeaponLevelStats(def, active.level));
                 if (this._customWeaponTimer <= 0) {
                     const parent = this.node.parent;
                     if (parent) {
