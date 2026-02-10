@@ -17,6 +17,7 @@ import {
     ParticleSystem,
     Animation,
     GradientRange,
+    Component,
 } from 'cc';
 import { ProjectilePool } from './vfx/ProjectilePool';
 
@@ -262,6 +263,56 @@ export class WeaponVFX {
         this._recycleFlamePrefabNode(node);
     }
 
+    // ========== 持续枪口火焰（机枪专用，零开销） ==========
+
+    /** 
+     * 创建一个挂载在父节点下的微缩版火焰，初始状态为隐藏 
+     * 用于机枪高频射击时的枪口闪光（复用同一个节点，避免 destroy）
+     */
+    public static createPersistentMuzzleFlame(parent: Node): Node | null {
+        this._ensureFlamePrefab();
+        if (!this._flamePrefab) return null;
+        
+        // 直接使用 instantiate 而非 borrow，因为这个节点会长期驻留直到武器销毁
+        // 机枪射速极快，borrow/return 开销不如长期持有划算
+        const node = instantiate(this._flamePrefab);
+        parent.addChild(node);
+        node.name = 'PersistentMuzzleFlame';
+        
+        // 初始隐藏缩小
+        node.setScale(0, 0, 0); 
+        this._setFlamePrefabPlayback(node, true); // 保持粒子播放状态，靠缩放/透明度控制可见性
+        
+        return node;
+    }
+
+    /** 
+     * 触发一次枪口闪光脉冲 
+     * 只是瞬间放大然后迅速缩小，不涉及对象创建销毁
+     */
+    public static pulseMuzzleFlame(node: Node, sizeScale: number = 1.0): void {
+        if (!node || !node.isValid) return;
+
+        // 停止之前的缓动，重新开始
+        Tween.stopAllByTarget(node);
+
+        // 随机旋转
+        const angle = Math.random() * 360;
+        node.setRotationFromEuler(0, angle, 0);
+
+        // 瞬间放大 -> 迅速回缩
+        const peakScale = 0.35 * sizeScale * (0.8 + Math.random() * 0.4);
+        
+        // 使用简单的缩放动画模拟喷射
+        // 0 -> Peak (0.02s) -> 0 (0.05s)
+        node.setScale(peakScale * 0.5, peakScale, peakScale); // 初始略大
+        
+        tween(node)
+            .to(0.04, { scale: new Vec3(peakScale * 0.8, peakScale * 1.5, peakScale * 0.8) })
+            .to(0.06, { scale: new Vec3(0, 0, 0) })
+            .start();
+    }
+
     private static _applyFlameTransform(
         node: Node,
         start: Vec3,
@@ -307,9 +358,9 @@ export class WeaponVFX {
         this._setNodeUniformScale(root.getChildByName('fasan'), trailScale);
     }
 
-    private static _getComponentSafe<T>(
+    private static _getComponentSafe<T extends Component>(
         node: Node | null,
-        ctor: new (...args: never[]) => T
+        ctor: new (...args: any[]) => T
     ): T | null {
         if (!node || !node.isValid) return null;
         try {

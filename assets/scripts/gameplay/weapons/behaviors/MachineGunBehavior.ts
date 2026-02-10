@@ -111,6 +111,27 @@ export class MachineGunBehavior extends WeaponBehavior {
             WeaponVFX.ejectCasing(parent, spawnPos, dirX, dirZ);
         }
 
+        // ==================== 枪口火焰 (优化版: 微缩喷火器) ====================
+        // 寻找或创建挂载在 parent (场景层) 或 owner (角色层) 下的持久化火焰节点
+        // 这里挂在 parent 下与子弹同层级比较好控制位置
+        let flameNode = parent.getChildByName('PersistentMuzzleFlame_MG');
+        if (!flameNode) {
+            flameNode = WeaponVFX.createPersistentMuzzleFlame(parent);
+            if (flameNode) flameNode.name = 'PersistentMuzzleFlame_MG';
+        }
+
+        if (flameNode) {
+            // 将火焰移动到枪口位置 (比子弹生成点稍微靠后一点，贴近枪管)
+            // 子弹偏移是 1.2，火焰改用 0.6，使其更贴近角色（任务->人物）
+            flameNode.setPosition(
+                spawnPos.x + dirX * 0.6,
+                spawnPos.y,
+                spawnPos.z + dirZ * 0.6
+            );
+            // 触发脉冲
+            WeaponVFX.pulseMuzzleFlame(flameNode, 1.0 + level * 0.1);
+        }
+
         // ==================== 单发子弹（直线飞行） ====================
         const node = ProjectilePool.get('mg_bullet');
         if (!node) return;
