@@ -84,6 +84,8 @@ export class ResourcePreloader {
         resources.preload('building/sunflower', Texture2D);
         resources.preload('building/sunflower.webp', Texture2D);
         resources.preload('building/radar_3d', Prefab);
+        resources.preload('effects/star_coin', Prefab);
+        resources.preload('effects/star_coin/star_coin', Prefab);
     }
 
     private static readonly BUILDING_MODEL_PREFAB_PATHS = [

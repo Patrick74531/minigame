@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, Vec3, Tween, tween } from 'cc';
+import { _decorator, Component, Node, Vec3, Tween, tween, Quat } from 'cc';
 import { resolveHeroModelConfig } from '../units/HeroModelConfig';
 
 const { ccclass, property } = _decorator;
@@ -50,7 +50,10 @@ export class StackVisualizer extends Component {
 
         // Immediate set + random rot
         item.setPosition(targetPos);
-        item.setRotationFromEuler(0, Math.random() * 360, 0);
+        // Keep existing X/Z rotation (e.g. for flat coins) and randomize Y
+        const currentRot = new Vec3();
+        Quat.toEuler(currentRot, item.rotation);
+        item.setRotationFromEuler(currentRot.x, Math.random() * 360, currentRot.z);
         const config = resolveHeroModelConfig();
         const scale = config.stackItemScale ?? 0.5;
         item.setScale(scale, scale, scale);

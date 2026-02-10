@@ -180,6 +180,9 @@ export class Hero extends Unit {
      * 添加金币
      */
     public addCoin(coin: Node): void {
+        // Rotate coin flat (Horizontal) for stacking
+        coin.setRotationFromEuler(90, 0, 0);
+
         if (this._stackVisualizer) {
             this._stackVisualizer.addToStack(coin);
         }

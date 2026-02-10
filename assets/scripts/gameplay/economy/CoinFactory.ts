@@ -7,12 +7,12 @@ import {
     Material,
     Color,
     BoxCollider,
+    resources,
+    Prefab,
+    instantiate,
 } from 'cc';
 import { GameConfig } from '../../data/GameConfig';
-// import { GameManager } from '../../core/managers/GameManager';
-// import { EventManager } from '../../core/managers/EventManager';
-// import { GameEvents } from '../../data/GameEvents';
-// import { GameConfig } from '../../data/GameConfig';
+
 import { Coin } from './Coin';
 
 /**
@@ -20,14 +20,67 @@ import { Coin } from './Coin';
  */
 export class CoinFactory {
     private static _materials: Map<string, Material> = new Map();
+    private static _starCoinPrefab: Prefab | null = null;
+    private static _isLoading: boolean = false;
+
+    public static loadResources(): void {
+        if (this._isLoading || this._starCoinPrefab) return;
+        this._isLoading = true;
+
+        // Try loading 'effects/star_coin'
+        resources.load('effects/star_coin', Prefab, (err, prefab) => {
+            if (!err && prefab) {
+                console.log('[CoinFactory] Successfully loaded star_coin prefab (path: effects/star_coin)');
+                this._starCoinPrefab = prefab;
+                this._isLoading = false;
+                return;
+            }
+            
+            console.warn('[CoinFactory] Failed to load effects/star_coin:', err);
+
+            // Try loading 'effects/star_coin/star_coin' (common GLTF import issue)
+            resources.load('effects/star_coin/star_coin', Prefab, (err2, prefab2) => {
+                if (!err2 && prefab2) {
+                     console.log('[CoinFactory] Successfully loaded star_coin prefab (path: effects/star_coin/star_coin)');
+                     this._starCoinPrefab = prefab2;
+                } else {
+                     console.error('[CoinFactory] Failed to load star_coin from both paths.', err2);
+                }
+                this._isLoading = false;
+            });
+        });
+    }
 
     /**
      * 创建金币
      */
     public static createCoin(parent: Node, x: number, z: number, value: number): Node {
-        const node = this.createCubeNode('Coin', new Color(255, 165, 0, 255));
+        let node: Node;
+        if (this._starCoinPrefab) {
+            node = instantiate(this._starCoinPrefab);
+            node.setScale(0.35, 0.35, 0.35); 
+            // Default rotation (0,0,0) makes it upright/vertical on ground (if model is Y-up / Standing)
+            node.setRotationFromEuler(0, 0, 0);
+
+            // Enhance Visuals
+            // Use builtin-unlit to GUARANTEE the color appears exactly as defined (no lighting interference)
+            const goldMaterial = new Material();
+            goldMaterial.initialize({ effectName: 'builtin-unlit' });
+            
+            const goldColor = new Color(255, 190, 0, 255); // Rich Gold
+            goldMaterial.setProperty('mainColor', goldColor);
+            // Unlit doesn't use metallic/roughness/emission, just mainColor
+
+            const renderers = node.getComponentsInChildren(MeshRenderer);
+            for (const renderer of renderers) {
+                 renderer.material = goldMaterial;
+            }
+        } else {
+            console.warn('[CoinFactory] StarCoin prefab not ready, using cube.');
+            node = this.createCubeNode('Coin', new Color(255, 165, 0, 255));
+            node.setScale(0.3, 0.3, 0.3); // Slightly larger for visibility
+        }
         node.setPosition(x, GameConfig.PHYSICS.COIN_Y, z);
-        node.setScale(0.3, 0.3, 0.3); // Slightly larger for visibility
         parent.addChild(node);
 
         // Physics: Trigger for Pickup
