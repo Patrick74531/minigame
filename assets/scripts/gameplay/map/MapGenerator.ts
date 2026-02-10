@@ -278,35 +278,37 @@ export class MapGenerator extends Component {
         const enemyNx = 0.95;
         const enemyNz = 0.05;
 
-        // Top/Right Lane: Start TL -> Go along Top edge -> Turn at TR corner (0.95, 0.95) -> Go along Right edge -> End BR
+        // Top/Right Lane: Strictly Top Edge
+        // Start TL -> Go along Top edge -> End at TR corner (0.95, 0.95).
+        // Removed segment connecting to BR (Right Edge Road).
         const topLane = [
             { x: baseNx, z: baseNz },
-            { x: 0.06, z: 0.95 },
-            { x: 0.94, z: 0.95 },   // Near TR corner
-            { x: 0.95, z: 0.94 },   // Turn corner
-            { x: enemyNx, z: enemyNz }
+            { x: 0.06, z: 0.92 },    
+            { x: 0.95, z: 0.92 }     // End at TR (inset Y)
         ];
 
-        // Mid Lane: Diagonal TL -> BR
+        // Mid Lane: Diagonal TL -> BR (unchanged)
         const midLane = [
             { x: baseNx, z: baseNz },
-            { x: 0.35, z: 0.65 },   // Control point
-            { x: 0.5, z: 0.5 },     // Center
-            { x: 0.65, z: 0.35 },   // Control point
+            { x: 0.35, z: 0.65 },   
+            { x: 0.5, z: 0.5 },     
+            { x: 0.65, z: 0.35 },   
             { x: enemyNx, z: enemyNz }
         ];
 
-        // Bot/Left Lane: Start TL -> Go along Left edge -> Turn at BL corner (0.05, 0.05) -> Go along Bottom edge -> End BR
+        // Bot/Left Lane: Strictly Left Edge
+        // Start TL -> Go along Left edge -> End at BL corner (0.05, 0.05).
+        // Removed segment connecting to BR (Bottom Edge Road).
         const botLane = [ 
             { x: baseNx, z: baseNz },
-            { x: 0.05, z: 0.94 },   // Near TL corner (go down)
-            { x: 0.05, z: 0.06 },   // Near BL corner (along left edge)
-            { x: 0.06, z: 0.05 },   // Turn corner at BL
-            { x: enemyNx, z: enemyNz } // Along bottom edge
+            { x: 0.08, z: 0.94 },   
+            { x: 0.08, z: 0.05 }    // End at BL (inset X) 
         ];
 
         // Lane half-width in normalized space
         const laneHalfWidth = 0.028;
+        // Wider width for Top and Left lanes (user request increased width)
+        const laneHalfWidthWide = 0.045;
         // Smoothstep transition width
         const edgeSoftness = 0.025;
 
@@ -317,9 +319,10 @@ export class MapGenerator extends Component {
                 const nz = (py + 0.5) / S;
 
                 // Distance to each lane (polyline distance)
-                const dTop = this.distToPolyline(nx, nz, topLane);
+                // Top and Bot lanes are wider now
+                const dTop = Math.max(0, this.distToPolyline(nx, nz, topLane) - (laneHalfWidthWide - laneHalfWidth));
                 const dMid = this.distToPolyline(nx, nz, midLane);
-                const dBot = this.distToPolyline(nx, nz, botLane);
+                const dBot = Math.max(0, this.distToPolyline(nx, nz, botLane) - (laneHalfWidthWide - laneHalfWidth));
 
                 const minDist = Math.min(dTop, dMid, dBot);
 
