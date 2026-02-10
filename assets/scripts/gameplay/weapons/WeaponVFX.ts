@@ -46,6 +46,10 @@ export class WeaponVFX {
     private static _deathRayPrefabLoading: boolean = false;
     private static _deathRayPrefabPool: Node[] = [];
     private static readonly _DEATH_RAY_PREFAB_POOL_CAP: number = 8;
+    private static _flamePrefab: Prefab | null = null;
+    private static _flamePrefabLoading: boolean = false;
+    private static _flamePrefabPool: Node[] = [];
+    private static readonly _FLAME_PREFAB_POOL_CAP: number = 10;
 
     /** 初始化共享资源 + 预热池（在 GameController.onLoad 调用一次） */
     public static initialize(): void {
@@ -65,6 +69,7 @@ export class WeaponVFX {
         ProjectilePool.register('mg_casing', () => this._createCasingNode(), 10);
         this._ensureBulletTexture();
         this._ensureDeathRayPrefab();
+        this._ensureFlamePrefab();
     }
 
     private static _ensureBulletTexture(): void {
@@ -119,6 +124,19 @@ export class WeaponVFX {
         });
     }
 
+    private static _ensureFlamePrefab(): void {
+        if (this._flamePrefab || this._flamePrefabLoading) return;
+        this._flamePrefabLoading = true;
+        resources.load('effects/flamethrower_skill/fire01', Prefab, (err, prefab) => {
+            this._flamePrefabLoading = false;
+            if (err || !prefab) {
+                console.warn('[WeaponVFX] Failed to load flame prefab fire01:', err);
+                return;
+            }
+            this._flamePrefab = prefab;
+        });
+    }
+
     private static _borrowDeathRayPrefabNode(): Node | null {
         while (this._deathRayPrefabPool.length > 0) {
             const cached = this._deathRayPrefabPool.pop();
@@ -126,6 +144,15 @@ export class WeaponVFX {
         }
         if (!this._deathRayPrefab) return null;
         return instantiate(this._deathRayPrefab);
+    }
+
+    private static _borrowFlamePrefabNode(): Node | null {
+        while (this._flamePrefabPool.length > 0) {
+            const cached = this._flamePrefabPool.pop();
+            if (cached && cached.isValid) return cached;
+        }
+        if (!this._flamePrefab) return null;
+        return instantiate(this._flamePrefab);
     }
 
     private static _recycleDeathRayPrefabNode(node: Node): void {
@@ -137,6 +164,20 @@ export class WeaponVFX {
 
         if (this._deathRayPrefabPool.length < this._DEATH_RAY_PREFAB_POOL_CAP) {
             this._deathRayPrefabPool.push(node);
+        } else {
+            node.destroy();
+        }
+    }
+
+    private static _recycleFlamePrefabNode(node: Node): void {
+        if (!node || !node.isValid) return;
+        Tween.stopAllByTarget(node);
+        this._setFlamePrefabPlayback(node, false);
+        node.removeFromParent();
+        node.setScale(1, 1, 1);
+
+        if (this._flamePrefabPool.length < this._FLAME_PREFAB_POOL_CAP) {
+            this._flamePrefabPool.push(node);
         } else {
             node.destroy();
         }
@@ -177,6 +218,70 @@ export class WeaponVFX {
             .call(() => this._recycleDeathRayPrefabNode(node))
             .start();
         return true;
+    }
+
+
+
+    // ========== 持续火焰 API（喷火器专用） ==========
+
+    /** 借出一个持续播放的火焰节点（调用方负责 update + stop） */
+    public static startContinuousFlame(
+        parent: Node,
+        start: Vec3,
+        end: Vec3,
+        width: number
+    ): Node | null {
+        this._ensureFlamePrefab();
+        if (!this._flamePrefab) return null;
+        const node = this._borrowFlamePrefabNode();
+        if (!node) return null;
+
+        parent.addChild(node);
+        this._applyFlameTransform(node, start, end, width);
+        this._setFlamePrefabPlayback(node, true);
+        return node;
+    }
+
+    /** 更新已存在的持续火焰的位置/方向/大小 */
+    public static updateFlameTransform(
+        node: Node,
+        start: Vec3,
+        end: Vec3,
+        width: number
+    ): void {
+        if (!node || !node.isValid) return;
+        this._applyFlameTransform(node, start, end, width);
+    }
+
+    /** 停止持续火焰并归池 */
+    public static stopContinuousFlame(node: Node): void {
+        if (!node || !node.isValid) return;
+        this._recycleFlamePrefabNode(node);
+    }
+
+    private static _applyFlameTransform(
+        node: Node,
+        start: Vec3,
+        end: Vec3,
+        width: number
+    ): void {
+        const dx = end.x - start.x;
+        const dz = end.z - start.z;
+        const len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 0.001) return;
+
+        const yawDeg = (Math.atan2(dx, dz) * 180) / Math.PI + 180;
+
+        // 将火焰起点前移，让火焰从角色身前喷出而非烧自己
+        const forwardOffset = 1.8;
+        const offsetX = (dx / len) * forwardOffset;
+        const offsetZ = (dz / len) * forwardOffset;
+
+        node.setPosition(start.x + offsetX, start.y, start.z + offsetZ);
+        const widthScale = Math.max(3.0, Math.min(8.0, width / 0.12));
+        const lengthScale = Math.max(3.5, Math.min(14, len / 0.5));
+        node.setRotationFromEuler(0, yawDeg, 0);
+        node.setScale(lengthScale, widthScale, widthScale);
     }
 
     private static _setNodeUniformScale(node: Node | null, value: number): void {
@@ -243,6 +348,21 @@ export class WeaponVFX {
         if (bullet) bullet.active = false;
         const rune = root.getChildByName('rune');
         if (rune) rune.active = false;
+    }
+
+    private static _setFlamePrefabPlayback(node: Node, play: boolean): void {
+        const systems = node.getComponentsInChildren(ParticleSystem);
+        for (const ps of systems) {
+            if (!ps || !ps.isValid) continue;
+            if (play) {
+                ps.stop();
+                ps.clear();
+                ps.play();
+            } else {
+                ps.stop();
+                ps.clear();
+            }
+        }
     }
 
     /** 获取子弹贴图（可能为 null，异步加载中） */
@@ -624,6 +744,7 @@ export class WeaponVFX {
             .start();
     }
 
+
     /** 破坏死光特效（仅 skill8 prefab 路径，无手写 fallback） */
     public static createDestructionRay(
         parent: Node,
@@ -832,6 +953,12 @@ export class WeaponVFX {
             if (node && node.isValid) node.destroy();
         }
         this._deathRayPrefabPool.length = 0;
+        this._flamePrefab = null;
+        this._flamePrefabLoading = false;
+        for (const node of this._flamePrefabPool) {
+            if (node && node.isValid) node.destroy();
+        }
+        this._flamePrefabPool.length = 0;
         this._initialized = false;
     }
 }

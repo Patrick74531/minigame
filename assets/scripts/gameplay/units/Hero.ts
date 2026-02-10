@@ -48,6 +48,8 @@ export class Hero extends Unit {
     private _stackVisualizer: StackVisualizer | null = null;
     /** 空投武器冷却计时器 */
     private _customWeaponTimer: number = 0;
+    /** 上一帧 dt（供持续型武器使用） */
+    private _lastDt: number = 0;
 
     /** 基础属性快照（用于成长计算） */
     private _baseStats = {
@@ -223,6 +225,8 @@ export class Hero extends Unit {
         // 游戏暂停时不处理移动和攻击
         if (!this.gameManager.isPlaying) return;
 
+        this._lastDt = dt;
+
         // 空投武器冷却
         if (this._customWeaponTimer > 0) {
             this._customWeaponTimer -= dt;
@@ -240,9 +244,19 @@ export class Hero extends Unit {
         }
 
         // 只要有目标 + 武器就绪，无论移动还是静止都开火
+        // 持续型武器每帧触发，离散型武器按冷却间隔
         const manager = HeroWeaponManager.instance;
-        if (this._target && manager.activeWeapon && this._customWeaponTimer <= 0) {
-            this.performAttack();
+        if (manager.activeWeapon) {
+            const behavior = WeaponBehaviorFactory.get(manager.activeWeapon.type);
+            const shouldFire =
+                this._target &&
+                (behavior?.isContinuous || this._customWeaponTimer <= 0);
+            if (shouldFire) {
+                this.performAttack();
+            } else if (!this._target) {
+                // 无目标时停止持续型武器
+                this._stopCurrentWeapon();
+            }
         }
 
         super.update(dt);
@@ -369,7 +383,10 @@ export class Hero extends Unit {
     }
 
     protected performAttack(): void {
-        if (!this._target || !this._target.isAlive) return;
+        if (!this._target || !this._target.isAlive) {
+            this._stopCurrentWeapon();
+            return;
+        }
 
         // 优先使用空投武器系统
         const manager = HeroWeaponManager.instance;
@@ -379,12 +396,20 @@ export class Hero extends Unit {
             const def = manager.getWeaponDef(active.type);
             if (behavior && def) {
                 const stats = this.getEffectiveWeaponStats(getWeaponLevelStats(def, active.level));
-                if (this._customWeaponTimer <= 0) {
-                    const parent = this.node.parent;
-                    if (parent) {
+                const parent = this.node.parent;
+                if (!parent) return;
+
+                if (behavior.isContinuous) {
+                    // 持续型武器（喷火器）：每帧 fire，传入 dt
+                    const dt = this._lastDt > 0 ? this._lastDt : 0.016;
+                    behavior.fire(this.node, this._target.node, stats, active.level, parent, dt);
+                    // 不使用 _customWeaponTimer，持续触发
+                } else {
+                    // 离散型武器（机枪、大炮等）：按冷却间隔
+                    if (this._customWeaponTimer <= 0) {
                         behavior.fire(this.node, this._target.node, stats, active.level, parent);
+                        this._customWeaponTimer = stats.attackInterval;
                     }
-                    this._customWeaponTimer = stats.attackInterval;
                 }
                 return;
             }
@@ -393,6 +418,18 @@ export class Hero extends Unit {
         // 默认武器
         if (this._weapon) {
             this._weapon.tryAttack(this._target.node);
+        }
+    }
+
+    /** 停止当前持续型武器的效果 */
+    private _stopCurrentWeapon(): void {
+        const manager = HeroWeaponManager.instance;
+        const active = manager.activeWeapon;
+        if (active) {
+            const behavior = WeaponBehaviorFactory.get(active.type);
+            if (behavior?.stopFire) {
+                behavior.stopFire();
+            }
         }
     }
 

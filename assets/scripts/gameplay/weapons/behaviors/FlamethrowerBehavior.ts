@@ -6,7 +6,14 @@ import { GameConfig } from '../../../data/GameConfig';
 import { Unit, UnitType } from '../../units/Unit';
 import { EnemyQuery } from '../../../core/managers/EnemyQuery';
 
-/** 堆肥喷火器 — 纯代码持续火束版 */
+/**
+ * 堆肥喷火器 — 持续喷射火焰版
+ *
+ * 与其他武器不同，喷火器是持续型武器：
+ * - fire() 每帧被调用，维护一个持续的火焰粒子节点
+ * - 伤害按 DPS 均摊到每帧（乘以 dt）
+ * - 失去目标时调用 stopFire() 回收火焰节点
+ */
 export class FlamethrowerBehavior extends WeaponBehavior {
     public readonly type = WeaponType.FLAMETHROWER;
 
@@ -25,22 +32,41 @@ export class FlamethrowerBehavior extends WeaponBehavior {
         new Color(255, 148, 42, 198),
         new Color(255, 160, 54, 210),
     ];
-    private static readonly FLASH_COLORS: Color[] = [
-        new Color(255, 195, 82, 220),
-        new Color(255, 204, 90, 224),
-        new Color(255, 212, 100, 228),
-        new Color(255, 220, 110, 232),
-        new Color(255, 228, 124, 236),
-    ];
 
+    /** 持续火焰节点 */
+    private _flameNode: Node | null = null;
+    /** 当前火焰的父节点 */
+    private _flameParent: Node | null = null;
+
+    /** 伤害计时器（控制每秒伤害 tick 频率） */
+    private _dmgTickTimer: number = 0;
+    /** 伤害 tick 间隔（秒） */
+    private static readonly DMG_TICK_INTERVAL = 0.15;
+
+
+
+    /** 标记为持续型武器 */
+    public override get isContinuous(): boolean {
+        return true;
+    }
+
+    /**
+     * 每帧调用：维护火焰 VFX + 持续造成伤害
+     */
     public fire(
         owner: Node,
         target: Node,
         stats: WeaponLevelStats,
         level: number,
-        parent: Node
+        parent: Node,
+        dt?: number
     ): void {
-        if (!target || !target.isValid) return;
+        if (!target || !target.isValid) {
+            this.stopFire();
+            return;
+        }
+
+        const frameDt = dt ?? 0.016;
 
         WeaponVFX.initialize();
 
@@ -58,27 +84,37 @@ export class FlamethrowerBehavior extends WeaponBehavior {
         const range = Math.max(1.6, stats.range);
         const streamLength = Math.max(1.6, Math.min(range, len + 0.95));
         const streamWidth = 0.46 + level * 0.08;
-        const streamDuration = Math.max(0.2, stats.attackInterval * 1.4);
         const streamEnd = new Vec3(
             spawnPos.x + dirX * streamLength,
             spawnPos.y,
             spawnPos.z + dirZ * streamLength
         );
 
-        WeaponVFX.createCodeBeam(parent, spawnPos, streamEnd, {
-            width: streamWidth,
-            duration: streamDuration,
-            beamColor: FlamethrowerBehavior.GLOW_COLORS[idx],
-            coreColor: FlamethrowerBehavior.CORE_COLORS[idx],
-            intensity: 1.15 + level * 0.2,
-        });
-        WeaponVFX.createMuzzleFlash(
-            parent,
-            spawnPos,
-            FlamethrowerBehavior.FLASH_COLORS[idx],
-            0.15 + level * 0.025
-        );
-        if (Math.random() < 0.35) {
+        // === 持续火焰 VFX ===
+        if (!this._flameNode || !this._flameNode.isValid) {
+            // 首次：创建持续火焰
+            this._flameNode = WeaponVFX.startContinuousFlame(
+                parent,
+                spawnPos,
+                streamEnd,
+                streamWidth
+            );
+            this._flameParent = parent;
+        } else {
+            // 后续帧：更新位置/方向
+            WeaponVFX.updateFlameTransform(
+                this._flameNode,
+                spawnPos,
+                streamEnd,
+                streamWidth
+            );
+        }
+
+
+
+
+        // === 地面灼烧（低频随机） ===
+        if (Math.random() < 0.006) {
             WeaponVFX.createGroundBurn(
                 parent,
                 streamEnd,
@@ -87,6 +123,13 @@ export class FlamethrowerBehavior extends WeaponBehavior {
                 0.18
             );
         }
+
+        // === 持续伤害（按 tick 间隔计算） ===
+        this._dmgTickTimer += frameDt;
+        if (this._dmgTickTimer < FlamethrowerBehavior.DMG_TICK_INTERVAL) return;
+
+        // 达到 tick 间隔，结算一次伤害
+        this._dmgTickTimer -= FlamethrowerBehavior.DMG_TICK_INTERVAL;
 
         const hitRadiusAtEnd = 0.56 + level * 0.12;
         const hits = this.collectConeHits(spawnPos, dirX, dirZ, streamLength, hitRadiusAtEnd);
@@ -98,11 +141,14 @@ export class FlamethrowerBehavior extends WeaponBehavior {
         const targetCap = FlamethrowerBehavior.MAX_TARGETS[idx];
         const hitCount = Math.min(targetCap, hits.length);
 
+        // DPS 按 tick 间隔分摊：每 tick 伤害 = damage * (tickInterval / attackInterval)
+        const dpsRatio = FlamethrowerBehavior.DMG_TICK_INTERVAL / Math.max(0.1, stats.attackInterval);
+
         for (let i = 0; i < hitCount; i++) {
             const hit = hits[i];
             const distanceT = hit.dist / streamLength;
             const nearBonus = 1 - distanceT * 0.35;
-            let damage = Math.max(1, Math.floor(stats.damage * nearBonus));
+            let damage = Math.max(1, Math.floor(stats.damage * nearBonus * dpsRatio));
             let isCrit = false;
             if (critRate > 0 && Math.random() < critRate) {
                 damage = Math.floor(damage * critDamage);
@@ -110,8 +156,20 @@ export class FlamethrowerBehavior extends WeaponBehavior {
             }
 
             hit.unit.takeDamage(damage, undefined, isCrit);
-            hit.unit.applyKnockback(dirX, dirZ, 0.9 + level * 0.25, 0.05);
+            hit.unit.applyKnockback(dirX, dirZ, (0.9 + level * 0.25) * dpsRatio, 0.05);
         }
+    }
+
+    /**
+     * 停止火焰 VFX（失去目标或切换武器时调用）
+     */
+    public override stopFire(): void {
+        if (this._flameNode && this._flameNode.isValid) {
+            WeaponVFX.stopContinuousFlame(this._flameNode);
+        }
+        this._flameNode = null;
+        this._flameParent = null;
+        this._dmgTickTimer = 0;
     }
 
     private collectConeHits(
