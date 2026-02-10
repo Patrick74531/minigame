@@ -22,6 +22,11 @@ export class CombatSystem extends Component implements CombatProvider {
     /** 所有活跃的敌人 */
     private _enemies: Enemy[] = [];
 
+    public get activeEnemies(): Enemy[] {
+        return this._enemies;
+    }
+
+
     /** 所有活跃的士兵 */
     private _soldiers: Soldier[] = [];
 

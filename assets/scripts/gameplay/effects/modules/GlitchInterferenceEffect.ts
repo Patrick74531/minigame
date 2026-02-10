@@ -3,11 +3,7 @@ import { VisualEffect } from '../VisualEffect';
 import { TextureLoader } from '../runtime/TextureLoader';
 
 export class GlitchInterferenceEffect {
-    private static readonly NOISE_TEXTURE_PATHS = [
-        'textures/beam_noise/texture',
-        'textures/beam_noise',
-        'textures/beam_noise.png',
-    ];
+    private static readonly NOISE_TEXTURE_PATHS: string[] = []; // 移除 beam_noise 引用
 
     public static play(payload: { parent: Node; position: Vec3; radius: number }): void {
         const effectNode = new Node('GlitchInterference');

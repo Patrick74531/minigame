@@ -60,7 +60,6 @@ export class ResourcePreloader {
     // === WeaponVFX 贴图 ===
 
     private static preloadWeaponVFXTextures(): void {
-        resources.preload('textures/beam_noise', Texture2D);
         resources.preload('textures/bullet/texture', Texture2D);
         resources.preload('textures/bullet', Texture2D);
         resources.preload('floor/tileable_grass_01/texture', Texture2D);

@@ -2,6 +2,10 @@ import { Node, Color, Vec3 } from 'cc';
 import { WeaponBehavior } from '../WeaponBehavior';
 import { WeaponType, WeaponLevelStats } from '../WeaponTypes';
 import { WeaponVFX } from '../WeaponVFX';
+import { CombatService } from '../../../core/managers/CombatService';
+import { CombatSystem } from '../../combat/CombatSystem';
+import { GlitchDistortion } from '../../visuals/GlitchDistortion';
+import { Enemy } from '../../units/Enemy';
 import { GlitchOverlay } from '../vfx/GlitchOverlay';
 import { ScreenShake } from '../vfx/ScreenShake';
 import { EventManager } from '../../../core/managers/EventManager';
@@ -78,6 +82,9 @@ export class GlitchWaveBehavior extends WeaponBehavior {
             color: color,
         });
 
+        // === 敌人扭曲特效 ===
+        this.applyDistortionToEnemies(owner.worldPosition, waveRadius * levelScale, level);
+
         // === 3D 层：干扰束脉冲（次级细节） ===
         this.spawnInterferenceBurst(parent, center, waveRadius, waveSpeed, color, level);
 
@@ -143,6 +150,35 @@ export class GlitchWaveBehavior extends WeaponBehavior {
                 coreColor,
                 intensity: 1.8 + level * 0.35,
             });
+        }
+    }
+
+    private applyDistortionToEnemies(center: Vec3, radius: number, level: number): void {
+        const combatSys = CombatService.provider as unknown as CombatSystem;
+        if (!combatSys || !combatSys.activeEnemies) return;
+
+        const enemies = combatSys.activeEnemies;
+        const radiusSq = radius * radius;
+        
+        // 扭曲强度随等级增加
+        const duration = 0.5 + level * 0.1; 
+        const strength = 1.0 + level * 0.5;
+
+        for (const enemy of enemies) {
+            if (!enemy.isAlive || !enemy.node || !enemy.node.isValid) continue;
+
+            const dx = enemy.node.worldPosition.x - center.x;
+            const dz = enemy.node.worldPosition.z - center.z;
+            const distSq = dx * dx + dz * dz;
+
+            if (distSq <= radiusSq) {
+                // Add distortion component
+                let distortion = enemy.node.getComponent(GlitchDistortion);
+                if (!distortion) {
+                    distortion = enemy.node.addComponent(GlitchDistortion);
+                }
+                distortion.init(duration, strength);
+            }
         }
     }
 }
