@@ -2,14 +2,14 @@
   "ver": "2.3.14",
   "importer": "gltf",
   "imported": true,
-  "uuid": "96c5c1a0-49bb-429d-ab98-5f2fa9e7221b",
+  "uuid": "a2bdf513-6995-4e56-ae73-e53884ba3df3",
   "files": [
     "__original-animation-0.bin"
   ],
   "subMetas": {
     "18d6f": {
       "importer": "gltf-animation",
-      "uuid": "96c5c1a0-49bb-429d-ab98-5f2fa9e7221b@18d6f",
+      "uuid": "a2bdf513-6995-4e56-ae73-e53884ba3df3@18d6f",
       "displayName": "",
       "id": "18d6f",
       "name": "mixamo.com.animation",
@@ -30,12 +30,12 @@
       ],
       "subMetas": {}
     },
-    "7359a": {
+    "eb297": {
       "importer": "gltf-scene",
-      "uuid": "96c5c1a0-49bb-429d-ab98-5f2fa9e7221b@7359a",
+      "uuid": "a2bdf513-6995-4e56-ae73-e53884ba3df3@eb297",
       "displayName": "",
-      "id": "7359a",
-      "name": "out.prefab",
+      "id": "eb297",
+      "name": "out_optimized.prefab",
       "userData": {
         "gltfIndex": 0
       },
@@ -89,7 +89,7 @@
       "textures": [],
       "materials": [],
       "scenes": [
-        "96c5c1a0-49bb-429d-ab98-5f2fa9e7221b@7359a"
+        "a2bdf513-6995-4e56-ae73-e53884ba3df3@eb297"
       ]
     }
   }

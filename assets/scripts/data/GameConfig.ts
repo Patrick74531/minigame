@@ -405,14 +405,14 @@ export const GameConfig = {
             firingRifle: {
                 key: 'firingRifle',
                 prefab: {
-                    path: 'character/Firing Rifle Run Compressed/out/out',
+                    path: 'character/Firing Rifle Run Compressed/out_optimized/out_optimized',
                 },
                 clips: {
                     run: {
-                        path: 'character/Firing Rifle Run Compressed/out/mixamo.com',
+                        path: 'character/Firing Rifle Run Compressed/out_optimized/mixamo.com',
                     },
                     idle: {
-                        path: 'character/Firing Rifle Idle Compressed/out/mixamo.com',
+                        path: 'character/Firing Rifle Idle Compressed/out_optimized/mixamo.com',
                     },
                 },
                 transform: {
