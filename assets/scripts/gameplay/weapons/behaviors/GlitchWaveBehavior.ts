@@ -66,7 +66,19 @@ export class GlitchWaveBehavior extends WeaponBehavior {
             effectType: 'glitch_interference',
         });
 
-        // === 3D 层：干扰束脉冲（替代方块冲击波） ===
+
+        // === 3D 层：模拟回音主特效 ===
+        // 核心旋转粒子效果 (Lv.1+)
+        // 改为挂载在 owner (英雄) 下，跟随移动
+        // y=0.1 贴近脚底
+        // 视觉大小随等级提升 (Lv1=1.0, Lv5=1.6)
+        const levelScale = 1.0 + (level - 1) * 0.15;
+        WeaponVFX.createEchoWave(owner, new Vec3(0, 0.1, 0), {
+            scale: waveRadius * 0.8 * levelScale, 
+            color: color,
+        });
+
+        // === 3D 层：干扰束脉冲（次级细节） ===
         this.spawnInterferenceBurst(parent, center, waveRadius, waveSpeed, color, level);
 
         // 中心闪光 (Lv.2+)

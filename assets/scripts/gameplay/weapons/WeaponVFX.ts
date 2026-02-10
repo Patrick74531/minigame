@@ -16,6 +16,7 @@ import {
     instantiate,
     ParticleSystem,
     Animation,
+    GradientRange,
 } from 'cc';
 import { ProjectilePool } from './vfx/ProjectilePool';
 
@@ -819,6 +820,88 @@ export class WeaponVFX {
             .to(0.05, { scale: new Vec3(0, 1, 0) })
             .call(() => ProjectilePool.put('vfx_flash', node2))
             .start();
+    }
+
+
+    // ========== 模拟回音特效（Glitch Wave） ==========
+
+    public static createEchoWave(
+        parent: Node,
+        center: Vec3,
+        opts: {
+            scale: number;
+            color: Color;
+        }
+    ): void {
+        const path = 'effects/glitch_wave/echo_wave'; // 用户需放入此 prefab
+        resources.load(path, Prefab, (err, prefab) => {
+            if (err) {
+                // 静默失败，等待用户添加资源
+                return;
+            }
+            // 创建一个容器节点来控制整体旋转，避免被 prefab 自带动画覆盖
+            const container = new Node('EchoWaveContainer');
+            parent.addChild(container);
+            container.setPosition(center);
+            
+            // 用户反馈要“水平贴地”
+            // commonLight 原本可能是竖着的，这里通过容器旋转将其放平
+            // 尝试 x=-90 度
+            container.setRotationFromEuler(-90, 0, 0);
+
+            // 缩放应用在容器上
+            // 用户反馈特效太大，手动缩放 0.15 倍
+            const finalScale = opts.scale * 0.15;
+            container.setScale(finalScale, finalScale, finalScale);
+            
+            const node = instantiate(prefab);
+            container.addChild(node);
+            node.setPosition(0, 0, 0);
+            node.setScale(1, 1, 1); // 缩放在容器层处理了
+
+            // 1. 播放动画 (针对 commonLight 这类带 Animation 的特效)
+            const anim = node.getComponent(Animation);
+            if (anim) {
+                anim.play();
+            }
+
+            // 2. 尝试设置颜色
+            // A. 粒子系统
+            const particles = node.getComponentsInChildren(ParticleSystem);
+            particles.forEach(p => {
+                // GradientRange 构造函数可能不接受参数，或者签名不同
+                // 安全做法：先创建，再赋值
+                const grad = new GradientRange();
+                grad.mode = GradientRange.Mode.Color;
+                grad.color = opts.color;
+                p.startColor = grad;
+            });
+
+            // B. Sprite (尽管本项目暂未导入 Sprite，加上防御性代码无妨)
+            // const sprites = node.getComponentsInChildren(Sprite);
+            // sprites.forEach(s => s.color = opts.color);
+
+            // C. MeshRenderer (针对 commonLight 的 Plane 模型)
+            const meshes = node.getComponentsInChildren(MeshRenderer);
+            meshes.forEach(mesh => {
+                // 获取材质实例（会克隆材质，互不影响）
+                // 注意：accessing .material getter creates an instance automatically
+                const mat = mesh.material; 
+                if (mat) {
+                    // 尝试设置 mainColor 或 tintColor (通用属性名)
+                    // 内置 unlit/builtin-standard 通常用 mainColor
+                    // 粒子材质可能用 tintColor
+                    mat.setProperty('mainColor', opts.color);
+                    mat.setProperty('tintColor', opts.color); 
+                }
+            });
+
+            // 自动销毁（假设特效时长 < 2秒）
+            tween(container)
+                .delay(2.0)
+                .call(() => container.destroy())
+                .start();
+        });
     }
 
     // ========== 冲击波环（池化） ==========
