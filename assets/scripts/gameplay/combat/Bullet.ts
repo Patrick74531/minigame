@@ -416,38 +416,107 @@ export class Bullet extends BaseComponent implements IPoolable {
     }
 
     private handleChainBounce(currentHitNode: Node): void {
-        // Find nearest enemy excluding current one
-        const nextTarget = this.findNextChainTarget(currentHitNode);
+        // 即时链式弹射：隐藏子弹，依次对目标施加伤害 + 闪电特效
+        // 每次弹射间隔 0.1s，形成清晰的视觉链条
 
-        if (nextTarget) {
-            this.chainCount--;
+        const parent = this.node.parent;
+        if (!parent) {
+            this.recycle();
+            return;
+        }
 
-            // Visual Trail/Zap
-            if (this.node.parent) {
-                EffectFactory.createLightningBolt(
-                    this.node.parent,
-                    this.node.position,
-                    nextTarget.position
-                );
-            }
+        // 隐藏子弹（不再物理飞行）
+        this.node.active = false;
 
-            // Increase speed for bounce to make it look snappier
-            this.speed *= 1.5;
+        // 收集所有链式目标
+        const chainTargets: { node: Node; unit: Unit }[] = [];
+        let fromPos = this.node.position.clone();
+        let lastHitNode = currentHitNode;
+        let remainingChains = this.chainCount;
+        let chainDmg = this.damage;
 
-            // Update Target
-            this._target = nextTarget;
-            this.updateVelocity();
+        while (remainingChains > 0) {
+            const next = this._findChainTargetFrom(fromPos, lastHitNode);
+            if (!next) break;
 
-            // Reset lifetime so it doesn't expire mid-bounce
-            this._lifetime = 0;
+            const unit = next.getComponent(Unit);
+            if (!unit || !unit.isAlive) break;
 
-            // Apply reduced damage on bounce? (Optional)
-            this.damage = Math.floor(this.damage * 0.8);
-        } else {
-            // No target found, chain ends
+            chainTargets.push({ node: next, unit });
+            this._hitNodes.add(next);
+            fromPos = next.position.clone();
+            lastHitNode = next;
+            remainingChains--;
+        }
+
+        if (chainTargets.length === 0) {
             this.createHitEffect();
             this.recycle();
+            return;
         }
+
+        // 依次播放闪电链
+        const CHAIN_DELAY = 0.1; // 每次弹射间隔（秒）
+        let prevPos = this.node.position.clone();
+
+        for (let i = 0; i < chainTargets.length; i++) {
+            const target = chainTargets[i];
+            const startPos = prevPos.clone();
+            const dmg = Math.floor(chainDmg);
+            chainDmg *= 0.8; // 每次递减 20%
+
+            this.scheduleOnce(() => {
+                if (!target.node.isValid) return;
+
+                // 绘制闪电
+                if (parent.isValid) {
+                    EffectFactory.createLightningBolt(parent, startPos, target.node.position);
+                }
+
+                // 造成伤害
+                if (target.unit.isValid && target.unit.isAlive) {
+                    target.unit.takeDamage(dmg);
+                    if (this.slowPercent > 0) {
+                        target.unit.applySlow(this.slowPercent, this.slowDuration);
+                    }
+                }
+
+                // 击中特效
+                if (parent.isValid) {
+                    WeaponVFX.createHitSpark(parent, target.node.position.clone());
+                }
+
+                // 最后一个目标：回收子弹
+                if (i === chainTargets.length - 1) {
+                    this.recycle();
+                }
+            }, CHAIN_DELAY * (i + 1));
+
+            prevPos = target.node.position.clone();
+        }
+    }
+
+    /** 从指定位置搜索最近的链式目标（排除已命中的） */
+    private _findChainTargetFrom(fromPos: Vec3, excludeNode: Node): Node | null {
+        const enemies = EnemyQuery.getEnemies();
+        let nearest: Node | null = null;
+        let minDistSq = this.chainRange * this.chainRange;
+
+        for (const enemy of enemies) {
+            if (!enemy.isValid || enemy === excludeNode || this._hitNodes.has(enemy)) continue;
+            const unit = enemy.getComponent(Unit);
+            if (!unit || !unit.isAlive) continue;
+
+            const dx = enemy.position.x - fromPos.x;
+            const dz = enemy.position.z - fromPos.z;
+            const distSqr = dx * dx + dz * dz;
+
+            if (distSqr < minDistSq) {
+                minDistSq = distSqr;
+                nearest = enemy;
+            }
+        }
+        return nearest;
     }
 
     private findNextChainTarget(excludeNode: Node): Node | null {
@@ -459,7 +528,7 @@ export class Bullet extends BaseComponent implements IPoolable {
         const myPos = this.node.position;
 
         for (const enemy of enemies) {
-            if (!enemy.isValid || enemy === excludeNode) continue;
+            if (!enemy.isValid || enemy === excludeNode || this._hitNodes.has(enemy)) continue;
             const unit = enemy.getComponent(Unit);
             if (!unit || !unit.isAlive) continue;
 

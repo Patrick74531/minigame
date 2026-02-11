@@ -238,11 +238,11 @@ export const GameConfig = {
                 stats: {
                     hp: 260,
                     attackRange: 17,
-                    attackDamage: 20,
+                    attackDamage: 12,
                     attackInterval: 0.95,
                 },
                 features: {
-                    chainCount: 2,
+                    chainCount: 5,
                     chainRange: 6,
                     bulletColorHex: '#A020F0',
                     useLaserVisual: true,

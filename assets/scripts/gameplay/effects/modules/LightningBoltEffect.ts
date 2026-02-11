@@ -19,7 +19,7 @@ export class LightningBoltEffect {
 
         const g = node.addComponent(Graphics);
         g.lineWidth = 0.2;
-        g.strokeColor = new Color(150, 50, 255, 255);
+        g.strokeColor = new Color(50, 150, 255, 255); // Blue
 
         node.setWorldPosition(payload.startPos);
         const localEnd = new Vec3();
@@ -62,7 +62,7 @@ export class LightningBoltEffect {
 
         const material = new Material();
         material.initialize({ effectName: 'builtin-unlit' });
-        material.setProperty('mainColor', new Color(200, 100, 255, 255));
+        material.setProperty('mainColor', new Color(80, 180, 255, 255)); // Blue
         if (material.passes && material.passes.length > 0) {
             const target = material.passes[0].blendState.targets[0];
             target.blend = true;
@@ -76,7 +76,7 @@ export class LightningBoltEffect {
         Vec3.add(mid, start, end);
         mid.multiplyScalar(0.5);
         seg.setPosition(mid);
-        seg.setScale(0.15, 0.15, length);
+        seg.setScale(0.06, 0.06, length); // Thinner bolt
 
         const dir = new Vec3();
         Vec3.subtract(dir, end, start);
