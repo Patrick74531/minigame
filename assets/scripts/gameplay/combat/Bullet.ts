@@ -37,6 +37,7 @@ export class Bullet extends BaseComponent implements IPoolable {
 
     public chainCount: number = 0;
     public chainRange: number = 0;
+    public chainWidth: number = 1; // 闪电链宽度倍率（随塔等级缩放）
 
     // === Crit Properties ===
     public critRate: number = 0;
@@ -113,6 +114,7 @@ export class Bullet extends BaseComponent implements IPoolable {
         this.slowDuration = 0;
         this.chainCount = 0;
         this.chainRange = 0;
+        this.chainWidth = 1;
         this.critRate = 0;
         this.critDamage = 1.5;
         this.orientXAxis = false;
@@ -470,7 +472,7 @@ export class Bullet extends BaseComponent implements IPoolable {
 
                 // 绘制闪电
                 if (parent.isValid) {
-                    EffectFactory.createLightningBolt(parent, startPos, target.node.position);
+                    EffectFactory.createLightningBolt(parent, startPos, target.node.position, this.chainWidth);
                 }
 
                 // 造成伤害

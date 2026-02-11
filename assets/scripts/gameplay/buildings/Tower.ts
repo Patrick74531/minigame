@@ -69,6 +69,7 @@ export class Tower extends Building {
     public rangeMultiplier: number = 1.03;
     public intervalMultiplier: number = 0.95;
     public chainRangePerLevel: number = 0;
+    public chainCountPerLevel: number = 0;
 
     private _attackTimer: number = 0;
     private _target: Node | null = null;
@@ -255,9 +256,11 @@ export class Tower extends Building {
         bullet.explosionRadius = this.bulletExplosionRadius;
         bullet.slowDuration = this.bulletSlowDuration;
 
-        // Chain Lightning
-        bullet.chainCount = this.chainCount;
+        // Chain Lightning (dynamic based on level)
+        const levelBonus = Math.max(0, this.level - 1);
+        bullet.chainCount = this.chainCount + levelBonus * this.chainCountPerLevel;
         bullet.chainRange = this.chainRange;
+        bullet.chainWidth = 1 + levelBonus * 0.3; // 每级增加 30% 宽度
 
         bullet.setTarget(target);
     }

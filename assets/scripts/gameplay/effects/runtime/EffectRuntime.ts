@@ -20,6 +20,7 @@ export type EffectPayloadMap = {
         parent: Node;
         startPos: Vec3;
         endPos: Vec3;
+        width: number;
     };
 };
 

@@ -320,6 +320,11 @@ export class BuildingPad extends BaseComponent {
     public onBuildingCreated(building: Building): void {
         this._associatedBuilding = building;
 
+        // 若 start() 还未执行，提前加载配置
+        if (!this._config) {
+            this._config = this.buildingRegistry.get(this.buildingTypeId) ?? null;
+        }
+
         // Calculate next upgrade cost
         const baseCost = this._config?.cost ?? 0;
         const costMult = building.upgradeCostMultiplier;

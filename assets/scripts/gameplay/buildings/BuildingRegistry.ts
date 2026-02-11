@@ -52,6 +52,7 @@ export interface BuildingTypeConfig {
 
         // Chain Lightning
         chainCount?: number;
+        chainCountPerLevel?: number;
         chainRange?: number;
         useLaserVisual?: boolean;
     };

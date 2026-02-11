@@ -242,7 +242,8 @@ export const GameConfig = {
                     attackInterval: 0.95,
                 },
                 features: {
-                    chainCount: 5,
+                    chainCount: 3,
+                    chainCountPerLevel: 1,
                     chainRange: 6,
                     bulletColorHex: '#A020F0',
                     useLaserVisual: true,

@@ -331,6 +331,8 @@ export class BuildingFactory {
                 // Chain Lightning
                 if (config.features.chainCount !== undefined)
                     tower.chainCount = config.features.chainCount;
+                if (config.features.chainCountPerLevel !== undefined)
+                    tower.chainCountPerLevel = config.features.chainCountPerLevel;
                 if (config.features.chainRange !== undefined)
                     tower.chainRange = config.features.chainRange;
 

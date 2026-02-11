@@ -22,8 +22,8 @@ export class EffectFactory {
         EffectRuntime.play('glitchInterference', { parent, position, radius });
     }
 
-    public static createLightningBolt(parent: Node, startPos: Vec3, endPos: Vec3): void {
+    public static createLightningBolt(parent: Node, startPos: Vec3, endPos: Vec3, width: number = 1): void {
         ensureEffectModulesRegistered();
-        EffectRuntime.play('lightningBolt', { parent, startPos, endPos });
+        EffectRuntime.play('lightningBolt', { parent, startPos, endPos, width });
     }
 }
