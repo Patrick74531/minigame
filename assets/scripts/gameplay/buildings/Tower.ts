@@ -18,6 +18,7 @@ import { EventManager } from '../../core/managers/EventManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../data/GameEvents';
 import { EffectFactory } from '../effects/EffectFactory';
+import { WeaponVFX } from '../weapons/WeaponVFX';
 
 const { ccclass, property } = _decorator;
 
@@ -60,6 +61,9 @@ export class Tower extends Building {
     /** Frost rain radius growth per level (multiplicative): radius * (1 + (level-1)*k) */
     @property
     public rainRadiusPerLevel: number = 0.22;
+
+    @property
+    public useLaserVisual: boolean = false;
 
     public attackMultiplier: number = 1.2;
     public rangeMultiplier: number = 1.03;
@@ -185,7 +189,18 @@ export class Tower extends Building {
         }
 
         // Create Bullet
-        const bulletNode = new Node('Bullet');
+        let bulletNode: Node | null = null;
+        
+        if (this.useLaserVisual) {
+             bulletNode = WeaponVFX.createLaserBolt(0.3); // Shortened length (Half of 0.6)
+             if (!bulletNode) {
+                 bulletNode = new Node('Bullet'); // Fallback
+             } else {
+                 bulletNode.name = 'LaserBullet';
+             }
+        } else {
+            bulletNode = new Node('Bullet');
+        }
 
         // Add to parent (Buildings container)
         if (this.node.parent) {
@@ -197,19 +212,41 @@ export class Tower extends Building {
         bulletNode.setPosition(this.node.position.x, 1.5, this.node.position.z);
         // console.log(`[Tower] Spawned bullet at ${bulletNode.position}`);
 
-        // 1. Visuals: Glowing Sphere
-        const renderer = bulletNode.addComponent(MeshRenderer);
-        renderer.mesh = utils.MeshUtils.createMesh(
-            primitives.box({ width: 0.2, height: 0.2, length: 0.2 }) // Smaller Cube
-        );
-        const material = new Material();
-        material.initialize({ effectName: 'builtin-unlit' });
-        // Use custom color
-        material.setProperty('mainColor', this.bulletColor);
-        renderer.material = material;
+        // 1. Visuals
+        if (!this.useLaserVisual) {
+            // Standard Glowing Sphere for non-laser towers
+            const renderer = bulletNode.addComponent(MeshRenderer);
+            renderer.mesh = utils.MeshUtils.createMesh(
+                primitives.box({ width: 0.2, height: 0.2, length: 0.2 }) // Smaller Cube
+            );
+            const material = new Material();
+            material.initialize({ effectName: 'builtin-unlit' });
+            // Use custom color
+            material.setProperty('mainColor', this.bulletColor);
+            renderer.material = material;
+        } else {
+            // For laser, Bullet.ts expects us to handle orientation, but LaserBolt has its own axis.
+            // WeaponVFX.createLaserBolt returns a node where Z is length. 
+            // Bullet.ts attempts to lookAt target. 
+            // If we want the bolt to fly like a projectile, we need to ensure Bullet.ts rotates it correctly.
+            // The laser bolt prefab (skill8/juan) likely faces Z or has a specific rotation.
+            // In WeaponVFX._stripLaserBolt, 'juan' is used.
+            // In Bullet.ts: this.node.lookAt(lookAtPos);
+            // This aligns -Z (cocos default forward) to target? No, lookAt aligns Forward (-Z) to target usually.
+            // We need to check if 'juan' aligns with -Z.
+        }
 
         // Logic
-        const bullet = bulletNode.addComponent(Bullet);
+        const bullet = bulletNode.getComponent(Bullet) ?? bulletNode.addComponent(Bullet);
+        // If it was a laser bolt from pool, it might already have Bullet? Unlikely from WeaponVFX factory.
+        // Actually WeaponVFX just returns a visual node. We attach Bullet logic here.
+        
+        // For Laser Visual, we might need to tell Bullet to orient specifically if the model is rotated.
+        if (this.useLaserVisual) {
+            // Bullet.ts usually looks at target (-Z forward). 
+            // If our mesh (juan) is elongated along Z, we probably want it to face target.
+            // If juan is Z-aligned, lookAt works if we want it to fly "lengthwise".
+        }
         bullet.damage = this.attackDamage;
         bullet.speed = this.projectileSpeed;
 

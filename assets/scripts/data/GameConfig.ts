@@ -245,6 +245,7 @@ export const GameConfig = {
                     chainCount: 2,
                     chainRange: 6,
                     bulletColorHex: '#A020F0',
+                    useLaserVisual: true,
                 },
                 upgrades: {
                     maxLevel: 5,

@@ -66,6 +66,13 @@ export class WeaponVFX {
         ProjectilePool.register('vfx_beam_core', () => this._createVfxNode('BeamCore'), 2);
         ProjectilePool.register('vfx_beam_glow', () => this._createVfxNode('BeamGlow'), 2);
         ProjectilePool.register('vfx_beam_pulse', () => this._createVfxNode('BeamPulse'), 2);
+        // Laser Tower Bolt (Stripped skill8)
+        ProjectilePool.register(
+            'laser_bolt', 
+            () => this._createLaserBoltNode(), 
+            0,
+            (node) => this._cleanupLaserBoltNode(node) // Custom Recycle Handler
+        );
         // 机枪子弹池 + 弹壳池
         ProjectilePool.register('mg_bullet', () => this._createMGBulletNode(), 40);
         ProjectilePool.register('mg_casing', () => this._createCasingNode(), 10);
@@ -614,6 +621,103 @@ export class WeaponVFX {
             .to(0.08, { scale: this._SCALE_ZERO })
             .call(() => ProjectilePool.put('vfx_debris', d))
             .start();
+    }
+
+    // ========== Laser Bolt (Tower) ==========
+
+    private static _createLaserBoltNode(): Node {
+        if (!this._deathRayPrefab) {
+            // Should be loaded by the time towers shoot.
+            // If not, return a dummy that will likely be discarded or invisible.
+            console.warn('[WeaponVFX] createLaserBoltNode called before prefab loaded');
+            return new Node('LaserBolt_Fallback');
+        }
+        const node = instantiate(this._deathRayPrefab);
+        this._stripLaserBolt(node);
+        return node;
+    }
+
+    private static _stripLaserBolt(node: Node): void {
+        const root = node.getChildByName('root');
+        if (!root) return;
+        
+        // Hide distractors
+        const hideList = ['glow', 'hit', 'fasan', 'rune', 'liudong'];
+        hideList.forEach(name => {
+            const child = root.getChildByName(name);
+            if (child) child.active = false;
+        });
+
+        // Setup Beam Core
+        const juan = root.getChildByName('juan');
+        if (juan) {
+             juan.active = true;
+             // Stop any animation that might override scale
+             const anim = juan.getComponent(Animation) ?? root.getComponent(Animation);
+             if (anim) {
+                 anim.stop();
+                 anim.enabled = false;
+             }
+        }
+    }
+
+    public static createLaserBolt(length: number): Node | null {
+        this._ensureDeathRayPrefab();
+        // Try getting from pool. If pool empty, custom factory _createLaserBoltNode runs.
+        const node = ProjectilePool.get('laser_bolt');
+        if (!node) return null;
+
+        // Handle fallback case if instantiation failed primarily
+        if (node.name === 'LaserBolt_Fallback') {
+             if (this._deathRayPrefab) {
+                 // Recover
+                 node.destroy();
+                 return this._createLaserBoltNode();
+             }
+             ProjectilePool.put('laser_bolt', node);
+             return null;
+        }
+
+        // Setup for this shot
+        const root = node.getChildByName('root');
+        if (root) {
+            const juan = root.getChildByName('juan');
+            if (juan) {
+                juan.active = true;
+                const ps = juan.getComponent(ParticleSystem);
+                if (ps) {
+                    ps.stop();
+                    ps.clear();
+                    ps.play();
+                }
+                // Prevent any Animation from messing up our scale
+                const anim = juan.getComponent(Animation);
+                if (anim && anim.enabled) {
+                    anim.stop();
+                    anim.enabled = false;
+                }
+                
+                // Thicker (0.15) and Shorter (allow down to 0.2)
+                juan.setScale(0.15, 0.15, Math.max(0.2, length)); 
+            }
+        }
+
+        return node;
+    }
+
+    private static _cleanupLaserBoltNode(node: Node): void {
+        const root = node.getChildByName('root');
+        if (root) {
+            const juan = root.getChildByName('juan');
+            if (juan) {
+                const ps = juan.getComponent(ParticleSystem);
+                if (ps) {
+                    ps.stop();
+                    ps.clear(); // Immediate visual clear
+                }
+                juan.active = false; // Hide mesh
+            }
+        }
     }
 
     // ========== 弹壳粒子（池化） ==========

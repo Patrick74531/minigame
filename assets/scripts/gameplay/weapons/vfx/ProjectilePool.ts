@@ -11,6 +11,7 @@ import { Node, MeshRenderer, primitives, utils, Material, Color } from 'cc';
 export class ProjectilePool {
     private static _pools: Map<string, Node[]> = new Map();
     private static _factories: Map<string, () => Node> = new Map();
+    private static _recycleCbs: Map<string, (node: Node) => void> = new Map();
 
     /**
      * 注册一个池（附带工厂函数）
@@ -18,11 +19,19 @@ export class ProjectilePool {
      * @param factory 节点工厂
      * @param warmUp  预热数量
      */
-    public static register(key: string, factory: () => Node, warmUp: number = 0): void {
+    public static register(
+        key: string,
+        factory: () => Node,
+        warmUp: number = 0,
+        recycleCb?: (node: Node) => void
+    ): void {
         if (!this._pools.has(key)) {
             this._pools.set(key, []);
         }
         this._factories.set(key, factory);
+        if (recycleCb) {
+            this._recycleCbs.set(key, recycleCb);
+        }
         // 预热
         const pool = this._pools.get(key)!;
         for (let i = 0; i < warmUp; i++) {
@@ -52,6 +61,13 @@ export class ProjectilePool {
     /** 回收节点到池（不销毁，仅隐藏） */
     public static put(key: string, node: Node): void {
         if (!node.isValid) return;
+        
+        // Execute recycle callback if exists
+        const cb = this._recycleCbs.get(key);
+        if (cb) {
+            cb(node);
+        }
+
         node.active = false;
         node.removeFromParent();
         let pool = this._pools.get(key);
@@ -85,5 +101,6 @@ export class ProjectilePool {
         });
         this._pools.clear();
         this._factories.clear();
+        this._recycleCbs.clear();
     }
 }

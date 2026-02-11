@@ -333,6 +333,9 @@ export class BuildingFactory {
                     tower.chainCount = config.features.chainCount;
                 if (config.features.chainRange !== undefined)
                     tower.chainRange = config.features.chainRange;
+
+                if (config.features.useLaserVisual !== undefined)
+                    tower.useLaserVisual = config.features.useLaserVisual;
             }
         }
 
