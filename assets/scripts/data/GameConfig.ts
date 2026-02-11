@@ -55,7 +55,7 @@ export const GameConfig = {
             noiseAmp: { base: 0.025, perLevel: 0.004 },
             intensity: { base: 2.2, perLevel: 0.5 },
             spawnForwardOffset: 0.85,
-            spawnUpOffset: 0.45,
+            spawnUpOffset: 0.0,
             fadeIn: 0.03,
             fadeOut: 0.05,
         },

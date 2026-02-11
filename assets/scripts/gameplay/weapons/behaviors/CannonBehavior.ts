@@ -17,8 +17,8 @@ import { EnemyQuery } from '../../../core/managers/EnemyQuery';
  */
 export class CannonBehavior extends WeaponBehavior {
     public readonly type = WeaponType.CANNON;
-    private static readonly BEAM_LENGTH_MULTIPLIER = 1.35;
-    private static readonly MIN_EXTRA_LENGTH = 2.5;
+    private static readonly BEAM_LENGTH_MULTIPLIER = 0.675;
+    private static readonly MIN_EXTRA_LENGTH = 1.25;
     private static readonly PHYSICS_ENEMY_MASK = 1 << 3;
 
     private static readonly COLORS: Color[] = [
