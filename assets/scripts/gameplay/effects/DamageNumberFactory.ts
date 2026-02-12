@@ -10,7 +10,7 @@ import {
     LabelOutline,
 } from 'cc';
 
-export type DamageNumberStyle = 'default' | 'enemyHit';
+export type DamageNumberStyle = 'default' | 'enemyHit' | 'heal';
 
 /**
  * 浮动伤害数字工厂
@@ -22,6 +22,7 @@ export class DamageNumberFactory {
     // 复用的常量颜色
     private static readonly COLOR_NORMAL = new Color(255, 255, 255, 255);
     private static readonly COLOR_ENEMY_HIT = new Color(255, 70, 70, 255);
+    private static readonly COLOR_HEAL = new Color(80, 255, 120, 255);
     private static readonly COLOR_CRIT = new Color(255, 60, 30, 255);
     private static readonly COLOR_CRIT_OUTLINE = new Color(255, 200, 0, 255);
 
@@ -113,7 +114,8 @@ export class DamageNumberFactory {
         root.setWorldPosition(worldPos.x + offsetX, startY, worldPos.z + offsetZ);
 
         const isEnemyHitStyle = !isCrit && style === 'enemyHit';
-        const baseScale = isCrit ? 0.016 : isEnemyHitStyle ? 0.009 : 0.011;
+        const isHealStyle = !isCrit && style === 'heal';
+        const baseScale = isCrit ? 0.016 : isEnemyHitStyle ? 0.009 : isHealStyle ? 0.01 : 0.011;
         root.setScale(baseScale, baseScale, baseScale);
 
         // 标签节点
@@ -121,9 +123,9 @@ export class DamageNumberFactory {
         root.addChild(labelNode);
 
         const label = labelNode.addComponent(Label);
-        label.string = isCrit ? `${damage}!` : `${damage}`;
-        label.fontSize = isCrit ? 40 : isEnemyHitStyle ? 26 : 30;
-        label.lineHeight = isCrit ? 44 : isEnemyHitStyle ? 30 : 34;
+        label.string = isCrit ? `${damage}!` : isHealStyle ? `+${damage}` : `${damage}`;
+        label.fontSize = isCrit ? 40 : isEnemyHitStyle ? 26 : isHealStyle ? 28 : 30;
+        label.lineHeight = isCrit ? 44 : isEnemyHitStyle ? 30 : isHealStyle ? 32 : 34;
         label.isBold = true;
         label.overflow = Label.Overflow.NONE;
         label.horizontalAlign = Label.HorizontalAlign.CENTER;
@@ -132,13 +134,18 @@ export class DamageNumberFactory {
             ? DamageNumberFactory.COLOR_CRIT
             : isEnemyHitStyle
               ? DamageNumberFactory.COLOR_ENEMY_HIT
-              : DamageNumberFactory.COLOR_NORMAL;
+              : isHealStyle
+                ? DamageNumberFactory.COLOR_HEAL
+                : DamageNumberFactory.COLOR_NORMAL;
 
         // 所有伤害数字加描边，提高可读性
         const outline = labelNode.addComponent(LabelOutline);
         if (isCrit) {
             outline.color = DamageNumberFactory.COLOR_CRIT_OUTLINE;
             outline.width = 3;
+        } else if (isHealStyle) {
+            outline.color = new Color(0, 80, 0, 180);
+            outline.width = 2;
         } else {
             outline.color = new Color(0, 0, 0, 180);
             outline.width = 2;
@@ -149,8 +156,8 @@ export class DamageNumberFactory {
         opacity.opacity = 255;
 
         // ====== 动画 ======
-        const floatHeight = isCrit ? 1.2 : isEnemyHitStyle ? 0.6 : 0.8;
-        const duration = isCrit ? 0.8 : isEnemyHitStyle ? 0.45 : 0.55;
+        const floatHeight = isCrit ? 1.2 : isEnemyHitStyle ? 0.6 : isHealStyle ? 0.7 : 0.8;
+        const duration = isCrit ? 0.8 : isEnemyHitStyle ? 0.45 : isHealStyle ? 0.5 : 0.55;
         const endY = startY + floatHeight;
 
         const recycleRoot = root;

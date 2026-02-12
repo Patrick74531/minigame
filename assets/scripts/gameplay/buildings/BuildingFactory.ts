@@ -18,6 +18,7 @@ import { BuildingRegistry } from './BuildingRegistry';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { Base } from './Base';
 import { SunflowerPreview } from '../visuals/SunflowerPreview';
+import { Spa } from './Spa';
 
 /**
  * 建筑工厂
@@ -292,7 +293,8 @@ export class BuildingFactory {
             } else if (buildingId === 'spa') {
                 this.attachSpaModelAsync(node);
             }
-            const building = node.addComponent(Building);
+            const building =
+                buildingId === 'spa' ? node.addComponent(Spa) : node.addComponent(Building);
             const isBarracks = config.role === 'barracks';
             building.setConfig({
                 type: this.resolveBuildingType(buildingId, config.role),
@@ -310,6 +312,18 @@ export class BuildingFactory {
                 maxUnitsPerLevel: config.upgrades?.maxUnitsPerLevel ?? 0,
                 spawnBatchPerLevel: isBarracks ? (config.upgrades?.spawnBatchPerLevel ?? 1) : 0,
             });
+
+            if (buildingId === 'spa') {
+                const spaFeatures = config.features as
+                    | { healRadius?: number; healInterval?: number }
+                    | undefined;
+                (building as Spa).setHealConfig({
+                    radius: spaFeatures?.healRadius ?? 5,
+                    healPercentPerSecond: 0.1,
+                    tickInterval: spaFeatures?.healInterval ?? 1,
+                });
+            }
+
             if (unitContainer) {
                 building.setUnitContainer(unitContainer);
             }

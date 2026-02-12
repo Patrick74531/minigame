@@ -180,6 +180,32 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         }
     }
 
+    /**
+     * 恢复生命值
+     * @param amount 治疗量
+     * @param showNumber 是否显示飘字
+     * @returns 实际恢复值
+     */
+    public heal(amount: number, showNumber: boolean = true): number {
+        if (!this.isAlive) return 0;
+
+        amount = Math.floor(amount);
+        if (amount <= 0) return 0;
+
+        const before = this._stats.currentHp;
+        this._stats.currentHp = Math.min(this._stats.maxHp, this._stats.currentHp + amount);
+        const healed = this._stats.currentHp - before;
+        if (healed <= 0) return 0;
+
+        this.updateHealthBar();
+
+        if (showNumber) {
+            this.showHealNumber(healed);
+        }
+
+        return healed;
+    }
+
     /** 显示浮动伤害数字 */
     private showDamageNumber(
         damage: number,
@@ -189,6 +215,13 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         const parent = this.node.parent;
         if (!parent) return;
         DamageNumberFactory.show(parent, this.node.worldPosition, damage, isCrit, this.node, style);
+    }
+
+    /** 显示浮动治疗数字 */
+    private showHealNumber(heal: number): void {
+        const parent = this.node.parent;
+        if (!parent) return;
+        DamageNumberFactory.show(parent, this.node.worldPosition, heal, false, undefined, 'heal');
     }
 
     /**
