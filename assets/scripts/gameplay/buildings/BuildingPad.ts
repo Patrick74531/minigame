@@ -10,7 +10,7 @@ import {
     UITransform,
     Billboard,
     RenderRoot2D,
-    SphereCollider,
+    BoxCollider,
     ITriggerEvent,
     Vec3,
     RigidBody,
@@ -64,6 +64,10 @@ export class BuildingPad extends BaseComponent {
     @property
     public collectInterval: number = 0.1;
 
+    /** 锁定在初始世界坐标（建成后不自动移动到建筑前方） */
+    @property
+    public lockWorldPosition: boolean = true;
+
     // 内部状态
     private _config: BuildingTypeConfig | null = null;
     private _collectedCoins: number = 0;
@@ -110,8 +114,14 @@ export class BuildingPad extends BaseComponent {
     // Flag to track hero presence
     private _heroInArea: boolean = false;
     private _heroRef: Hero | null = null;
+    
+    // Store original spawn position to place the building there.
+    private _originalPosition: Vec3 = new Vec3();
 
     protected start(): void {
+        // 1. Store Original Position (Where the building should be)
+        this._originalPosition.set(this.node.worldPosition);
+
         this.setupPhysics();
 
         // Previous start logic
@@ -128,7 +138,43 @@ export class BuildingPad extends BaseComponent {
         }
 
         this.createVisuals();
+        if (this.lockWorldPosition) {
+            this.applyFixedOffsetFromSpawn();
+        }
+
         console.log(`[BuildingPad] 初始化: ${this._config.name}, 需要 ${this._config.cost} 金币`);
+    }
+
+    private applyFixedOffsetFromSpawn(): void {
+        const forward = new Vec3();
+        Vec3.multiplyScalar(forward, this.node.forward, -1);
+        if (forward.lengthSqr() < 0.0001) {
+            forward.set(0, 0, 1);
+        } else {
+            forward.normalize();
+        }
+
+        const buildingHalfSize = this.estimateBuildingHalfSize();
+        const offsetDistance =
+            buildingHalfSize + this.collectRadius + GameConfig.BUILDING.UPGRADE_PAD.GAP;
+
+        this.node.setWorldPosition(
+            this._originalPosition.x + forward.x * offsetDistance,
+            this.node.worldPosition.y,
+            this._originalPosition.z + forward.z * offsetDistance
+        );
+    }
+
+    private estimateBuildingHalfSize(): number {
+        if (this.buildingTypeId === 'wall') {
+            return 1.0;
+        }
+
+        const cfg = this.buildingRegistry.get(this.buildingTypeId);
+        const sx = Math.abs(cfg?.visual?.scale?.x ?? 1);
+        const sz = Math.abs(cfg?.visual?.scale?.z ?? 1);
+        const half = Math.max(sx, sz) * 0.5;
+        return Math.max(0.3, half);
     }
 
     private setupPhysics(): void {
@@ -139,15 +185,15 @@ export class BuildingPad extends BaseComponent {
             rb.type = RigidBody.Type.STATIC;
         }
 
-        let col = this.node.getComponent(SphereCollider);
+        let col = this.node.getComponent(BoxCollider);
         if (!col) {
-            col = this.node.addComponent(SphereCollider);
+            col = this.node.addComponent(BoxCollider);
         }
 
         // Force update properties even if component existed (e.g. from Prefab)
         col.isTrigger = true;
-        col.center = new Vec3(0, 0.7, 0);
-        col.radius = this.collectRadius;
+        col.center = new Vec3(0, 1.0, 0);
+        col.size = new Vec3(2.4, 2.0, 2.4);
 
         col.setGroup(1 << 2); // BUILDING_PAD
         col.setMask(1 << 0); // Collide with HERO
@@ -156,7 +202,7 @@ export class BuildingPad extends BaseComponent {
         col.on('onTriggerExit', this.onTriggerExit, this);
 
         console.log(
-            `[BuildingPad] Physics Setup Complete. Collider Radius: ${col.radius}, Trigger: ${col.isTrigger}`
+            `[BuildingPad] Physics Setup Complete. BoxCollider Size: ${col.size}, Trigger: ${col.isTrigger}`
         );
     }
 
@@ -470,7 +516,6 @@ export class BuildingPad extends BaseComponent {
         // Update Label to show nothing or "Upgrade"
         this.updateDisplay();
         
-        // Move pad to front of building
         this.placeUpgradeZoneInFront(building.node);
 
         console.log(
@@ -481,8 +526,9 @@ export class BuildingPad extends BaseComponent {
     /**
      * 将投放区放到建筑前方，避免与建筑模型重叠
      */
-    public placeUpgradeZoneInFront(buildingNode: Node): void {
+    public placeUpgradeZoneInFront(buildingNode: Node, force: boolean = false): void {
         if (!buildingNode || !buildingNode.isValid) return;
+        if (this.lockWorldPosition && !force) return;
 
         // Calculate direction: Perpendicular to building (Local Back)
         // Cocos Forward is -Z. Local Back is +Z.
@@ -590,7 +636,7 @@ export class BuildingPad extends BaseComponent {
         this.eventManager.emit(GameEvents.BUILDING_CONSTRUCTED, {
             padNode: this.node,
             buildingTypeId: this.buildingTypeId,
-            position: this.node.position.clone(),
+            position: this._originalPosition.clone(),
         });
 
         // Note: Manager will call onBuildingCreated(), setting state to UPGRADING

@@ -47,6 +47,7 @@ export class Base extends Building {
         const pad = padNode.addComponent(BuildingPad);
         pad.buildingTypeId = 'base';
         pad.collectRadius = GameConfig.BUILDING.UPGRADE_PAD.RADIUS;
+        pad.lockWorldPosition = false;
         
         // Ensure pad is registered with manager to get Hero reference
         const buildingManager = ServiceRegistry.get<any>('BuildingManager'); // Avoid circular dependency import if strict
@@ -59,7 +60,7 @@ export class Base extends Building {
         pad.initForExistingBuilding(this, startCost);
         
         // Position it
-        pad.placeUpgradeZoneInFront(this.node);
+        pad.placeUpgradeZoneInFront(this.node, true);
         
         this._upgradePad = pad;
     }
