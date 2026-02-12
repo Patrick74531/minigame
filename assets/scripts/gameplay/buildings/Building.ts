@@ -19,6 +19,7 @@ export enum BuildingType {
     TOWER = 'tower', // 防御塔（后续扩展）
     WALL = 'wall', // 墙
     BASE = 'base', // 基地
+    SPA = 'spa', // 温泉
 }
 
 /** 建筑配置 */
@@ -128,24 +129,44 @@ export class Building extends BaseComponent implements IAttackable {
         this._healthBar.baseWorldScale = 0.012;
         this._healthBar.inheritOwnerScaleInWorldSpace = false;
         this._healthBar.autoDetectHeadAnchor = false;
+        this.updateHealthBarOffset();
+    }
+
+    private updateHealthBarOffset(): void {
+        if (!this._healthBar) return;
         if (this.buildingType === BuildingType.WALL) {
             this._healthBar.yOffset = 1.6;
-        } else {
-            this._healthBar.yOffset = 2.2;
+            return;
         }
+        this._healthBar.yOffset = 2.2;
     }
 
     private setupPhysics(): void {
         let rb = this.node.getComponent(RigidBody);
-        if (!rb) {
-            rb = this.node.addComponent(RigidBody);
-            rb.type = RigidBody.Type.STATIC;
+        let col = this.node.getComponent(BoxCollider);
+
+        // Spa is not an obstacle (can be walked through)
+        if (this.buildingType === BuildingType.SPA) {
+            if (col && col.isValid) {
+                col.destroy();
+                col = null;
+            }
+            if (rb && rb.isValid) {
+                rb.destroy();
+                rb = null;
+            }
+            return;
         }
 
-        let col = this.node.getComponent(BoxCollider);
+        if (!rb) {
+            rb = this.node.addComponent(RigidBody);
+        }
+        rb.type = RigidBody.Type.STATIC;
+
         if (!col) {
             col = this.node.addComponent(BoxCollider);
         }
+        col.enabled = true;
         col.isTrigger = false; // Physical Obstacle
         col.size = new Vec3(1, 2, 1); // Standard Building Size (Approx)
         col.center = new Vec3(0, 1, 0);
@@ -164,6 +185,7 @@ export class Building extends BaseComponent implements IAttackable {
      * @param config 配置
      */
     public setConfig(config: Partial<BuildingConfig>): void {
+        const oldType = this.buildingType;
         if (config.type !== undefined) this.buildingType = config.type;
         if (config.hp !== undefined) {
             this.maxHp = config.hp;
@@ -172,6 +194,12 @@ export class Building extends BaseComponent implements IAttackable {
         if (config.spawnInterval !== undefined) this.spawnInterval = config.spawnInterval;
         if (config.maxUnits !== undefined) this.maxUnits = config.maxUnits;
         if (config.soldierPoolName !== undefined) this.soldierPoolName = config.soldierPoolName;
+
+        if (this._initialized && config.type !== undefined && config.type !== oldType) {
+            // Handle addComponent/setConfig lifecycle ordering differences in runtime.
+            this.setupPhysics();
+            this.updateHealthBarOffset();
+        }
     }
 
     public setUpgradeConfig(config: Partial<BuildingUpgradeConfig>): void {

@@ -312,6 +312,30 @@ export const GameConfig = {
                     statMultiplier: 1.25,
                 },
             },
+            spa: {
+                name: '温泉',
+                cost: 0,
+                buildTime: 0,
+                description: '提供治疗和增益效果',
+                role: 'building',
+                visual: {
+                    colorHex: '#FFC0CB',
+                    scale: { x: 3, y: 3, z: 3 },
+                },
+                stats: {
+                    hp: 800,
+                },
+                features: {
+                    healRate: 5,
+                    healInterval: 1,
+                    healRadius: 5,
+                },
+                upgrades: {
+                    maxLevel: 5,
+                    costMultiplier: 0,
+                    statMultiplier: 1.2,
+                },
+            },
         },
         /**
          * 初始建造点配置 (World XZ)
@@ -325,6 +349,8 @@ export const GameConfig = {
             { x: -9, z: -3, type: 'wall' },
             { x: -11, z: -3, type: 'wall' },
             { x: -7, z: -3, type: 'wall' },
+            // Spa in Top-Left (Consistent with other buildings using negative Z)
+            { x: -18, z: -18, type: 'spa' },
         ],
     },
 

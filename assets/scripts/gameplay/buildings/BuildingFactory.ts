@@ -62,6 +62,16 @@ export class BuildingFactory {
     private static readonly BASE_MODEL_Y_OFFSET = 0.0;
     private static readonly BASE_MODEL_Y_ROTATION = 0;
 
+    // === Spa Model ===
+    private static _spaModelPrefab: Prefab | null = null;
+    private static _spaModelLoading: boolean = false;
+    private static _pendingSpaModelNodes: Node[] = [];
+    private static readonly SPA_MODEL_PREFAB_PATHS = ['building/spa', 'building/spa/spa'];
+    private static readonly SPA_MODEL_NODE_NAME = 'SpaModel';
+    private static readonly SPA_MODEL_SCALE = 3.0;
+    private static readonly SPA_MODEL_Y_OFFSET = 0.0;
+    private static readonly SPA_MODEL_Y_ROTATION = 0;
+
     // === Rifle Tower Model ===
     private static _rifleTowerModelPrefab: Prefab | null = null;
     private static _rifleTowerModelLoading: boolean = false;
@@ -279,6 +289,8 @@ export class BuildingFactory {
         if (config.role === 'barracks' || config.role === 'building') {
             if (buildingId === 'barracks') {
                 this.attachBarracksBarnVisual(node);
+            } else if (buildingId === 'spa') {
+                this.attachSpaModelAsync(node);
             }
             const building = node.addComponent(Building);
             const isBarracks = config.role === 'barracks';
@@ -309,6 +321,7 @@ export class BuildingFactory {
             } else if (buildingId === 'tower') {
                 this.attachRifleTowerModelAsync(node);
             }
+
             const tower = node.addComponent(Tower);
             tower.setConfig({
                 type: BuildingType.TOWER,
@@ -392,6 +405,7 @@ export class BuildingFactory {
         if (role === 'tower') return BuildingType.TOWER;
         if (buildingId === 'wall') return BuildingType.WALL;
         if (buildingId === 'base') return BuildingType.BASE;
+        if (buildingId === 'spa') return BuildingType.SPA;
         if (role === 'barracks' || buildingId === 'barracks') return BuildingType.BARRACKS;
         return BuildingType.BARRACKS;
     }
@@ -780,6 +794,84 @@ export class BuildingFactory {
             this.RIFLE_TOWER_MODEL_SCALE / parentScaleZ
         );
         model.setRotationFromEuler(0, this.RIFLE_TOWER_MODEL_Y_ROTATION, 0);
+
+        this.applyLayerRecursive(model, node.layer);
+        node.addChild(model);
+
+        const hasRenderer = model.getComponentsInChildren(Renderer).length > 0;
+        const ownerMesh = node.getComponent(MeshRenderer);
+        if (ownerMesh && hasRenderer) {
+            ownerMesh.enabled = false;
+        }
+    }
+
+    // =================================================================================
+    // Spa Model Logic
+    // =================================================================================
+
+    private static attachSpaModelAsync(node: Node): void {
+        if (!node || !node.isValid) return;
+        if (this.tryAttachSpaModel(node)) return;
+
+        this._pendingSpaModelNodes.push(node);
+        if (this._spaModelLoading) return;
+
+        this._spaModelLoading = true;
+        this.loadSpaModelPrefabByPath(0);
+    }
+
+    private static tryAttachSpaModel(node: Node): boolean {
+        if (!this._spaModelPrefab) return false;
+        this.applySpaModel(node, this._spaModelPrefab);
+        return true;
+    }
+
+    private static loadSpaModelPrefabByPath(index: number): void {
+        if (index >= this.SPA_MODEL_PREFAB_PATHS.length) {
+            this._spaModelLoading = false;
+            this._pendingSpaModelNodes.length = 0;
+            return;
+        }
+
+        const path = this.SPA_MODEL_PREFAB_PATHS[index];
+        resources.load(path, Prefab, (err, prefab) => {
+            if (err || !prefab) {
+                this.loadSpaModelPrefabByPath(index + 1);
+                return;
+            }
+            this.onSpaModelPrefabLoaded(prefab);
+        });
+    }
+
+    private static onSpaModelPrefabLoaded(prefab: Prefab): void {
+        this._spaModelLoading = false;
+        this._spaModelPrefab = prefab;
+        const pending = this._pendingSpaModelNodes.splice(0);
+        for (const n of pending) {
+            if (!n || !n.isValid) continue;
+            this.applySpaModel(n, prefab);
+        }
+    }
+
+    private static applySpaModel(node: Node, prefab: Prefab): void {
+        const existing = node.getChildByName(this.SPA_MODEL_NODE_NAME);
+        if (existing && existing.isValid) return;
+
+        const model = instantiate(prefab);
+        model.name = this.SPA_MODEL_NODE_NAME;
+
+        const parentScale = node.scale;
+        const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
+        const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
+        const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
+
+        model.setPosition(0, this.SPA_MODEL_Y_OFFSET / parentScaleY, 0);
+        model.setScale(
+            this.SPA_MODEL_SCALE / parentScaleX,
+            this.SPA_MODEL_SCALE / parentScaleY,
+            this.SPA_MODEL_SCALE / parentScaleZ
+        );
+        model.setRotationFromEuler(0, this.SPA_MODEL_Y_ROTATION, 0);
 
         this.applyLayerRecursive(model, node.layer);
         node.addChild(model);

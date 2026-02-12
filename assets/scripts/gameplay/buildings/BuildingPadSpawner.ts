@@ -14,6 +14,21 @@ export class BuildingPadSpawner {
         const padPositions = GameConfig.BUILDING.PADS;
 
         for (const pos of padPositions) {
+            // Special handling for Spa: Pre-spawned, invalid interaction (no pad/upgrade)
+            if (pos.type === 'spa') {
+                const buildingNode = BuildingFactory.createBuilding(
+                    buildingContainer,
+                    pos.x,
+                    pos.z,
+                    pos.type
+                );
+                console.log(
+                    `[BuildingPadSpawner] Pre-spawned Static Spa at (${pos.x}, 0, ${pos.z})`
+                );
+                // No pad, no upgrade zone.
+                continue;
+            }
+
             // Pre-spawn special towers
             if (pos.type === 'frost_tower' || pos.type === 'lightning_tower') {
                 const buildingNode = BuildingFactory.createBuilding(buildingContainer, pos.x, pos.z, pos.type);
