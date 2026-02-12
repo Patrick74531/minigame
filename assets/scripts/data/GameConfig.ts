@@ -297,7 +297,7 @@ export const GameConfig = {
                 name: '焊接墙',
                 cost: 6,
                 buildTime: 0,
-                description: '高生命值防线，拖住敌人推进',
+                description: '具有嘲讽属性的防线，敌人会优先攻击',
                 role: 'building',
                 visual: {
                     colorHex: '#808080',

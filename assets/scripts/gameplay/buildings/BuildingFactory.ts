@@ -86,6 +86,20 @@ export class BuildingFactory {
     private static readonly RIFLE_TOWER_MODEL_Y_OFFSET = 0.0;
     private static readonly RIFLE_TOWER_MODEL_Y_ROTATION = 0;
 
+    // === Fencebar (Wall) Model ===
+    private static _fencebarModelPrefab: Prefab | null = null;
+    private static _fencebarModelLoading: boolean = false;
+    private static _pendingFencebarModelNodes: Node[] = [];
+    private static readonly FENCEBAR_MODEL_PREFAB_PATHS = [
+        'building/fencebar',
+        'building/fencebar/fencebar',
+    ];
+    private static readonly FENCEBAR_MODEL_NODE_NAME = 'FencebarModel';
+    private static readonly FENCEBAR_MODEL_SCALE = 1.0;
+    // fencebar mesh pivot is centered (~ -0.5009..0.5006), lift it so the bottom sits on ground.
+    private static readonly FENCEBAR_MODEL_Y_OFFSET = 0.51;
+    private static readonly FENCEBAR_MODEL_Y_ROTATION = 0;
+
     public static createBarracks(parent: Node, x: number, z: number): Node {
         const barracksConfig = this.buildingRegistry.get('barracks');
         const node = this.createCubeNode('Barracks', new Color(100, 180, 100, 255));
@@ -292,6 +306,8 @@ export class BuildingFactory {
                 this.attachBarracksBarnVisual(node);
             } else if (buildingId === 'spa') {
                 this.attachSpaModelAsync(node);
+            } else if (buildingId === 'wall') {
+                this.attachFencebarModelAsync(node);
             }
             const building =
                 buildingId === 'spa' ? node.addComponent(Spa) : node.addComponent(Building);
@@ -886,6 +902,84 @@ export class BuildingFactory {
             this.SPA_MODEL_SCALE / parentScaleZ
         );
         model.setRotationFromEuler(0, this.SPA_MODEL_Y_ROTATION, 0);
+
+        this.applyLayerRecursive(model, node.layer);
+        node.addChild(model);
+
+        const hasRenderer = model.getComponentsInChildren(Renderer).length > 0;
+        const ownerMesh = node.getComponent(MeshRenderer);
+        if (ownerMesh && hasRenderer) {
+            ownerMesh.enabled = false;
+        }
+    }
+
+    // =================================================================================
+    // Fencebar (Wall) Model Logic
+    // =================================================================================
+
+    private static attachFencebarModelAsync(node: Node): void {
+        if (!node || !node.isValid) return;
+        if (this.tryAttachFencebarModel(node)) return;
+
+        this._pendingFencebarModelNodes.push(node);
+        if (this._fencebarModelLoading) return;
+
+        this._fencebarModelLoading = true;
+        this.loadFencebarModelPrefabByPath(0);
+    }
+
+    private static tryAttachFencebarModel(node: Node): boolean {
+        if (!this._fencebarModelPrefab) return false;
+        this.applyFencebarModel(node, this._fencebarModelPrefab);
+        return true;
+    }
+
+    private static loadFencebarModelPrefabByPath(index: number): void {
+        if (index >= this.FENCEBAR_MODEL_PREFAB_PATHS.length) {
+            this._fencebarModelLoading = false;
+            this._pendingFencebarModelNodes.length = 0;
+            return;
+        }
+
+        const path = this.FENCEBAR_MODEL_PREFAB_PATHS[index];
+        resources.load(path, Prefab, (err, prefab) => {
+            if (err || !prefab) {
+                this.loadFencebarModelPrefabByPath(index + 1);
+                return;
+            }
+            this.onFencebarModelPrefabLoaded(prefab);
+        });
+    }
+
+    private static onFencebarModelPrefabLoaded(prefab: Prefab): void {
+        this._fencebarModelLoading = false;
+        this._fencebarModelPrefab = prefab;
+        const pending = this._pendingFencebarModelNodes.splice(0);
+        for (const n of pending) {
+            if (!n || !n.isValid) continue;
+            this.applyFencebarModel(n, prefab);
+        }
+    }
+
+    private static applyFencebarModel(node: Node, prefab: Prefab): void {
+        const existing = node.getChildByName(this.FENCEBAR_MODEL_NODE_NAME);
+        if (existing && existing.isValid) return;
+
+        const model = instantiate(prefab);
+        model.name = this.FENCEBAR_MODEL_NODE_NAME;
+
+        const parentScale = node.scale;
+        const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
+        const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
+        const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
+
+        model.setPosition(0, this.FENCEBAR_MODEL_Y_OFFSET / parentScaleY, 0);
+        model.setScale(
+            this.FENCEBAR_MODEL_SCALE / parentScaleX,
+            this.FENCEBAR_MODEL_SCALE / parentScaleY,
+            this.FENCEBAR_MODEL_SCALE / parentScaleZ
+        );
+        model.setRotationFromEuler(0, this.FENCEBAR_MODEL_Y_ROTATION, 0);
 
         this.applyLayerRecursive(model, node.layer);
         node.addChild(model);
