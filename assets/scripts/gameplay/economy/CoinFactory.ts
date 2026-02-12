@@ -64,17 +64,17 @@ export class CoinFactory {
 
             // Enhance Visuals
             // Use builtin-unlit to GUARANTEE the color appears exactly as defined (no lighting interference)
-            const goldMaterial = new Material();
-            goldMaterial.initialize({ effectName: 'builtin-unlit' });
+            // const goldMaterial = new Material();
+            // goldMaterial.initialize({ effectName: 'builtin-unlit' });
             
-            const goldColor = new Color(255, 190, 0, 255); // Rich Gold
-            goldMaterial.setProperty('mainColor', goldColor);
-            // Unlit doesn't use metallic/roughness/emission, just mainColor
+            // const goldColor = new Color(255, 190, 0, 255); // Rich Gold
+            // goldMaterial.setProperty('mainColor', goldColor);
+            // // Unlit doesn't use metallic/roughness/emission, just mainColor
 
-            const renderers = node.getComponentsInChildren(MeshRenderer);
-            for (const renderer of renderers) {
-                 renderer.material = goldMaterial;
-            }
+            // const renderers = node.getComponentsInChildren(MeshRenderer);
+            // for (const renderer of renderers) {
+            //      renderer.material = goldMaterial;
+            // }
         } else {
             console.warn('[CoinFactory] StarCoin prefab not ready, using cube.');
             node = this.createCubeNode('Coin', new Color(255, 165, 0, 255));
