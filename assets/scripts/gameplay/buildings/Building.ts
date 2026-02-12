@@ -426,15 +426,15 @@ export class Building extends BaseComponent implements IAttackable {
         this._baseLevel = Building._latestBaseLevel;
     }
 
-    private get eventManager(): EventManager {
+    protected get eventManager(): EventManager {
         return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }
 
-    private get gameManager(): GameManager {
+    protected get gameManager(): GameManager {
         return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
     }
 
-    private get poolManager(): PoolManager {
+    protected get poolManager(): PoolManager {
         return ServiceRegistry.get<PoolManager>('PoolManager') ?? PoolManager.instance;
     }
 }

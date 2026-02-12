@@ -51,6 +51,17 @@ export class BuildingFactory {
     private static readonly LIGHTNING_TOWER_MODEL_Y_OFFSET = 1.7;
     private static readonly LIGHTNING_TOWER_MODEL_Y_ROTATION = 0;
 
+    // === Base House Model ===
+    private static _baseModelPrefab: Prefab | null = null;
+    private static _baseModelLoading: boolean = false;
+    private static _pendingBaseModelNodes: Node[] = [];
+    private static _baseModelAutoGroundOffset: number | null = null;
+    private static readonly BASE_MODEL_PREFAB_PATHS = ['building/house', 'building/house/house'];
+    private static readonly BASE_MODEL_NODE_NAME = 'BaseHouseModel';
+    private static readonly BASE_MODEL_SCALE = 1.0;
+    private static readonly BASE_MODEL_Y_OFFSET = 0.0;
+    private static readonly BASE_MODEL_Y_ROTATION = 0;
+
     /**
      * 创建兵营
      */
@@ -103,6 +114,8 @@ export class BuildingFactory {
         });
         // Ensure Base.onLoad reads configured HP (avoid one-frame HUD mismatch at default 500).
         parent.addChild(node);
+
+        this.attachBaseModelAsync(node);
 
         return node;
     }
@@ -564,5 +577,124 @@ export class BuildingFactory {
             }
             this.onLightningTowerModelPrefabLoaded(prefab);
         });
+    }
+
+    // =================================================================================
+    // Base House Model Logic
+    // =================================================================================
+
+    private static attachBaseModelAsync(node: Node): void {
+        if (!node || !node.isValid) return;
+        if (this.tryAttachBaseModel(node)) return;
+
+        this._pendingBaseModelNodes.push(node);
+        if (this._baseModelLoading) return;
+
+        this._baseModelLoading = true;
+        this.loadBaseModelPrefabByPath(0);
+    }
+
+    private static tryAttachBaseModel(node: Node): boolean {
+        if (!this._baseModelPrefab) return false;
+        this.applyBaseModel(node, this._baseModelPrefab);
+        return true;
+    }
+
+    private static loadBaseModelPrefabByPath(index: number): void {
+        if (index >= this.BASE_MODEL_PREFAB_PATHS.length) {
+            // Keep cube mesh when 3D model load fails.
+            this._baseModelLoading = false;
+            this._pendingBaseModelNodes.length = 0;
+            return;
+        }
+
+        const path = this.BASE_MODEL_PREFAB_PATHS[index];
+        resources.load(path, Prefab, (err, prefab) => {
+            if (err || !prefab) {
+                this.loadBaseModelPrefabByPath(index + 1);
+                return;
+            }
+            this.onBaseModelPrefabLoaded(prefab);
+        });
+    }
+
+    private static onBaseModelPrefabLoaded(prefab: Prefab): void {
+        this._baseModelLoading = false;
+        this._baseModelPrefab = prefab;
+        this._baseModelAutoGroundOffset = this.estimateModelGroundOffset(prefab);
+        const pending = this._pendingBaseModelNodes.splice(0);
+        for (const n of pending) {
+            if (!n || !n.isValid) continue;
+            this.applyBaseModel(n, prefab);
+        }
+    }
+
+    private static applyBaseModel(node: Node, prefab: Prefab): void {
+        const existing = node.getChildByName(this.BASE_MODEL_NODE_NAME);
+        if (existing && existing.isValid) return;
+
+        const model = instantiate(prefab);
+        model.name = this.BASE_MODEL_NODE_NAME;
+
+        const parentScale = node.scale;
+        const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
+        const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
+        const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
+        const groundOffset = this.getBaseModelGroundOffset(prefab);
+
+        // Compensate if parent scale is not 1 (Base is 0.8)
+        model.setPosition(0, (this.BASE_MODEL_Y_OFFSET + groundOffset) / parentScaleY, 0);
+        model.setScale(
+            this.BASE_MODEL_SCALE / parentScaleX,
+            this.BASE_MODEL_SCALE / parentScaleY,
+            this.BASE_MODEL_SCALE / parentScaleZ
+        );
+        model.setRotationFromEuler(0, this.BASE_MODEL_Y_ROTATION, 0);
+
+        this.applyLayerRecursive(model, node.layer);
+        node.addChild(model);
+
+        const hasRenderer = model.getComponentsInChildren(Renderer).length > 0;
+        const ownerMesh = node.getComponent(MeshRenderer);
+        if (ownerMesh && hasRenderer) {
+            ownerMesh.enabled = false;
+        }
+    }
+
+    private static getBaseModelGroundOffset(prefab: Prefab): number {
+        if (this._baseModelAutoGroundOffset === null) {
+            this._baseModelAutoGroundOffset = this.estimateModelGroundOffset(prefab);
+        }
+        return this._baseModelAutoGroundOffset ?? 0;
+    }
+
+    private static estimateModelGroundOffset(prefab: Prefab): number {
+        const probe = instantiate(prefab);
+        let minLocalY = Number.POSITIVE_INFINITY;
+
+        const renderers = probe.getComponentsInChildren(MeshRenderer);
+        for (const renderer of renderers) {
+            const mesh = (renderer as unknown as { mesh?: any }).mesh;
+            if (!mesh) continue;
+
+            const rawMinY = mesh?.struct?.minPosition?.y ?? mesh?._struct?.minPosition?.y;
+            if (typeof rawMinY !== 'number' || !Number.isFinite(rawMinY)) continue;
+
+            const nodeScaleY = renderer.node.scale.y;
+            const nodePosY = renderer.node.position.y;
+            const scaledMinY = nodePosY + rawMinY * nodeScaleY;
+            if (scaledMinY < minLocalY) {
+                minLocalY = scaledMinY;
+            }
+        }
+
+        probe.destroy();
+
+        if (!Number.isFinite(minLocalY)) {
+            return 0;
+        }
+
+        // Raise model so its lowest point touches y=0 plane.
+        return Math.max(0, -minLocalY * this.BASE_MODEL_SCALE);
     }
 }

@@ -167,6 +167,17 @@ export const GameConfig = {
                     spawnBatchPerLevel: 1,
                 },
             },
+            base: {
+                name: '基地',
+                cost: 20, // Initial upgrade cost reference
+                buildTime: 0,
+                description: '核心目标',
+                role: 'building',
+                visual: {
+                    colorHex: '#FFFFFF',
+                    scale: { x: 1, y: 1, z: 1 },
+                },
+            },
             tower: {
                 name: '机炮塔',
                 cost: 10,

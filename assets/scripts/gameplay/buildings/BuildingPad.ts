@@ -309,6 +309,30 @@ export class BuildingPad extends BaseComponent {
     }
 
     /**
+     * 为已存在的建筑初始化（如基地）
+     * @param building 建筑实例
+     * @param initialNextCost 初始升级费用
+     */
+    public initForExistingBuilding(building: Building, initialNextCost: number): void {
+        this._associatedBuilding = building;
+
+        // Ensure config is loaded
+        if (!this._config) {
+            this._config = this.buildingRegistry.get(this.buildingTypeId) ?? null;
+        }
+
+        this._nextUpgradeCost = initialNextCost;
+        this._state = BuildingPadState.UPGRADING;
+        this._collectedCoins = 0;
+
+        this.updateDisplay();
+
+        console.log(
+            `[BuildingPad] Init for existing building: ${this.buildingName}, Next Cost: ${this._nextUpgradeCost}`
+        );
+    }
+
+    /**
      * 关联的建筑实例
      */
     private _associatedBuilding: Building | null = null;
@@ -357,15 +381,16 @@ export class BuildingPad extends BaseComponent {
             forward.normalize();
         }
 
-        const buildingHalfSize =
-            Math.max(Math.abs(buildingNode.scale.x), Math.abs(buildingNode.scale.z)) * 0.5;
+        const worldScale = buildingNode.worldScale;
+        const buildingHalfSize = Math.max(Math.abs(worldScale.x), Math.abs(worldScale.z)) * 0.5;
         const offsetDistance =
             buildingHalfSize + this.collectRadius + GameConfig.BUILDING.UPGRADE_PAD.GAP;
 
-        this.node.setPosition(
-            buildingNode.position.x + forward.x * offsetDistance,
-            this.node.position.y,
-            buildingNode.position.z + forward.z * offsetDistance
+        const worldPos = buildingNode.worldPosition;
+        this.node.setWorldPosition(
+            worldPos.x + forward.x * offsetDistance,
+            this.node.worldPosition.y,
+            worldPos.z + forward.z * offsetDistance
         );
 
         // Prevent stale in-area state from old position causing accidental collection
