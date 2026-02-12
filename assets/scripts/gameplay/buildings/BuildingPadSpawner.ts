@@ -64,6 +64,9 @@ export class BuildingPadSpawner {
             const padNode = new Node(`BuildingPad_${pos.type}`);
             buildingContainer.addChild(padNode);
             padNode.setPosition(pos.x, 0, pos.z);
+            if ((pos as any).angle) {
+                padNode.setRotationFromEuler(0, (pos as any).angle, 0);
+            }
 
             console.log(
                 `[BuildingPadSpawner] 创建建造点: type=${pos.type}, pos=(${pos.x}, 0, ${pos.z})`

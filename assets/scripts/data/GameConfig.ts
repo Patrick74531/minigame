@@ -346,9 +346,9 @@ export const GameConfig = {
             { x: -13, z: -6, type: 'lightning_tower' },
             { x: -18, z: -10, type: 'frost_tower' },
             { x: -5, z: -12, type: 'tower' },
-            { x: -2, z: -2, type: 'wall' },
+            { x: -2, z: -2, type: 'wall', angle: 45 },
             { x: -24, z: -2, type: 'wall' },
-            { x: 0, z: -24, type: 'wall' },
+            { x: 0, z: -24, type: 'wall', angle: 90 },
             // Spa in Top-Left (Consistent with other buildings using negative Z)
             { x: -22, z: -22, type: 'spa' },
         ],

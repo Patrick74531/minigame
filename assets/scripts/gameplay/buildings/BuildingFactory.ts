@@ -290,7 +290,8 @@ export class BuildingFactory {
         x: number,
         z: number,
         buildingId: string,
-        unitContainer?: Node
+        unitContainer?: Node,
+        angle: number = 0
     ): Node | null {
         const config = BuildingFactory.buildingRegistry.get(buildingId);
         if (!config) {
@@ -305,6 +306,9 @@ export class BuildingFactory {
         node.setPosition(x, 0, z);
         const scale = config.visual?.scale || { x: 1, y: 1, z: 1 };
         node.setScale(scale.x, scale.y, scale.z);
+        if (angle !== 0) {
+            node.setRotationFromEuler(0, angle, 0);
+        }
         parent.addChild(node);
 
         // 2. Component Logic
@@ -1001,8 +1005,8 @@ export class BuildingFactory {
         const existing = node.getChildByName(this.FENCEBAR_MODEL_NODE_NAME);
         if (existing && existing.isValid) return;
 
-        const model = instantiate(prefab);
-        model.name = this.FENCEBAR_MODEL_NODE_NAME;
+        // Container for the 10 bars
+        const container = new Node(this.FENCEBAR_MODEL_NODE_NAME);
 
         const parentScale = node.scale;
         const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
@@ -1010,21 +1014,90 @@ export class BuildingFactory {
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
         const scaleFactor = this.getUniformScaleFactor(node, this.FENCEBAR_DEFAULT_NODE_SCALE);
 
-        model.setPosition(0, this.FENCEBAR_MODEL_Y_OFFSET / parentScaleY, 0);
-        model.setScale(
-            (this.FENCEBAR_MODEL_SCALE * scaleFactor) / parentScaleX,
-            (this.FENCEBAR_MODEL_SCALE * scaleFactor) / parentScaleY,
-            (this.FENCEBAR_MODEL_SCALE * scaleFactor) / parentScaleZ
-        );
-        model.setRotationFromEuler(0, this.FENCEBAR_MODEL_Y_ROTATION, 0);
+        // Position container at the correct height
+        container.setPosition(0, this.FENCEBAR_MODEL_Y_OFFSET / parentScaleY, 0);
 
-        this.applyLayerRecursive(model, node.layer);
-        node.addChild(model);
+        // Apply rotation to container
+        container.setRotationFromEuler(0, this.FENCEBAR_MODEL_Y_ROTATION, 0);
 
-        const hasRenderer = model.getComponentsInChildren(Renderer).length > 0;
+        // Apply scale to container
+        const containerScaleX = (this.FENCEBAR_MODEL_SCALE * scaleFactor) / parentScaleX;
+        const containerScaleY = (this.FENCEBAR_MODEL_SCALE * scaleFactor) / parentScaleY;
+        const containerScaleZ = (this.FENCEBAR_MODEL_SCALE * scaleFactor) / parentScaleZ;
+
+        container.setScale(containerScaleX, containerScaleY, containerScaleZ);
+
+        this.applyLayerRecursive(container, node.layer);
+        node.addChild(container);
+
+        // Ensure parent visual is hidden
         const ownerMesh = node.getComponent(MeshRenderer);
-        if (ownerMesh && hasRenderer) {
+        if (ownerMesh) {
             ownerMesh.enabled = false;
         }
+
+        // --- Instantiate 20 bars ---
+        const barCount = 20;
+        const gap = 0.05; // Smaller gap between bars
+
+        // Estimate width of a single bar to calculate step
+        const modelWidth = this.estimateModelXSize(prefab);
+        // Default to ~0.5 if estimation fails or is 0 (thin post?)
+        const effectiveWidth = modelWidth > 0 ? modelWidth : 0.5;
+        const step = effectiveWidth + gap;
+
+        // Calculate offset to center the row of bars
+        // Total width from center of first to center of last is step * (barCount - 1)
+        const totalSpan = step * (barCount - 1);
+        const startX = -totalSpan / 2;
+
+        for (let i = 0; i < barCount; i++) {
+            const bar = instantiate(prefab);
+            bar.setPosition(startX + i * step, 0, 0); // Local to container
+            // Reset rotation if needed, or keep prefab rotation
+            // bar.setRotationFromEuler(0, 0, 0); 
+            this.applyLayerRecursive(bar, node.layer);
+            container.addChild(bar);
+        }
+    }
+
+    private static estimateModelXSize(prefab: Prefab): number {
+        const probe = instantiate(prefab);
+        let minX = Number.POSITIVE_INFINITY;
+        let maxX = Number.NEGATIVE_INFINITY;
+        let found = false;
+
+        const renderers = probe.getComponentsInChildren(MeshRenderer);
+        for (const renderer of renderers) {
+            // Unsafe cast to access mesh struct
+            const mesh = (renderer as unknown as { mesh?: any }).mesh;
+            if (!mesh) continue;
+
+            // Access min/max position from mesh struct
+            // Note: Cocos Creator mesh struct access can vary by version.
+            const minPos = mesh?.struct?.minPosition ?? mesh?._struct?.minPosition;
+            const maxPos = mesh?.struct?.maxPosition ?? mesh?._struct?.maxPosition;
+
+            if (!minPos || !maxPos) continue;
+
+            const nodeScaleX = renderer.node.scale.x;
+            const nodePosX = renderer.node.position.x;
+
+            // Calculate world-ish X (local to prefab root)
+            // Assuming no complex rotation hierarchy for simple props
+            const worldMinX = nodePosX + minPos.x * nodeScaleX;
+            const worldMaxX = nodePosX + maxPos.x * nodeScaleX;
+
+            if (worldMinX < minX) minX = worldMinX;
+            if (worldMaxX > maxX) maxX = worldMaxX;
+            found = true;
+        }
+
+        probe.destroy();
+
+        if (found && Number.isFinite(minX) && Number.isFinite(maxX)) {
+            return maxX - minX;
+        }
+        return 0;
     }
 }

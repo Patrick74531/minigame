@@ -78,9 +78,14 @@ export class BuildingManager {
      */
     private onBuildingConstructed(data: {
         padNode: Node;
-        buildingTypeId: string;
-        position: Vec3;
+        buildingTypeId?: string;
+        position?: Vec3;
     }): void {
+        if (!data.buildingTypeId || !data.position) {
+            console.warn('[BuildingManager] Missing data in BUILDING_CONSTRUCTED event');
+            return;
+        }
+
         console.log(`[BuildingManager] 建造完成: ${data.buildingTypeId}`);
 
         // Find the Pad Component
@@ -92,12 +97,14 @@ export class BuildingManager {
 
         // 根据建筑类型创建建筑
         if (this._buildingContainer) {
+            const angle = data.padNode.eulerAngles.y;
             const buildingNode = BuildingFactory.createBuilding(
                 this._buildingContainer,
                 data.position.x,
                 data.position.z,
                 data.buildingTypeId,
-                this._unitContainer || undefined
+                this._unitContainer || undefined,
+                angle
             );
 
             if (!buildingNode) {
@@ -156,8 +163,10 @@ export class BuildingManager {
         return this._pads;
     }
 
-    private onBuildingDestroyed(data: { building: Building }): void {
-        this.unregisterBuilding(data.building);
+    private onBuildingDestroyed(data: { buildingId: string; building?: unknown }): void {
+        if (data.building instanceof Building) {
+            this.unregisterBuilding(data.building);
+        }
     }
 
     private get eventManager(): EventManager {
