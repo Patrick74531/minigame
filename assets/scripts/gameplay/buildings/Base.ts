@@ -38,6 +38,11 @@ export class Base extends Building {
     private createUpgradePad(): void {
         const padNode = new Node('UpgradePad');
         this.node.addChild(padNode);
+        // Keep upgrade pad world-size stable even when Base node is scaled up/down.
+        const sx = Math.abs(this.node.scale.x) > 1e-6 ? this.node.scale.x : 1;
+        const sy = Math.abs(this.node.scale.y) > 1e-6 ? this.node.scale.y : 1;
+        const sz = Math.abs(this.node.scale.z) > 1e-6 ? this.node.scale.z : 1;
+        padNode.setScale(1 / sx, 1 / sy, 1 / sz);
 
         const pad = padNode.addComponent(BuildingPad);
         pad.buildingTypeId = 'base';

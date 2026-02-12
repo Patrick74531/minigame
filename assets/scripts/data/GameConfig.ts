@@ -16,7 +16,7 @@ export const GameConfig = {
     // === 关卡/生成点 ===
     MAP: {
         /** 基地出生点 (World XZ) */
-        BASE_SPAWN: { x: -9, z: -9 },
+        BASE_SPAWN: { x: -15, z: -15 },
         /** 英雄相对基地的偏移 */
         HERO_SPAWN_OFFSET: { x: 2, z: 2 },
         /** 可移动范围限制 */
@@ -149,7 +149,7 @@ export const GameConfig = {
                 role: 'barracks',
                 visual: {
                     colorHex: '#64B464',
-                    scale: { x: 0.45, y: 0.45, z: 0.45 },
+                    scale: { x: 0.54, y: 0.54, z: 0.54 },
                 },
                 stats: {
                     hp: 180,
@@ -175,7 +175,7 @@ export const GameConfig = {
                 role: 'building',
                 visual: {
                     colorHex: '#FFFFFF',
-                    scale: { x: 1, y: 1, z: 1 },
+                    scale: { x: 4, y: 4, z: 4 },
                 },
             },
             tower: {
@@ -186,7 +186,7 @@ export const GameConfig = {
                 role: 'tower',
                 visual: {
                     colorHex: '#DCDC3C',
-                    scale: { x: 0.4, y: 0.8, z: 0.4 },
+                    scale: { x: 0.72, y: 1.44, z: 0.72 },
                 },
                 stats: {
                     hp: 300,
@@ -277,7 +277,7 @@ export const GameConfig = {
                 role: 'building',
                 visual: {
                     colorHex: '#8B4513',
-                    scale: { x: 0.6, y: 0.3, z: 0.6 },
+                    scale: { x: 1.2, y: 0.6, z: 1.2 },
                 },
                 stats: {
                     hp: 150,
@@ -320,7 +320,7 @@ export const GameConfig = {
                 role: 'building',
                 visual: {
                     colorHex: '#FFC0CB',
-                    scale: { x: 3, y: 3, z: 3 },
+                    scale: { x: 9, y: 9, z: 9 },
                 },
                 stats: {
                     hp: 800,
@@ -342,15 +342,15 @@ export const GameConfig = {
          * NOTE: 扩展新建造点请优先修改此处，避免在 GameController 中硬编码。
          */
         PADS: [
-            { x: -13, z: -6, type: 'barracks' },
-            { x: -5, z: -6, type: 'lightning_tower' },
-            { x: -13, z: -12, type: 'frost_tower' },
+            { x: -23, z: -15, type: 'barracks' },
+            { x: -13, z: -6, type: 'lightning_tower' },
+            { x: -18, z: -10, type: 'frost_tower' },
             { x: -5, z: -12, type: 'tower' },
-            { x: -9, z: -3, type: 'wall' },
-            { x: -11, z: -3, type: 'wall' },
-            { x: -7, z: -3, type: 'wall' },
+            { x: -2, z: -2, type: 'wall' },
+            { x: -24, z: -2, type: 'wall' },
+            { x: 0, z: -24, type: 'wall' },
             // Spa in Top-Left (Consistent with other buildings using negative Z)
-            { x: -18, z: -18, type: 'spa' },
+            { x: -22, z: -22, type: 'spa' },
         ],
     },
 

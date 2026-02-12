@@ -51,6 +51,7 @@ export class BuildingFactory {
     private static readonly LIGHTNING_TOWER_MODEL_SCALE = 2;
     private static readonly LIGHTNING_TOWER_MODEL_Y_OFFSET = 1.7;
     private static readonly LIGHTNING_TOWER_MODEL_Y_ROTATION = 0;
+    private static readonly LIGHTNING_TOWER_DEFAULT_NODE_SCALE = { x: 0.4, y: 0.8, z: 0.4 };
 
     // === Base House Model ===
     private static _baseModelPrefab: Prefab | null = null;
@@ -62,6 +63,7 @@ export class BuildingFactory {
     private static readonly BASE_MODEL_SCALE = 1.0;
     private static readonly BASE_MODEL_Y_OFFSET = 0.0;
     private static readonly BASE_MODEL_Y_ROTATION = 0;
+    private static readonly BASE_DEFAULT_NODE_SCALE = { x: 1, y: 1, z: 1 };
 
     // === Spa Model ===
     private static _spaModelPrefab: Prefab | null = null;
@@ -72,6 +74,7 @@ export class BuildingFactory {
     private static readonly SPA_MODEL_SCALE = 3.0;
     private static readonly SPA_MODEL_Y_OFFSET = 0.0;
     private static readonly SPA_MODEL_Y_ROTATION = 0;
+    private static readonly SPA_DEFAULT_NODE_SCALE = { x: 3, y: 3, z: 3 };
 
     // === Rifle Tower Model ===
     private static _rifleTowerModelPrefab: Prefab | null = null;
@@ -85,6 +88,7 @@ export class BuildingFactory {
     private static readonly RIFLE_TOWER_MODEL_SCALE = 1.5; // Scaled up 3x from 0.5
     private static readonly RIFLE_TOWER_MODEL_Y_OFFSET = 0.0;
     private static readonly RIFLE_TOWER_MODEL_Y_ROTATION = 0;
+    private static readonly RIFLE_TOWER_DEFAULT_NODE_SCALE = { x: 0.4, y: 0.8, z: 0.4 };
 
     // === Fencebar (Wall) Model ===
     private static _fencebarModelPrefab: Prefab | null = null;
@@ -99,6 +103,7 @@ export class BuildingFactory {
     // fencebar mesh pivot is centered (~ -0.5009..0.5006), lift it so the bottom sits on ground.
     private static readonly FENCEBAR_MODEL_Y_OFFSET = 0.51;
     private static readonly FENCEBAR_MODEL_Y_ROTATION = 0;
+    private static readonly FENCEBAR_DEFAULT_NODE_SCALE = { x: 0.8, y: 0.8, z: 0.8 };
 
     public static createBarracks(parent: Node, x: number, z: number): Node {
         const barracksConfig = this.buildingRegistry.get('barracks');
@@ -136,9 +141,11 @@ export class BuildingFactory {
      * 创建基地
      */
     public static createBase(parent: Node, x: number, z: number, hp: number = 500): Node {
+        const baseConfig = this.buildingRegistry.get('base');
         const node = this.createCubeNode('Base', new Color(150, 100, 200, 255));
         node.setPosition(x, 0, z);
-        node.setScale(0.8, 0.8, 0.8);
+        const baseScale = baseConfig?.visual?.scale ?? this.BASE_DEFAULT_NODE_SCALE;
+        node.setScale(baseScale.x, baseScale.y, baseScale.z);
 
         const base = node.addComponent(Base);
         base.setConfig({
@@ -552,6 +559,24 @@ export class BuildingFactory {
         }
     }
 
+    private static getUniformScaleFactor(
+        node: Node,
+        baseline: { x: number; y: number; z: number }
+    ): number {
+        const sx = Math.abs(node.scale.x) > 1e-6 ? Math.abs(node.scale.x) : 1;
+        const sy = Math.abs(node.scale.y) > 1e-6 ? Math.abs(node.scale.y) : 1;
+        const sz = Math.abs(node.scale.z) > 1e-6 ? Math.abs(node.scale.z) : 1;
+        const curAvg = (sx + sy + sz) / 3;
+
+        const bx = Math.abs(baseline.x) > 1e-6 ? Math.abs(baseline.x) : 1;
+        const by = Math.abs(baseline.y) > 1e-6 ? Math.abs(baseline.y) : 1;
+        const bz = Math.abs(baseline.z) > 1e-6 ? Math.abs(baseline.z) : 1;
+        const baseAvg = (bx + by + bz) / 3;
+
+        if (baseAvg <= 1e-6) return 1;
+        return curAvg / baseAvg;
+    }
+
     private static attachLightningTowerRadarModel(node: Node): void {
         this.attachLightningTowerRadarModelAsync(node);
     }
@@ -602,12 +627,16 @@ export class BuildingFactory {
         const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
+        const scaleFactor = this.getUniformScaleFactor(
+            node,
+            this.LIGHTNING_TOWER_DEFAULT_NODE_SCALE
+        );
         // Compensate parent non-uniform scale so the imported model keeps aspect ratio.
         model.setPosition(0, this.LIGHTNING_TOWER_MODEL_Y_OFFSET / parentScaleY, 0);
         model.setScale(
-            this.LIGHTNING_TOWER_MODEL_SCALE / parentScaleX,
-            this.LIGHTNING_TOWER_MODEL_SCALE / parentScaleY,
-            this.LIGHTNING_TOWER_MODEL_SCALE / parentScaleZ
+            (this.LIGHTNING_TOWER_MODEL_SCALE * scaleFactor) / parentScaleX,
+            (this.LIGHTNING_TOWER_MODEL_SCALE * scaleFactor) / parentScaleY,
+            (this.LIGHTNING_TOWER_MODEL_SCALE * scaleFactor) / parentScaleZ
         );
         model.setRotationFromEuler(0, this.LIGHTNING_TOWER_MODEL_Y_ROTATION, 0);
         this.applyLayerRecursive(model, node.layer);
@@ -700,13 +729,18 @@ export class BuildingFactory {
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
         const groundOffset = this.getBaseModelGroundOffset(prefab);
+        const scaleFactor = this.getUniformScaleFactor(node, this.BASE_DEFAULT_NODE_SCALE);
 
-        // Compensate if parent scale is not 1 (Base is 0.8)
-        model.setPosition(0, (this.BASE_MODEL_Y_OFFSET + groundOffset) / parentScaleY, 0);
+        // When base is enlarged, lift by scaled ground offset to keep feet on ground.
+        model.setPosition(
+            0,
+            (this.BASE_MODEL_Y_OFFSET + groundOffset * scaleFactor) / parentScaleY,
+            0
+        );
         model.setScale(
-            this.BASE_MODEL_SCALE / parentScaleX,
-            this.BASE_MODEL_SCALE / parentScaleY,
-            this.BASE_MODEL_SCALE / parentScaleZ
+            (this.BASE_MODEL_SCALE * scaleFactor) / parentScaleX,
+            (this.BASE_MODEL_SCALE * scaleFactor) / parentScaleY,
+            (this.BASE_MODEL_SCALE * scaleFactor) / parentScaleZ
         );
         model.setRotationFromEuler(0, this.BASE_MODEL_Y_ROTATION, 0);
 
@@ -816,12 +850,13 @@ export class BuildingFactory {
         const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
+        const scaleFactor = this.getUniformScaleFactor(node, this.RIFLE_TOWER_DEFAULT_NODE_SCALE);
 
         model.setPosition(0, this.RIFLE_TOWER_MODEL_Y_OFFSET / parentScaleY, 0);
         model.setScale(
-            this.RIFLE_TOWER_MODEL_SCALE / parentScaleX,
-            this.RIFLE_TOWER_MODEL_SCALE / parentScaleY,
-            this.RIFLE_TOWER_MODEL_SCALE / parentScaleZ
+            (this.RIFLE_TOWER_MODEL_SCALE * scaleFactor) / parentScaleX,
+            (this.RIFLE_TOWER_MODEL_SCALE * scaleFactor) / parentScaleY,
+            (this.RIFLE_TOWER_MODEL_SCALE * scaleFactor) / parentScaleZ
         );
         model.setRotationFromEuler(0, this.RIFLE_TOWER_MODEL_Y_ROTATION, 0);
 
@@ -894,12 +929,13 @@ export class BuildingFactory {
         const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
+        const scaleFactor = this.getUniformScaleFactor(node, this.SPA_DEFAULT_NODE_SCALE);
 
         model.setPosition(0, this.SPA_MODEL_Y_OFFSET / parentScaleY, 0);
         model.setScale(
-            this.SPA_MODEL_SCALE / parentScaleX,
-            this.SPA_MODEL_SCALE / parentScaleY,
-            this.SPA_MODEL_SCALE / parentScaleZ
+            (this.SPA_MODEL_SCALE * scaleFactor) / parentScaleX,
+            (this.SPA_MODEL_SCALE * scaleFactor) / parentScaleY,
+            (this.SPA_MODEL_SCALE * scaleFactor) / parentScaleZ
         );
         model.setRotationFromEuler(0, this.SPA_MODEL_Y_ROTATION, 0);
 
@@ -972,12 +1008,13 @@ export class BuildingFactory {
         const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
+        const scaleFactor = this.getUniformScaleFactor(node, this.FENCEBAR_DEFAULT_NODE_SCALE);
 
         model.setPosition(0, this.FENCEBAR_MODEL_Y_OFFSET / parentScaleY, 0);
         model.setScale(
-            this.FENCEBAR_MODEL_SCALE / parentScaleX,
-            this.FENCEBAR_MODEL_SCALE / parentScaleY,
-            this.FENCEBAR_MODEL_SCALE / parentScaleZ
+            (this.FENCEBAR_MODEL_SCALE * scaleFactor) / parentScaleX,
+            (this.FENCEBAR_MODEL_SCALE * scaleFactor) / parentScaleY,
+            (this.FENCEBAR_MODEL_SCALE * scaleFactor) / parentScaleZ
         );
         model.setRotationFromEuler(0, this.FENCEBAR_MODEL_Y_ROTATION, 0);
 
