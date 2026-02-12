@@ -62,9 +62,19 @@ export class BuildingFactory {
     private static readonly BASE_MODEL_Y_OFFSET = 0.0;
     private static readonly BASE_MODEL_Y_ROTATION = 0;
 
-    /**
-     * 创建兵营
-     */
+    // === Rifle Tower Model ===
+    private static _rifleTowerModelPrefab: Prefab | null = null;
+    private static _rifleTowerModelLoading: boolean = false;
+    private static _pendingRifleTowerModelNodes: Node[] = [];
+    private static readonly RIFLE_TOWER_MODEL_PREFAB_PATHS = [
+        'building/rifle_tower',
+        'building/rifle_tower/rifle_tower',
+    ];
+    private static readonly RIFLE_TOWER_MODEL_NODE_NAME = 'RifleTowerModel';
+    private static readonly RIFLE_TOWER_MODEL_SCALE = 1.5; // Scaled up 3x from 0.5
+    private static readonly RIFLE_TOWER_MODEL_Y_OFFSET = 0.0;
+    private static readonly RIFLE_TOWER_MODEL_Y_ROTATION = 0;
+
     public static createBarracks(parent: Node, x: number, z: number): Node {
         const barracksConfig = this.buildingRegistry.get('barracks');
         const node = this.createCubeNode('Barracks', new Color(100, 180, 100, 255));
@@ -153,8 +163,11 @@ export class BuildingFactory {
         // 红色/黄色区分防御塔
         const node = this.createCubeNode('Tower', new Color(220, 220, 60, 255)); // Yellow
         node.setPosition(x, 0, z);
-        node.setScale(0.4, 0.8, 0.4); // Taller, thinner
+        node.setPosition(x, 0, z);
+        node.setScale(0.8, 0.8, 0.8); // Adjusted scale for model
         parent.addChild(node);
+
+        this.attachRifleTowerModelAsync(node);
 
         const tower = node.addComponent(Tower);
         tower.setConfig({
@@ -293,6 +306,8 @@ export class BuildingFactory {
                 this.attachFrostTowerSunflowerVisual(node);
             } else if (buildingId === 'lightning_tower') {
                 this.attachLightningTowerRadarModel(node);
+            } else if (buildingId === 'tower') {
+                this.attachRifleTowerModelAsync(node);
             }
             const tower = node.addComponent(Tower);
             tower.setConfig({
@@ -696,5 +711,83 @@ export class BuildingFactory {
 
         // Raise model so its lowest point touches y=0 plane.
         return Math.max(0, -minLocalY * this.BASE_MODEL_SCALE);
+    }
+
+    // =================================================================================
+    // Rifle Tower Model Logic
+    // =================================================================================
+
+    private static attachRifleTowerModelAsync(node: Node): void {
+        if (!node || !node.isValid) return;
+        if (this.tryAttachRifleTowerModel(node)) return;
+
+        this._pendingRifleTowerModelNodes.push(node);
+        if (this._rifleTowerModelLoading) return;
+
+        this._rifleTowerModelLoading = true;
+        this.loadRifleTowerModelPrefabByPath(0);
+    }
+
+    private static tryAttachRifleTowerModel(node: Node): boolean {
+        if (!this._rifleTowerModelPrefab) return false;
+        this.applyRifleTowerModel(node, this._rifleTowerModelPrefab);
+        return true;
+    }
+
+    private static loadRifleTowerModelPrefabByPath(index: number): void {
+        if (index >= this.RIFLE_TOWER_MODEL_PREFAB_PATHS.length) {
+            this._rifleTowerModelLoading = false;
+            this._pendingRifleTowerModelNodes.length = 0;
+            return;
+        }
+
+        const path = this.RIFLE_TOWER_MODEL_PREFAB_PATHS[index];
+        resources.load(path, Prefab, (err, prefab) => {
+            if (err || !prefab) {
+                this.loadRifleTowerModelPrefabByPath(index + 1);
+                return;
+            }
+            this.onRifleTowerModelPrefabLoaded(prefab);
+        });
+    }
+
+    private static onRifleTowerModelPrefabLoaded(prefab: Prefab): void {
+        this._rifleTowerModelLoading = false;
+        this._rifleTowerModelPrefab = prefab;
+        const pending = this._pendingRifleTowerModelNodes.splice(0);
+        for (const n of pending) {
+            if (!n || !n.isValid) continue;
+            this.applyRifleTowerModel(n, prefab);
+        }
+    }
+
+    private static applyRifleTowerModel(node: Node, prefab: Prefab): void {
+        const existing = node.getChildByName(this.RIFLE_TOWER_MODEL_NODE_NAME);
+        if (existing && existing.isValid) return;
+
+        const model = instantiate(prefab);
+        model.name = this.RIFLE_TOWER_MODEL_NODE_NAME;
+
+        const parentScale = node.scale;
+        const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
+        const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
+        const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
+
+        model.setPosition(0, this.RIFLE_TOWER_MODEL_Y_OFFSET / parentScaleY, 0);
+        model.setScale(
+            this.RIFLE_TOWER_MODEL_SCALE / parentScaleX,
+            this.RIFLE_TOWER_MODEL_SCALE / parentScaleY,
+            this.RIFLE_TOWER_MODEL_SCALE / parentScaleZ
+        );
+        model.setRotationFromEuler(0, this.RIFLE_TOWER_MODEL_Y_ROTATION, 0);
+
+        this.applyLayerRecursive(model, node.layer);
+        node.addChild(model);
+
+        const hasRenderer = model.getComponentsInChildren(Renderer).length > 0;
+        const ownerMesh = node.getComponent(MeshRenderer);
+        if (ownerMesh && hasRenderer) {
+            ownerMesh.enabled = false;
+        }
     }
 }
