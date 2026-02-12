@@ -114,6 +114,7 @@ export class BuildingPad extends BaseComponent {
     // Flag to track hero presence
     private _heroInArea: boolean = false;
     private _heroRef: Hero | null = null;
+    private _isAnimating: boolean = false; // New flag to block input during animation
     
     // Store original spawn position to place the building there.
     private _originalPosition: Vec3 = new Vec3();
@@ -444,7 +445,15 @@ export class BuildingPad extends BaseComponent {
     private updateDisplay(): void {
         if (this._label) {
             const remaining = this.requiredCoins - this._collectedCoins;
-            this._label.string = `${remaining}`;
+
+
+            if (remaining <= 0) {
+                this._label.string = 'building...';
+                this._label.fontSize = 20; // Reduce size for text fit
+            } else {
+                this._label.string = `${remaining}`;
+                this._label.fontSize = 50; // Restore size for number
+            }
 
             if (this.progress >= 1) {
                 this._label.color = new Color(0, 255, 0, 255);
@@ -589,6 +598,8 @@ export class BuildingPad extends BaseComponent {
      * @returns 实际收集的金币数
      */
     public tryCollectCoin(heroCoins: number): number {
+        if (this._isAnimating) return 0; // Block collection during animation
+
         if (this._state !== BuildingPadState.WAITING && this._state !== BuildingPadState.UPGRADING)
             return 0;
 
@@ -632,11 +643,14 @@ export class BuildingPad extends BaseComponent {
 
         console.log(`[BuildingPad] 建造完成: ${this._config?.name}`);
 
-        // 发送建造完成事件
-        this.eventManager.emit(GameEvents.BUILDING_CONSTRUCTED, {
-            padNode: this.node,
-            buildingTypeId: this.buildingTypeId,
-            position: this._originalPosition.clone(),
+        // Play visual effect first, then create building
+        this.playConstructionEffect(() => {
+            // 发送建造完成事件
+            this.eventManager.emit(GameEvents.BUILDING_CONSTRUCTED, {
+                padNode: this.node,
+                buildingTypeId: this.buildingTypeId,
+                position: this._originalPosition.clone(),
+            });
         });
 
         // Note: Manager will call onBuildingCreated(), setting state to UPGRADING
@@ -645,31 +659,50 @@ export class BuildingPad extends BaseComponent {
     private onUpgradeComplete(): void {
         if (!this._associatedBuilding) return;
 
-        // Perform Upgrade
-        const upgraded = this._associatedBuilding.upgrade();
-        if (!upgraded) {
-            return;
-        }
+        // Prevent multiple triggers
+        if (this._isAnimating) return;
+        this._isAnimating = true;
 
-        // Calculate NEXT cost
-        const costMult = this._associatedBuilding.upgradeCostMultiplier;
-        this._nextUpgradeCost = Math.ceil(this._nextUpgradeCost * costMult);
+        // Hide building during animation
+        this._associatedBuilding.node.active = false;
 
-        // Reset
-        this._collectedCoins = 0;
-        this.updateDisplay();
-
-        // Check Max Level
-        const maxLvl = this._associatedBuilding.maxLevel;
-        if (this._associatedBuilding.level >= maxLvl) {
-            console.log('[BuildingPad] Max Level Reached.');
-            if (this._label) {
-                this._label.string = 'MAX';
-                this._label.color = Color.RED;
+        // Play visual effect first
+        this.playConstructionEffect(() => {
+            if (!this._associatedBuilding) {
+                this._isAnimating = false;
+                return;
             }
-            // Logic to disable collider or visuals?
-            // For now keep it simple.
-        }
+
+            // Show building again
+            this._associatedBuilding.node.active = true;
+
+            // Perform Upgrade
+            const upgraded = this._associatedBuilding.upgrade();
+            if (!upgraded) {
+                this._isAnimating = false;
+                return;
+            }
+
+            // Calculate NEXT cost
+            const costMult = this._associatedBuilding.upgradeCostMultiplier;
+            this._nextUpgradeCost = Math.ceil(this._nextUpgradeCost * costMult);
+
+            // Reset
+            this._collectedCoins = 0;
+            this.updateDisplay();
+
+            // Check Max Level
+            const maxLvl = this._associatedBuilding.maxLevel;
+            if (this._associatedBuilding.level >= maxLvl) {
+                console.log('[BuildingPad] Max Level Reached.');
+                if (this._label) {
+                    this._label.string = 'MAX';
+                    this._label.color = Color.RED;
+                }
+            }
+            
+            this._isAnimating = false;
+        });
     }
 
     /**
@@ -679,6 +712,46 @@ export class BuildingPad extends BaseComponent {
         this._collectedCoins = 0;
         this._state = BuildingPadState.WAITING;
         this.updateDisplay();
+    }
+
+    private playConstructionEffect(onComplete?: () => void): void {
+        const path = 'effects/build_smoke/attckSmoke';
+        resources.load(path, Prefab, (err, prefab) => {
+            if (err || !prefab) {
+                console.warn(`[BuildingPad] Failed to load construction effect: ${path}`, err);
+                if (onComplete) onComplete(); // Ensure callback runs even on error
+                return;
+            }
+            if (!this.node.isValid) return;
+
+            const effectNode = instantiate(prefab);
+            
+            // Fix: Add to parent (Scene/Map) instead of offset Pad
+            if (this.node.parent) {
+                this.node.parent.addChild(effectNode);
+                // Set World Position to the original building location
+                effectNode.setWorldPosition(
+                    this._originalPosition.x, 
+                    this._originalPosition.y + 0.5, 
+                    this._originalPosition.z
+                );
+            } else {
+                // Fallback (shouldn't happen for active node)
+                this.node.addChild(effectNode);
+                effectNode.setPosition(0, 0.5, 0); 
+            }
+
+            // Scale up 9x as requested (previous was 3x)
+            effectNode.setScale(9, 9, 9);
+
+            // Destroy after 1.5 seconds as requested
+            this.scheduleOnce(() => {
+                if (effectNode && effectNode.isValid) {
+                    effectNode.destroy();
+                }
+                if (onComplete) onComplete();
+            }, 1.5);
+        });
     }
 
     private get eventManager(): EventManager {

@@ -142,7 +142,7 @@ export const GameConfig = {
          */
         TYPES: {
             barracks: {
-                name: '兵营',
+                nameKey: 'building.barracks.name',
                 cost: 6,
                 buildTime: 0,
                 description: '自动生产士兵，稳定提供前线肉盾',
@@ -168,7 +168,7 @@ export const GameConfig = {
                 },
             },
             base: {
-                name: '基地',
+                nameKey: 'building.base.name',
                 cost: 20, // Initial upgrade cost reference
                 buildTime: 0,
                 description: '核心目标',
@@ -179,7 +179,7 @@ export const GameConfig = {
                 },
             },
             tower: {
-                name: '机炮塔',
+                nameKey: 'building.tower.name',
                 cost: 10,
                 buildTime: 0,
                 description: '高频单体输出，稳定击杀前排目标',
@@ -204,7 +204,7 @@ export const GameConfig = {
                 },
             },
             frost_tower: {
-                name: '冰霜塔',
+                nameKey: 'building.frost_tower.name',
                 cost: 12,
                 buildTime: 0,
                 description: '范围减速并补伤害，负责控场',
@@ -237,7 +237,7 @@ export const GameConfig = {
                 },
             },
             lightning_tower: {
-                name: '闪电塔',
+                nameKey: 'building.lightning_tower.name',
                 cost: 14,
                 buildTime: 0,
                 description: '弹射打击，适合清理中后排',
@@ -270,7 +270,7 @@ export const GameConfig = {
                 },
             },
             farm: {
-                name: '回收工坊',
+                nameKey: 'building.farm.name',
                 cost: 18,
                 buildTime: 0,
                 description: '将残骸转化为额外资源',
@@ -294,7 +294,7 @@ export const GameConfig = {
                 },
             },
             wall: {
-                name: '焊接墙',
+                nameKey: 'building.wall.name',
                 cost: 6,
                 buildTime: 0,
                 description: '具有嘲讽属性的防线，敌人会优先攻击',
@@ -313,7 +313,7 @@ export const GameConfig = {
                 },
             },
             spa: {
-                name: '温泉',
+                nameKey: 'building.spa.name',
                 cost: 0,
                 buildTime: 0,
                 description: '提供治疗和增益效果',

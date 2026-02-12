@@ -12,6 +12,10 @@ import {
     geometry,
     director,
     view,
+    Label,
+    LabelOutline,
+    LabelShadow,
+    Font,
 } from 'cc';
 
 const { ccclass, property } = _decorator;
@@ -107,6 +111,7 @@ export class HealthBar extends Component {
     private _cameraRef: Camera | null = null;
     private _offscreenTimer: number = 0;
     private _cachedOnScreen: boolean = true;
+    private _nameLabel: Label | null = null;
 
     private static readonly _tmpWorldPos = new Vec3();
     private static readonly _tmpWorldScale = new Vec3();
@@ -264,6 +269,33 @@ export class HealthBar extends Component {
         this._fgGraphics.fill();
 
         fgNode.setPosition(-this.width / 2, -this.height / 2, 0);
+
+        // Name Label
+        const labelNode = new Node('NameLabel');
+        root.addChild(labelNode);
+        // Position above the bar
+        labelNode.setPosition(0, this.height + 4, 0); 
+        this._nameLabel = labelNode.addComponent(Label);
+        this._nameLabel.fontSize = 28;
+        this._nameLabel.lineHeight = 32;
+        this._nameLabel.isBold = true;
+        this._nameLabel.string = '';
+        
+        // Outline
+        const outline = labelNode.addComponent(LabelOutline);
+        outline.color = new Color(0, 0, 0, 255);
+        outline.width = 2;
+
+        // Shadow
+        const shadow = labelNode.addComponent(LabelShadow);
+        shadow.color = new Color(0, 0, 0, 200);
+        shadow.offset.set(2, -2);
+        shadow.blur = 2;
+    }
+
+    public setName(name: string, level: number): void {
+        if (!this._nameLabel) return;
+        this._nameLabel.string = `${name} Lv.${level}`;
     }
 
     public updateHealth(current: number, max: number): void {

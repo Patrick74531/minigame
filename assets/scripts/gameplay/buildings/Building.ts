@@ -6,6 +6,7 @@ import { PoolManager } from '../../core/managers/PoolManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../data/GameEvents';
 import { GameConfig } from '../../data/GameConfig';
+import { Localization } from '../../core/i18n/Localization';
 import { HealthBar } from '../../ui/HealthBar';
 import { IAttackable } from '../../core/interfaces/IAttackable';
 import { DamageNumberFactory, type DamageNumberStyle } from '../effects/DamageNumberFactory';
@@ -129,6 +130,12 @@ export class Building extends BaseComponent implements IAttackable {
         this._healthBar.baseWorldScale = 0.012;
         this._healthBar.inheritOwnerScaleInWorldSpace = false;
         this._healthBar.autoDetectHeadAnchor = false;
+        
+        // Disable health bar immediately if building is full HP (default behavior)
+        // or just let updateHealth handle it.
+        // We want to set the name.
+        this.updateHealthBarName();
+
         this.updateHealthBarOffset();
     }
 
@@ -139,6 +146,15 @@ export class Building extends BaseComponent implements IAttackable {
             return;
         }
         this._healthBar.yOffset = 2.2;
+    }
+
+    private updateHealthBarName(): void {
+        if (!this._healthBar) return;
+        const config = GameConfig.BUILDING.TYPES[this.buildingType];
+        if (config && config.nameKey) {
+            const localizedName = Localization.instance.t(config.nameKey);
+            this._healthBar.setName(localizedName, this.level);
+        }
     }
 
     private setupPhysics(): void {
@@ -240,6 +256,7 @@ export class Building extends BaseComponent implements IAttackable {
 
         if (this._healthBar) {
             this._healthBar.updateHealth(this.currentHp, this.maxHp);
+            this.updateHealthBarName();
         }
 
         console.log(`[Building] Upgraded to Level ${this.level}. HP: ${oldHp} -> ${this.maxHp}`);
