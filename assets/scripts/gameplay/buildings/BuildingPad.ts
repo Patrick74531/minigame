@@ -14,6 +14,11 @@ import {
     ITriggerEvent,
     Vec3,
     RigidBody,
+    Graphics,
+    LabelOutline,
+    Prefab,
+    resources,
+    instantiate,
 } from 'cc';
 import { Building } from './Building';
 import { BaseComponent } from '../../core/base/BaseComponent';
@@ -248,45 +253,146 @@ export class BuildingPad extends BaseComponent {
      * 创建视觉元素（圆盘和数字）
      */
     private createVisuals(): void {
-        const padNode = new Node('PadVisual');
-        this.node.addChild(padNode);
+        // Root for all visuals, lifted slightly to avoid z-fighting with ground
+        const visualRoot = new Node('VisualRoot');
+        this.node.addChild(visualRoot);
+        visualRoot.setPosition(0, 0.05, 0);
 
-        const renderer = padNode.addComponent(MeshRenderer);
-        renderer.mesh = utils.MeshUtils.createMesh(primitives.sphere());
+        // 1. Ground Graphics (Dashed Border)
+        const flatRoot = new Node('FlatRoot');
+        visualRoot.addChild(flatRoot);
+        flatRoot.setRotationFromEuler(-90, 0, 0);
+        flatRoot.addComponent(RenderRoot2D);
+        flatRoot.setScale(0.01, 0.01, 0.01); // Scale down to match world units
 
-        this._padMaterial = new Material();
-        this._padMaterial.initialize({ effectName: 'builtin-unlit' });
-        this._padMaterial.setProperty('mainColor', new Color(80, 220, 255, 255));
+        // -- Setup Helper for Dashed Drawing --
+        const ctx = flatRoot.addComponent(Graphics);
+        ctx.lineWidth = 6;
+        ctx.strokeColor = Color.WHITE;
+        ctx.lineJoin = Graphics.LineJoin.ROUND;
+        ctx.lineCap = Graphics.LineCap.ROUND;
 
-        renderer.material = this._padMaterial;
-        // Use a flattened sphere so top-down camera can clearly see a circular zone.
-        const diameter = this.collectRadius * 2;
-        padNode.setScale(diameter, 0.04, diameter);
-        padNode.setPosition(0, 0.12, 0);
+        const w = 240;
+        const h = 240;
+        const r = 40;
+        // Use 0 radius or just skip corners to match request "No corner circles"
+        // drawing dashed rect with unconnected corners
+        this.drawDashedRectSimple(ctx, -w / 2, -h / 2, w, h, 20, 15);
 
-        const labelRoot = new Node('LabelRoot');
-        this.node.addChild(labelRoot);
-        labelRoot.addComponent(RenderRoot2D);
-        labelRoot.addComponent(Billboard);
-
+        // -- Content Container (Label + Coin) --
+        const contentNode = new Node('Content');
+        flatRoot.addChild(contentNode);
+        
+        // -- Cost Label --
+        // Positioned Top (y > 0)
         const labelNode = new Node('CostLabel');
-        labelRoot.addChild(labelNode);
-        labelNode.layer = 1;
+        contentNode.addChild(labelNode);
+        // Moved Up slightly more to accommodate larger text
+        labelNode.setPosition(0, 60, 0); 
 
         const uiTransform = labelNode.addComponent(UITransform);
-        uiTransform.setContentSize(400, 200);
+        uiTransform.setContentSize(300, 150); // Increased size container
 
         this._label = labelNode.addComponent(Label);
         this._label.string = `${this.requiredCoins}`;
-        this._label.fontSize = 80;
-        this._label.lineHeight = 80;
-        this._label.color = new Color(0, 0, 0, 255);
+        this._label.fontSize = 120; // Increased from 90
+        this._label.lineHeight = 120;
+        this._label.color = Color.WHITE;
         this._label.isBold = true;
-        this._label.horizontalAlign = Label.HorizontalAlign.CENTER;
-        this._label.verticalAlign = Label.VerticalAlign.CENTER;
+        this._label.horizontalAlign = Label.HorizontalAlign.CENTER; // Center align
+        this._label.verticalAlign = Label.VerticalAlign.BOTTOM;
 
-        labelRoot.setScale(0.015, 0.015, 0.015);
-        labelRoot.setPosition(0, 0.6, 0);
+        // Add outline for better visibility
+        const outline = labelNode.addComponent(LabelOutline);
+        outline.color = Color.BLACK;
+        outline.width = 6; // Thicker outline for larger text
+
+        // 2. Coin Model (3D)
+        const loadCoin = (path: string, next?: () => void) => {
+            resources.load(path, Prefab, (err, prefab) => {
+                if (err || !prefab) {
+                    if (next) next();
+                    else console.warn(`[BuildingPad] Failed to load coin from ${path}:`, err);
+                    return;
+                }
+                if (!visualRoot.isValid) return;
+
+                const coin = instantiate(prefab);
+                visualRoot.addChild(coin);
+                
+                // Position: Bottom (World Z+)
+                // Text is at Y=+60 (flatRoot) => World Z=-0.6
+                // Coin should be at World Z=+0.7 to balance
+                coin.setPosition(0, 0, 0.7); 
+                
+                // Rotate to lie flat (-90 X)
+                coin.setRotationFromEuler(-90, 0, 0); 
+
+                // Scale - Reduced further
+                // Previous 1.2. User said "smaller".
+                // Let's try 0.8.
+                const coinScale = 0.8; 
+                coin.setScale(coinScale, coinScale, coinScale);
+            });
+        };
+
+        loadCoin('effects/star_coin', () => {
+            loadCoin('effects/star_coin/star_coin');
+        });
+    }
+
+    private drawDashedRectSimple(
+        ctx: Graphics,
+        x: number,
+        y: number,
+        w: number,
+        h: number,
+        dash: number,
+        gap: number
+    ): void {
+        // Draw 4 independent dashed lines, leave corners open
+        const cornerGap = 20; // safe space from corner
+
+        // Top Edge (y+h)
+        this.drawDashedLine(ctx, x + cornerGap, y + h, x + w - cornerGap, y + h, dash, gap);
+        // Right Edge (x+w)
+        this.drawDashedLine(ctx, x + w, y + h - cornerGap, x + w, y + cornerGap, dash, gap);
+        // Bottom Edge (y)
+        this.drawDashedLine(ctx, x + w - cornerGap, y, x + cornerGap, y, dash, gap);
+        // Left Edge (x)
+        this.drawDashedLine(ctx, x, y + cornerGap, x, y + h - cornerGap, dash, gap);
+    }
+
+    private drawDashedLine(
+        ctx: Graphics,
+        x1: number,
+        y1: number,
+        x2: number,
+        y2: number,
+        dashLen: number,
+        gapLen: number
+    ): void {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const dirX = dx / len;
+        const dirY = dy / len;
+        
+        let current = 0;
+        let drawing = true;
+        
+        while (current < len) {
+            const segLen = Math.min(drawing ? dashLen : gapLen, len - current);
+            
+            if (drawing) {
+                ctx.moveTo(x1 + dirX * current, y1 + dirY * current);
+                ctx.lineTo(x1 + dirX * (current + segLen), y1 + dirY * (current + segLen));
+                ctx.stroke();
+            }
+            
+            current += segLen;
+            drawing = !drawing;
+        }
     }
 
     private updateDisplay(): void {
@@ -363,6 +469,9 @@ export class BuildingPad extends BaseComponent {
 
         // Update Label to show nothing or "Upgrade"
         this.updateDisplay();
+        
+        // Move pad to front of building
+        this.placeUpgradeZoneInFront(building.node);
 
         console.log(
             `[BuildingPad] Entered Upgrade Mode. Base: ${baseCost}, Next Cost: ${this._nextUpgradeCost}`
@@ -373,30 +482,52 @@ export class BuildingPad extends BaseComponent {
      * 将投放区放到建筑前方，避免与建筑模型重叠
      */
     public placeUpgradeZoneInFront(buildingNode: Node): void {
-        const forwardCfg = GameConfig.BUILDING.UPGRADE_PAD.FORWARD_DIR;
-        const forward = new Vec3(forwardCfg.x, 0, forwardCfg.z);
-        if (forward.lengthSqr() < 0.0001) {
-            forward.set(0, 0, 1);
-        } else {
-            forward.normalize();
-        }
+        if (!buildingNode || !buildingNode.isValid) return;
+
+        // Calculate direction: Perpendicular to building (Local Back)
+        // Cocos Forward is -Z. Local Back is +Z.
+        // We want to move in the direction of the building's "Front" visually presented to player?
+        // Actually, for Walls rotated 90deg, "Front" or "Back" (perpendicular) are both fine, as long as not parallel.
+        // Using visual Back (-Forward) = Local +Z.
+        const forward = new Vec3();
+        Vec3.multiplyScalar(forward, buildingNode.forward, -1); // Local +Z (Back)
+        
+        // Normalize (forward from Node might have scale?) No, usually normalized direction. 
+        // Node.forward is normalized in recent Cocos versions? Let's ensure.
+        forward.normalize();
 
         const worldScale = buildingNode.worldScale;
-        const buildingHalfSize = Math.max(Math.abs(worldScale.x), Math.abs(worldScale.z)) * 0.5;
+        // Use X/Z max as approximate radius/half-size
+        // For walls (long X), using Max might push it very far?
+        // If Wall is 10 units long (X), 1 unit thick (Z).
+        // If we move along Z (Back), we only need to clear Thickness (Z).
+        // So we should probably use the dimension projected on the direction?
+        // That's complex.
+        // Simplified: For 'wall', use a fixed small size. For others use Max.
+        // A wall's meaningful bounds for "clearing" perpendicular is small.
+        
+        let buildingHalfSize = Math.max(Math.abs(worldScale.x), Math.abs(worldScale.z)) * 0.5;
+        if (this.buildingTypeId === 'wall') {
+            // Walls are long but thin. We are moving perpendicular. Use thickness approx.
+            buildingHalfSize = 1.0; 
+        }
+
         const offsetDistance =
             buildingHalfSize + this.collectRadius + GameConfig.BUILDING.UPGRADE_PAD.GAP;
 
         const worldPos = buildingNode.worldPosition;
         this.node.setWorldPosition(
             worldPos.x + forward.x * offsetDistance,
-            this.node.worldPosition.y,
+            this.node.worldPosition.y, // Keep current Y (usually 0)
             worldPos.z + forward.z * offsetDistance
         );
 
         // Prevent stale in-area state from old position causing accidental collection
         this._heroInArea = false;
         this._heroRef = null;
-        this.hudManager.hideBuildingInfo();
+        if (this.hudManager) {
+             this.hudManager.hideBuildingInfo();
+        }
     }
 
     public get requiredCoins(): number {

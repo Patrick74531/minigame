@@ -102,7 +102,7 @@ export const GameConfig = {
             /** 建筑“前方”方向（世界坐标） */
             FORWARD_DIR: { x: 0, z: 1 },
             /** 与建筑前缘的额外间距 */
-            GAP: 0.2,
+            GAP: 0.8,
         },
         /** 基地升级系统 */
         BASE_UPGRADE: {
