@@ -1,13 +1,13 @@
 import { _decorator } from 'cc';
+import { DEFAULT_LANGUAGE, DEFAULT_MESSAGES } from './messages';
+import type { LanguageCode, LocalizationDictionary, LocalizationParams } from './types';
 const { ccclass } = _decorator;
-
-export type LanguageCode = 'zh' | 'en';
 
 @ccclass('Localization')
 export class Localization {
     private static _instance: Localization;
-    private _currentLang: LanguageCode = 'zh';
-    private _data: Record<string, string> = {};
+    private _currentLang: LanguageCode = DEFAULT_LANGUAGE;
+    private readonly _messages = new Map<LanguageCode, LocalizationDictionary>();
 
     public static get instance(): Localization {
         if (!this._instance) {
@@ -18,43 +18,71 @@ export class Localization {
     }
 
     public init(): void {
-        // In a real app, this might load JSON assets.
-        // For now, hardcode the dictionary for simplicity.
-        this.loadLanguage(this._currentLang);
+        this._messages.clear();
+
+        const entries = Object.entries(DEFAULT_MESSAGES) as Array<
+            [LanguageCode, LocalizationDictionary]
+        >;
+        for (const [lang, dictionary] of entries) {
+            this._messages.set(lang, { ...dictionary });
+        }
     }
 
     public setLanguage(lang: LanguageCode): void {
-        this._currentLang = lang;
-        this.loadLanguage(lang);
-    }
-
-    public t(key: string): string {
-        return this._data[key] || key;
-    }
-
-    private loadLanguage(lang: LanguageCode): void {
-        if (lang === 'zh') {
-            this._data = {
-                'building.barracks.name': '兵营',
-                'building.tower.name': '机炮塔',
-                'building.frost_tower.name': '冰霜塔',
-                'building.lightning_tower.name': '闪电塔',
-                'building.wall.name': '焊接墙',
-                'building.base.name': '指挥中心',
-                'building.spa.name': '纳米修复池',
-                'building.farm.name': '资源回收站',
-            };
-        } else {
-            this._data = {
-                'building.barracks.name': 'Barracks',
-                'building.tower.name': 'Gatling Tower',
-                'building.frost_tower.name': 'Frost Tower',
-                'building.lightning_tower.name': 'Tesla Tower',
-                'building.wall.name': 'Blast Wall',
-                'building.base.name': 'Command Center',
-                'building.spa.name': 'Nano Spa',
-                'building.farm.name': 'Recycler',
-            };
+        if (!this._messages.has(lang)) {
+            console.warn(
+                `[Localization] Unsupported language "${lang}", fallback to ${DEFAULT_LANGUAGE}.`
+            );
+            this._currentLang = DEFAULT_LANGUAGE;
+            return;
         }
+        this._currentLang = lang;
+    }
+
+    public get currentLanguage(): LanguageCode {
+        return this._currentLang;
+    }
+
+    public t(key: string, params?: LocalizationParams): string {
+        const template = this.resolveTemplate(key);
+        if (!template) {
+            console.error(`[Localization] Missing key: "${key}"`);
+            return `[[${key}]]`;
+        }
+        return this.interpolate(template, params);
+    }
+
+    public registerMessages(lang: LanguageCode, messages: LocalizationDictionary): void {
+        const existing = this._messages.get(lang) ?? {};
+        this._messages.set(lang, {
+            ...existing,
+            ...messages,
+        });
+    }
+
+    private resolveTemplate(key: string): string | null {
+        const current = this._messages.get(this._currentLang);
+        if (current && current[key] !== undefined) {
+            return current[key];
+        }
+
+        const fallback = this._messages.get(DEFAULT_LANGUAGE);
+        if (fallback && fallback[key] !== undefined) {
+            return fallback[key];
+        }
+
+        return null;
+    }
+
+    private interpolate(template: string, params?: LocalizationParams): string {
+        if (!params) return template;
+
+        return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_match, token: string) => {
+            const value = params[token];
+            if (value === undefined || value === null) {
+                return `{${token}}`;
+            }
+            return `${value}`;
+        });
     }
 }

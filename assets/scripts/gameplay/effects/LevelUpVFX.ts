@@ -9,6 +9,7 @@ import {
     UITransform,
     Graphics,
 } from 'cc';
+import { Localization } from '../../core/i18n/Localization';
 
 const UI_LAYER = 33554432; // Cocos UI_2D layer
 
@@ -66,7 +67,7 @@ export class LevelUpVFX {
         transform.setContentSize(400, 120);
 
         const label = root.addComponent(Label);
-        label.string = `LEVEL UP!  Lv.${level}`;
+        label.string = Localization.instance.t('ui.levelup.banner', { level });
         label.fontSize = 48;
         label.lineHeight = 56;
         label.isBold = true;

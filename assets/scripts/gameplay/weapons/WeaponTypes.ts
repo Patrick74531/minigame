@@ -24,8 +24,8 @@ export interface WeaponLevelStats {
 /** 武器静态定义（对应 GameConfig.WEAPON_SYSTEM.WEAPONS 条目） */
 export interface WeaponDef {
     id: string;
-    name: string;
-    description: string;
+    nameKey: string;
+    descriptionKey: string;
     iconColor: string;
     levels: WeaponLevelStats[];
 }

@@ -145,7 +145,7 @@ export const GameConfig = {
                 nameKey: 'building.barracks.name',
                 cost: 6,
                 buildTime: 0,
-                description: '自动生产士兵，稳定提供前线肉盾',
+                descriptionKey: 'building.barracks.description',
                 role: 'barracks',
                 visual: {
                     colorHex: '#64B464',
@@ -171,7 +171,7 @@ export const GameConfig = {
                 nameKey: 'building.base.name',
                 cost: 20, // Initial upgrade cost reference
                 buildTime: 0,
-                description: '核心目标',
+                descriptionKey: 'building.base.description',
                 role: 'building',
                 visual: {
                     colorHex: '#FFFFFF',
@@ -182,7 +182,7 @@ export const GameConfig = {
                 nameKey: 'building.tower.name',
                 cost: 10,
                 buildTime: 0,
-                description: '高频单体输出，稳定击杀前排目标',
+                descriptionKey: 'building.tower.description',
                 role: 'tower',
                 visual: {
                     colorHex: '#DCDC3C',
@@ -207,7 +207,7 @@ export const GameConfig = {
                 nameKey: 'building.frost_tower.name',
                 cost: 12,
                 buildTime: 0,
-                description: '范围减速并补伤害，负责控场',
+                descriptionKey: 'building.frost_tower.description',
                 role: 'tower',
                 visual: {
                     colorHex: '#3C64DC',
@@ -240,7 +240,7 @@ export const GameConfig = {
                 nameKey: 'building.lightning_tower.name',
                 cost: 14,
                 buildTime: 0,
-                description: '弹射打击，适合清理中后排',
+                descriptionKey: 'building.lightning_tower.description',
                 role: 'tower',
                 visual: {
                     colorHex: '#800080',
@@ -273,7 +273,7 @@ export const GameConfig = {
                 nameKey: 'building.farm.name',
                 cost: 18,
                 buildTime: 0,
-                description: '将残骸转化为额外资源',
+                descriptionKey: 'building.farm.description',
                 role: 'building',
                 visual: {
                     colorHex: '#8B4513',
@@ -297,7 +297,7 @@ export const GameConfig = {
                 nameKey: 'building.wall.name',
                 cost: 6,
                 buildTime: 0,
-                description: '具有嘲讽属性的防线，敌人会优先攻击',
+                descriptionKey: 'building.wall.description',
                 role: 'building',
                 visual: {
                     colorHex: '#808080',
@@ -316,7 +316,7 @@ export const GameConfig = {
                 nameKey: 'building.spa.name',
                 cost: 0,
                 buildTime: 0,
-                description: '提供治疗和增益效果',
+                descriptionKey: 'building.spa.description',
                 role: 'building',
                 visual: {
                     colorHex: '#FFC0CB',
@@ -652,37 +652,37 @@ export const GameConfig = {
             // ========== 蓝色卡牌 (Blue) — 1 词条，数值较低 ==========
             {
                 id: 'blue_attack',
-                name: '锋刃磨砺',
+                nameKey: 'buff.card.blue_attack.name',
                 rarity: 'blue',
                 effects: { attack: { multiply: 1.1 } },
             },
             {
                 id: 'blue_speed',
-                name: '迅捷之风',
+                nameKey: 'buff.card.blue_speed.name',
                 rarity: 'blue',
                 effects: { moveSpeed: { multiply: 1.08 } },
             },
             {
                 id: 'blue_range',
-                name: '精准射击',
+                nameKey: 'buff.card.blue_range.name',
                 rarity: 'blue',
                 effects: { attackRange: { add: 0.15 } },
             },
             {
                 id: 'blue_rapid',
-                name: '快速连击',
+                nameKey: 'buff.card.blue_rapid.name',
                 rarity: 'blue',
                 effects: { attackInterval: { multiply: 0.95 } },
             },
             {
                 id: 'blue_crit_chance',
-                name: '锐利直觉',
+                nameKey: 'buff.card.blue_crit_chance.name',
                 rarity: 'blue',
                 effects: { critRate: { add: 0.05 } },
             },
             {
                 id: 'blue_crit_power',
-                name: '致命一击',
+                nameKey: 'buff.card.blue_crit_power.name',
                 rarity: 'blue',
                 effects: { critDamage: { add: 0.2 } },
             },
@@ -690,7 +690,7 @@ export const GameConfig = {
             // ========== 紫色卡牌 (Purple) — 2~3 词条，数值适中 ==========
             {
                 id: 'purple_warrior',
-                name: '战士之力',
+                nameKey: 'buff.card.purple_warrior.name',
                 rarity: 'purple',
                 effects: {
                     attack: { multiply: 1.15 },
@@ -699,7 +699,7 @@ export const GameConfig = {
             },
             {
                 id: 'purple_hunter',
-                name: '疾风猎手',
+                nameKey: 'buff.card.purple_hunter.name',
                 rarity: 'purple',
                 effects: {
                     moveSpeed: { multiply: 1.12 },
@@ -708,7 +708,7 @@ export const GameConfig = {
             },
             {
                 id: 'purple_assassin',
-                name: '暗影刺客',
+                nameKey: 'buff.card.purple_assassin.name',
                 rarity: 'purple',
                 effects: {
                     critRate: { add: 0.08 },
@@ -717,7 +717,7 @@ export const GameConfig = {
             },
             {
                 id: 'purple_sniper',
-                name: '远程精通',
+                nameKey: 'buff.card.purple_sniper.name',
                 rarity: 'purple',
                 effects: {
                     attackRange: { add: 0.25 },
@@ -726,7 +726,7 @@ export const GameConfig = {
             },
             {
                 id: 'purple_training',
-                name: '全面训练',
+                nameKey: 'buff.card.purple_training.name',
                 rarity: 'purple',
                 effects: {
                     attack: { multiply: 1.08 },
@@ -738,7 +738,7 @@ export const GameConfig = {
             // ========== 金色卡牌 (Gold) — 3~5 词条，数值很高 ==========
             {
                 id: 'gold_wargod',
-                name: '战神降临',
+                nameKey: 'buff.card.gold_wargod.name',
                 rarity: 'gold',
                 effects: {
                     attack: { multiply: 1.25 },
@@ -748,7 +748,7 @@ export const GameConfig = {
             },
             {
                 id: 'gold_deathblow',
-                name: '死神之手',
+                nameKey: 'buff.card.gold_deathblow.name',
                 rarity: 'gold',
                 effects: {
                     critRate: { add: 0.12 },
@@ -758,7 +758,7 @@ export const GameConfig = {
             },
             {
                 id: 'gold_berserker',
-                name: '狂战之魂',
+                nameKey: 'buff.card.gold_berserker.name',
                 rarity: 'gold',
                 effects: {
                     attack: { multiply: 1.2 },
@@ -769,7 +769,7 @@ export const GameConfig = {
             },
             {
                 id: 'gold_perfection',
-                name: '完美强化',
+                nameKey: 'buff.card.gold_perfection.name',
                 rarity: 'gold',
                 effects: {
                     attack: { multiply: 1.12 },
@@ -800,8 +800,8 @@ export const GameConfig = {
         WEAPONS: {
             machine_gun: {
                 id: 'machine_gun',
-                name: '寡妇制造者',
-                description: '高射速曳光机枪，以炽热弹幕切割敌人',
+                nameKey: 'weapon.machine_gun.name',
+                descriptionKey: 'weapon.machine_gun.description',
                 iconColor: '#FF4500',
                 levels: [
                     { damage: 8, attackInterval: 0.12, range: 6.5, projectileSpeed: 28, spread: 4 },
@@ -837,8 +837,8 @@ export const GameConfig = {
             },
             flamethrower: {
                 id: 'flamethrower',
-                name: '堆肥喷火器',
-                description: '喷射粘稠废油，抛物线落地后猛烈燃烧',
+                nameKey: 'weapon.flamethrower.name',
+                descriptionKey: 'weapon.flamethrower.description',
                 iconColor: '#8B0000',
                 levels: [
                     {
@@ -885,8 +885,8 @@ export const GameConfig = {
             },
             cannon: {
                 id: 'cannon',
-                name: '断桩机加农炮',
-                description: '发射旋转螺纹钢，巨大冲击力附带范围伤害',
+                nameKey: 'weapon.cannon.name',
+                descriptionKey: 'weapon.cannon.description',
                 iconColor: '#708090',
                 levels: [
                     {
@@ -933,8 +933,8 @@ export const GameConfig = {
             },
             glitch_wave: {
                 id: 'glitch_wave',
-                name: '模拟回音',
-                description: '释放信号干扰波，低伤害并减速范围内敌人',
+                nameKey: 'weapon.glitch_wave.name',
+                descriptionKey: 'weapon.glitch_wave.description',
                 iconColor: '#00FFFF',
                 levels: [
                     {

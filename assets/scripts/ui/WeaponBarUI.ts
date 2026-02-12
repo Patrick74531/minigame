@@ -1,10 +1,11 @@
-import { Node, UITransform, Color, Graphics, Label, Vec3 } from 'cc';
+import { Node, UITransform, Color, Graphics, Label } from 'cc';
 import { Singleton } from '../core/base/Singleton';
 import { EventManager } from '../core/managers/EventManager';
 import { ServiceRegistry } from '../core/managers/ServiceRegistry';
 import { GameEvents } from '../data/GameEvents';
 import { HeroWeaponManager } from '../gameplay/weapons/HeroWeaponManager';
 import { WeaponType, WeaponDef } from '../gameplay/weapons/WeaponTypes';
+import { Localization } from '../core/i18n/Localization';
 
 const UI_LAYER = 33554432;
 const ICON_SIZE = 56;
@@ -127,7 +128,7 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         lvNode.addComponent(UITransform).setContentSize(ICON_SIZE, 16);
         node.addChild(lvNode);
         const lvLabel = lvNode.addComponent(Label);
-        lvLabel.string = `Lv.${level}`;
+        lvLabel.string = Localization.instance.t('ui.common.level.short', { level });
         lvLabel.fontSize = 12;
         lvLabel.lineHeight = 14;
         lvLabel.color = Color.WHITE;

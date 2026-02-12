@@ -6,11 +6,11 @@ import { PoolManager } from '../../core/managers/PoolManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../data/GameEvents';
 import { GameConfig } from '../../data/GameConfig';
-import { Localization } from '../../core/i18n/Localization';
 import { HealthBar } from '../../ui/HealthBar';
 import { IAttackable } from '../../core/interfaces/IAttackable';
 import { DamageNumberFactory, type DamageNumberStyle } from '../effects/DamageNumberFactory';
 import { Soldier } from '../units/Soldier';
+import { BuildingText } from './BuildingText';
 
 const { ccclass, property } = _decorator;
 
@@ -18,14 +18,19 @@ const { ccclass, property } = _decorator;
 export enum BuildingType {
     BARRACKS = 'barracks', // 兵营
     TOWER = 'tower', // 防御塔（后续扩展）
+    FROST_TOWER = 'frost_tower', // 冰霜塔
+    LIGHTNING_TOWER = 'lightning_tower', // 闪电塔
     WALL = 'wall', // 墙
     BASE = 'base', // 基地
     SPA = 'spa', // 温泉
+    FARM = 'farm', // 农场
 }
 
 /** 建筑配置 */
 export interface BuildingConfig {
     type: BuildingType;
+    typeId?: string;
+    nameKey?: string;
     cost: number;
     hp: number;
     spawnInterval: number;
@@ -52,6 +57,8 @@ export class Building extends BaseComponent implements IAttackable {
 
     @property
     public buildingType: BuildingType = BuildingType.BARRACKS;
+    public buildingTypeId: string = BuildingType.BARRACKS;
+    public displayNameKey: string = 'building.barracks.name';
 
     @property
     public maxHp: number = 500;
@@ -105,6 +112,13 @@ export class Building extends BaseComponent implements IAttackable {
     // === 初始化 ===
 
     protected initialize(): void {
+        if (!this.buildingTypeId) {
+            this.buildingTypeId = this.buildingType;
+        }
+        if (!this.displayNameKey) {
+            this.displayNameKey = BuildingText.resolveNameKey(this.buildingTypeId) ?? '';
+        }
+
         this.currentHp = this.maxHp;
         this._activeUnits = 0;
         this._spawnTimer = 0;
@@ -130,7 +144,7 @@ export class Building extends BaseComponent implements IAttackable {
         this._healthBar.baseWorldScale = 0.012;
         this._healthBar.inheritOwnerScaleInWorldSpace = false;
         this._healthBar.autoDetectHeadAnchor = false;
-        
+
         // Disable health bar immediately if building is full HP (default behavior)
         // or just let updateHealth handle it.
         // We want to set the name.
@@ -150,11 +164,11 @@ export class Building extends BaseComponent implements IAttackable {
 
     private updateHealthBarName(): void {
         if (!this._healthBar) return;
-        const config = GameConfig.BUILDING.TYPES[this.buildingType];
-        if (config && config.nameKey) {
-            const localizedName = Localization.instance.t(config.nameKey);
-            this._healthBar.setName(localizedName, this.level);
-        }
+        const localizedName = BuildingText.resolveName({
+            id: this.buildingTypeId,
+            nameKey: this.displayNameKey,
+        });
+        this._healthBar.setName(localizedName, this.level);
     }
 
     private setupPhysics(): void {
@@ -202,7 +216,19 @@ export class Building extends BaseComponent implements IAttackable {
      */
     public setConfig(config: Partial<BuildingConfig>): void {
         const oldType = this.buildingType;
+        const oldTypeId = this.buildingTypeId;
+        const oldNameKey = this.displayNameKey;
         if (config.type !== undefined) this.buildingType = config.type;
+        if (config.typeId !== undefined) {
+            this.buildingTypeId = config.typeId;
+        } else if (config.type !== undefined) {
+            this.buildingTypeId = config.type;
+        }
+        if (config.nameKey !== undefined) {
+            this.displayNameKey = config.nameKey;
+        } else if (!this.displayNameKey) {
+            this.displayNameKey = BuildingText.resolveNameKey(this.buildingTypeId) ?? '';
+        }
         if (config.hp !== undefined) {
             this.maxHp = config.hp;
             this.currentHp = config.hp;
@@ -211,10 +237,17 @@ export class Building extends BaseComponent implements IAttackable {
         if (config.maxUnits !== undefined) this.maxUnits = config.maxUnits;
         if (config.soldierPoolName !== undefined) this.soldierPoolName = config.soldierPoolName;
 
-        if (this._initialized && config.type !== undefined && config.type !== oldType) {
+        const typeChanged = config.type !== undefined && config.type !== oldType;
+        const typeIdChanged = this.buildingTypeId !== oldTypeId;
+        const nameKeyChanged = this.displayNameKey !== oldNameKey;
+
+        if (this._initialized && (typeChanged || typeIdChanged || nameKeyChanged)) {
             // Handle addComponent/setConfig lifecycle ordering differences in runtime.
-            this.setupPhysics();
-            this.updateHealthBarOffset();
+            if (typeChanged) {
+                this.setupPhysics();
+                this.updateHealthBarOffset();
+            }
+            this.updateHealthBarName();
         }
     }
 

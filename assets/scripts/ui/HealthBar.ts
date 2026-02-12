@@ -17,6 +17,7 @@ import {
     LabelShadow,
     Font,
 } from 'cc';
+import { Localization } from '../core/i18n/Localization';
 
 const { ccclass, property } = _decorator;
 
@@ -274,13 +275,13 @@ export class HealthBar extends Component {
         const labelNode = new Node('NameLabel');
         root.addChild(labelNode);
         // Position above the bar
-        labelNode.setPosition(0, this.height + 4, 0); 
+        labelNode.setPosition(0, this.height + 4, 0);
         this._nameLabel = labelNode.addComponent(Label);
         this._nameLabel.fontSize = 28;
         this._nameLabel.lineHeight = 32;
         this._nameLabel.isBold = true;
         this._nameLabel.string = '';
-        
+
         // Outline
         const outline = labelNode.addComponent(LabelOutline);
         outline.color = new Color(0, 0, 0, 255);
@@ -295,7 +296,8 @@ export class HealthBar extends Component {
 
     public setName(name: string, level: number): void {
         if (!this._nameLabel) return;
-        this._nameLabel.string = `${name} Lv.${level}`;
+        const levelText = Localization.instance.t('ui.common.level.short', { level });
+        this._nameLabel.string = `${name} ${levelText}`;
     }
 
     public updateHealth(current: number, max: number): void {

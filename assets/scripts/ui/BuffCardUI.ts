@@ -9,6 +9,7 @@ import {
     BuffCardEffect,
 } from '../gameplay/roguelike/BuffCardService';
 import { GameConfig } from '../data/GameConfig';
+import { Localization } from '../core/i18n/Localization';
 
 // UI_2D Layer
 const UI_LAYER = 33554432;
@@ -169,7 +170,7 @@ export class BuffCardUI {
         titleNode.addComponent(UITransform);
 
         const label = titleNode.addComponent(Label);
-        label.string = '-- 选择一张强化卡牌 --';
+        label.string = Localization.instance.t('ui.buff.select.title');
         label.fontSize = 38;
         label.lineHeight = 44;
         label.color = new Color(255, 215, 0, 255);
@@ -221,7 +222,7 @@ export class BuffCardUI {
         cardNode.addChild(nameNode);
 
         const nameLabel = nameNode.addComponent(Label);
-        nameLabel.string = card.name;
+        nameLabel.string = Localization.instance.t(card.nameKey);
         nameLabel.fontSize = 26;
         nameLabel.lineHeight = 30;
         nameLabel.color = Color.WHITE;
@@ -279,13 +280,13 @@ export class BuffCardUI {
 
     // === 属性格式化 ===
 
-    private static readonly STAT_NAMES: Record<string, string> = {
-        attack: '攻击力',
-        attackInterval: '攻击间隔',
-        moveSpeed: '移动速度',
-        attackRange: '攻击范围',
-        critRate: '暴击率',
-        critDamage: '暴击伤害',
+    private static readonly STAT_NAME_KEYS: Record<string, string> = {
+        attack: 'ui.buff.stat.attack',
+        attackInterval: 'ui.buff.stat.attackInterval',
+        moveSpeed: 'ui.buff.stat.moveSpeed',
+        attackRange: 'ui.buff.stat.attackRange',
+        critRate: 'ui.buff.stat.critRate',
+        critDamage: 'ui.buff.stat.critDamage',
     };
 
     /** critRate / critDamage 的 add 值以百分比展示 */
@@ -307,7 +308,9 @@ export class BuffCardUI {
             const mod = effects[key];
             if (!mod || typeof mod !== 'object') continue;
 
-            const name = BuffCardUI.STAT_NAMES[key] || key;
+            const keyName = BuffCardUI.STAT_NAME_KEYS[key as string];
+            if (!keyName) continue;
+            const name = Localization.instance.t(keyName);
             const parts: string[] = [];
 
             if ('multiply' in mod && mod.multiply !== undefined) {

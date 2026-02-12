@@ -5,6 +5,7 @@ import { UIFactory } from './UIFactory';
 import { GameConfig } from '../data/GameConfig';
 import { WaveService } from '../core/managers/WaveService';
 import { ServiceRegistry } from '../core/managers/ServiceRegistry';
+import { Localization } from '../core/i18n/Localization';
 
 // UI_2D Layer
 const UI_LAYER = 33554432;
@@ -57,7 +58,10 @@ export class HUDManager {
         // 创建基地 HP 显示
         this._baseHpLabel = UIFactory.createLabel(
             uiCanvas,
-            `Base HP: ${GameConfig.BUILDING.BASE_START_HP}/${GameConfig.BUILDING.BASE_START_HP}`,
+            Localization.instance.t('ui.hud.baseHp', {
+                current: GameConfig.BUILDING.BASE_START_HP,
+                max: GameConfig.BUILDING.BASE_START_HP,
+            }),
             'BaseHPLabel'
         );
         this._baseHpLabel.node.setPosition(0, 300); // 屏幕上方
@@ -67,7 +71,11 @@ export class HUDManager {
         this.createBuildingInfoLabel(uiCanvas);
 
         // 创建波次显示 (Top Left)
-        this._waveLabel = UIFactory.createLabel(uiCanvas, 'Wave: 1', 'WaveLabel');
+        this._waveLabel = UIFactory.createLabel(
+            uiCanvas,
+            Localization.instance.t('ui.hud.wave', { wave: 1 }),
+            'WaveLabel'
+        );
         this._waveLabel.node.setPosition(-350, 300); // Top Left
         this._waveLabel.fontSize = 30;
         this._waveLabel.color = new Color(255, 215, 0, 255); // Gold color
@@ -122,7 +130,7 @@ export class HUDManager {
      */
     public updateCoinDisplay(count: number): void {
         if (this._coinLabel) {
-            this._coinLabel.string = `Coins: ${count}`;
+            this._coinLabel.string = Localization.instance.t('ui.hud.coins', { count });
         }
     }
 
@@ -131,7 +139,10 @@ export class HUDManager {
      */
     public updateBaseHp(current: number, max: number): void {
         if (this._baseHpLabel) {
-            this._baseHpLabel.string = `Base HP: ${Math.max(0, Math.floor(current))}/${max}`;
+            this._baseHpLabel.string = Localization.instance.t('ui.hud.baseHp', {
+                current: Math.max(0, Math.floor(current)),
+                max,
+            });
             // 简单的变色逻辑
             if (current < max * 0.3) {
                 this._baseHpLabel.color = new Color(255, 50, 50, 255);
@@ -146,20 +157,20 @@ export class HUDManager {
      */
     public updateWaveDisplay(wave: number): void {
         if (this._waveLabel) {
-            this._waveLabel.string = `Wave: ${wave}`;
+            this._waveLabel.string = Localization.instance.t('ui.hud.wave', { wave });
         }
     }
 
     /**
      * 显示建造点信息
      */
-    public showBuildingInfo(
-        buildingName: string,
-        requiredCoins: number,
-        collectedCoins: number
-    ): void {
+    public showBuildingInfo(title: string, requiredCoins: number, collectedCoins: number): void {
         if (this._buildingInfoLabel) {
-            this._buildingInfoLabel.string = `${buildingName}: ${collectedCoins}/${requiredCoins} 金币`;
+            this._buildingInfoLabel.string = Localization.instance.t('ui.building.infoProgress', {
+                title,
+                collected: collectedCoins,
+                required: requiredCoins,
+            });
             this._buildingInfoLabel.node.active = true;
         }
     }
@@ -223,7 +234,7 @@ export class HUDManager {
         root.addChild(lvNode);
         lvNode.addComponent(UITransform);
         this._levelLabel = lvNode.addComponent(Label);
-        this._levelLabel.string = 'Lv.1';
+        this._levelLabel.string = Localization.instance.t('ui.common.level.short', { level: 1 });
         this._levelLabel.fontSize = 22;
         this._levelLabel.lineHeight = 26;
         this._levelLabel.color = new Color(255, 230, 140, 255);
@@ -288,7 +299,7 @@ export class HUDManager {
         const ratio = maxXp > 0 ? currentXp / maxXp : 0;
         this.drawXpFill(ratio);
         if (this._levelLabel) {
-            this._levelLabel.string = `Lv.${level}`;
+            this._levelLabel.string = Localization.instance.t('ui.common.level.short', { level });
         }
     }
 

@@ -29,6 +29,7 @@ import { GameConfig } from '../../data/GameConfig';
 import { HUDManager } from '../../ui/HUDManager';
 import { Hero } from '../units/Hero';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import { BuildingText } from './BuildingText';
 
 const { ccclass, property } = _decorator;
 
@@ -100,7 +101,10 @@ export class BuildingPad extends BaseComponent {
     }
 
     public get buildingName(): string {
-        return this._config?.name ?? '未知建筑';
+        return BuildingText.resolveName({
+            id: this._config?.id ?? this.buildingTypeId,
+            nameKey: this._config?.nameKey,
+        });
     }
 
     // === 生命周期 ===
@@ -115,7 +119,7 @@ export class BuildingPad extends BaseComponent {
     private _heroInArea: boolean = false;
     private _heroRef: Hero | null = null;
     private _isAnimating: boolean = false; // New flag to block input during animation
-    
+
     // Store original spawn position to place the building there.
     private _originalPosition: Vec3 = new Vec3();
 
@@ -143,7 +147,7 @@ export class BuildingPad extends BaseComponent {
             this.applyFixedOffsetFromSpawn();
         }
 
-        console.log(`[BuildingPad] 初始化: ${this._config.name}, 需要 ${this._config.cost} 金币`);
+        console.log(`[BuildingPad] 初始化: ${this.buildingName}, 需要 ${this._config.cost} 金币`);
     }
 
     private applyFixedOffsetFromSpawn(): void {
@@ -224,10 +228,7 @@ export class BuildingPad extends BaseComponent {
 
             // Show Info
             if (this.hudManager) {
-                const title =
-                    this._state === BuildingPadState.UPGRADING
-                        ? `升级 ${this.buildingName} (Lv ${this._associatedBuilding?.level || 1} -> ${(this._associatedBuilding?.level || 1) + 1})`
-                        : `建造 ${this.buildingName}`;
+                const title = this.getHudTitle();
                 this.hudManager.showBuildingInfo(title, this.requiredCoins, this.collectedCoins);
             }
         }
@@ -280,10 +281,7 @@ export class BuildingPad extends BaseComponent {
                     if (this.hudManager) {
                         this.hudManager.updateCoinDisplay(this._heroRef.coinCount);
                         // Update building info too as coins change
-                        const title =
-                            this._state === BuildingPadState.UPGRADING
-                                ? `升级 ${this.buildingName} (Lv ${this._associatedBuilding?.level || 1} -> ${(this._associatedBuilding?.level || 1) + 1})`
-                                : `建造 ${this.buildingName}`;
+                        const title = this.getHudTitle();
                         this.hudManager.showBuildingInfo(
                             title,
                             this.requiredCoins,
@@ -329,13 +327,13 @@ export class BuildingPad extends BaseComponent {
         // -- Content Container (Label + Coin) --
         const contentNode = new Node('Content');
         flatRoot.addChild(contentNode);
-        
+
         // -- Cost Label --
         // Positioned Top (y > 0)
         const labelNode = new Node('CostLabel');
         contentNode.addChild(labelNode);
         // Moved Up slightly more to accommodate larger text
-        labelNode.setPosition(0, 60, 0); 
+        labelNode.setPosition(0, 60, 0);
 
         const uiTransform = labelNode.addComponent(UITransform);
         uiTransform.setContentSize(300, 150); // Increased size container
@@ -366,19 +364,19 @@ export class BuildingPad extends BaseComponent {
 
                 const coin = instantiate(prefab);
                 visualRoot.addChild(coin);
-                
+
                 // Position: Bottom (World Z+)
                 // Text is at Y=+60 (flatRoot) => World Z=-0.6
                 // Coin should be at World Z=+0.7 to balance
-                coin.setPosition(0, 0, 0.7); 
-                
+                coin.setPosition(0, 0, 0.7);
+
                 // Rotate to lie flat (-90 X)
-                coin.setRotationFromEuler(-90, 0, 0); 
+                coin.setRotationFromEuler(-90, 0, 0);
 
                 // Scale - Reduced further
                 // Previous 1.2. User said "smaller".
                 // Let's try 0.8.
-                const coinScale = 0.8; 
+                const coinScale = 0.8;
                 coin.setScale(coinScale, coinScale, coinScale);
             });
         };
@@ -424,19 +422,19 @@ export class BuildingPad extends BaseComponent {
         const len = Math.sqrt(dx * dx + dy * dy);
         const dirX = dx / len;
         const dirY = dy / len;
-        
+
         let current = 0;
         let drawing = true;
-        
+
         while (current < len) {
             const segLen = Math.min(drawing ? dashLen : gapLen, len - current);
-            
+
             if (drawing) {
                 ctx.moveTo(x1 + dirX * current, y1 + dirY * current);
                 ctx.lineTo(x1 + dirX * (current + segLen), y1 + dirY * (current + segLen));
                 ctx.stroke();
             }
-            
+
             current += segLen;
             drawing = !drawing;
         }
@@ -446,9 +444,8 @@ export class BuildingPad extends BaseComponent {
         if (this._label) {
             const remaining = this.requiredCoins - this._collectedCoins;
 
-
             if (remaining <= 0) {
-                this._label.string = 'building...';
+                this._label.string = BuildingText.constructingLabel();
                 this._label.fontSize = 20; // Reduce size for text fit
             } else {
                 this._label.string = `${remaining}`;
@@ -524,7 +521,7 @@ export class BuildingPad extends BaseComponent {
 
         // Update Label to show nothing or "Upgrade"
         this.updateDisplay();
-        
+
         this.placeUpgradeZoneInFront(building.node);
 
         console.log(
@@ -546,8 +543,8 @@ export class BuildingPad extends BaseComponent {
         // Using visual Back (-Forward) = Local +Z.
         const forward = new Vec3();
         Vec3.multiplyScalar(forward, buildingNode.forward, -1); // Local +Z (Back)
-        
-        // Normalize (forward from Node might have scale?) No, usually normalized direction. 
+
+        // Normalize (forward from Node might have scale?) No, usually normalized direction.
         // Node.forward is normalized in recent Cocos versions? Let's ensure.
         forward.normalize();
 
@@ -560,11 +557,11 @@ export class BuildingPad extends BaseComponent {
         // That's complex.
         // Simplified: For 'wall', use a fixed small size. For others use Max.
         // A wall's meaningful bounds for "clearing" perpendicular is small.
-        
+
         let buildingHalfSize = Math.max(Math.abs(worldScale.x), Math.abs(worldScale.z)) * 0.5;
         if (this.buildingTypeId === 'wall') {
             // Walls are long but thin. We are moving perpendicular. Use thickness approx.
-            buildingHalfSize = 1.0; 
+            buildingHalfSize = 1.0;
         }
 
         const offsetDistance =
@@ -581,7 +578,7 @@ export class BuildingPad extends BaseComponent {
         this._heroInArea = false;
         this._heroRef = null;
         if (this.hudManager) {
-             this.hudManager.hideBuildingInfo();
+            this.hudManager.hideBuildingInfo();
         }
     }
 
@@ -608,7 +605,7 @@ export class BuildingPad extends BaseComponent {
             const maxLvl = this._associatedBuilding.maxLevel;
             if (this._associatedBuilding.level >= maxLvl) {
                 // Max Level Reached
-                if (this._label) this._label.string = 'MAX';
+                if (this._label) this._label.string = BuildingText.maxLabel();
                 return 0;
             }
         }
@@ -641,7 +638,7 @@ export class BuildingPad extends BaseComponent {
     private onBuildComplete(): void {
         this._state = BuildingPadState.COMPLETE; // Transient state before Manager calls onBuildingCreated
 
-        console.log(`[BuildingPad] 建造完成: ${this._config?.name}`);
+        console.log(`[BuildingPad] 建造完成: ${this.buildingName}`);
 
         // Play visual effect first, then create building
         this.playConstructionEffect(() => {
@@ -696,11 +693,11 @@ export class BuildingPad extends BaseComponent {
             if (this._associatedBuilding.level >= maxLvl) {
                 console.log('[BuildingPad] Max Level Reached.');
                 if (this._label) {
-                    this._label.string = 'MAX';
+                    this._label.string = BuildingText.maxLabel();
                     this._label.color = Color.RED;
                 }
             }
-            
+
             this._isAnimating = false;
         });
     }
@@ -725,20 +722,20 @@ export class BuildingPad extends BaseComponent {
             if (!this.node.isValid) return;
 
             const effectNode = instantiate(prefab);
-            
+
             // Fix: Add to parent (Scene/Map) instead of offset Pad
             if (this.node.parent) {
                 this.node.parent.addChild(effectNode);
                 // Set World Position to the original building location
                 effectNode.setWorldPosition(
-                    this._originalPosition.x, 
-                    this._originalPosition.y + 0.5, 
+                    this._originalPosition.x,
+                    this._originalPosition.y + 0.5,
                     this._originalPosition.z
                 );
             } else {
                 // Fallback (shouldn't happen for active node)
                 this.node.addChild(effectNode);
-                effectNode.setPosition(0, 0.5, 0); 
+                effectNode.setPosition(0, 0.5, 0);
             }
 
             // Scale up 9x as requested (previous was 3x)
@@ -756,6 +753,14 @@ export class BuildingPad extends BaseComponent {
 
     private get eventManager(): EventManager {
         return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
+    }
+
+    private getHudTitle(): string {
+        if (this._state === BuildingPadState.UPGRADING) {
+            const level = this._associatedBuilding?.level || 1;
+            return BuildingText.upgradeTitle(this.buildingName, level);
+        }
+        return BuildingText.buildTitle(this.buildingName);
     }
 
     private get hudManager(): HUDManager {

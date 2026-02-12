@@ -9,6 +9,7 @@ import {
     Material,
     tween,
     Tween,
+    Quat,
 } from 'cc';
 import { Building } from './Building';
 import { Bullet } from '../combat/Bullet';
@@ -76,6 +77,9 @@ export class Tower extends Building {
 
     // Cache material for bullet? Maybe separate factory.
 
+    @property
+    public rotationSpeed: number = 5;
+
     protected update(dt: number): void {
         super.update(dt); // Handles HP?
 
@@ -105,6 +109,24 @@ export class Tower extends Building {
         // Search new target if needed
         if (!this._target) {
             this._target = this.findNearestEnemy();
+        }
+
+        // Rotate towards target
+        if (this._target) {
+            const desiredDir = new Vec3();
+            Vec3.subtract(desiredDir, this._target.worldPosition, this.node.worldPosition);
+            desiredDir.y = 0; // Keep level
+            desiredDir.normalize();
+
+            if (desiredDir.lengthSqr() > 0.001) {
+                const currentRot = this.node.rotation.clone();
+                const targetRot = new Quat();
+                Quat.fromViewUp(targetRot, desiredDir, Vec3.UP);
+
+                const nextRot = new Quat();
+                Quat.slerp(nextRot, currentRot, targetRot, dt * this.rotationSpeed);
+                this.node.setRotation(nextRot);
+            }
         }
 
         // Attack
@@ -300,7 +322,5 @@ export class Tower extends Building {
         return Math.sqrt(dx * dx + dz * dz);
     }
 
-    private get eventManager(): EventManager {
-        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
-    }
+
 }

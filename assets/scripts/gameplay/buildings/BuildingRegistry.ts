@@ -9,14 +9,14 @@ const { ccclass } = _decorator;
 export interface BuildingTypeConfig {
     /** 唯一标识 */
     id: string;
-    /** 显示名称 */
-    name: string;
+    /** 显示名称 key（i18n） */
+    nameKey: string;
+    /** 描述 key（i18n） */
+    descriptionKey: string;
     /** 所需金币数量 */
     cost: number;
     /** 建造时间（秒），0 表示立即完成 */
     buildTime: number;
-    /** 描述 */
-    description: string;
 
     // --- V2 Architecture Extensions ---
     /** 视觉配置 */
@@ -97,13 +97,10 @@ export class BuildingRegistry {
      * 注册默认建筑类型
      */
     private registerDefaults(): void {
-        const types = GameConfig.BUILDING.TYPES;
+        const types = GameConfig.BUILDING.TYPES as Record<string, Omit<BuildingTypeConfig, 'id'>>;
 
         for (const [id, config] of Object.entries(types)) {
-            this.register({
-                id,
-                ...config,
-            });
+            this.register(this.normalizeTypeConfig(id, config));
         }
 
         console.log('[BuildingRegistry] 注册了', this._types.size, '种建筑类型');
@@ -113,7 +110,7 @@ export class BuildingRegistry {
      * 注册新的建筑类型
      */
     public register(config: BuildingTypeConfig): void {
-        this._types.set(config.id, config);
+        this._types.set(config.id, this.normalizeTypeConfig(config.id, config));
     }
 
     /**
@@ -136,5 +133,36 @@ export class BuildingRegistry {
     public getCost(id: string): number {
         const config = this.get(id);
         return config ? config.cost : 0;
+    }
+
+    private normalizeTypeConfig(
+        id: string,
+        config: Partial<Omit<BuildingTypeConfig, 'id'>>
+    ): BuildingTypeConfig {
+        if (!config.nameKey) {
+            throw new Error(`[BuildingRegistry] Missing nameKey for building type "${id}"`);
+        }
+        if (!config.descriptionKey) {
+            throw new Error(`[BuildingRegistry] Missing descriptionKey for building type "${id}"`);
+        }
+        if (config.cost === undefined) {
+            throw new Error(`[BuildingRegistry] Missing cost for building type "${id}"`);
+        }
+        if (config.buildTime === undefined) {
+            throw new Error(`[BuildingRegistry] Missing buildTime for building type "${id}"`);
+        }
+
+        return {
+            id,
+            nameKey: config.nameKey,
+            descriptionKey: config.descriptionKey,
+            cost: config.cost,
+            buildTime: config.buildTime,
+            visual: config.visual,
+            role: config.role,
+            stats: config.stats,
+            features: config.features,
+            upgrades: config.upgrades,
+        };
     }
 }

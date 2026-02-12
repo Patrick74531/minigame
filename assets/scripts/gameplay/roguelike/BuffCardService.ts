@@ -27,7 +27,7 @@ export type CardRarity = 'gold' | 'purple' | 'blue';
 /** 卡牌定义（与 GameConfig.BUFF_CARDS.POOL 条目一一对应） */
 export interface BuffCardDef {
     id: string;
-    name: string;
+    nameKey: string;
     rarity: CardRarity;
     effects: BuffCardEffect;
 }
@@ -108,7 +108,7 @@ export class BuffCardService extends Singleton<BuffCardService>() {
         hero.applyBuffCard(card.effects);
         this._pickedHistory.push(card);
 
-        console.log(`[BuffCardService] Applied card: ${card.name} (${card.id})`);
+        console.log(`[BuffCardService] Applied card: ${card.id}`);
         return true;
     }
 
@@ -132,7 +132,7 @@ export class BuffCardService extends Singleton<BuffCardService>() {
     private getCardPool(): BuffCardDef[] {
         return GameConfig.BUFF_CARDS.POOL.map(raw => ({
             id: raw.id,
-            name: raw.name,
+            nameKey: raw.nameKey,
             rarity: raw.rarity as CardRarity,
             effects: raw.effects as BuffCardEffect,
         }));

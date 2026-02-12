@@ -11,6 +11,7 @@ import {
     Label,
 } from 'cc';
 import { Joystick } from './Joystick';
+import { Localization } from '../core/i18n/Localization';
 
 /**
  * UI 工厂
@@ -108,7 +109,7 @@ export class UIFactory {
         widget.right = 150;
 
         const label = node.addComponent(Label);
-        label.string = 'Coins: 0';
+        label.string = Localization.instance.t('ui.hud.coins', { count: 0 });
         label.fontSize = 40;
         label.lineHeight = 50;
         label.color = new Color(255, 215, 0, 255); // 金色

@@ -4,9 +4,9 @@ import { EventManager } from '../core/managers/EventManager';
 import { GameManager } from '../core/managers/GameManager';
 import { ServiceRegistry } from '../core/managers/ServiceRegistry';
 import { GameEvents } from '../data/GameEvents';
-import { GameConfig } from '../data/GameConfig';
 import { HeroWeaponManager } from '../gameplay/weapons/HeroWeaponManager';
 import { WeaponType, WeaponDef } from '../gameplay/weapons/WeaponTypes';
+import { Localization } from '../core/i18n/Localization';
 
 const UI_LAYER = 33554432;
 
@@ -132,7 +132,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         root.addChild(titleNode);
 
         const label = titleNode.addComponent(Label);
-        label.string = '— 选择武器 —';
+        label.string = Localization.instance.t('ui.weapon.select.title');
         label.fontSize = 36;
         label.lineHeight = 40;
         label.color = new Color(255, 215, 0, 255);
@@ -182,7 +182,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         nameNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 20, 50);
         cardNode.addChild(nameNode);
         const nameLabel = nameNode.addComponent(Label);
-        nameLabel.string = def.name;
+        nameLabel.string = Localization.instance.t(def.nameKey);
         nameLabel.fontSize = 26;
         nameLabel.lineHeight = 30;
         nameLabel.color = Color.WHITE;
@@ -196,7 +196,12 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         levelNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 20, 30);
         cardNode.addChild(levelNode);
         const levelLabel = levelNode.addComponent(Label);
-        levelLabel.string = isUpgrade ? `Lv.${currentLevel} → Lv.${currentLevel + 1}` : '新武器';
+        levelLabel.string = isUpgrade
+            ? Localization.instance.t('ui.weapon.level.upgrade', {
+                  from: currentLevel,
+                  to: currentLevel + 1,
+              })
+            : Localization.instance.t('ui.weapon.level.new');
         levelLabel.fontSize = 18;
         levelLabel.lineHeight = 22;
         levelLabel.color = isUpgrade ? new Color(255, 215, 0, 255) : new Color(100, 255, 100, 255);
@@ -209,7 +214,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         descNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 24, 60);
         cardNode.addChild(descNode);
         const descLabel = descNode.addComponent(Label);
-        descLabel.string = def.description;
+        descLabel.string = Localization.instance.t(def.descriptionKey);
         descLabel.fontSize = 16;
         descLabel.lineHeight = 20;
         descLabel.color = new Color(190, 190, 190, 255);
@@ -247,20 +252,20 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
 
     // === 属性格式化 ===
 
-    private static readonly STAT_LABELS: Record<string, string> = {
-        damage: '伤害',
-        attackInterval: '攻击间隔',
-        range: '射程',
-        projectileSpeed: '弹速',
-        spread: '散射角',
-        gravity: '重力',
-        burnDuration: '燃烧时间',
-        explosionRadius: '爆炸范围',
-        spinSpeed: '旋转速度',
-        waveSpeed: '波速',
-        waveRadius: '波半径',
-        slowPercent: '减速比例',
-        slowDuration: '减速时长',
+    private static readonly STAT_LABEL_KEYS: Record<string, string> = {
+        damage: 'ui.weapon.stat.damage',
+        attackInterval: 'ui.weapon.stat.attackInterval',
+        range: 'ui.weapon.stat.range',
+        projectileSpeed: 'ui.weapon.stat.projectileSpeed',
+        spread: 'ui.weapon.stat.spread',
+        gravity: 'ui.weapon.stat.gravity',
+        burnDuration: 'ui.weapon.stat.burnDuration',
+        explosionRadius: 'ui.weapon.stat.explosionRadius',
+        spinSpeed: 'ui.weapon.stat.spinSpeed',
+        waveSpeed: 'ui.weapon.stat.waveSpeed',
+        waveRadius: 'ui.weapon.stat.waveRadius',
+        slowPercent: 'ui.weapon.stat.slowPercent',
+        slowDuration: 'ui.weapon.stat.slowDuration',
     };
 
     private formatStats(def: WeaponDef, level: number): string {
@@ -272,12 +277,16 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         for (let i = 0; i < keys.length; i++) {
             const key = keys[i];
             const value = (stats as any)[key];
-            const label = WeaponSelectUI.STAT_LABELS[key] || key;
+            const labelKey = WeaponSelectUI.STAT_LABEL_KEYS[key];
+            if (!labelKey) continue;
+            const label = Localization.instance.t(labelKey);
             if (typeof value === 'number') {
                 if (key === 'slowPercent') {
                     lines.push(`${label}: ${Math.round(value * 100)}%`);
                 } else if (key === 'slowDuration') {
-                    lines.push(`${label}: ${value}s`);
+                    lines.push(
+                        `${label}: ${Localization.instance.t('ui.common.seconds', { value })}`
+                    );
                 } else {
                     lines.push(`${label}: ${value}`);
                 }
