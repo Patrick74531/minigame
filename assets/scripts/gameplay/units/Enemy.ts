@@ -314,7 +314,7 @@ export class Enemy extends Unit {
         const dz = targetPos.z - myPos.z;
         const distSq = dx * dx + dz * dz;
         let aggroRange = Math.max(Enemy.MIN_ATTACK_RANGE, this._aggroRange);
-        
+
         if (target instanceof Building && target.tauntRange > 0) {
             aggroRange = Math.max(aggroRange, target.tauntRange);
         }
@@ -477,9 +477,14 @@ export class Enemy extends Unit {
     }
 
     private isPaperDoll(): boolean {
-        if (this._usesPaperDoll === null) {
-            this._usesPaperDoll = !!this.node.getChildByName('EnemyPaperRoot');
+        if (this._usesPaperDoll === true) {
+            return true;
         }
+
+        const hasPaperVisual =
+            !!this.node.getChildByName('EnemyPaperRoot') ||
+            !!this.node.getChildByName('EnemyVacuumRoot');
+        this._usesPaperDoll = hasPaperVisual;
         return this._usesPaperDoll;
     }
 

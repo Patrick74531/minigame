@@ -32,7 +32,7 @@ export class EnemyRoboVacuumAnimator extends Component {
     public yOffset: number = 0.42;
 
     @property
-    public visualScale: number = 0.0105;
+    public visualScale: number = 0.015;
 
     @property
     public scaleReference: number = 0.38;
@@ -50,10 +50,13 @@ export class EnemyRoboVacuumAnimator extends Component {
     public frameCountOverride: number = 4;
 
     @property
-    public pitchAngle: number = 68;
+    public pitchAngle: number = -90;
 
     @property
-    public rollAngle: number = 4;
+    public yawAngle: number = -20;
+
+    @property
+    public rollAngle: number = 0;
 
     private static readonly _stripCache = new Map<string, SpriteFrame[]>();
     private static readonly _eliteTint = new Color(255, 236, 170, 255);
@@ -137,6 +140,7 @@ export class EnemyRoboVacuumAnimator extends Component {
             if (billboard && billboard.isValid) {
                 billboard.destroy();
             }
+            this.applySpriteOrientation();
             this.applyVisualRootTransform();
             if (this._meshRenderer && this._meshRenderer.isValid) {
                 this._meshRenderer.enabled = false;
@@ -167,7 +171,7 @@ export class EnemyRoboVacuumAnimator extends Component {
         this._sprite = spriteNode.addComponent(Sprite);
         this._sprite.sizeMode = Sprite.SizeMode.RAW;
         this._sprite.trim = false;
-        this._sprite.node.setRotationFromEuler(0, 180, 0);
+        this.applySpriteOrientation();
         this._sprite.color = this._enemy?.isElite
             ? EnemyRoboVacuumAnimator._eliteTint
             : EnemyRoboVacuumAnimator._normalTint;
@@ -252,8 +256,15 @@ export class EnemyRoboVacuumAnimator extends Component {
         const referenceScale = Math.max(this.scaleReference, 0.0001);
         const localVisualScale = this.visualScale / referenceScale;
         this._visualRoot.setPosition(0, this.yOffset / referenceScale, 0);
+        // Keep root strictly ground-aligned; yaw is applied on sprite local Z to avoid tilting.
         this._visualRoot.setRotationFromEuler(this.pitchAngle, 0, this.rollAngle);
         this._visualRoot.setScale(localVisualScale, localVisualScale, localVisualScale);
+    }
+
+    private applySpriteOrientation(): void {
+        if (!this._sprite || !this._sprite.node || !this._sprite.node.isValid) return;
+        // After root is laid flat on ground, rotate in-plane for initial viewing direction.
+        this._sprite.node.setRotationFromEuler(0, 0, this.yawAngle);
     }
 
     private applyLayerRecursive(root: Node, layer: number): void {
