@@ -1,0 +1,70 @@
+// Terrain Splatmap Shader — blends grass + dirt using a grayscale mask
+// Single draw call for the entire ground plane
+
+CCEffect %{
+  techniques:
+  - name: opaque
+    passes:
+    - vert: terrain-vs:vert
+      frag: terrain-fs:frag
+      depthStencilState:
+        depthTest: true
+        depthWrite: true
+      rasterizerState:
+        cullMode: none
+      properties:
+        grassTex:     { value: white }
+        dirtTex:      { value: white }
+        splatMap:     { value: black }
+        grassTiling:  { value: [8.0, 8.0, 0.0, 0.0] }
+        dirtTiling:   { value: [8.0, 8.0, 0.0, 0.0] }
+}%
+
+CCProgram terrain-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #include <builtin/uniforms/cc-local>
+
+  in vec3 a_position;
+  in vec2 a_texCoord;
+
+  out vec2 v_uv;
+
+  vec4 vert () {
+    v_uv = a_texCoord;
+    return cc_matProj * cc_matView * cc_matWorld * vec4(a_position, 1.0);
+  }
+}%
+
+CCProgram terrain-fs %{
+  precision highp float;
+
+  in vec2 v_uv;
+
+  uniform sampler2D grassTex;
+  uniform sampler2D dirtTex;
+  uniform sampler2D splatMap;
+
+  uniform TerrainParams {
+    vec4 grassTiling;
+    vec4 dirtTiling;
+  };
+
+  vec4 frag () {
+    // Sample splatmap (single channel mask: 0=grass, 1=dirt)
+    float mask = texture(splatMap, v_uv).r;
+
+    // Tile grass and dirt textures independently
+    vec2 grassUV = v_uv * grassTiling.xy + grassTiling.zw;
+    vec2 dirtUV  = v_uv * dirtTiling.xy  + dirtTiling.zw;
+
+    vec4 grassColor = texture(grassTex, grassUV);
+    vec4 dirtColor  = texture(dirtTex, dirtUV);
+
+    // Blend: mask=0 → grass, mask=1 → dirt
+    vec4 finalColor = mix(grassColor, dirtColor, mask);
+    finalColor.a = 1.0;
+
+    return finalColor;
+  }
+}%

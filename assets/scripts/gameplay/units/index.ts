@@ -1,7 +1,8 @@
 /**
  * 单位模块导出
  */
-export { Unit, UnitType, UnitState, UnitStats } from './Unit';
+export { Unit, UnitType, UnitState } from './Unit';
+export type { UnitStats } from './Unit';
 export { Enemy } from './Enemy';
 export { Soldier } from './Soldier';
 export { UnitFactory } from './UnitFactory';

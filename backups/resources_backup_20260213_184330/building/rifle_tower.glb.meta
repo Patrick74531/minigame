@@ -1,0 +1,142 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "d75b6d48-f5ca-41bb-82c9-cff42b5f33ae",
+  "files": [],
+  "subMetas": {
+    "40586": {
+      "importer": "gltf-embeded-image",
+      "uuid": "d75b6d48-f5ca-41bb-82c9-cff42b5f33ae@40586",
+      "displayName": "",
+      "id": "40586",
+      "name": "UnnamedImage.image",
+      "userData": {
+        "gltfIndex": 0,
+        "fixAlphaTransparencyArtifacts": true,
+        "hasAlpha": false,
+        "type": "texture"
+      },
+      "ver": "1.0.3",
+      "imported": true,
+      "files": [
+        ".json",
+        ".png"
+      ],
+      "subMetas": {}
+    },
+    "f04db": {
+      "importer": "gltf-mesh",
+      "uuid": "d75b6d48-f5ca-41bb-82c9-cff42b5f33ae@f04db",
+      "displayName": "",
+      "id": "f04db",
+      "name": "geometry_0.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 746
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "e39f7": {
+      "importer": "texture",
+      "uuid": "d75b6d48-f5ca-41bb-82c9-cff42b5f33ae@e39f7",
+      "displayName": "",
+      "id": "e39f7",
+      "name": "UnnamedTexture.texture",
+      "userData": {
+        "wrapModeS": "repeat",
+        "wrapModeT": "repeat",
+        "minfilter": "linear",
+        "magfilter": "linear",
+        "mipfilter": "none",
+        "anisotropy": 0,
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "d75b6d48-f5ca-41bb-82c9-cff42b5f33ae@40586"
+      },
+      "ver": "1.0.22",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "f7779": {
+      "importer": "gltf-material",
+      "uuid": "d75b6d48-f5ca-41bb-82c9-cff42b5f33ae@f7779",
+      "displayName": "",
+      "id": "f7779",
+      "name": "UnnamedMaterial.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "1c09a": {
+      "importer": "gltf-scene",
+      "uuid": "d75b6d48-f5ca-41bb-82c9-cff42b5f33ae@1c09a",
+      "displayName": "",
+      "id": "1c09a",
+      "name": "rifle_tower.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [
+      {
+        "uri": "d75b6d48-f5ca-41bb-82c9-cff42b5f33ae@40586"
+      }
+    ],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "d75b6d48-f5ca-41bb-82c9-cff42b5f33ae@f04db"
+      ],
+      "skeletons": [],
+      "textures": [
+        "d75b6d48-f5ca-41bb-82c9-cff42b5f33ae@e39f7"
+      ],
+      "materials": [
+        "d75b6d48-f5ca-41bb-82c9-cff42b5f33ae@f7779"
+      ],
+      "scenes": [
+        "d75b6d48-f5ca-41bb-82c9-cff42b5f33ae@1c09a"
+      ]
+    }
+  }
+}

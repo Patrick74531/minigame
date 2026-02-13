@@ -1,10 +1,8 @@
 export {
     WeaponType,
-    WeaponDef,
-    WeaponInstance,
-    WeaponLevelStats,
     getWeaponLevelStats,
 } from './WeaponTypes';
+export type { WeaponDef, WeaponInstance, WeaponLevelStats } from './WeaponTypes';
 export { WeaponBehavior } from './WeaponBehavior';
 export { WeaponBehaviorFactory } from './WeaponBehaviorFactory';
 export { HeroWeaponManager } from './HeroWeaponManager';

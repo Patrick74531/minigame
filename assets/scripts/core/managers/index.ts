@@ -2,7 +2,8 @@
  * 管理器导出
  */
 export { EventManager } from './EventManager';
-export { PoolManager, IPoolable } from './PoolManager';
+export { PoolManager } from './PoolManager';
+export type { IPoolable } from './PoolManager';
 export { GameManager, GameState } from './GameManager';
 export { EffectManager } from './EffectManager';
 export { WaveService } from './WaveService';

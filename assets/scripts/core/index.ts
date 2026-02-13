@@ -15,9 +15,9 @@ export {
     PoolManager,
     GameManager,
     GameState,
-    IPoolable,
     EffectManager,
 } from './managers';
+export type { IPoolable } from './managers';
 
 // 工具
 export { MathUtils } from './utils';

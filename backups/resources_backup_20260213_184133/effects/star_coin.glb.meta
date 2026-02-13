@@ -1,0 +1,93 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "70de51a1-e56c-48e9-93de-bb422af7acf4",
+  "files": [],
+  "subMetas": {
+    "5f206": {
+      "importer": "gltf-mesh",
+      "uuid": "70de51a1-e56c-48e9-93de-bb422af7acf4@5f206",
+      "displayName": "",
+      "id": "5f206",
+      "name": "Coin_Star.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 452
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "0be58": {
+      "importer": "gltf-material",
+      "uuid": "70de51a1-e56c-48e9-93de-bb422af7acf4@0be58",
+      "displayName": "",
+      "id": "0be58",
+      "name": "Gold.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "667d0": {
+      "importer": "gltf-scene",
+      "uuid": "70de51a1-e56c-48e9-93de-bb422af7acf4@667d0",
+      "displayName": "",
+      "id": "667d0",
+      "name": "star_coin.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "70de51a1-e56c-48e9-93de-bb422af7acf4@5f206"
+      ],
+      "skeletons": [],
+      "textures": [],
+      "materials": [
+        "70de51a1-e56c-48e9-93de-bb422af7acf4@0be58"
+      ],
+      "scenes": [
+        "70de51a1-e56c-48e9-93de-bb422af7acf4@667d0"
+      ]
+    }
+  }
+}

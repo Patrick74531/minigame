@@ -3,13 +3,16 @@
  */
 
 // 单位系统
-export { Unit, UnitType, UnitState, UnitStats, Enemy, Soldier } from './units';
+export { Unit, UnitType, UnitState, Enemy, Soldier } from './units';
+export type { UnitStats } from './units';
 
 // 建筑系统
-export { Building, BuildingType, BuildingConfig } from './buildings';
+export { Building, BuildingType } from './buildings';
+export type { BuildingConfig } from './buildings';
 
 // 波次系统
-export { WaveManager, WaveConfig } from './wave';
+export { WaveManager } from './wave';
+export type { WaveConfig } from './wave';
 
 // 经济系统
 export { Coin } from './economy';
@@ -20,20 +23,17 @@ export { CombatSystem } from './combat/CombatSystem';
 // 肉鸽卡牌系统
 export {
     BuffCardService,
-    BuffCardDef,
-    BuffCardEffect,
-    CardRarity,
 } from './roguelike/BuffCardService';
+export type { BuffCardDef, BuffCardEffect, CardRarity } from './roguelike/BuffCardService';
 
 // 武器系统
 export {
     WeaponType,
-    WeaponDef,
-    WeaponInstance,
     WeaponBehavior,
     WeaponBehaviorFactory,
     HeroWeaponManager,
 } from './weapons';
+export type { WeaponDef, WeaponInstance } from './weapons';
 
 // 空投系统
 export { AirdropService } from './airdrop/AirdropService';
