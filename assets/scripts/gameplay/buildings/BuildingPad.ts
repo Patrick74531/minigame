@@ -174,6 +174,9 @@ export class BuildingPad extends BaseComponent {
         if (this.buildingTypeId === 'wall') {
             return 1.0;
         }
+        if (this.buildingTypeId === 'farm') {
+            return 3.4;
+        }
 
         const cfg = this.buildingRegistry.get(this.buildingTypeId);
         const sx = Math.abs(cfg?.visual?.scale?.x ?? 1);
@@ -522,7 +525,8 @@ export class BuildingPad extends BaseComponent {
         // Update Label to show nothing or "Upgrade"
         this.updateDisplay();
 
-        this.placeUpgradeZoneInFront(building.node);
+        // Recompute with real built footprint even if pad was initially world-locked.
+        this.placeUpgradeZoneInFront(building.node, true);
 
         console.log(
             `[BuildingPad] Entered Upgrade Mode. Base: ${baseCost}, Next Cost: ${this._nextUpgradeCost}`
@@ -562,6 +566,9 @@ export class BuildingPad extends BaseComponent {
         if (this.buildingTypeId === 'wall') {
             // Walls are long but thin. We are moving perpendicular. Use thickness approx.
             buildingHalfSize = 1.0;
+        } else if (this.buildingTypeId === 'farm') {
+            // Keep clear of mine mesh, but still visible and reachable.
+            buildingHalfSize = 3.8;
         }
 
         const offsetDistance =

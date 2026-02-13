@@ -11,6 +11,9 @@ import { IAttackable } from '../../core/interfaces/IAttackable';
 import { DamageNumberFactory, type DamageNumberStyle } from '../effects/DamageNumberFactory';
 import { Soldier } from '../units/Soldier';
 import { BuildingText } from './BuildingText';
+import { CoinFactory } from '../economy/CoinFactory';
+import { Coin } from '../economy/Coin';
+import { resolveHeroModelConfig } from '../units/HeroModelConfig';
 
 const { ccclass, property } = _decorator;
 
@@ -36,6 +39,8 @@ export interface BuildingConfig {
     spawnInterval: number;
     maxUnits: number;
     soldierPoolName: string;
+    incomePerTick?: number;
+    incomeInterval?: number;
 }
 
 export interface BuildingUpgradeConfig {
@@ -45,6 +50,7 @@ export interface BuildingUpgradeConfig {
     spawnIntervalMultiplier: number;
     maxUnitsPerLevel: number;
     spawnBatchPerLevel?: number;
+    incomeMultiplier?: number;
 }
 
 /**
@@ -54,6 +60,14 @@ export interface BuildingUpgradeConfig {
 @ccclass('Building')
 export class Building extends BaseComponent implements IAttackable {
     private static _latestBaseLevel: number = 1;
+    private static readonly FARM_STACK_BASE_POS: ReadonlyArray<{ x: number; z: number }> = [
+        { x: 2.65, z: -0.48 },
+        { x: 3.55, z: -0.48 },
+        { x: 2.65, z: 0.48 },
+        { x: 3.55, z: 0.48 },
+    ];
+    private static readonly FARM_STACK_BASE_Y = 0.09;
+    private static readonly FARM_STACK_MAX_HEIGHT = 12;
 
     @property
     public buildingType: BuildingType = BuildingType.BARRACKS;
@@ -75,6 +89,7 @@ export class Building extends BaseComponent implements IAttackable {
     public spawnIntervalMultiplier: number = 0.93;
     public maxUnitsPerLevel: number = 0;
     public spawnBatchPerLevel: number = 0;
+    public incomeMultiplier: number = 1.2;
 
     @property
     public spawnInterval: number = 3;
@@ -84,6 +99,10 @@ export class Building extends BaseComponent implements IAttackable {
 
     @property
     public soldierPoolName: string = 'soldier_basic';
+    @property
+    public incomePerTick: number = 1;
+    @property
+    public incomeInterval: number = 6;
 
     /** 当前存活的单位数量 */
     private _activeUnits: number = 0;
@@ -95,6 +114,13 @@ export class Building extends BaseComponent implements IAttackable {
     private _unitContainer: Node | null = null;
     /** 当前已知的基地等级（用于兵营批量产兵） */
     private _baseLevel: number = 1;
+    /** 农场产币计时器 */
+    private _incomeTimer: number = 0;
+    /** 农场金币堆（四摞） */
+    private _farmStackCoins: Node[][] = [[], [], [], []];
+    /** 农场金币堆叠视觉参数（对齐英雄头顶金币） */
+    private _farmCoinStackHeight: number = 0.1;
+    private _farmCoinStackScale: number = 0.5;
 
     /** 血条组件 */
     private _healthBar: HealthBar | null = null;
@@ -123,6 +149,11 @@ export class Building extends BaseComponent implements IAttackable {
         this._activeUnits = 0;
         this._spawnTimer = 0;
         this._baseLevel = Building._latestBaseLevel;
+        this._incomeTimer = 0;
+        this._farmStackCoins = [[], [], [], []];
+        const stackCfg = resolveHeroModelConfig();
+        this._farmCoinStackHeight = Math.max(0.06, stackCfg.stackItemHeight);
+        this._farmCoinStackScale = Math.max(0.2, stackCfg.stackItemScale);
 
         // Register Unit Died Event
         this.eventManager.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
@@ -236,6 +267,12 @@ export class Building extends BaseComponent implements IAttackable {
         if (config.spawnInterval !== undefined) this.spawnInterval = config.spawnInterval;
         if (config.maxUnits !== undefined) this.maxUnits = config.maxUnits;
         if (config.soldierPoolName !== undefined) this.soldierPoolName = config.soldierPoolName;
+        if (config.incomePerTick !== undefined) {
+            this.incomePerTick = Math.max(1, Math.floor(config.incomePerTick));
+        }
+        if (config.incomeInterval !== undefined) {
+            this.incomeInterval = Math.max(0.5, config.incomeInterval);
+        }
 
         const typeChanged = config.type !== undefined && config.type !== oldType;
         const typeIdChanged = this.buildingTypeId !== oldTypeId;
@@ -261,6 +298,9 @@ export class Building extends BaseComponent implements IAttackable {
         if (config.spawnBatchPerLevel !== undefined) {
             this.spawnBatchPerLevel = Math.max(0, config.spawnBatchPerLevel);
         }
+        if (config.incomeMultiplier !== undefined) {
+            this.incomeMultiplier = Math.max(1.01, config.incomeMultiplier);
+        }
     }
 
     /**
@@ -282,6 +322,9 @@ export class Building extends BaseComponent implements IAttackable {
         }
         if (this.maxUnitsPerLevel > 0) {
             this.maxUnits += this.maxUnitsPerLevel;
+        }
+        if (this.buildingType === BuildingType.FARM && this.incomeInterval > 0) {
+            this.incomeInterval = Math.max(0.35, this.incomeInterval / this.incomeMultiplier);
         }
 
         // Heal to full (bonus)
@@ -315,6 +358,11 @@ export class Building extends BaseComponent implements IAttackable {
     protected update(dt: number): void {
         if (!this.isAlive) return;
         if (!this.gameManager.isPlaying) return;
+
+        if (this.buildingType === BuildingType.FARM) {
+            this.updateFarmIncome(dt);
+            return;
+        }
 
         // 产兵逻辑
         if (this._activeUnits < this.maxUnits) {
@@ -424,6 +472,71 @@ export class Building extends BaseComponent implements IAttackable {
             x: baseX + Math.cos(angle) * radius,
             z: baseZ + Math.sin(angle) * radius,
         };
+    }
+
+    private updateFarmIncome(dt: number): void {
+        this._incomeTimer += dt;
+        while (this._incomeTimer >= this.incomeInterval) {
+            this._incomeTimer -= this.incomeInterval;
+            for (let i = 0; i < this.incomePerTick; i++) {
+                this.spawnFarmCoinOnPlatform();
+            }
+        }
+    }
+
+    private spawnFarmCoinOnPlatform(): void {
+        const stackIndex = this.pickFarmStackIndex();
+        if (stackIndex < 0) return;
+
+        const stack = this._farmStackCoins[stackIndex];
+        const y = Building.FARM_STACK_BASE_Y + stack.length * this._farmCoinStackHeight;
+        const base = Building.FARM_STACK_BASE_POS[stackIndex];
+        const coinNode = CoinFactory.createCoin(this.node, base.x, base.z, 1);
+        coinNode.setPosition(base.x, y, base.z);
+        coinNode.setRotationFromEuler(90, Math.random() * 360, 0);
+
+        coinNode.setScale(
+            this._farmCoinStackScale,
+            this._farmCoinStackScale,
+            this._farmCoinStackScale
+        );
+
+        const coinComp = coinNode.getComponent(Coin);
+        if (coinComp) {
+            coinComp.value = 1;
+            coinComp.enableLifetime = false;
+            coinComp.floatAmplitude = Math.max(GameConfig.ECONOMY.COIN_FLOAT_AMPLITUDE, 0.12);
+            coinComp.floatPhase = Math.random() * Math.PI * 2;
+        }
+
+        stack.push(coinNode);
+    }
+
+    private pickFarmStackIndex(): number {
+        this.compactFarmStacks();
+
+        let bestIndex = -1;
+        let minCount = Number.POSITIVE_INFINITY;
+
+        for (let i = 0; i < this._farmStackCoins.length; i++) {
+            const count = this._farmStackCoins[i].length;
+            if (count >= Building.FARM_STACK_MAX_HEIGHT) continue;
+            if (count < minCount) {
+                minCount = count;
+                bestIndex = i;
+            }
+        }
+
+        return bestIndex;
+    }
+
+    private compactFarmStacks(): void {
+        for (let i = 0; i < this._farmStackCoins.length; i++) {
+            const stack = this._farmStackCoins[i];
+            this._farmStackCoins[i] = stack.filter(
+                coin => coin && coin.isValid && coin.parent === this.node
+            );
+        }
     }
 
     // === 伤害处理 ===

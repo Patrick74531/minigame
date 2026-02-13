@@ -105,6 +105,17 @@ export class BuildingFactory {
     private static readonly FENCEBAR_MODEL_Y_ROTATION = 0;
     private static readonly FENCEBAR_DEFAULT_NODE_SCALE = { x: 0.8, y: 0.8, z: 0.8 };
 
+    // === Farm (Gold Mine) Model ===
+    private static _farmModelPrefab: Prefab | null = null;
+    private static _farmModelLoading: boolean = false;
+    private static _pendingFarmModelNodes: Node[] = [];
+    private static readonly FARM_MODEL_PREFAB_PATHS = ['building/gold', 'building/gold/gold'];
+    private static readonly FARM_MODEL_NODE_NAME = 'FarmModel';
+    private static readonly FARM_MODEL_SCALE = 4.0;
+    private static readonly FARM_MODEL_Y_OFFSET = 1.0;
+    private static readonly FARM_MODEL_Y_ROTATION = -45; // Rotate to add depth
+    private static readonly FARM_DEFAULT_NODE_SCALE = { x: 1, y: 1, z: 1 };
+
     public static createBarracks(parent: Node, x: number, z: number): Node {
         const barracksConfig = this.requireBuildingConfig('barracks');
         const node = this.createCubeNode('Barracks', new Color(100, 180, 100, 255));
@@ -325,10 +336,13 @@ export class BuildingFactory {
                 this.attachSpaModelAsync(node);
             } else if (buildingId === 'wall') {
                 this.attachFencebarModelAsync(node);
+            } else if (buildingId === 'farm') {
+                this.attachFarmModelAsync(node);
             }
             const building =
                 buildingId === 'spa' ? node.addComponent(Spa) : node.addComponent(Building);
             const isBarracks = config.role === 'barracks';
+            const isFarm = buildingId === 'farm';
             building.setConfig({
                 type: this.resolveBuildingType(buildingId, config.role),
                 typeId: buildingId,
@@ -337,6 +351,12 @@ export class BuildingFactory {
                 hp: config.stats?.hp || 100,
                 spawnInterval: isBarracks ? (config.features?.spawnInterval ?? 4.5) : 0,
                 maxUnits: isBarracks ? (config.features?.maxUnits ?? 3) : 0,
+                incomePerTick: isFarm
+                    ? Math.max(1, Math.floor(config.features?.incomePerTick ?? 1))
+                    : undefined,
+                incomeInterval: isFarm
+                    ? Math.max(0.5, config.features?.incomeInterval ?? 6)
+                    : undefined,
             });
             building.setUpgradeConfig({
                 maxLevel: config.upgrades?.maxLevel ?? GameConfig.BUILDING.DEFAULT_MAX_LEVEL,
@@ -346,6 +366,7 @@ export class BuildingFactory {
                 spawnIntervalMultiplier: config.upgrades?.spawnIntervalMultiplier ?? 0.93,
                 maxUnitsPerLevel: config.upgrades?.maxUnitsPerLevel ?? 0,
                 spawnBatchPerLevel: isBarracks ? (config.upgrades?.spawnBatchPerLevel ?? 1) : 0,
+                incomeMultiplier: isFarm ? (config.upgrades?.incomeMultiplier ?? 1.2) : undefined,
             });
 
             if (buildingId === 'spa') {
@@ -1122,5 +1143,88 @@ export class BuildingFactory {
             return maxX - minX;
         }
         return 0;
+    }
+
+    // =================================================================================
+    // Farm Model Logic
+    // =================================================================================
+
+    private static attachFarmModelAsync(node: Node): void {
+        if (!node || !node.isValid) return;
+        if (this.tryAttachFarmModel(node)) return;
+
+        this._pendingFarmModelNodes.push(node);
+        if (this._farmModelLoading) return;
+
+        this._farmModelLoading = true;
+        this.loadFarmModelPrefab(0);
+    }
+
+    private static tryAttachFarmModel(node: Node): boolean {
+        if (!this._farmModelPrefab) return false;
+        this.applyFarmModel(node, this._farmModelPrefab);
+        return true;
+    }
+
+    private static loadFarmModelPrefab(index: number): void {
+        if (index >= this.FARM_MODEL_PREFAB_PATHS.length) {
+            this._farmModelLoading = false;
+            this._pendingFarmModelNodes.length = 0;
+            return;
+        }
+
+        const path = this.FARM_MODEL_PREFAB_PATHS[index];
+        resources.load(path, Prefab, (err, prefab) => {
+            if (err || !prefab) {
+                this.loadFarmModelPrefab(index + 1);
+                return;
+            }
+            this.onFarmPrefabLoaded(prefab);
+        });
+    }
+
+    private static onFarmPrefabLoaded(prefab: Prefab): void {
+        this._farmModelLoading = false;
+        this._farmModelPrefab = prefab;
+        const pending = this._pendingFarmModelNodes.splice(0);
+        for (const n of pending) {
+            if (!n || !n.isValid) continue;
+            this.applyFarmModel(n, prefab);
+        }
+    }
+
+    private static applyFarmModel(node: Node, prefab: Prefab): void {
+        const legacyPlatform = node.getChildByName('FarmPlatform');
+        if (legacyPlatform && legacyPlatform.isValid) {
+            legacyPlatform.destroy();
+        }
+
+        const existing = node.getChildByName(this.FARM_MODEL_NODE_NAME);
+        if (existing && existing.isValid) return;
+
+        const parentScale = node.scale;
+        const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
+        const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
+        const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
+        const scaleFactor = this.getUniformScaleFactor(node, this.FARM_DEFAULT_NODE_SCALE);
+
+        const model = instantiate(prefab);
+        model.name = this.FARM_MODEL_NODE_NAME;
+        // Compensate parent non-uniform scale so mine keeps its volume.
+        model.setPosition(0, this.FARM_MODEL_Y_OFFSET / parentScaleY, 0);
+        model.setScale(
+            (this.FARM_MODEL_SCALE * scaleFactor) / parentScaleX,
+            (this.FARM_MODEL_SCALE * scaleFactor) / parentScaleY,
+            (this.FARM_MODEL_SCALE * scaleFactor) / parentScaleZ
+        );
+        model.setRotationFromEuler(0, this.FARM_MODEL_Y_ROTATION, 0);
+        this.applyLayerRecursive(model, node.layer);
+        node.addChild(model);
+
+        const hasRenderer = model.getComponentsInChildren(Renderer).length > 0;
+        const ownerMesh = node.getComponent(MeshRenderer);
+        if (ownerMesh && hasRenderer) {
+            ownerMesh.enabled = false;
+        }
     }
 }

@@ -283,7 +283,7 @@ export const GameConfig = {
                     hp: 150,
                 },
                 features: {
-                    incomePerTick: 2,
+                    incomePerTick: 1,
                     incomeInterval: 6,
                 },
                 upgrades: {
@@ -351,6 +351,8 @@ export const GameConfig = {
             { x: 0, z: -24, type: 'wall', angle: 90 },
             // Spa in Top-Left (Consistent with other buildings using negative Z)
             { x: -22, z: -22, type: 'spa' },
+            // Gold Mine (Farm) to the right of Spa
+            { x: -12, z: -25, type: 'farm' },
         ],
     },
 

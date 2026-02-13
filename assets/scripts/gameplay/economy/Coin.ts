@@ -1,9 +1,9 @@
-import { _decorator, Component, Vec3, BoxCollider, Node } from 'cc';
+import { _decorator, Vec3, BoxCollider, Node } from 'cc';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { IPoolable } from '../../core/managers/PoolManager';
-import { tween, Tween } from 'cc';
+import { Tween } from 'cc';
 // import { GameManager } from '../../core/managers/GameManager';
 import { GameConfig } from '../../data/GameConfig';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
@@ -18,6 +18,16 @@ const { ccclass, property } = _decorator;
 export class Coin extends BaseComponent implements IPoolable {
     @property
     public value: number = 5;
+    @property
+    public floatSpeed: number = GameConfig.ECONOMY.COIN_FLOAT_SPEED;
+    @property
+    public floatAmplitude: number = GameConfig.ECONOMY.COIN_FLOAT_AMPLITUDE;
+    @property
+    public enableLifetime: boolean = true;
+    @property
+    public lifetimeLimit: number = GameConfig.ECONOMY.COIN_LIFETIME;
+    @property
+    public floatPhase: number = 0;
 
     public startY: number = 0.5;
     private _lifetime: number = 0;
@@ -99,15 +109,14 @@ export class Coin extends BaseComponent implements IPoolable {
             this._lifetime += dt;
 
             // Life Cycle
-            if (this._lifetime >= GameConfig.ECONOMY.COIN_LIFETIME) {
+            if (this.enableLifetime && this._lifetime >= this.lifetimeLimit) {
                 this.collect(true);
                 return;
             }
 
             // Floating Animation
             const floatY =
-                Math.sin(this._lifetime * GameConfig.ECONOMY.COIN_FLOAT_SPEED) *
-                GameConfig.ECONOMY.COIN_FLOAT_AMPLITUDE;
+                Math.sin(this._lifetime * this.floatSpeed + this.floatPhase) * this.floatAmplitude;
             this.node.setPosition(this.node.position.x, this.startY + floatY, this.node.position.z);
         }
     }
