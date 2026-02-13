@@ -111,6 +111,125 @@ copy_dir_clean() {
   fi
 }
 
+rewrite_index_for_reddit() {
+  local webroot="$1"
+  local index_file="${webroot}/index.html"
+  local boot_file="${webroot}/boot.js"
+
+  [ -f "$index_file" ] || die "index.html not found for compliance rewrite: $index_file"
+  log "Rewriting index.html for Reddit web constraints (no inline JS/CSS)..."
+
+  # Move startup + contextmenu handler into an external JS file.
+  cat > "$boot_file" <<'EOF'
+(function () {
+  var gameCanvas = document.getElementById('GameCanvas');
+  if (gameCanvas) {
+    gameCanvas.addEventListener('contextmenu', function (event) {
+      event.preventDefault();
+    });
+  }
+
+  System.import('./index.js').catch(function (err) {
+    console.error(err);
+  });
+})();
+EOF
+
+  # Remove inline contextmenu handler attribute on canvas.
+  perl -0pi -e 's/\s+oncontextmenu="event\.preventDefault\(\)"//g' "$index_file"
+
+  # Replace the Cocos inline boot script with an external boot.js reference.
+  perl -0pi -e 's#<script>\s*System\.import\(\s*["\047]\./index\.js["\047]\s*\).*?</script>#<script src="boot.js" charset="utf-8"></script>#gs' "$index_file"
+
+  if ! rg -q 'src="boot\.js"' "$index_file"; then
+    die "Failed to inject external boot.js into index.html"
+  fi
+}
+
+scan_reddit_html_compliance() {
+  local webroot="$1"
+  local report="$2"
+  local has_violation=0
+
+  {
+    echo "Reddit HTML Compliance Scan"
+    echo "root=$webroot"
+    echo
+  } > "$report"
+
+  while IFS= read -r -d '' html; do
+    local hit
+
+    # No inline <script> tags (must use external src).
+    hit="$(rg -n "<script" "$html" | rg -v "src=" || true)"
+    if [ -n "$hit" ]; then
+      has_violation=1
+      {
+        echo "violation=inline_script_tag"
+        echo "file=$html"
+        echo "$hit"
+        echo
+      } >> "$report"
+    fi
+
+    # No inline <style> tags.
+    hit="$(rg -n "<style" "$html" || true)"
+    if [ -n "$hit" ]; then
+      has_violation=1
+      {
+        echo "violation=inline_style_tag"
+        echo "file=$html"
+        echo "$hit"
+        echo
+      } >> "$report"
+    fi
+
+    # No inline event handlers, e.g. onclick= / oncontextmenu=.
+    hit="$(rg -n "[[:space:]]on[a-zA-Z]+[[:space:]]*=" "$html" || true)"
+    if [ -n "$hit" ]; then
+      has_violation=1
+      {
+        echo "violation=inline_event_handler"
+        echo "file=$html"
+        echo "$hit"
+        echo
+      } >> "$report"
+    fi
+
+    # No inline style attributes.
+    hit="$(rg -n "style=" "$html" || true)"
+    if [ -n "$hit" ]; then
+      has_violation=1
+      {
+        echo "violation=inline_style_attribute"
+        echo "file=$html"
+        echo "$hit"
+        echo
+      } >> "$report"
+    fi
+
+    # No direct HTML form submission.
+    hit="$(rg -n "<form[^>]*(action=|method=)" "$html" || true)"
+    if [ -n "$hit" ]; then
+      has_violation=1
+      {
+        echo "violation=direct_form_submission"
+        echo "file=$html"
+        echo "$hit"
+        echo
+      } >> "$report"
+    fi
+  done < <(find "$webroot" -type f -name "*.html" -print0)
+
+  if [ "$has_violation" -eq 1 ]; then
+    echo "status=FAIL" >> "$report"
+    return 1
+  fi
+
+  echo "status=PASS" >> "$report"
+  return 0
+}
+
 SKIP_COCOS_BUILD=0
 OPTIMIZE_SOURCE_ASSETS=1
 SOURCE_BUILD_DIR=""
@@ -142,12 +261,13 @@ Options:
   -h, --help                        Show this help.
 
 Examples:
-  COCOS_CREATOR="/Applications/CocosCreator/Creator/3.8.8/CocosCreator.app/Contents/MacOS/CocosCreator" \
-  bash scripts/build_reddit_package.sh
+  COCOS_CREATOR="/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/MacOS/CocosCreator" \
+  bash scripts/build_reddit_package.sh \
+    --cocos-build-opts "stage=build;buildPath=project://build;outputName=reddit-web"
 
   bash scripts/build_reddit_package.sh \
     --skip-cocos-build \
-    --source-build-dir build/web-mobile
+    --source-build-dir build/reddit-web
 EOF
 }
 
@@ -177,6 +297,7 @@ ensure_dir "$REPORT_DIR"
 RUN_ID="$(timestamp)"
 REPORT_FILE="${REPORT_DIR}/reddit_build_report_${RUN_ID}.txt"
 ASSET_REPORT_TSV="${REPORT_DIR}/reddit_asset_opt_${RUN_ID}.tsv"
+COMPLIANCE_REPORT="${REPORT_DIR}/reddit_compliance_${RUN_ID}.txt"
 
 ASSETS_DIR="${ROOT_DIR}/assets/resources"
 ASSETS_BEFORE=0
@@ -342,6 +463,13 @@ if has_cmd cwebp; then
   done < <(find "$OUTPUT_WEBROOT" -type f -name "*.webp" -print0)
 fi
 
+rewrite_index_for_reddit "$OUTPUT_WEBROOT"
+
+if ! scan_reddit_html_compliance "$OUTPUT_WEBROOT" "$COMPLIANCE_REPORT"; then
+  warn "Reddit HTML compliance scan failed. See: $COMPLIANCE_REPORT"
+  exit 3
+fi
+
 TOTAL_BYTES="$(sum_bytes_dir "$OUTPUT_WEBROOT")"
 TOTAL_HUMAN="$(human_bytes "$TOTAL_BYTES")"
 MAX_FILE_BYTES=$((MAX_FILE_MB * 1024 * 1024))
@@ -408,6 +536,10 @@ BY_EXT="$(find "$OUTPUT_WEBROOT" -type f | awk -F. '
     echo "assets_saved_human=$(human_bytes "$ASSETS_SAVED")"
   fi
   echo
+  echo "=== Compliance ==="
+  echo "compliance_report=$COMPLIANCE_REPORT"
+  echo "html_inline_check=PASS"
+  echo
   echo "=== Top Files (bytes<TAB>path) ==="
   echo "$TOP_FILES"
   echo
@@ -426,6 +558,7 @@ log "Output webroot: $OUTPUT_WEBROOT"
 log "Output size: $TOTAL_HUMAN"
 log "Largest file: $(human_bytes "$MAX_SIZE") - $MAX_PATH"
 log "Report: $REPORT_FILE"
+log "Compliance report: $COMPLIANCE_REPORT"
 if [ "$OPTIMIZE_SOURCE_ASSETS" -eq 1 ]; then
   log "Assets backup: $BACKUP_DIR"
   log "Asset optimization report: $ASSET_REPORT_TSV"
