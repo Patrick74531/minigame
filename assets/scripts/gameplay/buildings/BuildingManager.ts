@@ -181,6 +181,15 @@ export class BuildingManager {
         if (data.building instanceof Building) {
             this.unregisterBuilding(data.building);
         }
+
+        if (!data.buildingId) return;
+
+        for (const pad of this._pads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            if (pad.onAssociatedBuildingDestroyed(data.buildingId)) {
+                break;
+            }
+        }
     }
 
     private get eventManager(): EventManager {

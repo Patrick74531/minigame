@@ -541,6 +541,19 @@ export class BuildingPad extends BaseComponent {
         );
     }
 
+    public onAssociatedBuildingDestroyed(buildingId: string): boolean {
+        if (!this._associatedBuilding || !buildingId) return false;
+        const associatedNode = this._associatedBuilding.node;
+        if (!associatedNode || !associatedNode.isValid) {
+            this.reset();
+            return true;
+        }
+        if (associatedNode.uuid !== buildingId) return false;
+
+        this.reset();
+        return true;
+    }
+
     /**
      * 将投放区放到建筑前方，避免与建筑模型重叠
      */
@@ -778,11 +791,19 @@ export class BuildingPad extends BaseComponent {
      * 重置建造点
      */
     public reset(): void {
+        this._associatedBuilding = null;
+        this._nextUpgradeCost = 0;
         this._collectedCoins = 0;
         this._state = BuildingPadState.WAITING;
+        this._isAnimating = false;
         this._buildEmitAttempts = 0;
         this._buildAutoRetryRounds = 0;
         this.updateDisplay();
+
+        if (this._heroInArea && this.hudManager) {
+            const title = this.getHudTitle();
+            this.hudManager.showBuildingInfo(title, this.requiredCoins, this.collectedCoins);
+        }
     }
 
     private playConstructionEffect(onComplete?: () => void): void {
