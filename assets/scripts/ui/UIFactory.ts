@@ -12,6 +12,7 @@ import {
 } from 'cc';
 import { Joystick } from './Joystick';
 import { Localization } from '../core/i18n/Localization';
+import { UIResponsive } from './UIResponsive';
 
 /**
  * UI 工厂
@@ -20,6 +21,8 @@ import { Localization } from '../core/i18n/Localization';
 export class UIFactory {
     // UI_2D Layer
     private static readonly UI_LAYER = 33554432;
+    private static readonly DESIGN_WIDTH = 1280;
+    private static readonly DESIGN_HEIGHT = 720;
 
     public static createUICanvas(): Node {
         const node = new Node('UICanvas');
@@ -27,16 +30,28 @@ export class UIFactory {
 
         const canvas = node.addComponent(Canvas);
         const transform = node.addComponent(UITransform);
-        transform.setContentSize(1280, 720); // 必须设置尺寸，否则 Widget 子节点无法对齐
-        node.addComponent(Widget);
+        view.setDesignResolutionSize(
+            this.DESIGN_WIDTH,
+            this.DESIGN_HEIGHT,
+            ResolutionPolicy.SHOW_ALL
+        );
+        transform.setContentSize(this.DESIGN_WIDTH, this.DESIGN_HEIGHT);
 
-        view.setDesignResolutionSize(1280, 720, ResolutionPolicy.FIXED_HEIGHT);
+        const widget = node.addComponent(Widget);
+        widget.isAlignTop = true;
+        widget.isAlignBottom = true;
+        widget.isAlignLeft = true;
+        widget.isAlignRight = true;
+        widget.top = 0;
+        widget.bottom = 0;
+        widget.left = 0;
+        widget.right = 0;
 
         const cameraNode = new Node('UICamera');
         cameraNode.layer = this.UI_LAYER;
         const camera = cameraNode.addComponent(Camera);
         camera.projection = Camera.ProjectionType.ORTHO;
-        camera.orthoHeight = 360;
+        camera.orthoHeight = this.DESIGN_HEIGHT * 0.5;
         camera.visibility = this.UI_LAYER;
         camera.clearFlags = Camera.ClearFlag.DEPTH_ONLY;
         camera.priority = 100;
@@ -48,12 +63,13 @@ export class UIFactory {
     }
 
     public static createJoystick(parent: Node): Joystick {
-        // Joystick Node 作为一个全屏容器
         const joystickNode = new Node('JoystickArea');
         joystickNode.layer = this.UI_LAYER;
         parent.addChild(joystickNode);
+        joystickNode
+            .addComponent(UITransform)
+            .setContentSize(this.DESIGN_WIDTH, this.DESIGN_HEIGHT);
 
-        // 使用 Widget 撑满全屏
         const widget = joystickNode.addComponent(Widget);
         widget.isAlignTop = true;
         widget.isAlignBottom = true;
@@ -68,7 +84,7 @@ export class UIFactory {
         const bgNode = new Node('Background');
         bgNode.layer = this.UI_LAYER;
         joystickNode.addChild(bgNode);
-        bgNode.setPosition(-450, -220, 0); // Bottom-Left offset relative to center (1280x720)
+        bgNode.setPosition(0, 0, 0);
 
         const bgGraphics = bgNode.addComponent(Graphics);
         this.drawCircle(bgGraphics, new Color(100, 100, 100, 128), 70);
@@ -77,7 +93,7 @@ export class UIFactory {
         const stickNode = new Node('Stick');
         stickNode.layer = this.UI_LAYER;
         joystickNode.addChild(stickNode);
-        stickNode.setPosition(-450, -220, 0); // Match background position
+        stickNode.setPosition(0, 0, 0);
 
         const stickGraphics = stickNode.addComponent(Graphics);
         this.drawCircle(stickGraphics, new Color(200, 200, 200, 200), 30);
@@ -87,8 +103,6 @@ export class UIFactory {
         joystick.stick = stickNode;
         joystick.background = bgNode;
         joystick.maxRadius = 55;
-
-        joystickNode.addComponent(UITransform); // 必须有 UITransform
 
         return joystick;
     }
@@ -136,6 +150,31 @@ export class UIFactory {
         label.fontSize = 30;
         label.lineHeight = 35;
         label.color = Color.WHITE;
+
+        return label;
+    }
+
+    public static createDesktopMoveHint(parent: Node): Label {
+        const node = new Node('DesktopMoveHint');
+        node.layer = this.UI_LAYER;
+        parent.addChild(node);
+
+        const transform = node.addComponent(UITransform);
+        transform.setAnchorPoint(0, 0);
+
+        const widget = node.addComponent(Widget);
+        widget.isAlignLeft = true;
+        widget.isAlignBottom = true;
+        const padding = UIResponsive.getControlPadding();
+        widget.left = padding.left;
+        widget.bottom = padding.bottom;
+
+        const label = node.addComponent(Label);
+        label.string = '提示：WASD 控制方向';
+        label.fontSize = 24;
+        label.lineHeight = 30;
+        label.color = new Color(235, 235, 235, 255);
+        label.horizontalAlign = Label.HorizontalAlign.LEFT;
 
         return label;
     }

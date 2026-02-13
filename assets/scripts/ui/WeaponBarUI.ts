@@ -1,4 +1,4 @@
-import { Node, UITransform, Color, Graphics, Label } from 'cc';
+import { Node, UITransform, Color, Graphics, Label, Widget, view } from 'cc';
 import { Singleton } from '../core/base/Singleton';
 import { EventManager } from '../core/managers/EventManager';
 import { ServiceRegistry } from '../core/managers/ServiceRegistry';
@@ -6,6 +6,7 @@ import { GameEvents } from '../data/GameEvents';
 import { HeroWeaponManager } from '../gameplay/weapons/HeroWeaponManager';
 import { WeaponType, WeaponDef } from '../gameplay/weapons/WeaponTypes';
 import { Localization } from '../core/i18n/Localization';
+import { UIResponsive } from './UIResponsive';
 
 const UI_LAYER = 33554432;
 const ICON_SIZE = 56;
@@ -20,24 +21,40 @@ const ICON_CORNER_RADIUS = 8;
 export class WeaponBarUI extends Singleton<WeaponBarUI>() {
     private _uiCanvas: Node | null = null;
     private _barNode: Node | null = null;
+    private _barWidget: Widget | null = null;
     private _iconNodes: Map<WeaponType, Node> = new Map();
+    private _active: boolean = false;
 
     public initialize(uiCanvas: Node): void {
+        if (!UIResponsive.shouldUseTouchControls()) {
+            this._active = false;
+            return;
+        }
+
+        this._active = true;
         this._uiCanvas = uiCanvas;
         this.createBarContainer();
 
         this.eventManager.on(GameEvents.WEAPON_INVENTORY_CHANGED, this.refresh, this);
         this.eventManager.on(GameEvents.WEAPON_SWITCHED, this.refresh, this);
-        console.log('[WeaponBarUI] 初始化完成');
+        view.on('canvas-resize', this.onResize, this);
+        this.updateLayout();
     }
 
     public cleanup(): void {
+        if (!this._active) {
+            return;
+        }
+
+        this._active = false;
         this.eventManager.off(GameEvents.WEAPON_INVENTORY_CHANGED, this.refresh, this);
         this.eventManager.off(GameEvents.WEAPON_SWITCHED, this.refresh, this);
+        view.off('canvas-resize', this.onResize, this);
         if (this._barNode) {
             this._barNode.destroy();
             this._barNode = null;
         }
+        this._barWidget = null;
         this._iconNodes.clear();
     }
 
@@ -68,8 +85,8 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
             const icon = this.createIconNode(type, def, instance.level, type === activeType);
             this._barNode!.addChild(icon);
 
-            // 从右向左排列
-            const x = -(index * (ICON_SIZE + ICON_GAP));
+            // 从右向左排列，同时向内收半个图标，避免首个图标贴边/越界
+            const x = -ICON_SIZE * 0.5 - index * (ICON_SIZE + ICON_GAP);
             icon.setPosition(x, 0, 0);
             this._iconNodes.set(type, icon);
             index++;
@@ -89,8 +106,25 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         transform.setContentSize(300, ICON_SIZE + 20);
         transform.setAnchorPoint(1, 0);
 
-        // 右下角定位
-        this._barNode.setPosition(600, -320, 0);
+        this._barWidget = this._barNode.addComponent(Widget);
+        this._barWidget.isAlignBottom = true;
+        this._barWidget.isAlignRight = true;
+    }
+
+    private onResize(): void {
+        this.updateLayout();
+    }
+
+    private updateLayout(): void {
+        if (!this._barNode || !this._barWidget) return;
+
+        const padding = UIResponsive.getControlPadding();
+        const scale = UIResponsive.getControlScale();
+        this._barNode.setScale(scale, scale, 1);
+
+        this._barWidget.bottom = padding.bottom;
+        this._barWidget.right = padding.right;
+        this._barWidget.updateAlignment();
     }
 
     private createIconNode(

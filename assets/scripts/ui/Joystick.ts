@@ -1,6 +1,23 @@
-import { _decorator, Component, Node, Vec2, Vec3, EventTouch, Input, input, view, sys } from 'cc';
+import {
+    _decorator,
+    Component,
+    Node,
+    Size,
+    UITransform,
+    Vec2,
+    Vec3,
+    Widget,
+    EventTouch,
+    Input,
+    input,
+    view,
+} from 'cc';
+import { ScreenBounds, UIResponsive } from './UIResponsive';
 
 const { ccclass, property } = _decorator;
+const JOYSTICK_BG_RADIUS = 70;
+const JOYSTICK_ZONE_WIDTH_RATIO = 0.5;
+const JOYSTICK_ZONE_HEIGHT_RATIO = 0.6;
 
 /**
  * 动态虚拟摇杆
@@ -21,31 +38,30 @@ export class Joystick extends Component {
     private _touchId: number | null = null;
     private _basePos: Vec3 = new Vec3();
     private _defaultPos: Vec3 = new Vec3();
+    private _movementBounds: ScreenBounds | null = null;
+    private _effectiveRadius: number = 80;
 
     public get inputVector(): Vec2 {
         return this._inputVector;
     }
 
     protected onLoad(): void {
-        // Desktop / Web Desktop check: disable joystick if not mobile
-        if (!sys.isMobile) {
+        if (!UIResponsive.shouldUseTouchControls()) {
             this.hideVisuals();
             return;
         }
 
-        // Store initial position as default anchor
-        if (this.background) {
-            this._defaultPos.set(this.background.position);
-            this._basePos.set(this._defaultPos);
-        }
-        
-        // Show by default at anchor position
         this.showVisuals();
 
         input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);
         input.on(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
         input.on(Input.EventType.TOUCH_END, this.onTouchEnd, this);
         input.on(Input.EventType.TOUCH_CANCEL, this.onTouchEnd, this);
+
+        this.node.getComponent(Widget)?.updateAlignment();
+        view.on('canvas-resize', this.onResize, this);
+        this.updateDefaultPosition();
+        this.scheduleOnce(() => this.updateDefaultPosition(), 0);
     }
 
     protected onDestroy(): void {
@@ -53,6 +69,53 @@ export class Joystick extends Component {
         input.off(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
         input.off(Input.EventType.TOUCH_END, this.onTouchEnd, this);
         input.off(Input.EventType.TOUCH_CANCEL, this.onTouchEnd, this);
+        view.off('canvas-resize', this.onResize, this);
+    }
+
+    private onResize(): void {
+        this.updateDefaultPosition();
+        if (this._touchId === null) {
+            this.resetPosition();
+        }
+    }
+
+    private updateDefaultPosition(): void {
+        const scale = UIResponsive.getControlScale();
+        this._effectiveRadius = Math.max(1, this.maxRadius * scale);
+        this.background?.setScale(scale, scale, 1);
+        this.stick?.setScale(scale, scale, 1);
+
+        const area = this.getControlAreaSize();
+        const halfW = area.width * 0.5;
+        const halfH = area.height * 0.5;
+
+        const padding = UIResponsive.getControlPadding();
+        const visualRadius = Math.max(
+            JOYSTICK_BG_RADIUS * scale,
+            this._effectiveRadius + 12 * scale
+        );
+
+        this._movementBounds = {
+            left: -halfW + padding.left + visualRadius,
+            right: halfW - padding.right - visualRadius,
+            bottom: -halfH + padding.bottom + visualRadius,
+            top: halfH - padding.top - visualRadius,
+        };
+
+        if (!this._movementBounds) return;
+        const x = this._movementBounds.left;
+        const y = this._movementBounds.bottom;
+        this._defaultPos.set(x, y, 0);
+
+        if (this._touchId === null) {
+            this._basePos.set(this._defaultPos);
+            this.resetPosition();
+        }
+    }
+
+    private resetPosition(): void {
+        if (this.background) this.background.setPosition(this._defaultPos);
+        if (this.stick) this.stick.setPosition(this._defaultPos);
     }
 
     private showVisuals(): void {
@@ -65,78 +128,100 @@ export class Joystick extends Component {
         if (this.stick) this.stick.active = false;
     }
 
-    /**
-     * 将屏幕坐标转换为 Canvas 本地坐标
-     * Canvas 使用 1280x720 设计分辨率，锚点 (0.5, 0.5)
-     */
     private screenToLocal(screenX: number, screenY: number): Vec3 {
-        const size = view.getVisibleSize();
-        // 计算相对于屏幕中心的偏移
-        const localX = (screenX / size.width - 0.5) * 1280;
-        const localY = (screenY / size.height - 0.5) * 720;
-        return new Vec3(localX, localY, 0);
+        const uiTransform = this.node.getComponent(UITransform);
+        if (!uiTransform) {
+            const area = this.getControlAreaSize();
+            return new Vec3(screenX - area.width * 0.5, screenY - area.height * 0.5, 0);
+        }
+
+        const worldPos = new Vec3(screenX, screenY, 0);
+        return uiTransform.convertToNodeSpaceAR(worldPos);
     }
 
     private onTouchStart(event: EventTouch): void {
-        if (this._touchId !== null) return;
-
-        const loc = event.getLocation();
-        const size = view.getVisibleSize();
-
-        // Limit to bottom-left area (40% width, 50% height)
-        if (loc.x > size.width * 0.4 || loc.y > size.height * 0.5) return;
-
+        if (!this.tryBeginInput(event.getUILocation().x, event.getUILocation().y)) return;
         this._touchId = event.touch!.getID();
-
-        // 将触摸位置转为本地坐标
-        const localPos = this.screenToLocal(loc.x, loc.y);
-        this._basePos.set(localPos);
-
-        // 移动摇杆到触摸位置 (Dynamic behavior)
-        if (this.background) this.background.setPosition(localPos);
-        if (this.stick) this.stick.setPosition(localPos);
-
-        this.showVisuals();
-        this._inputVector.set(0, 0);
     }
 
     private onTouchMove(event: EventTouch): void {
         if (event.touch!.getID() !== this._touchId) return;
-
-        const loc = event.getLocation();
-        const currentPos = this.screenToLocal(loc.x, loc.y);
-
-        // 计算相对于起点的偏移
-        const dx = currentPos.x - this._basePos.x;
-        const dy = currentPos.y - this._basePos.y;
-        const len = Math.sqrt(dx * dx + dy * dy);
-
-        // 限制在最大半径内
-        let clampedX = dx;
-        let clampedY = dy;
-        if (len > this.maxRadius) {
-            const ratio = this.maxRadius / len;
-            clampedX = dx * ratio;
-            clampedY = dy * ratio;
-        }
-
-        // 移动摇杆头
-        if (this.stick) {
-            this.stick.setPosition(this._basePos.x + clampedX, this._basePos.y + clampedY, 0);
-        }
-
-        // 输出归一化向量 (-1 ~ 1)
-        this._inputVector.set(clampedX / this.maxRadius, clampedY / this.maxRadius);
+        this.applyInputMove(event.getUILocation().x, event.getUILocation().y);
     }
 
     private onTouchEnd(event: EventTouch): void {
         if (event.touch!.getID() !== this._touchId) return;
 
         this._touchId = null;
+        this.endInput();
+    }
+
+    private clampToMovementBounds(pos: Vec3): Vec3 {
+        if (!this._movementBounds) return pos;
+        return UIResponsive.clampVec3ToBounds(pos, this._movementBounds);
+    }
+
+    private tryBeginInput(screenX: number, screenY: number): boolean {
+        if (!this.isInJoystickZone(screenX, screenY)) return false;
+
+        const localPos = this.clampToMovementBounds(this.screenToLocal(screenX, screenY));
+        this._basePos.set(localPos.x, localPos.y, 0);
+
+        if (this.background) this.background.setPosition(localPos);
+        if (this.stick) this.stick.setPosition(localPos);
+
+        this.showVisuals();
         this._inputVector.set(0, 0);
-        
-        // Reset to default anchor position instead of hiding
-        if (this.background) this.background.setPosition(this._defaultPos);
-        if (this.stick) this.stick.setPosition(this._defaultPos);
+        return true;
+    }
+
+    private applyInputMove(screenX: number, screenY: number): void {
+        const currentPos = this.screenToLocal(screenX, screenY);
+
+        const dx = currentPos.x - this._basePos.x;
+        const dy = currentPos.y - this._basePos.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+
+        let clampedX = dx;
+        let clampedY = dy;
+        if (len > this._effectiveRadius) {
+            const ratio = this._effectiveRadius / len;
+            clampedX = dx * ratio;
+            clampedY = dy * ratio;
+        }
+
+        if (this.stick) {
+            this.stick.setPosition(this._basePos.x + clampedX, this._basePos.y + clampedY, 0);
+        }
+
+        this._inputVector.set(clampedX / this._effectiveRadius, clampedY / this._effectiveRadius);
+    }
+
+    private isInJoystickZone(screenX: number, screenY: number): boolean {
+        const local = this.screenToLocal(screenX, screenY);
+        const area = this.getControlAreaSize();
+        const halfW = area.width * 0.5;
+        const halfH = area.height * 0.5;
+        const zoneRight = -halfW + area.width * JOYSTICK_ZONE_WIDTH_RATIO;
+        const zoneTop = -halfH + area.height * JOYSTICK_ZONE_HEIGHT_RATIO;
+
+        return local.x >= -halfW && local.x <= zoneRight && local.y >= -halfH && local.y <= zoneTop;
+    }
+
+    private endInput(): void {
+        this._inputVector.set(0, 0);
+        this.resetPosition();
+    }
+
+    private getControlAreaSize(): Size {
+        const uiTransform = this.node.getComponent(UITransform);
+        if (uiTransform) {
+            const size = uiTransform.contentSize;
+            if (size.width > 0 && size.height > 0) {
+                return size;
+            }
+        }
+
+        return UIResponsive.getVisibleSize();
     }
 }

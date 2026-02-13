@@ -64,7 +64,12 @@ export class HUDManager {
             }),
             'BaseHPLabel'
         );
-        this._baseHpLabel.node.setPosition(0, 300); // 屏幕上方
+        // Position using Widget
+        const hpWidget = this._baseHpLabel.node.addComponent(Widget);
+        hpWidget.isAlignTop = true;
+        hpWidget.isAlignHorizontalCenter = true;
+        hpWidget.top = 20;
+        
         this._baseHpLabel.fontSize = 24;
 
         // 创建建造点信息显示
@@ -76,7 +81,14 @@ export class HUDManager {
             Localization.instance.t('ui.hud.wave', { wave: 1 }),
             'WaveLabel'
         );
-        this._waveLabel.node.setPosition(-350, 300); // Top Left
+        
+        // Position using Widget
+        const waveWidget = this._waveLabel.node.addComponent(Widget);
+        waveWidget.isAlignTop = true;
+        waveWidget.isAlignLeft = true;
+        waveWidget.top = 20;
+        waveWidget.left = 20;
+
         this._waveLabel.fontSize = 30;
         this._waveLabel.color = new Color(255, 215, 0, 255); // Gold color
 
@@ -186,14 +198,14 @@ export class HUDManager {
 
     // === 事件处理 ===
 
-    private onWaveStart(data: { wave: number }): void {
+    private onWaveStart(data: { wave?: number }): void {
         // console.log(`[HUD] 波次 ${data.wave} 开始`);
         const snapshot = this.waveService.getSnapshot();
         const wave = snapshot.currentWave || data.wave || 1;
         this.updateWaveDisplay(wave);
     }
 
-    private onWaveComplete(data: { wave: number; bonus: number }): void {
+    private onWaveComplete(data: { wave?: number; bonus?: number }): void {
         // 可以在这里显示波次完成的提示
     }
 

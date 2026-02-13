@@ -5,6 +5,7 @@ import { HUDManager } from '../../ui/HUDManager';
 import { BuffCardUI } from '../../ui/BuffCardUI';
 import { WeaponSelectUI } from '../../ui/WeaponSelectUI';
 import { WeaponBarUI } from '../../ui/WeaponBarUI';
+import { UIResponsive } from '../../ui/UIResponsive';
 import { ServiceRegistry } from '../managers/ServiceRegistry';
 import { GlitchWaveBehavior } from '../../gameplay/weapons/behaviors/GlitchWaveBehavior';
 
@@ -23,6 +24,10 @@ export class UIBootstrap {
         root.addChild(canvas);
 
         const joystick = UIFactory.createJoystick(canvas);
+        if (!UIResponsive.shouldUseTouchControls()) {
+            UIFactory.createDesktopMoveHint(canvas);
+        }
+
         UIBootstrap.hudManager.initialize(canvas);
         UIBootstrap.buffCardUI.initialize(canvas);
         UIBootstrap.weaponSelectUI.initialize(canvas);

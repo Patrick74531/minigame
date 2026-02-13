@@ -89,6 +89,14 @@ export class BuffCardUI {
 
         // 居中排列卡牌
         const totalWidth = cards.length * CARD_WIDTH + (cards.length - 1) * CARD_GAP;
+        
+        // Dynamic scaling if total width exceeds screen width
+        const size = this._root.getComponent(UITransform)?.contentSize;
+        if (size && totalWidth > size.width - 100) {
+             const scale = (size.width - 100) / totalWidth;
+             cardContainer.setScale(scale, scale, 1);
+        }
+
         const startX = -totalWidth / 2 + CARD_WIDTH / 2;
 
         for (let i = 0; i < cards.length; i++) {
@@ -176,7 +184,11 @@ export class BuffCardUI {
         label.color = new Color(255, 215, 0, 255);
         label.horizontalAlign = Label.HorizontalAlign.CENTER;
 
-        titleNode.setPosition(0, 200, 0);
+        // Responsive Title using Widget
+        const widget = titleNode.addComponent(Widget);
+        widget.isAlignTop = true;
+        widget.isAlignHorizontalCenter = true;
+        widget.top = 100;
     }
 
     private createCardNode(card: BuffCardDef, _index: number): Node {

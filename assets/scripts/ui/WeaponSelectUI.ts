@@ -93,11 +93,24 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
 
         // 卡牌
         const totalWidth = weapons.length * CARD_WIDTH + (weapons.length - 1) * CARD_GAP;
+
+        // Dynamic scaling if total width exceeds screen width
+        const size = this._rootNode.getComponent(UITransform)?.contentSize;
+         // Create a container for scaling
+        const cardContainer = new Node('CardContainer');
+        cardContainer.layer = UI_LAYER;
+        this._rootNode.addChild(cardContainer);
+
+        if (size && totalWidth > size.width - 100) {
+             const scale = (size.width - 100) / totalWidth;
+             cardContainer.setScale(scale, scale, 1);
+        }
+
         const startX = -totalWidth / 2 + CARD_WIDTH / 2;
 
         weapons.forEach((w, i) => {
             const card = this.createCardNode(w, i);
-            this._rootNode!.addChild(card);
+            cardContainer.addChild(card);
             card.setPosition(startX + i * (CARD_WIDTH + CARD_GAP), -20, 0);
 
             // 入场动画
@@ -130,6 +143,12 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         titleNode.layer = UI_LAYER;
         titleNode.addComponent(UITransform).setContentSize(600, 60);
         root.addChild(titleNode);
+
+        // Responsive Title using Widget
+        const widget = titleNode.addComponent(Widget);
+        widget.isAlignTop = true;
+        widget.isAlignHorizontalCenter = true;
+        widget.top = 100;
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.weapon.select.title');
