@@ -49,6 +49,10 @@ export enum BuildingPadState {
  */
 @ccclass('BuildingPad')
 export class BuildingPad extends BaseComponent {
+    private static readonly BUILD_CONFIRM_DELAY = 0.25;
+    private static readonly BUILD_MAX_RETRY = 3;
+    private static readonly BUILD_AUTO_RETRY_ROUNDS = 2;
+
     /** 建筑类型 ID */
     @property
     public buildingTypeId: string = 'barracks';
@@ -119,6 +123,8 @@ export class BuildingPad extends BaseComponent {
     private _heroInArea: boolean = false;
     private _heroRef: Hero | null = null;
     private _isAnimating: boolean = false; // New flag to block input during animation
+    private _buildEmitAttempts: number = 0;
+    private _buildAutoRetryRounds: number = 0;
 
     // Store original spawn position to place the building there.
     private _originalPosition: Vec3 = new Vec3();
@@ -504,6 +510,8 @@ export class BuildingPad extends BaseComponent {
      */
     public onBuildingCreated(building: Building): void {
         this._associatedBuilding = building;
+        this._buildEmitAttempts = 0;
+        this._buildAutoRetryRounds = 0;
 
         // 若 start() 还未执行，提前加载配置
         if (!this._config) {
@@ -643,21 +651,78 @@ export class BuildingPad extends BaseComponent {
      * 建造完成
      */
     private onBuildComplete(): void {
-        this._state = BuildingPadState.COMPLETE; // Transient state before Manager calls onBuildingCreated
+        if (this._state === BuildingPadState.BUILDING) return;
+        this._state = BuildingPadState.BUILDING;
+        this._buildEmitAttempts = 0;
 
         console.log(`[BuildingPad] 建造完成: ${this.buildingName}`);
 
-        // Play visual effect first, then create building
+        // 首次建造：烟雾播放完毕后才真正创建模型，避免建筑“抢跑”。
         this.playConstructionEffect(() => {
-            // 发送建造完成事件
-            this.eventManager.emit(GameEvents.BUILDING_CONSTRUCTED, {
-                padNode: this.node,
-                buildingTypeId: this.buildingTypeId,
-                position: this._originalPosition.clone(),
-            });
+            this.requestBuildConstruction();
         });
 
         // Note: Manager will call onBuildingCreated(), setting state to UPGRADING
+    }
+
+    private requestBuildConstruction(): void {
+        if (!this.node.isValid || this._state !== BuildingPadState.BUILDING) return;
+        if (this._associatedBuilding) return;
+
+        this._buildEmitAttempts += 1;
+        this.eventManager.emit(GameEvents.BUILDING_CONSTRUCTED, {
+            padNode: this.node,
+            buildingTypeId: this.buildingTypeId,
+            position: this._originalPosition.clone(),
+        });
+
+        this.scheduleOnce(() => {
+            if (!this.node.isValid) return;
+            if (this._state !== BuildingPadState.BUILDING || this._associatedBuilding) return;
+
+            if (this._buildEmitAttempts < BuildingPad.BUILD_MAX_RETRY) {
+                console.warn(
+                    `[BuildingPad] Build confirmation timeout (${this._buildEmitAttempts}/${BuildingPad.BUILD_MAX_RETRY}), retrying...`
+                );
+                this.requestBuildConstruction();
+                return;
+            }
+
+            this.onBuildFailed('build confirmation timeout');
+        }, BuildingPad.BUILD_CONFIRM_DELAY);
+    }
+
+    public onBuildFailed(reason: string = 'unknown'): void {
+        if (this._associatedBuilding) return;
+        if (
+            this._state !== BuildingPadState.BUILDING &&
+            this._state !== BuildingPadState.COMPLETE
+        ) {
+            return;
+        }
+
+        console.warn(`[BuildingPad] Build failed: ${reason}`);
+        this._buildEmitAttempts = 0;
+        this._state = BuildingPadState.WAITING;
+
+        if (this._buildAutoRetryRounds < BuildingPad.BUILD_AUTO_RETRY_ROUNDS) {
+            this._buildAutoRetryRounds += 1;
+            this._collectedCoins = this.requiredCoins;
+            this.updateDisplay();
+            this.scheduleOnce(() => {
+                if (!this.node.isValid) return;
+                if (this._state !== BuildingPadState.WAITING || this._associatedBuilding) return;
+                if (this.isComplete) {
+                    this.onBuildComplete();
+                }
+            }, 0.35);
+            return;
+        }
+
+        // 保底解锁：重试多次失败后降为“差 1 金币”，避免一直卡在建造中。
+        this._buildAutoRetryRounds = 0;
+        this._collectedCoins = Math.max(0, this.requiredCoins - 1);
+        this.updateDisplay();
     }
 
     private onUpgradeComplete(): void {
@@ -715,6 +780,8 @@ export class BuildingPad extends BaseComponent {
     public reset(): void {
         this._collectedCoins = 0;
         this._state = BuildingPadState.WAITING;
+        this._buildEmitAttempts = 0;
+        this._buildAutoRetryRounds = 0;
         this.updateDisplay();
     }
 
@@ -726,24 +793,29 @@ export class BuildingPad extends BaseComponent {
                 if (onComplete) onComplete(); // Ensure callback runs even on error
                 return;
             }
-            if (!this.node.isValid) return;
+            if (!this.node.isValid) {
+                if (onComplete) onComplete();
+                return;
+            }
 
             const effectNode = instantiate(prefab);
+            const anchorPos = new Vec3();
+            const associatedParent = this._associatedBuilding?.node?.parent;
+            const parent =
+                associatedParent && associatedParent.isValid
+                    ? associatedParent
+                    : this.node.parent && this.node.parent.isValid
+                      ? this.node.parent
+                      : this.node;
 
-            // Fix: Add to parent (Scene/Map) instead of offset Pad
-            if (this.node.parent) {
-                this.node.parent.addChild(effectNode);
-                // Set World Position to the original building location
-                effectNode.setWorldPosition(
-                    this._originalPosition.x,
-                    this._originalPosition.y + 0.5,
-                    this._originalPosition.z
-                );
+            if (this._associatedBuilding?.node?.isValid) {
+                anchorPos.set(this._associatedBuilding.node.worldPosition);
             } else {
-                // Fallback (shouldn't happen for active node)
-                this.node.addChild(effectNode);
-                effectNode.setPosition(0, 0.5, 0);
+                anchorPos.set(this._originalPosition);
             }
+
+            parent.addChild(effectNode);
+            effectNode.setWorldPosition(anchorPos.x, anchorPos.y + 0.5, anchorPos.z);
 
             // Scale up 9x as requested (previous was 3x)
             effectNode.setScale(9, 9, 9);

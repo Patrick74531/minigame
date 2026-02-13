@@ -313,7 +313,12 @@ export class Enemy extends Unit {
         const dx = targetPos.x - myPos.x;
         const dz = targetPos.z - myPos.z;
         const distSq = dx * dx + dz * dz;
-        const aggroRange = Math.max(Enemy.MIN_ATTACK_RANGE, this._aggroRange);
+        let aggroRange = Math.max(Enemy.MIN_ATTACK_RANGE, this._aggroRange);
+        
+        if (target instanceof Building && target.tauntRange > 0) {
+            aggroRange = Math.max(aggroRange, target.tauntRange);
+        }
+
         return distSq <= aggroRange * aggroRange;
     }
 
@@ -384,7 +389,7 @@ export class Enemy extends Unit {
         if (!buildingNodes || buildingNodes.length <= 0) return null;
 
         let nearest: Building | null = null;
-        let minDistSq = aggroSq;
+        let minDistSq = Number.MAX_VALUE;
 
         for (const bNode of buildingNodes) {
             if (!bNode || !bNode.isValid) continue;
@@ -395,9 +400,16 @@ export class Enemy extends Unit {
             const dx = bNode.position.x - myPos.x;
             const dz = bNode.position.z - myPos.z;
             const distSq = dx * dx + dz * dz;
-            if (distSq < minDistSq) {
-                minDistSq = distSq;
-                nearest = bComp;
+
+            // Use larger of Enemy Aggro or Building Taunt Range
+            const buildingTauntSq = bComp.tauntRange ? bComp.tauntRange * bComp.tauntRange : 0;
+            const checkRangeSq = Math.max(aggroSq, buildingTauntSq);
+
+            if (distSq < checkRangeSq) {
+                if (distSq < minDistSq) {
+                    minDistSq = distSq;
+                    nearest = bComp;
+                }
             }
         }
 

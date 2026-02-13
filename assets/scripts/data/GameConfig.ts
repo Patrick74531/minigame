@@ -305,6 +305,7 @@ export const GameConfig = {
                 },
                 stats: {
                     hp: 1100,
+                    tauntRange: 15,
                 },
                 upgrades: {
                     maxLevel: 5,

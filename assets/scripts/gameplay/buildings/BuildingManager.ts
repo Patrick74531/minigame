@@ -81,47 +81,61 @@ export class BuildingManager {
         buildingTypeId?: string;
         position?: Vec3;
     }): void {
+        const pad = data.padNode.getComponent(BuildingPad);
+
         if (!data.buildingTypeId || !data.position) {
             console.warn('[BuildingManager] Missing data in BUILDING_CONSTRUCTED event');
+            pad?.onBuildFailed('missing building data');
             return;
         }
 
         console.log(`[BuildingManager] 建造完成: ${data.buildingTypeId}`);
 
         // Find the Pad Component
-        const pad = data.padNode.getComponent(BuildingPad);
         if (!pad) {
             console.error('[BuildingManager] Pad component missing on constructed event node');
             return;
         }
 
-        // 根据建筑类型创建建筑
-        if (this._buildingContainer) {
-            const angle = data.padNode.eulerAngles.y;
-            const buildingNode = BuildingFactory.createBuilding(
-                this._buildingContainer,
-                data.position.x,
-                data.position.z,
-                data.buildingTypeId,
-                this._unitContainer || undefined,
-                angle
-            );
-
-            if (!buildingNode) {
-                console.error(
-                    `[BuildingManager] Failed to create building for type: ${data.buildingTypeId}`
-                );
-            } else {
-                const buildingComp = buildingNode.getComponent(Building);
-                if (buildingComp) {
-                    this._activeBuildings.push(buildingComp);
-
-                    // Link Building back to Pad for upgrades
-                    pad.onBuildingCreated(buildingComp);
-                    pad.placeUpgradeZoneInFront(buildingNode);
-                }
-            }
+        if (!this._buildingContainer) {
+            console.error('[BuildingManager] Building container is not initialized');
+            pad.onBuildFailed('building container unavailable');
+            return;
         }
+
+        // 根据建筑类型创建建筑
+        const angle = data.padNode.eulerAngles.y;
+        const buildingNode = BuildingFactory.createBuilding(
+            this._buildingContainer,
+            data.position.x,
+            data.position.z,
+            data.buildingTypeId,
+            this._unitContainer || undefined,
+            angle
+        );
+
+        if (!buildingNode) {
+            console.error(
+                `[BuildingManager] Failed to create building for type: ${data.buildingTypeId}`
+            );
+            pad.onBuildFailed(`createBuilding returned null for ${data.buildingTypeId}`);
+            return;
+        }
+
+        const buildingComp = buildingNode.getComponent(Building);
+        if (!buildingComp) {
+            console.error(
+                `[BuildingManager] Missing Building component on created node: ${data.buildingTypeId}`
+            );
+            pad.onBuildFailed('created node missing Building component');
+            return;
+        }
+
+        this._activeBuildings.push(buildingComp);
+
+        // Link Building back to Pad for upgrades
+        pad.onBuildingCreated(buildingComp);
+        pad.placeUpgradeZoneInFront(buildingNode);
 
         // DO NOT Destroy Pad. It persists for upgrades.
         // data.padNode.destroy();

@@ -41,6 +41,7 @@ export interface BuildingConfig {
     soldierPoolName: string;
     incomePerTick?: number;
     incomeInterval?: number;
+    tauntRange?: number;
 }
 
 export interface BuildingUpgradeConfig {
@@ -96,6 +97,8 @@ export class Building extends BaseComponent implements IAttackable {
 
     @property
     public maxUnits: number = 10;
+    
+    public tauntRange: number = 0;
 
     @property
     public soldierPoolName: string = 'soldier_basic';
@@ -272,6 +275,9 @@ export class Building extends BaseComponent implements IAttackable {
         }
         if (config.incomeInterval !== undefined) {
             this.incomeInterval = Math.max(0.5, config.incomeInterval);
+        }
+        if (config.tauntRange !== undefined) {
+            this.tauntRange = Math.max(0, config.tauntRange);
         }
 
         const typeChanged = config.type !== undefined && config.type !== oldType;

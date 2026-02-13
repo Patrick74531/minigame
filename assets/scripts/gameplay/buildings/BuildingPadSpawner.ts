@@ -1,5 +1,4 @@
 import { Node } from 'cc';
-import { Building } from './Building';
 import { BuildingFactory } from './BuildingFactory';
 import { BuildingPad } from './BuildingPad';
 import { BuildingManager } from './BuildingManager';
@@ -26,38 +25,6 @@ export class BuildingPadSpawner {
                     `[BuildingPadSpawner] Pre-spawned Static Spa at (${pos.x}, 0, ${pos.z})`
                 );
                 // No pad, no upgrade zone.
-                continue;
-            }
-
-            // Pre-spawn special towers
-            if (pos.type === 'frost_tower' || pos.type === 'lightning_tower') {
-                const buildingNode = BuildingFactory.createBuilding(buildingContainer, pos.x, pos.z, pos.type);
-                console.log(
-                    `[BuildingPadSpawner] Pre-spawned ${pos.type} at (${pos.x}, 0, ${pos.z})`
-                );
-
-                // 为预生成的塔也创建升级投放区
-                if (buildingNode) {
-                    const buildingComp = buildingNode.getComponent(Building);
-
-                    if (buildingComp) {
-                        const padNode = new Node(`BuildingPad_${pos.type}`);
-                        buildingContainer.addChild(padNode);
-                        padNode.setPosition(pos.x, 0, pos.z);
-
-                        const pad = padNode.addComponent(BuildingPad);
-                        pad.buildingTypeId = pos.type;
-
-                        // 关联建筑并进入升级模式
-                        pad.onBuildingCreated(buildingComp);
-                        pad.placeUpgradeZoneInFront(buildingNode);
-
-                        buildingManager.registerPad(pad);
-                        console.log(
-                            `[BuildingPadSpawner] Created upgrade pad for pre-spawned ${pos.type}`
-                        );
-                    }
-                }
                 continue;
             }
 
