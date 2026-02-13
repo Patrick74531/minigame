@@ -34,6 +34,7 @@ export interface BuildingTypeConfig {
         attackRange?: number;
         attackDamage?: number;
         attackInterval?: number;
+        tauntRange?: number;
     };
 
     /** 特殊功能配置 */

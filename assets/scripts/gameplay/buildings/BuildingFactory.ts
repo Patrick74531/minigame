@@ -351,6 +351,7 @@ export class BuildingFactory {
                 hp: config.stats?.hp || 100,
                 spawnInterval: isBarracks ? (config.features?.spawnInterval ?? 4.5) : 0,
                 maxUnits: isBarracks ? (config.features?.maxUnits ?? 3) : 0,
+                tauntRange: config.stats?.tauntRange ?? 0,
                 incomePerTick: isFarm
                     ? Math.max(1, Math.floor(config.features?.incomePerTick ?? 1))
                     : undefined,
