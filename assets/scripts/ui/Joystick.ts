@@ -1,6 +1,7 @@
 import {
     _decorator,
     Component,
+    EventMouse,
     Node,
     Size,
     UITransform,
@@ -40,23 +41,28 @@ export class Joystick extends Component {
     private _defaultPos: Vec3 = new Vec3();
     private _movementBounds: ScreenBounds | null = null;
     private _effectiveRadius: number = 80;
+    private _desktopMode: boolean = false;
+    private _mouseActive: boolean = false;
 
     public get inputVector(): Vec2 {
         return this._inputVector;
     }
 
     protected onLoad(): void {
-        if (!UIResponsive.shouldUseTouchControls()) {
+        this._desktopMode = !UIResponsive.shouldUseTouchControls();
+        if (this._desktopMode) {
             this.hideVisuals();
-            return;
+        } else {
+            this.showVisuals();
         }
-
-        this.showVisuals();
 
         input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);
         input.on(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
         input.on(Input.EventType.TOUCH_END, this.onTouchEnd, this);
         input.on(Input.EventType.TOUCH_CANCEL, this.onTouchEnd, this);
+        input.on(Input.EventType.MOUSE_DOWN, this.onMouseDown, this);
+        input.on(Input.EventType.MOUSE_MOVE, this.onMouseMove, this);
+        input.on(Input.EventType.MOUSE_UP, this.onMouseUp, this);
 
         this.node.getComponent(Widget)?.updateAlignment();
         view.on('canvas-resize', this.onResize, this);
@@ -69,13 +75,21 @@ export class Joystick extends Component {
         input.off(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
         input.off(Input.EventType.TOUCH_END, this.onTouchEnd, this);
         input.off(Input.EventType.TOUCH_CANCEL, this.onTouchEnd, this);
+        input.off(Input.EventType.MOUSE_DOWN, this.onMouseDown, this);
+        input.off(Input.EventType.MOUSE_MOVE, this.onMouseMove, this);
+        input.off(Input.EventType.MOUSE_UP, this.onMouseUp, this);
         view.off('canvas-resize', this.onResize, this);
     }
 
     private onResize(): void {
+        this._desktopMode = !UIResponsive.shouldUseTouchControls();
         this.updateDefaultPosition();
-        if (this._touchId === null) {
-            this.resetPosition();
+        if (this._touchId === null && !this._mouseActive) {
+            if (this._desktopMode) {
+                this.hideVisuals();
+            } else {
+                this.resetPosition();
+            }
         }
     }
 
@@ -140,6 +154,7 @@ export class Joystick extends Component {
     }
 
     private onTouchStart(event: EventTouch): void {
+        if (this._mouseActive) return;
         if (!this.tryBeginInput(event.getUILocation().x, event.getUILocation().y)) return;
         this._touchId = event.touch!.getID();
     }
@@ -153,6 +168,27 @@ export class Joystick extends Component {
         if (event.touch!.getID() !== this._touchId) return;
 
         this._touchId = null;
+        this.endInput();
+    }
+
+    private onMouseDown(event: EventMouse): void {
+        if (event.getButton() !== EventMouse.BUTTON_LEFT) return;
+        if (this._touchId !== null || this._mouseActive) return;
+        const loc = event.getLocation();
+        if (!this.tryBeginInput(loc.x, loc.y)) return;
+        this._mouseActive = true;
+    }
+
+    private onMouseMove(event: EventMouse): void {
+        if (!this._mouseActive) return;
+        const loc = event.getLocation();
+        this.applyInputMove(loc.x, loc.y);
+    }
+
+    private onMouseUp(event: EventMouse): void {
+        if (event.getButton() !== EventMouse.BUTTON_LEFT) return;
+        if (!this._mouseActive) return;
+        this._mouseActive = false;
         this.endInput();
     }
 
@@ -210,7 +246,11 @@ export class Joystick extends Component {
 
     private endInput(): void {
         this._inputVector.set(0, 0);
-        this.resetPosition();
+        if (this._desktopMode) {
+            this.hideVisuals();
+        } else {
+            this.resetPosition();
+        }
     }
 
     private getControlAreaSize(): Size {

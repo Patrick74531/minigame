@@ -10,14 +10,25 @@ export type ScreenBounds = {
 export class UIResponsive {
     private static readonly DESIGN_SHORT_SIDE = 720;
     private static readonly MAX_SAFE_INSET_RATIO = 0.2;
+    private static readonly TEMP_INPUT_MODE: 'touch' | 'desktop' | null = null;
 
     public static getVisibleSize(): Size {
         return view.getVisibleSize();
     }
 
     public static shouldUseTouchControls(): boolean {
+        const forced = this.getForcedInputMode();
+        if (forced === 'touch') return true;
+        if (forced === 'desktop') return false;
+
         if (sys.isMobile) return true;
-        return this.isPadLikeViewport() || this.isPhoneLikeViewport();
+        if (!sys.isBrowser) return this.isMobileLikeViewport();
+
+        const likelyTouchDevice =
+            this.hasTouchCapability() || (this.isIpadDesktopUA() && this.isPadLikeViewport());
+        if (!likelyTouchDevice) return false;
+
+        return this.isMobileLikeViewport();
     }
 
     public static getControlScale(): number {
@@ -76,6 +87,27 @@ export class UIResponsive {
         return Math.max(min, Math.min(max, value));
     }
 
+    private static getForcedInputMode(): 'touch' | 'desktop' | null {
+        if (this.TEMP_INPUT_MODE) {
+            return this.TEMP_INPUT_MODE;
+        }
+
+        const runtimeValue = (globalThis as { __KINGSHIT_INPUT_MODE__?: unknown })
+            .__KINGSHIT_INPUT_MODE__;
+        if (runtimeValue === 'touch' || runtimeValue === 'desktop') {
+            return runtimeValue;
+        }
+
+        if (sys.isBrowser && typeof location !== 'undefined') {
+            const mode = new URLSearchParams(location.search).get('inputMode');
+            if (mode === 'touch' || mode === 'desktop') {
+                return mode;
+            }
+        }
+
+        return null;
+    }
+
     private static isPadLikeViewport(): boolean {
         const frame = view.getFrameSize();
         if (frame.width <= 0 || frame.height <= 0) return false;
@@ -96,6 +128,44 @@ export class UIResponsive {
         const ratio = longSide / shortSide;
 
         return shortSide >= 320 && shortSide <= 900 && ratio >= 1.6 && ratio <= 2.5;
+    }
+
+    private static isMobileLikeViewport(): boolean {
+        return this.isPadLikeViewport() || this.isPhoneLikeViewport();
+    }
+
+    private static hasTouchCapability(): boolean {
+        if (typeof navigator === 'undefined' || typeof window === 'undefined') {
+            return false;
+        }
+
+        const hasTouchPoints = (navigator.maxTouchPoints ?? 0) > 0;
+        const hasTouchEvent = 'ontouchstart' in window;
+        const coarsePointer = this.hasCoarsePointer();
+        return hasTouchPoints || hasTouchEvent || coarsePointer;
+    }
+
+    private static hasCoarsePointer(): boolean {
+        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+            return false;
+        }
+
+        try {
+            return window.matchMedia('(pointer: coarse)').matches;
+        } catch {
+            return false;
+        }
+    }
+
+    private static isIpadDesktopUA(): boolean {
+        if (typeof navigator === 'undefined') return false;
+
+        const ua = navigator.userAgent || '';
+        const platform = navigator.platform || '';
+        const touchPoints = navigator.maxTouchPoints ?? 0;
+
+        if (/iPad/i.test(ua)) return true;
+        return platform === 'MacIntel' && touchPoints > 1;
     }
 
     private static getSafeAreaInsets(): {

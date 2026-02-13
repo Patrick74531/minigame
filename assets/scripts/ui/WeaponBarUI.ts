@@ -12,6 +12,7 @@ const UI_LAYER = 33554432;
 const ICON_SIZE = 56;
 const ICON_GAP = 8;
 const ICON_CORNER_RADIUS = 8;
+const KEY_HINTS: string[] = ['H', 'J', 'K', 'L'];
 
 /**
  * WeaponBarUI
@@ -23,15 +24,10 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
     private _barNode: Node | null = null;
     private _barWidget: Widget | null = null;
     private _iconNodes: Map<WeaponType, Node> = new Map();
-    private _active: boolean = false;
+    private _showKeyboardHints: boolean = false;
 
     public initialize(uiCanvas: Node): void {
-        if (!UIResponsive.shouldUseTouchControls()) {
-            this._active = false;
-            return;
-        }
-
-        this._active = true;
+        this._showKeyboardHints = !UIResponsive.shouldUseTouchControls();
         this._uiCanvas = uiCanvas;
         this.createBarContainer();
 
@@ -42,11 +38,6 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
     }
 
     public cleanup(): void {
-        if (!this._active) {
-            return;
-        }
-
-        this._active = false;
         this.eventManager.off(GameEvents.WEAPON_INVENTORY_CHANGED, this.refresh, this);
         this.eventManager.off(GameEvents.WEAPON_SWITCHED, this.refresh, this);
         view.off('canvas-resize', this.onResize, this);
@@ -82,7 +73,7 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
             const def = manager.getWeaponDef(type);
             if (!def) return;
 
-            const icon = this.createIconNode(type, def, instance.level, type === activeType);
+            const icon = this.createIconNode(type, def, instance.level, type === activeType, index);
             this._barNode!.addChild(icon);
 
             // 从右向左排列，同时向内收半个图标，避免首个图标贴边/越界
@@ -118,8 +109,9 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
     private updateLayout(): void {
         if (!this._barNode || !this._barWidget) return;
 
-        const padding = UIResponsive.getControlPadding();
-        const scale = UIResponsive.getControlScale();
+        const isTouch = UIResponsive.shouldUseTouchControls();
+        const padding = isTouch ? UIResponsive.getControlPadding() : { right: 20, bottom: 20 };
+        const scale = isTouch ? UIResponsive.getControlScale() : 1;
         this._barNode.setScale(scale, scale, 1);
 
         this._barWidget.bottom = padding.bottom;
@@ -131,7 +123,8 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         type: WeaponType,
         def: WeaponDef,
         level: number,
-        isActive: boolean
+        isActive: boolean,
+        slotIndex: number
     ): Node {
         const node = new Node(`WeaponIcon_${type}`);
         node.layer = UI_LAYER;
@@ -168,6 +161,21 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         lvLabel.color = Color.WHITE;
         lvLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         lvNode.setPosition(0, -ICON_SIZE / 2 + 10, 0);
+
+        if (this._showKeyboardHints && slotIndex >= 0 && slotIndex < KEY_HINTS.length) {
+            const keyNode = new Node('KeyHint');
+            keyNode.layer = UI_LAYER;
+            keyNode.addComponent(UITransform).setContentSize(20, 20);
+            node.addChild(keyNode);
+
+            const keyLabel = keyNode.addComponent(Label);
+            keyLabel.string = KEY_HINTS[slotIndex];
+            keyLabel.fontSize = 14;
+            keyLabel.lineHeight = 16;
+            keyLabel.color = new Color(255, 230, 120, 255);
+            keyLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+            keyNode.setPosition(-ICON_SIZE / 2 + 10, ICON_SIZE / 2 - 10, 0);
+        }
 
         // 点击切换
         node.on(Node.EventType.TOUCH_END, () => {

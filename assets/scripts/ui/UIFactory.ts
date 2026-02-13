@@ -84,6 +84,7 @@ export class UIFactory {
         const bgNode = new Node('Background');
         bgNode.layer = this.UI_LAYER;
         joystickNode.addChild(bgNode);
+        bgNode.active = false;
         bgNode.setPosition(0, 0, 0);
 
         const bgGraphics = bgNode.addComponent(Graphics);
@@ -93,6 +94,7 @@ export class UIFactory {
         const stickNode = new Node('Stick');
         stickNode.layer = this.UI_LAYER;
         joystickNode.addChild(stickNode);
+        stickNode.active = false;
         stickNode.setPosition(0, 0, 0);
 
         const stickGraphics = stickNode.addComponent(Graphics);
@@ -170,7 +172,7 @@ export class UIFactory {
         widget.bottom = padding.bottom;
 
         const label = node.addComponent(Label);
-        label.string = '提示：WASD 控制方向';
+        label.string = Localization.instance.t('ui.hud.desktopMoveHint');
         label.fontSize = 24;
         label.lineHeight = 30;
         label.color = new Color(235, 235, 235, 255);
