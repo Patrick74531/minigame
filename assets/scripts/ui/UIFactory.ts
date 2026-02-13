@@ -68,23 +68,25 @@ export class UIFactory {
         const bgNode = new Node('Background');
         bgNode.layer = this.UI_LAYER;
         joystickNode.addChild(bgNode);
+        bgNode.setPosition(-450, -220, 0); // Bottom-Left offset relative to center (1280x720)
 
         const bgGraphics = bgNode.addComponent(Graphics);
-        this.drawCircle(bgGraphics, new Color(100, 100, 100, 128), 100);
+        this.drawCircle(bgGraphics, new Color(100, 100, 100, 128), 70);
 
         // Stick (Dot)
         const stickNode = new Node('Stick');
         stickNode.layer = this.UI_LAYER;
         joystickNode.addChild(stickNode);
+        stickNode.setPosition(-450, -220, 0); // Match background position
 
         const stickGraphics = stickNode.addComponent(Graphics);
-        this.drawCircle(stickGraphics, new Color(200, 200, 200, 200), 40);
+        this.drawCircle(stickGraphics, new Color(200, 200, 200, 200), 30);
 
         // Component
         const joystick = joystickNode.addComponent(Joystick);
         joystick.stick = stickNode;
         joystick.background = bgNode;
-        joystick.maxRadius = 80;
+        joystick.maxRadius = 55;
 
         joystickNode.addComponent(UITransform); // 必须有 UITransform
 

@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, Vec2, Vec3, EventTouch, Input, input, view } from 'cc';
+import { _decorator, Component, Node, Vec2, Vec3, EventTouch, Input, input, view, sys } from 'cc';
 
 const { ccclass, property } = _decorator;
 
@@ -20,13 +20,27 @@ export class Joystick extends Component {
     private _inputVector: Vec2 = new Vec2(0, 0);
     private _touchId: number | null = null;
     private _basePos: Vec3 = new Vec3();
+    private _defaultPos: Vec3 = new Vec3();
 
     public get inputVector(): Vec2 {
         return this._inputVector;
     }
 
     protected onLoad(): void {
-        this.hideVisuals();
+        // Desktop / Web Desktop check: disable joystick if not mobile
+        if (!sys.isMobile) {
+            this.hideVisuals();
+            return;
+        }
+
+        // Store initial position as default anchor
+        if (this.background) {
+            this._defaultPos.set(this.background.position);
+            this._basePos.set(this._defaultPos);
+        }
+        
+        // Show by default at anchor position
+        this.showVisuals();
 
         input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);
         input.on(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
@@ -69,8 +83,8 @@ export class Joystick extends Component {
         const loc = event.getLocation();
         const size = view.getVisibleSize();
 
-        // 只响应屏幕左半边
-        if (loc.x > size.width * 0.5) return;
+        // Limit to bottom-left area (40% width, 50% height)
+        if (loc.x > size.width * 0.4 || loc.y > size.height * 0.5) return;
 
         this._touchId = event.touch!.getID();
 
@@ -78,7 +92,7 @@ export class Joystick extends Component {
         const localPos = this.screenToLocal(loc.x, loc.y);
         this._basePos.set(localPos);
 
-        // 移动摇杆到触摸位置
+        // 移动摇杆到触摸位置 (Dynamic behavior)
         if (this.background) this.background.setPosition(localPos);
         if (this.stick) this.stick.setPosition(localPos);
 
@@ -120,6 +134,9 @@ export class Joystick extends Component {
 
         this._touchId = null;
         this._inputVector.set(0, 0);
-        this.hideVisuals();
+        
+        // Reset to default anchor position instead of hiding
+        if (this.background) this.background.setPosition(this._defaultPos);
+        if (this.stick) this.stick.setPosition(this._defaultPos);
     }
 }
