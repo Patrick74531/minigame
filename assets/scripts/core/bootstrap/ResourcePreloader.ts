@@ -35,6 +35,8 @@ export class ResourcePreloader {
         'enemies/Robot/RightArm',
         'enemies/Robot/LeftLeg',
         'enemies/Robot/RightLeg',
+        'enemies/robovacuum_blue',
+        'enemies/robovacuum_blue.webp',
     ];
 
     private static preloadEnemyPaperDollTextures(): void {

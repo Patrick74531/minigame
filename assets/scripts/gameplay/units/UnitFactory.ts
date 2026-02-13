@@ -26,9 +26,12 @@ import { HeroAnimationController } from './HeroAnimationController';
 import { HeroWeaponMountController } from './HeroWeaponMountController';
 import { AnimRootScaleLock } from '../visuals/AnimRootScaleLock';
 import { EnemyPaperDollAnimator } from '../visuals/EnemyPaperDollAnimator';
+import { EnemyRoboVacuumAnimator } from '../visuals/EnemyRoboVacuumAnimator';
 import { SoldierGooseAnimator } from '../visuals/SoldierGooseAnimator';
 import { resolveHeroModelConfig } from './HeroModelConfig';
 import { WeaponType } from '../weapons/WeaponTypes';
+
+export type EnemyVisualVariant = 'robot' | 'robovacuum';
 
 export interface EnemySpawnOptions {
     hpMultiplier?: number;
@@ -41,6 +44,8 @@ export interface EnemySpawnOptions {
     attackRange?: number;
     /** 索敌范围（发现/锁定目标距离） */
     aggroRange?: number;
+    /** 敌人外观变体 */
+    visualVariant?: EnemyVisualVariant;
 }
 
 /**
@@ -162,7 +167,7 @@ export class UnitFactory {
         // Set Target
         enemy.setTargetPosition(targetPos);
 
-        this.attachEnemyPaperVisual(node);
+        this.attachEnemyVisual(node, options.visualVariant ?? 'robot');
 
         // 血条（敌人使用 paper-doll，无骨骼头节点，关闭锚点探测避免浪费 CPU）
         // 仅在受伤时显示，避免大量敌人血条堆叠
@@ -948,10 +953,44 @@ export class UnitFactory {
         }
     }
 
+    private static attachEnemyVisual(root: Node, variant: EnemyVisualVariant): void {
+        if (variant === 'robovacuum') {
+            this.attachEnemyRoboVacuumVisual(root);
+            return;
+        }
+        this.attachEnemyPaperVisual(root);
+    }
+
     private static attachEnemyPaperVisual(root: Node): void {
         if (!root.isValid) return;
+        const vacuum = root.getComponent(EnemyRoboVacuumAnimator);
+        if (vacuum) {
+            vacuum.destroy();
+        }
+        const vacuumRoot = root.getChildByName('EnemyVacuumRoot');
+        if (vacuumRoot && vacuumRoot.isValid) {
+            vacuumRoot.destroy();
+        }
         if (root.getComponent(EnemyPaperDollAnimator)) return;
         root.addComponent(EnemyPaperDollAnimator);
+        const hb = root.getComponent(HealthBar);
+        if (hb) {
+            hb.requestAnchorRefresh();
+        }
+    }
+
+    private static attachEnemyRoboVacuumVisual(root: Node): void {
+        if (!root.isValid) return;
+        const paper = root.getComponent(EnemyPaperDollAnimator);
+        if (paper) {
+            paper.destroy();
+        }
+        const paperRoot = root.getChildByName('EnemyPaperRoot');
+        if (paperRoot && paperRoot.isValid) {
+            paperRoot.destroy();
+        }
+        if (root.getComponent(EnemyRoboVacuumAnimator)) return;
+        root.addComponent(EnemyRoboVacuumAnimator);
         const hb = root.getComponent(HealthBar);
         if (hb) {
             hb.requestAnchorRefresh();

@@ -1,6 +1,7 @@
 import { Node, Vec3 } from 'cc';
 import { GameEvents } from '../../data/GameEvents';
 import { UnitFactory } from '../units/UnitFactory';
+import type { EnemyVisualVariant } from '../units/UnitFactory';
 import { Unit, UnitType } from '../units/Unit';
 import { GameConfig } from '../../data/GameConfig';
 import { WaveService } from '../../core/managers/WaveService';
@@ -48,6 +49,7 @@ export class WaveManager {
     private _enemySpawnTimer: number = 0;
     private _waveConfig: WaveConfig | null = null;
     private _spawnPortals: Array<{ x: number; y: number }> = [];
+    private _waveVisualOffset: number = 0;
 
     // === 初始化 ===
 
@@ -145,6 +147,7 @@ export class WaveManager {
         this._regularSpawned = 0;
         this._eliteSpawned = 0;
         this._enemySpawnTimer = 0;
+        this._waveVisualOffset = waveNumber % 2;
 
         // Difficulty scaling from centralized config
         const infinite = GameConfig.WAVE.INFINITE;
@@ -262,6 +265,7 @@ export class WaveManager {
     private spawnEnemy(isElite: boolean): void {
         if (!this._enemyContainer) return;
 
+        const visualVariant = this.resolveEnemyVisualVariant(this.totalSpawned);
         const pos = this.getSpawnPosition();
         const elite = GameConfig.ENEMY.ELITE;
         const enemy = UnitFactory.createEnemy(
@@ -281,6 +285,7 @@ export class WaveManager {
                 isElite,
                 scaleMultiplier: isElite ? elite.SCALE_MULTIPLIER : 1,
                 coinDropMultiplier: isElite ? elite.COIN_DROP_MULTIPLIER : 1,
+                visualVariant,
             }
         );
         this._enemies.push(enemy);
@@ -290,6 +295,10 @@ export class WaveManager {
             unitType: 'enemy',
             node: enemy,
         });
+    }
+
+    private resolveEnemyVisualVariant(spawnIndex: number): EnemyVisualVariant {
+        return ((spawnIndex + this._waveVisualOffset) & 1) === 0 ? 'robot' : 'robovacuum';
     }
 
     private get totalSpawned(): number {
