@@ -976,7 +976,9 @@ export class UnitFactory {
         if (!root.getComponent(EnemyFlyingAnimator)) {
             const anim = root.addComponent(EnemyFlyingAnimator);
             anim.modelPath = 'enemies/Robot_Flying';
-            anim.modelPath = 'enemies/Robot_Flying';
+            const models = ['Robot_Flying', 'Robot_Large', 'Robot_Legs_Gun', 'Mech'];
+            const selected = models[Math.floor(Math.random() * models.length)];
+            anim.modelPath = `enemies/${selected}`;
             // Scale and Offset are now handled by component defaults (4.5 and 0.5)
             // anim.rotationY = 180; // If needed
         }
