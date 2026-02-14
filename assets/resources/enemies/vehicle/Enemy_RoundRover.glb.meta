@@ -1,0 +1,219 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "7e085162-86f3-46c6-8dff-dfc341297a69",
+  "files": [],
+  "subMetas": {
+    "ed3d8": {
+      "importer": "gltf-mesh",
+      "uuid": "7e085162-86f3-46c6-8dff-dfc341297a69@ed3d8",
+      "displayName": "",
+      "id": "ed3d8",
+      "name": "Wheel_1.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 876
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "d7f2d": {
+      "importer": "gltf-mesh",
+      "uuid": "7e085162-86f3-46c6-8dff-dfc341297a69@d7f2d",
+      "displayName": "",
+      "id": "d7f2d",
+      "name": "Wheel_2.mesh",
+      "userData": {
+        "gltfIndex": 1,
+        "triangleCount": 876
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "feea2": {
+      "importer": "gltf-mesh",
+      "uuid": "7e085162-86f3-46c6-8dff-dfc341297a69@feea2",
+      "displayName": "",
+      "id": "feea2",
+      "name": "Wheel_3.mesh",
+      "userData": {
+        "gltfIndex": 2,
+        "triangleCount": 876
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "ca932": {
+      "importer": "gltf-mesh",
+      "uuid": "7e085162-86f3-46c6-8dff-dfc341297a69@ca932",
+      "displayName": "",
+      "id": "ca932",
+      "name": "Wheel_4.mesh",
+      "userData": {
+        "gltfIndex": 3,
+        "triangleCount": 876
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "b793b": {
+      "importer": "gltf-mesh",
+      "uuid": "7e085162-86f3-46c6-8dff-dfc341297a69@b793b",
+      "displayName": "",
+      "id": "b793b",
+      "name": "Rover_Round.mesh",
+      "userData": {
+        "gltfIndex": 4,
+        "triangleCount": 2720
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "230a5": {
+      "importer": "gltf-embeded-image",
+      "uuid": "7e085162-86f3-46c6-8dff-dfc341297a69@230a5",
+      "displayName": "",
+      "id": "230a5",
+      "name": "Atlas.png.image",
+      "userData": {
+        "gltfIndex": 0,
+        "fixAlphaTransparencyArtifacts": true,
+        "hasAlpha": false,
+        "type": "texture"
+      },
+      "ver": "1.0.3",
+      "imported": true,
+      "files": [
+        ".json",
+        ".png"
+      ],
+      "subMetas": {}
+    },
+    "e39f7": {
+      "importer": "texture",
+      "uuid": "7e085162-86f3-46c6-8dff-dfc341297a69@e39f7",
+      "displayName": "",
+      "id": "e39f7",
+      "name": "UnnamedTexture.texture",
+      "userData": {
+        "wrapModeS": "repeat",
+        "wrapModeT": "repeat",
+        "minfilter": "linear",
+        "magfilter": "linear",
+        "mipfilter": "none",
+        "anisotropy": 0,
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "7e085162-86f3-46c6-8dff-dfc341297a69@230a5"
+      },
+      "ver": "1.0.22",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "89a26": {
+      "importer": "gltf-material",
+      "uuid": "7e085162-86f3-46c6-8dff-dfc341297a69@89a26",
+      "displayName": "",
+      "id": "89a26",
+      "name": "Atlas.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "80ab9": {
+      "importer": "gltf-scene",
+      "uuid": "7e085162-86f3-46c6-8dff-dfc341297a69@80ab9",
+      "displayName": "",
+      "id": "80ab9",
+      "name": "Enemy_RoundRover.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [
+      {
+        "name": "Atlas.png",
+        "uri": "7e085162-86f3-46c6-8dff-dfc341297a69@230a5"
+      }
+    ],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "7e085162-86f3-46c6-8dff-dfc341297a69@ed3d8",
+        "7e085162-86f3-46c6-8dff-dfc341297a69@d7f2d",
+        "7e085162-86f3-46c6-8dff-dfc341297a69@feea2",
+        "7e085162-86f3-46c6-8dff-dfc341297a69@ca932",
+        "7e085162-86f3-46c6-8dff-dfc341297a69@b793b"
+      ],
+      "skeletons": [],
+      "textures": [
+        "7e085162-86f3-46c6-8dff-dfc341297a69@e39f7"
+      ],
+      "materials": [
+        "7e085162-86f3-46c6-8dff-dfc341297a69@89a26"
+      ],
+      "scenes": [
+        "7e085162-86f3-46c6-8dff-dfc341297a69@80ab9"
+      ]
+    }
+  }
+}

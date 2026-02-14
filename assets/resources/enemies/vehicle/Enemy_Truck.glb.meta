@@ -1,0 +1,217 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "0527c06a-9885-4725-adf8-c7a1b7a2effe",
+  "files": [],
+  "subMetas": {
+    "24273": {
+      "importer": "gltf-mesh",
+      "uuid": "0527c06a-9885-4725-adf8-c7a1b7a2effe@24273",
+      "displayName": "",
+      "id": "24273",
+      "name": "FrontWheel_L.mesh",
+      "userData": {
+        "gltfIndex": 3,
+        "triangleCount": 956
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "ec353": {
+      "importer": "gltf-mesh",
+      "uuid": "0527c06a-9885-4725-adf8-c7a1b7a2effe@ec353",
+      "displayName": "",
+      "id": "ec353",
+      "name": "Pickup_Armored.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 6689
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "4ae03": {
+      "importer": "gltf-mesh",
+      "uuid": "0527c06a-9885-4725-adf8-c7a1b7a2effe@4ae03",
+      "displayName": "",
+      "id": "4ae03",
+      "name": "BackWheels.mesh",
+      "userData": {
+        "gltfIndex": 1,
+        "triangleCount": 1764
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "98b8f": {
+      "importer": "gltf-mesh",
+      "uuid": "0527c06a-9885-4725-adf8-c7a1b7a2effe@98b8f",
+      "displayName": "",
+      "id": "98b8f",
+      "name": "FrontWheel_R.mesh",
+      "userData": {
+        "gltfIndex": 2,
+        "triangleCount": 956
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "e909a": {
+      "importer": "gltf-embeded-image",
+      "uuid": "0527c06a-9885-4725-adf8-c7a1b7a2effe@e909a",
+      "displayName": "",
+      "id": "e909a",
+      "name": "Zombie_Atlas.png.image",
+      "userData": {
+        "gltfIndex": 0,
+        "fixAlphaTransparencyArtifacts": true,
+        "hasAlpha": true,
+        "type": "texture"
+      },
+      "ver": "1.0.3",
+      "imported": true,
+      "files": [
+        ".json",
+        ".png"
+      ],
+      "subMetas": {}
+    },
+    "e39f7": {
+      "importer": "texture",
+      "uuid": "0527c06a-9885-4725-adf8-c7a1b7a2effe@e39f7",
+      "displayName": "",
+      "id": "e39f7",
+      "name": "UnnamedTexture.texture",
+      "userData": {
+        "wrapModeS": "repeat",
+        "wrapModeT": "repeat",
+        "minfilter": "linear",
+        "magfilter": "linear",
+        "mipfilter": "none",
+        "anisotropy": 0,
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "0527c06a-9885-4725-adf8-c7a1b7a2effe@e909a"
+      },
+      "ver": "1.0.22",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "89a26": {
+      "importer": "gltf-material",
+      "uuid": "0527c06a-9885-4725-adf8-c7a1b7a2effe@89a26",
+      "displayName": "",
+      "id": "89a26",
+      "name": "Atlas.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "6f209": {
+      "importer": "gltf-material",
+      "uuid": "0527c06a-9885-4725-adf8-c7a1b7a2effe@6f209",
+      "displayName": "",
+      "id": "6f209",
+      "name": "Headlights.material",
+      "userData": {
+        "gltfIndex": 1
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "1212b": {
+      "importer": "gltf-scene",
+      "uuid": "0527c06a-9885-4725-adf8-c7a1b7a2effe@1212b",
+      "displayName": "",
+      "id": "1212b",
+      "name": "Enemy_Truck.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [
+      {
+        "name": "Zombie_Atlas.png",
+        "uri": "0527c06a-9885-4725-adf8-c7a1b7a2effe@e909a"
+      }
+    ],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "0527c06a-9885-4725-adf8-c7a1b7a2effe@ec353",
+        "0527c06a-9885-4725-adf8-c7a1b7a2effe@4ae03",
+        "0527c06a-9885-4725-adf8-c7a1b7a2effe@98b8f",
+        "0527c06a-9885-4725-adf8-c7a1b7a2effe@24273"
+      ],
+      "skeletons": [],
+      "textures": [
+        "0527c06a-9885-4725-adf8-c7a1b7a2effe@e39f7"
+      ],
+      "materials": [
+        "0527c06a-9885-4725-adf8-c7a1b7a2effe@89a26",
+        "0527c06a-9885-4725-adf8-c7a1b7a2effe@6f209"
+      ],
+      "scenes": [
+        "0527c06a-9885-4725-adf8-c7a1b7a2effe@1212b"
+      ]
+    }
+  }
+}

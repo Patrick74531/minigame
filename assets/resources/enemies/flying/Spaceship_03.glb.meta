@@ -1,0 +1,143 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "5b7a4eff-428a-415f-9f96-25c498e7bd08",
+  "files": [],
+  "subMetas": {
+    "c7f9f": {
+      "importer": "gltf-mesh",
+      "uuid": "5b7a4eff-428a-415f-9f96-25c498e7bd08@c7f9f",
+      "displayName": "",
+      "id": "c7f9f",
+      "name": "Spaceship_FernandoTheFlamingo.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 1554
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "230a5": {
+      "importer": "gltf-embeded-image",
+      "uuid": "5b7a4eff-428a-415f-9f96-25c498e7bd08@230a5",
+      "displayName": "",
+      "id": "230a5",
+      "name": "Atlas.png.image",
+      "userData": {
+        "gltfIndex": 0,
+        "fixAlphaTransparencyArtifacts": true,
+        "hasAlpha": false,
+        "type": "texture"
+      },
+      "ver": "1.0.3",
+      "imported": true,
+      "files": [
+        ".json",
+        ".png"
+      ],
+      "subMetas": {}
+    },
+    "e39f7": {
+      "importer": "texture",
+      "uuid": "5b7a4eff-428a-415f-9f96-25c498e7bd08@e39f7",
+      "displayName": "",
+      "id": "e39f7",
+      "name": "UnnamedTexture.texture",
+      "userData": {
+        "wrapModeS": "repeat",
+        "wrapModeT": "repeat",
+        "minfilter": "linear",
+        "magfilter": "linear",
+        "mipfilter": "none",
+        "anisotropy": 0,
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "5b7a4eff-428a-415f-9f96-25c498e7bd08@230a5"
+      },
+      "ver": "1.0.22",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "89a26": {
+      "importer": "gltf-material",
+      "uuid": "5b7a4eff-428a-415f-9f96-25c498e7bd08@89a26",
+      "displayName": "",
+      "id": "89a26",
+      "name": "Atlas.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "aa8fc": {
+      "importer": "gltf-scene",
+      "uuid": "5b7a4eff-428a-415f-9f96-25c498e7bd08@aa8fc",
+      "displayName": "",
+      "id": "aa8fc",
+      "name": "Spaceship_03.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [
+      {
+        "name": "Atlas.png",
+        "uri": "5b7a4eff-428a-415f-9f96-25c498e7bd08@230a5"
+      }
+    ],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "5b7a4eff-428a-415f-9f96-25c498e7bd08@c7f9f"
+      ],
+      "skeletons": [],
+      "textures": [
+        "5b7a4eff-428a-415f-9f96-25c498e7bd08@e39f7"
+      ],
+      "materials": [
+        "5b7a4eff-428a-415f-9f96-25c498e7bd08@89a26"
+      ],
+      "scenes": [
+        "5b7a4eff-428a-415f-9f96-25c498e7bd08@aa8fc"
+      ]
+    }
+  }
+}

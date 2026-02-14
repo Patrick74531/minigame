@@ -975,8 +975,26 @@ export class UnitFactory {
         // Attach new animator
         if (!root.getComponent(EnemyFlyingAnimator)) {
             const anim = root.addComponent(EnemyFlyingAnimator);
-            anim.modelPath = 'enemies/Robot_Flying';
-            const models = ['Robot_Flying', 'Robot_Large', 'Robot_Legs_Gun', 'Mech'];
+            anim.modelPath = 'enemies/boss/Robot_Flying';
+            const models = [
+                // Bosses (Robots)
+                'boss/Robot_Flying', 
+                'boss/Robot_Large', 
+                'boss/Robot_Legs_Gun', 
+                'boss/Mech', 
+                
+                // Vehicles (Ground)
+                'vehicle/Tank', 
+                'vehicle/Enemy_Turret', 
+                'vehicle/Enemy_Truck', 
+                'vehicle/Enemy_Rover', 
+                'vehicle/Enemy_RoundRover',
+
+                // Flying (Spaceships)
+                'flying/Spaceship', 
+                'flying/Spaceship_02', 
+                'flying/Spaceship_03'
+            ];
             const selected = models[Math.floor(Math.random() * models.length)];
             anim.modelPath = `enemies/${selected}`;
             // Scale and Offset are now handled by component defaults (4.5 and 0.5)
