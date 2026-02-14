@@ -1,0 +1,143 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "87c18f9b-1c81-4fcd-985d-12f0bc071a41",
+  "files": [],
+  "subMetas": {
+    "25384": {
+      "importer": "gltf-embeded-image",
+      "uuid": "87c18f9b-1c81-4fcd-985d-12f0bc071a41@25384",
+      "displayName": "",
+      "id": "25384",
+      "name": "forest_texture.image",
+      "userData": {
+        "gltfIndex": 0,
+        "fixAlphaTransparencyArtifacts": true,
+        "hasAlpha": true,
+        "type": "texture"
+      },
+      "ver": "1.0.3",
+      "imported": true,
+      "files": [
+        ".json",
+        ".png"
+      ],
+      "subMetas": {}
+    },
+    "b597c": {
+      "importer": "gltf-mesh",
+      "uuid": "87c18f9b-1c81-4fcd-985d-12f0bc071a41@b597c",
+      "displayName": "",
+      "id": "b597c",
+      "name": "Tree_3_A_Color1.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 556
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "e39f7": {
+      "importer": "texture",
+      "uuid": "87c18f9b-1c81-4fcd-985d-12f0bc071a41@e39f7",
+      "displayName": "",
+      "id": "e39f7",
+      "name": "UnnamedTexture.texture",
+      "userData": {
+        "wrapModeS": "repeat",
+        "wrapModeT": "repeat",
+        "minfilter": "linear",
+        "magfilter": "linear",
+        "mipfilter": "linear",
+        "anisotropy": 0,
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "87c18f9b-1c81-4fcd-985d-12f0bc071a41@25384"
+      },
+      "ver": "1.0.22",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "1eca8": {
+      "importer": "gltf-material",
+      "uuid": "87c18f9b-1c81-4fcd-985d-12f0bc071a41@1eca8",
+      "displayName": "",
+      "id": "1eca8",
+      "name": "forest.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "6dcc0": {
+      "importer": "gltf-scene",
+      "uuid": "87c18f9b-1c81-4fcd-985d-12f0bc071a41@6dcc0",
+      "displayName": "",
+      "id": "6dcc0",
+      "name": "Tree_3_A_Color1.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [
+      {
+        "name": "forest_texture",
+        "uri": "87c18f9b-1c81-4fcd-985d-12f0bc071a41@25384"
+      }
+    ],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "87c18f9b-1c81-4fcd-985d-12f0bc071a41@b597c"
+      ],
+      "skeletons": [],
+      "textures": [
+        "87c18f9b-1c81-4fcd-985d-12f0bc071a41@e39f7"
+      ],
+      "materials": [
+        "87c18f9b-1c81-4fcd-985d-12f0bc071a41@1eca8"
+      ],
+      "scenes": [
+        "87c18f9b-1c81-4fcd-985d-12f0bc071a41@6dcc0"
+      ]
+    }
+  }
+}

@@ -14,10 +14,45 @@ import {
     ImageAsset,
     Vec4,
     EffectAsset,
+    Prefab,
+    instantiate,
 } from 'cc';
 import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass, property } = _decorator;
+
+type NatureCategory = 'tree' | 'rock' | 'bush' | 'grass';
+
+type NatureModelDef = {
+    basePath: string;
+    category: NatureCategory;
+    weight: number;
+    scaleMin: number;
+    scaleMax: number;
+    radius: number;
+    avoidLaneWorld: number;
+    edgeBias: number;
+    clusterChance: number;
+    grassPattern?: 'scatter' | 'patch';
+};
+
+type NatureModelPrefab = NatureModelDef & {
+    prefab: Prefab;
+    modelName: string;
+};
+
+type NaturePlacement = {
+    x: number;
+    z: number;
+    radius: number;
+    category: NatureCategory;
+};
+
+type NatureZone = {
+    x: number;
+    z: number;
+    radius: number;
+};
 
 export enum TileType {
     EMPTY = 0,
@@ -50,6 +85,10 @@ export class MapGenerator extends Component {
 
     // Splatmap resolution (pixels)
     private static readonly SPLAT_SIZE = 256;
+    private static readonly LANE_HALF_WIDTH_NORM = 0.028;
+    private static readonly LANE_HALF_WIDTH_WIDE_NORM = 0.045;
+    private static readonly LANE_EDGE_SOFTNESS_NORM = 0.025;
+    private static readonly LANE_NOISE_PAD_NORM = 0.018;
 
     @property
     public mapWidth: number = 28;
@@ -139,6 +178,11 @@ export class MapGenerator extends Component {
         this.createSplatmapGround(cols, rows);
 
         this.createMountainBoundary(cols, rows);
+
+        // Spawn procedural nature dressing (trees/rocks/bushes/grass)
+        void this.spawnNatureShowcase(cols, rows).catch(err => {
+            console.error('[MapGenerator] spawnNatureShowcase failed:', err);
+        });
 
         const offsetX = (cols * this.tileSize) / 2;
         const offsetZ = (rows * this.tileSize) / 2;
@@ -306,11 +350,11 @@ export class MapGenerator extends Component {
         ];
 
         // Lane half-width in normalized space
-        const laneHalfWidth = 0.028;
+        const laneHalfWidth = MapGenerator.LANE_HALF_WIDTH_NORM;
         // Wider width for Top and Left lanes (user request increased width)
-        const laneHalfWidthWide = 0.045;
+        const laneHalfWidthWide = MapGenerator.LANE_HALF_WIDTH_WIDE_NORM;
         // Smoothstep transition width
-        const edgeSoftness = 0.025;
+        const edgeSoftness = MapGenerator.LANE_EDGE_SOFTNESS_NORM;
 
         for (let py = 0; py < S; py++) {
             for (let px = 0; px < S; px++) {
@@ -676,5 +720,1228 @@ export class MapGenerator extends Component {
         this.node.addChild(root);
         root.layer = this.node.layer;
         return root;
+    }
+
+    private async spawnNatureShowcase(cols: number, rows: number): Promise<void> {
+        const modelDefs: NatureModelDef[] = [
+            // Trees (keep sparse and large, mostly near edges)
+            {
+                basePath: 'models/nature/Tree_1_A_Color1',
+                category: 'tree',
+                weight: 1.0,
+                scaleMin: 0.9,
+                scaleMax: 1.75,
+                radius: 1.9,
+                avoidLaneWorld: 5.6,
+                edgeBias: 0.08,
+                clusterChance: 0.28,
+            },
+            {
+                basePath: 'models/nature/Tree_3_A_Color1',
+                category: 'tree',
+                weight: 1.0,
+                scaleMin: 0.94,
+                scaleMax: 1.82,
+                radius: 2.1,
+                avoidLaneWorld: 5.8,
+                edgeBias: 0.08,
+                clusterChance: 0.28,
+            },
+            // Bushes (medium density, often around trees/rocks)
+            {
+                basePath: 'models/nature/Bush_1_A_Color1',
+                category: 'bush',
+                weight: 1.35,
+                scaleMin: 0.72,
+                scaleMax: 1.28,
+                radius: 0.95,
+                avoidLaneWorld: 2.2,
+                edgeBias: 0.12,
+                clusterChance: 0.34,
+            },
+            {
+                basePath: 'models/nature/Bush_2_A_Color1',
+                category: 'bush',
+                weight: 1.35,
+                scaleMin: 0.7,
+                scaleMax: 1.24,
+                radius: 0.9,
+                avoidLaneWorld: 2.2,
+                edgeBias: 0.12,
+                clusterChance: 0.34,
+            },
+            {
+                basePath: 'models/nature/Bush_3_A_Color1',
+                category: 'bush',
+                weight: 0.95,
+                scaleMin: 0.76,
+                scaleMax: 1.34,
+                radius: 1.0,
+                avoidLaneWorld: 2.3,
+                edgeBias: 0.12,
+                clusterChance: 0.36,
+            },
+            {
+                basePath: 'models/nature/Bush_4_A_Color1',
+                category: 'bush',
+                weight: 0.95,
+                scaleMin: 0.7,
+                scaleMax: 1.22,
+                radius: 0.92,
+                avoidLaneWorld: 2.2,
+                edgeBias: 0.12,
+                clusterChance: 0.34,
+            },
+            // Rocks (edge + transition fillers)
+            {
+                basePath: 'models/nature/Rock_1_A_Color1',
+                category: 'rock',
+                weight: 1.0,
+                scaleMin: 0.9,
+                scaleMax: 1.3,
+                radius: 1.12,
+                avoidLaneWorld: 2.8,
+                edgeBias: 0.42,
+                clusterChance: 0.46,
+            },
+            {
+                basePath: 'models/nature/Rock_2_A_Color1',
+                category: 'rock',
+                weight: 1.0,
+                scaleMin: 0.9,
+                scaleMax: 1.25,
+                radius: 1.02,
+                avoidLaneWorld: 2.7,
+                edgeBias: 0.4,
+                clusterChance: 0.46,
+            },
+            {
+                basePath: 'models/nature/Rock_3_A_Color1',
+                category: 'rock',
+                weight: 1.1,
+                scaleMin: 0.9,
+                scaleMax: 1.35,
+                radius: 1.18,
+                avoidLaneWorld: 2.9,
+                edgeBias: 0.42,
+                clusterChance: 0.46,
+            },
+            // Grasses (high density, mostly clustered)
+            {
+                basePath: 'models/nature/Grass_1_A_Color1',
+                category: 'grass',
+                weight: 1.0,
+                scaleMin: 0.45,
+                scaleMax: 1.02,
+                radius: 0.36,
+                avoidLaneWorld: 3.1,
+                edgeBias: 0.08,
+                clusterChance: 0.96,
+                grassPattern: 'patch',
+            },
+        ];
+
+        const available = await this.loadAvailableNaturePrefabs(modelDefs);
+        if (available.length <= 0) {
+            console.warn('[MapGenerator] No nature prefabs available, skipping nature placement.');
+            return;
+        }
+
+        const root = this.getOrCreateGeneratedRoot();
+        const natureRoot = new Node('NatureWorld');
+        natureRoot.layer = root.layer;
+        root.addChild(natureRoot);
+
+        const worldW = cols * this.tileSize;
+        const worldH = rows * this.tileSize;
+        const halfW = worldW * 0.5;
+        const halfH = worldH * 0.5;
+        const minEdgeInset = 4.2;
+        const edgeBandDepth = 5.0;
+        const density = Math.max(0.8, Math.min(1.3, (cols * rows) / (28 * 28)));
+        const targetCounts: Record<NatureCategory, number> = {
+            tree: Math.max(34, Math.round(64 * density)),
+            rock: Math.max(28, Math.round(58 * density)),
+            bush: Math.max(30, Math.round(62 * density)),
+            grass: 0,
+        };
+        const grassScatterTarget = 0;
+        const grassPatchTarget = Math.max(150, Math.round(320 * density));
+        const buildingZones = this.getNatureBuildingExclusionZones();
+        const lanePolylines = this.getLanePolylinesNormalized();
+        const placed: NaturePlacement[] = [];
+        const rng = this.createSeededRandom(cols * 928371 + rows * 364479 + 1337);
+        let placedCount = 0;
+
+        const treePool = available.filter(item => item.category === 'tree');
+        if (treePool.length > 0) {
+            const roadsideMiniTrees = this.placeRoadsideMiniTrees({
+                root: natureRoot,
+                treeModels: treePool,
+                placed,
+                buildingZones,
+                lanePolylines,
+                halfW,
+                halfH,
+                worldMin: Math.min(worldW, worldH),
+                rng,
+                startIndex: placedCount,
+            });
+            placedCount += roadsideMiniTrees;
+            console.log(`[MapGenerator] Roadside mini trees placed: ${roadsideMiniTrees}`);
+        }
+
+        const categories: NatureCategory[] = ['tree', 'rock', 'bush'];
+        for (const category of categories) {
+            const pool = available.filter(item => item.category === category);
+            if (pool.length <= 0) continue;
+            const totalToPlace = targetCounts[category];
+            for (let i = 0; i < totalToPlace; i++) {
+                const model = this.pickWeightedNatureModel(pool, rng);
+                const scaleT =
+                    model.category === 'grass'
+                        ? Math.pow(rng(), 1.8)
+                        : model.category === 'tree'
+                          ? Math.pow(rng(), 0.55)
+                          : model.category === 'bush'
+                            ? Math.pow(rng(), 1.15)
+                            : rng();
+                const scale = this.lerp(model.scaleMin, model.scaleMax, scaleT);
+                const radius = model.radius * scale;
+                const point = this.sampleNaturePoint({
+                    model,
+                    scale,
+                    radius,
+                    halfW,
+                    halfH,
+                    minEdgeInset,
+                    edgeBandDepth,
+                    placed,
+                    buildingZones,
+                    lanePolylines,
+                    worldMin: Math.min(worldW, worldH),
+                    rng,
+                });
+                if (!point) continue;
+
+                const node = this.instantiateNatureNode(model, natureRoot, placedCount);
+                if (!node) continue;
+
+                const tiltX =
+                    model.category === 'grass'
+                        ? this.lerp(-6, 6, rng())
+                        : model.category === 'tree'
+                          ? this.lerp(-8, 8, rng())
+                          : 0;
+                const tiltZ =
+                    model.category === 'grass'
+                        ? this.lerp(-6, 6, rng())
+                        : model.category === 'tree'
+                          ? this.lerp(-6, 6, rng())
+                          : 0;
+                node.setPosition(point.x, 0, point.z);
+                node.setRotationFromEuler(tiltX, this.lerp(0, 360, rng()), tiltZ);
+                if (model.category === 'tree') {
+                    const sx = scale * this.lerp(0.9, 1.16, rng());
+                    const sy = scale * this.lerp(0.94, 1.2, rng());
+                    const sz = scale * this.lerp(0.9, 1.16, rng());
+                    node.setScale(sx, sy, sz);
+                } else {
+                    node.setScale(scale, scale, scale);
+                }
+
+                placed.push({ x: point.x, z: point.z, radius, category: model.category });
+                placedCount++;
+            }
+        }
+
+        const grassPatchPool = available.filter(
+            item => item.category === 'grass' && item.grassPattern === 'patch'
+        );
+        if (grassPatchPool.length > 0) {
+            placedCount += this.placeGrassPatchGroups({
+                root: natureRoot,
+                models: grassPatchPool,
+                targetTotal: grassPatchTarget,
+                placed,
+                buildingZones,
+                lanePolylines,
+                halfW,
+                halfH,
+                minEdgeInset,
+                worldMin: Math.min(worldW, worldH),
+                rng,
+                startIndex: placedCount,
+            });
+        }
+
+        const grassScatterPool = available.filter(
+            item => item.category === 'grass' && item.grassPattern !== 'patch'
+        );
+        if (grassScatterPool.length > 0) {
+            for (let i = 0; i < grassScatterTarget; i++) {
+                const model = this.pickWeightedNatureModel(grassScatterPool, rng);
+                const scaleT = Math.pow(rng(), 1.9);
+                const scale = this.lerp(model.scaleMin, model.scaleMax, scaleT);
+                const radius = model.radius * scale;
+                const point = this.sampleNaturePoint({
+                    model,
+                    scale,
+                    radius,
+                    halfW,
+                    halfH,
+                    minEdgeInset,
+                    edgeBandDepth,
+                    placed,
+                    buildingZones,
+                    lanePolylines,
+                    worldMin: Math.min(worldW, worldH),
+                    rng,
+                });
+                if (!point) continue;
+
+                const node = this.instantiateNatureNode(model, natureRoot, placedCount);
+                if (!node) continue;
+
+                node.setPosition(point.x, 0, point.z);
+                node.setRotationFromEuler(this.lerp(-7, 7, rng()), this.lerp(0, 360, rng()), this.lerp(-7, 7, rng()));
+                node.setScale(scale, scale, scale);
+
+                placed.push({ x: point.x, z: point.z, radius, category: model.category });
+                placedCount++;
+            }
+        }
+
+        console.log(`[MapGenerator] Nature placed: ${placedCount} instances.`);
+    }
+
+    private placeRoadsideMiniTrees(opts: {
+        root: Node;
+        treeModels: NatureModelPrefab[];
+        placed: NaturePlacement[];
+        buildingZones: NatureZone[];
+        lanePolylines: Array<Array<{ x: number; z: number }>>;
+        halfW: number;
+        halfH: number;
+        worldMin: number;
+        rng: () => number;
+        startIndex: number;
+    }): number {
+        const {
+            root,
+            treeModels,
+            placed,
+            buildingZones,
+            lanePolylines,
+            halfW,
+            halfH,
+            worldMin,
+            rng,
+            startIndex,
+        } = opts;
+        if (treeModels.length <= 0) return 0;
+
+        let created = 0;
+        const world = Math.max(1, worldMin);
+        const spacingWorld = 4.8;
+        const startInsetWorld = 1.6;
+        const endInsetWorld = 1.2;
+
+        for (let laneIndex = 0; laneIndex < lanePolylines.length; laneIndex++) {
+            const lane = lanePolylines[laneIndex];
+            if (lane.length < 2) continue;
+
+            const worldPoints = lane.map(p =>
+                this.laneNormalizedToWorld(p.x, p.z, halfW, halfH)
+            );
+            const segLens: number[] = [];
+            let totalLen = 0;
+            for (let i = 0; i < worldPoints.length - 1; i++) {
+                const dx = worldPoints[i + 1].x - worldPoints[i].x;
+                const dz = worldPoints[i + 1].z - worldPoints[i].z;
+                const len = Math.sqrt(dx * dx + dz * dz);
+                segLens.push(len);
+                totalLen += len;
+            }
+            if (totalLen <= startInsetWorld + endInsetWorld + 2.0) continue;
+
+            let walked = 0;
+            let nextDist = startInsetWorld;
+            for (let s = 0; s < segLens.length; s++) {
+                const segLen = segLens[s];
+                if (segLen <= 0.001) {
+                    walked += segLen;
+                    continue;
+                }
+                const p0 = worldPoints[s];
+                const p1 = worldPoints[s + 1];
+                const tx = (p1.x - p0.x) / segLen;
+                const tz = (p1.z - p0.z) / segLen;
+                const nx = -tz;
+                const nz = tx;
+
+                while (nextDist <= walked + segLen && nextDist < totalLen - endInsetWorld) {
+                    const local = nextDist - walked;
+                    const t = local / segLen;
+                    const px = this.lerp(p0.x, p1.x, t);
+                    const pz = this.lerp(p0.z, p1.z, t);
+                    const laneHalfWorld = this.getLaneHalfWidthNormalized(laneIndex) * world;
+                    const baseOffset = laneHalfWorld + (laneIndex === 1 ? 0.8 : 0.72);
+
+                    for (const side of [-1, 1]) {
+                        if (rng() < 0.35) continue;
+                        let planted = false;
+                        for (let attempt = 0; attempt < 2 && !planted; attempt++) {
+                            const offset = baseOffset + this.lerp(-0.12, 0.12, rng());
+                            const alongJitter = this.lerp(-0.72, 0.72, rng());
+                            const x = px + tx * alongJitter + nx * offset * side;
+                            const z = pz + tz * alongJitter + nz * offset * side;
+                            if (x < -halfW + 1.2 || x > halfW - 1.2 || z < -halfH + 1.2 || z > halfH - 1.2) continue;
+
+                            const model = this.pickWeightedNatureModel(treeModels, rng);
+                            const miniScaleFactor = this.lerp(0.48, 0.84, Math.pow(rng(), 0.72));
+                            const baseScaleT = Math.pow(rng(), 0.65);
+                            const scale = this.lerp(model.scaleMin, model.scaleMax, baseScaleT) * miniScaleFactor;
+                            const radius = model.radius * scale * 0.44;
+                            if (this.isInsideBuildingKeepout(x, z, buildingZones, 1.0)) continue;
+                            if (
+                                !this.isRoadsideMiniTreePointValid(
+                                    x,
+                                    z,
+                                    radius,
+                                    placed,
+                                    buildingZones
+                                )
+                            )
+                                continue;
+
+                            const node = this.instantiateNatureNode(
+                                model,
+                                root,
+                                startIndex + created
+                            );
+                            if (!node) continue;
+                            node.setPosition(x, 0, z);
+                            node.setRotationFromEuler(
+                                this.lerp(-5, 5, rng()),
+                                this.lerp(0, 360, rng()),
+                                this.lerp(-4, 4, rng())
+                            );
+                            node.setScale(
+                                scale * this.lerp(0.88, 1.1, rng()),
+                                scale * this.lerp(0.92, 1.16, rng()),
+                                scale * this.lerp(0.88, 1.1, rng())
+                            );
+                            placed.push({ x, z, radius, category: 'tree' });
+                            created++;
+                            planted = true;
+                        }
+                    }
+
+                    nextDist += spacingWorld + this.lerp(-0.45, 0.45, rng());
+                }
+                walked += segLen;
+            }
+        }
+        return created;
+    }
+
+    private isRoadsideMiniTreePointValid(
+        x: number,
+        z: number,
+        radius: number,
+        placed: NaturePlacement[],
+        buildingZones: NatureZone[]
+    ): boolean {
+        for (const zone of buildingZones) {
+            const dx = x - zone.x;
+            const dz = z - zone.z;
+            const rr = zone.radius + radius;
+            if (dx * dx + dz * dz < rr * rr) return false;
+        }
+        for (const p of placed) {
+            // Allow roadside mini trees to coexist with grass and small bushes.
+            if (p.category === 'grass' || p.category === 'bush') continue;
+            const dx = x - p.x;
+            const dz = z - p.z;
+            const rr = p.radius + radius;
+            if (dx * dx + dz * dz < rr * rr) return false;
+        }
+        return true;
+    }
+
+    private placeNatureBiomeClusters(opts: {
+        root: Node;
+        treeModels: NatureModelPrefab[];
+        rockModels: NatureModelPrefab[];
+        bushModels: NatureModelPrefab[];
+        grassModels: NatureModelPrefab[];
+        clusterCount: number;
+        placed: NaturePlacement[];
+        buildingZones: NatureZone[];
+        lanePolylines: Array<Array<{ x: number; z: number }>>;
+        halfW: number;
+        halfH: number;
+        minEdgeInset: number;
+        worldMin: number;
+        rng: () => number;
+        startIndex: number;
+    }): number {
+        const {
+            root,
+            treeModels,
+            rockModels,
+            bushModels,
+            grassModels,
+            clusterCount,
+            placed,
+            buildingZones,
+            lanePolylines,
+            halfW,
+            halfH,
+            minEdgeInset,
+            worldMin,
+            rng,
+            startIndex,
+        } = opts;
+
+        let created = 0;
+        const world = Math.max(1, worldMin);
+        for (let i = 0; i < clusterCount; i++) {
+            let cx = 0;
+            let cz = 0;
+            let foundCenter = false;
+            for (let attempt = 0; attempt < 480; attempt++) {
+                cx = this.lerp(-halfW + minEdgeInset, halfW - minEdgeInset, rng());
+                cz = this.lerp(-halfH + minEdgeInset, halfH - minEdgeInset, rng());
+                if (!this.isNaturePointValid(cx, cz, 1.0, placed, buildingZones)) continue;
+                if (this.isInsideBuildingKeepout(cx, cz, buildingZones, 1.25)) continue;
+                const lanePos = this.worldToLaneNormalized(cx, cz, halfW, halfH);
+                const laneInfo = this.getClosestLaneEdgeInfo(
+                    lanePos.nx,
+                    lanePos.nz,
+                    lanePolylines
+                );
+                const minCenterClearance = laneInfo.laneIndex === 2 ? 1.6 / world : 2.7 / world;
+                if (laneInfo.edgeDist < minCenterClearance) continue;
+                foundCenter = true;
+                break;
+            }
+            if (!foundCenter) continue;
+
+            const clusterRadius = this.lerp(2.2, 4.4, rng());
+            created += this.placeClusteredNatureSet({
+                root,
+                models: grassModels,
+                category: 'grass',
+                count: Math.floor(this.lerp(12, 28, rng())),
+                centerX: cx,
+                centerZ: cz,
+                clusterRadius,
+                placed,
+                buildingZones,
+                lanePolylines,
+                halfW,
+                halfH,
+                worldMin,
+                rng,
+                startIndex: startIndex + created,
+            });
+            created += this.placeClusteredNatureSet({
+                root,
+                models: bushModels,
+                category: 'bush',
+                count: Math.floor(this.lerp(4, 11, rng())),
+                centerX: cx,
+                centerZ: cz,
+                clusterRadius,
+                placed,
+                buildingZones,
+                lanePolylines,
+                halfW,
+                halfH,
+                worldMin,
+                rng,
+                startIndex: startIndex + created,
+            });
+            created += this.placeClusteredNatureSet({
+                root,
+                models: rockModels,
+                category: 'rock',
+                count: Math.floor(this.lerp(2, 6, rng())),
+                centerX: cx,
+                centerZ: cz,
+                clusterRadius,
+                placed,
+                buildingZones,
+                lanePolylines,
+                halfW,
+                halfH,
+                worldMin,
+                rng,
+                startIndex: startIndex + created,
+            });
+            if (rng() < 0.7) {
+                created += this.placeClusteredNatureSet({
+                    root,
+                    models: treeModels,
+                    category: 'tree',
+                    count: rng() < 0.32 ? 2 : 1,
+                    centerX: cx,
+                    centerZ: cz,
+                    clusterRadius,
+                    placed,
+                    buildingZones,
+                    lanePolylines,
+                    halfW,
+                    halfH,
+                    worldMin,
+                    rng,
+                    startIndex: startIndex + created,
+                });
+            }
+        }
+        return created;
+    }
+
+    private placeClusteredNatureSet(opts: {
+        root: Node;
+        models: NatureModelPrefab[];
+        category: NatureCategory;
+        count: number;
+        centerX: number;
+        centerZ: number;
+        clusterRadius: number;
+        placed: NaturePlacement[];
+        buildingZones: NatureZone[];
+        lanePolylines: Array<Array<{ x: number; z: number }>>;
+        halfW: number;
+        halfH: number;
+        worldMin: number;
+        rng: () => number;
+        startIndex: number;
+    }): number {
+        const {
+            root,
+            models,
+            category,
+            count,
+            centerX,
+            centerZ,
+            clusterRadius,
+            placed,
+            buildingZones,
+            lanePolylines,
+            halfW,
+            halfH,
+            worldMin,
+            rng,
+            startIndex,
+        } = opts;
+        if (models.length <= 0 || count <= 0) return 0;
+
+        let created = 0;
+        const world = Math.max(1, worldMin);
+        const maxAttempts = Math.max(24, count * 18);
+        for (let attempt = 0; attempt < maxAttempts && created < count; attempt++) {
+            const model = this.pickWeightedNatureModel(models, rng);
+            const scaleT = category === 'grass' ? Math.pow(rng(), 1.7) : rng();
+            const scale = this.lerp(model.scaleMin, model.scaleMax, scaleT);
+            const baseRadius = model.radius * scale;
+            const placementRadius =
+                category === 'grass'
+                    ? baseRadius * 0.42
+                    : category === 'bush'
+                      ? baseRadius * 0.62
+                      : category === 'rock'
+                        ? baseRadius * 0.75
+                        : baseRadius * 0.8;
+
+            const angle = this.lerp(0, Math.PI * 2, rng());
+            const radial = clusterRadius * Math.pow(rng(), 0.6);
+            const x = centerX + Math.cos(angle) * radial + this.lerp(-0.2, 0.2, rng());
+            const z = centerZ + Math.sin(angle) * radial + this.lerp(-0.2, 0.2, rng());
+            if (x < -halfW + 1.2 || x > halfW - 1.2 || z < -halfH + 1.2 || z > halfH - 1.2) continue;
+            if (category === 'tree') {
+                const edgeMarginWorld = 7.2;
+                const edgeDistWorld = Math.min(halfW - Math.abs(x), halfH - Math.abs(z));
+                if (edgeDistWorld < edgeMarginWorld) continue;
+            }
+            const buildingPadding =
+                category === 'grass'
+                    ? 0.95
+                    : category === 'bush'
+                      ? 0.75
+                      : category === 'rock'
+                        ? 0.8
+                        : 1.1;
+            if (this.isInsideBuildingKeepout(x, z, buildingZones, buildingPadding)) continue;
+            if (!this.isNaturePointValid(x, z, placementRadius, placed, buildingZones)) continue;
+
+            const lanePos = this.worldToLaneNormalized(x, z, halfW, halfH);
+            const laneInfo = this.getClosestLaneEdgeInfo(
+                lanePos.nx,
+                lanePos.nz,
+                lanePolylines
+            );
+            const radiusNorm = placementRadius / world;
+            const hardLaneKeepoutNorm =
+                category === 'grass' ? 1.05 / world : category === 'tree' ? 1.45 / world : 0.92 / world;
+            if (laneInfo.edgeDist < hardLaneKeepoutNorm) continue;
+            const laneSafetyNorm =
+                category === 'grass'
+                    ? 0.004 + radiusNorm * 0.3
+                    : category === 'rock'
+                      ? 0.012 + radiusNorm * 0.62
+                      : 0.014 + radiusNorm * 0.66;
+            const laneExtraNorm = this.getLaneExtraClearanceNorm(
+                laneInfo.laneIndex,
+                worldMin,
+                category === 'grass'
+            );
+            const laneThresholdNorm = model.avoidLaneWorld / world;
+            if (laneInfo.edgeDist < laneThresholdNorm * 0.52 + laneSafetyNorm + laneExtraNorm) continue;
+
+            const node = this.instantiateNatureNode(
+                model,
+                root,
+                startIndex + created
+            );
+            if (!node) continue;
+            node.setPosition(x, 0, z);
+            if (category === 'grass') {
+                node.setRotationFromEuler(
+                    this.lerp(-5, 5, rng()),
+                    this.lerp(0, 360, rng()),
+                    this.lerp(-5, 5, rng())
+                );
+            } else if (category === 'tree') {
+                node.setRotationFromEuler(
+                    this.lerp(-8, 8, rng()),
+                    this.lerp(0, 360, rng()),
+                    this.lerp(-6, 6, rng())
+                );
+            } else {
+                node.setRotationFromEuler(0, this.lerp(0, 360, rng()), 0);
+            }
+            if (category === 'tree') {
+                node.setScale(
+                    scale * this.lerp(0.9, 1.16, rng()),
+                    scale * this.lerp(0.94, 1.2, rng()),
+                    scale * this.lerp(0.9, 1.16, rng())
+                );
+            } else {
+                node.setScale(scale, scale, scale);
+            }
+            placed.push({ x, z, radius: placementRadius, category });
+            created++;
+        }
+        return created;
+    }
+
+    private async loadAvailableNaturePrefabs(modelDefs: NatureModelDef[]): Promise<NatureModelPrefab[]> {
+        const available: NatureModelPrefab[] = [];
+        for (const def of modelDefs) {
+            const modelName = def.basePath.split('/').pop() || 'NatureModel';
+            const prefab = await this.loadPrefabWithFallbacks([def.basePath, `${def.basePath}/${modelName}`]);
+            if (!prefab) continue;
+            available.push({ ...def, prefab, modelName });
+        }
+        return available;
+    }
+
+    private async loadPrefabWithFallbacks(paths: string[]): Promise<Prefab | null> {
+        for (const path of paths) {
+            const prefab = await this.loadPrefab(path);
+            if (prefab) return prefab;
+        }
+        return null;
+    }
+
+    private loadPrefab(path: string): Promise<Prefab | null> {
+        return new Promise(resolve => {
+            resources.load(path, Prefab, (err, prefab) => {
+                if (err || !prefab) return resolve(null);
+                resolve(prefab);
+            });
+        });
+    }
+
+    private instantiateNatureNode(
+        model: NatureModelPrefab,
+        parent: Node,
+        index: number
+    ): Node | null {
+        if (!parent || !parent.isValid) return null;
+        const prefab = model.prefab;
+        const prefabValid =
+            !!prefab &&
+            !!(prefab as unknown as { isValid?: boolean }).isValid;
+        if (!prefabValid) return null;
+        try {
+            const node = instantiate(prefab);
+            if (!node || !node.isValid) return null;
+            node.name = `${model.modelName}_${index}`;
+            this.applyLayerRecursive(node, parent.layer);
+            parent.addChild(node);
+            return node;
+        } catch (e) {
+            console.warn('[MapGenerator] instantiate nature prefab failed', model.basePath, e);
+            return null;
+        }
+    }
+
+    private placeGrassPatchGroups(opts: {
+        root: Node;
+        models: NatureModelPrefab[];
+        targetTotal: number;
+        placed: NaturePlacement[];
+        buildingZones: NatureZone[];
+        lanePolylines: Array<Array<{ x: number; z: number }>>;
+        halfW: number;
+        halfH: number;
+        minEdgeInset: number;
+        worldMin: number;
+        rng: () => number;
+        startIndex: number;
+    }): number {
+        const {
+            root,
+            models,
+            targetTotal,
+            placed,
+            buildingZones,
+            lanePolylines,
+            halfW,
+            halfH,
+            minEdgeInset,
+            worldMin,
+            rng,
+            startIndex,
+        } = opts;
+
+        let created = 0;
+        const patchCount = Math.max(12, Math.round(targetTotal / 22));
+        const laneThresholdNorm = 1.35 / Math.max(1, worldMin);
+
+        for (let p = 0; p < patchCount && created < targetTotal; p++) {
+            let centerX = 0;
+            let centerZ = 0;
+            let foundCenter = false;
+            for (let attempt = 0; attempt < 420; attempt++) {
+                centerX = this.lerp(-halfW + minEdgeInset, halfW - minEdgeInset, rng());
+                centerZ = this.lerp(-halfH + minEdgeInset, halfH - minEdgeInset, rng());
+                if (!this.isNaturePointValid(centerX, centerZ, 0.72, placed, buildingZones)) continue;
+                if (this.isInsideBuildingKeepout(centerX, centerZ, buildingZones, 1.0)) continue;
+
+                const lanePos = this.worldToLaneNormalized(
+                    centerX,
+                    centerZ,
+                    halfW,
+                    halfH
+                );
+                const laneInfo = this.getClosestLaneEdgeInfo(
+                    lanePos.nx,
+                    lanePos.nz,
+                    lanePolylines
+                );
+                const laneEdgeDist = laneInfo.edgeDist;
+                const hardLaneKeepoutNorm = 1.15 / Math.max(1, worldMin);
+                if (laneEdgeDist < hardLaneKeepoutNorm) continue;
+                const laneExtraNorm = this.getLaneExtraClearanceNorm(
+                    laneInfo.laneIndex,
+                    worldMin,
+                    true
+                );
+                const patchGuardNorm = 0.16 / Math.max(1, worldMin);
+                if (laneEdgeDist < laneThresholdNorm * 1.1 + patchGuardNorm + laneExtraNorm) continue;
+                foundCenter = true;
+                break;
+            }
+            if (!foundCenter) continue;
+
+            const angle = this.pickGeometricPatchAngle(rng);
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+            const spacing = this.lerp(0.105, 0.145, rng());
+            const cols = Math.floor(this.lerp(4, 8, rng()));
+            const rows = Math.floor(this.lerp(4, 7, rng()));
+            const halfCols = (cols - 1) * 0.5;
+            const halfRows = (rows - 1) * 0.5;
+
+            for (let iz = 0; iz < rows && created < targetTotal; iz++) {
+                for (let ix = 0; ix < cols && created < targetTotal; ix++) {
+                    if (rng() < 0.03) continue;
+
+                    const localX = (ix - halfCols) * spacing;
+                    const localZ = (iz - halfRows) * spacing;
+                    const nxRect = Math.abs(ix - halfCols) / Math.max(1, halfCols);
+                    const nzRect = Math.abs(iz - halfRows) / Math.max(1, halfRows);
+                    // Rounded-rectangle cutoff to keep "geometric patch" silhouette.
+                    if (nxRect + nzRect > 1.96) continue;
+
+                    const jitterX = this.lerp(-0.016, 0.016, rng());
+                    const jitterZ = this.lerp(-0.016, 0.016, rng());
+                    const x = centerX + (localX + jitterX) * cosA - (localZ + jitterZ) * sinA;
+                    const z = centerZ + (localX + jitterX) * sinA + (localZ + jitterZ) * cosA;
+                    const lanePos = this.worldToLaneNormalized(
+                        x,
+                        z,
+                        halfW,
+                        halfH
+                    );
+                    const model = this.pickWeightedNatureModel(models, rng);
+                    const scale = this.lerp(model.scaleMin, model.scaleMax, Math.pow(rng(), 1.55));
+                    const radius = 0.07 * scale;
+                    const laneInfo = this.getClosestLaneEdgeInfo(
+                        lanePos.nx,
+                        lanePos.nz,
+                        lanePolylines
+                    );
+                    const laneEdgeDist = laneInfo.edgeDist;
+                    const hardLaneKeepoutNorm = 1.05 / Math.max(1, worldMin);
+                    if (laneEdgeDist < hardLaneKeepoutNorm) continue;
+                    const laneKeepoutNorm =
+                        laneThresholdNorm * 0.65 +
+                        0.001 +
+                        radius / Math.max(1, worldMin) +
+                        this.getLaneExtraClearanceNorm(laneInfo.laneIndex, worldMin, true);
+                    if (laneEdgeDist < laneKeepoutNorm) continue;
+                    if (this.isInsideBuildingKeepout(x, z, buildingZones, 0.85)) continue;
+                    if (!this.isNaturePointValid(x, z, radius, placed, buildingZones)) continue;
+                    const node = this.instantiateNatureNode(
+                        model,
+                        root,
+                        startIndex + created
+                    );
+                    if (!node) continue;
+
+                    node.setPosition(x, 0, z);
+                    node.setRotationFromEuler(this.lerp(-4, 4, rng()), this.lerp(-12, 12, rng()) + (angle * 180) / Math.PI, this.lerp(-4, 4, rng()));
+                    node.setScale(scale, scale, scale);
+
+                    placed.push({ x, z, radius, category: 'grass' });
+                    created++;
+                }
+            }
+        }
+        return created;
+    }
+
+    private pickGeometricPatchAngle(rng: () => number): number {
+        const angles = [0, Math.PI * 0.25, Math.PI * 0.5, Math.PI * 0.75];
+        const idx = Math.floor(rng() * angles.length) % angles.length;
+        return angles[idx];
+    }
+
+    private sampleNaturePoint(opts: {
+        model: NatureModelPrefab;
+        scale: number;
+        radius: number;
+        halfW: number;
+        halfH: number;
+        minEdgeInset: number;
+        edgeBandDepth: number;
+        placed: NaturePlacement[];
+        buildingZones: NatureZone[];
+        lanePolylines: Array<Array<{ x: number; z: number }>>;
+        worldMin: number;
+        rng: () => number;
+    }): { x: number; z: number } | null {
+        const {
+            model,
+            radius,
+            halfW,
+            halfH,
+            minEdgeInset,
+            edgeBandDepth,
+            placed,
+            buildingZones,
+            lanePolylines,
+            worldMin,
+            rng,
+        } = opts;
+
+        const anchorCandidates = placed.filter(p =>
+            model.category === 'grass'
+                ? p.category === 'grass' || p.category === 'bush' || p.category === 'rock'
+                : p.category === 'tree' || p.category === 'rock'
+        );
+        const laneThresholdNorm = model.avoidLaneWorld / Math.max(1, worldMin);
+        const minGap =
+            model.category === 'grass' ? 0.01 : model.category === 'rock' ? 0.95 : 0.4;
+        const attemptLimit =
+            model.category === 'grass' ? 2200 : model.category === 'rock' ? 500 : 260;
+        const clusterRadiusMax = model.category === 'grass' ? 1.45 : 4.2;
+
+        for (let attempt = 0; attempt < attemptLimit; attempt++) {
+            let x = 0;
+            let z = 0;
+            const useCluster =
+                anchorCandidates.length > 0 &&
+                model.clusterChance > 0 &&
+                rng() < model.clusterChance;
+
+            if (useCluster) {
+                const anchor = anchorCandidates[Math.floor(rng() * anchorCandidates.length)];
+                const angle = this.lerp(0, Math.PI * 2, rng());
+                const dist = this.lerp(
+                    anchor.radius + radius + minGap,
+                    anchor.radius + radius + clusterRadiusMax,
+                    rng()
+                );
+                x = anchor.x + Math.cos(angle) * dist;
+                z = anchor.z + Math.sin(angle) * dist;
+            } else if (rng() < model.edgeBias) {
+                const side = Math.floor(rng() * 4);
+                if (side === 0) {
+                    x = this.lerp(-halfW + minEdgeInset, -halfW + minEdgeInset + edgeBandDepth, rng());
+                    z = this.lerp(-halfH + minEdgeInset, halfH - minEdgeInset, rng());
+                } else if (side === 1) {
+                    x = this.lerp(halfW - minEdgeInset - edgeBandDepth, halfW - minEdgeInset, rng());
+                    z = this.lerp(-halfH + minEdgeInset, halfH - minEdgeInset, rng());
+                } else if (side === 2) {
+                    x = this.lerp(-halfW + minEdgeInset, halfW - minEdgeInset, rng());
+                    z = this.lerp(-halfH + minEdgeInset, -halfH + minEdgeInset + edgeBandDepth, rng());
+                } else {
+                    x = this.lerp(-halfW + minEdgeInset, halfW - minEdgeInset, rng());
+                    z = this.lerp(halfH - minEdgeInset - edgeBandDepth, halfH - minEdgeInset, rng());
+                }
+            } else {
+                x = this.lerp(-halfW + minEdgeInset, halfW - minEdgeInset, rng());
+                z = this.lerp(-halfH + minEdgeInset, halfH - minEdgeInset, rng());
+            }
+
+            if (model.category === 'tree') {
+                // Keep trees away from outer boundary so they sit in central green space.
+                const edgeMarginWorld = 7.2;
+                const edgeDistWorld = Math.min(halfW - Math.abs(x), halfH - Math.abs(z));
+                if (edgeDistWorld < edgeMarginWorld) continue;
+            }
+            const buildingPadding =
+                model.category === 'grass'
+                    ? 0.95
+                    : model.category === 'bush'
+                      ? 0.75
+                      : model.category === 'rock'
+                        ? 0.8
+                        : 1.1;
+            if (this.isInsideBuildingKeepout(x, z, buildingZones, buildingPadding)) continue;
+
+            if (!this.isNaturePointValid(x, z, radius, placed, buildingZones)) continue;
+
+            const lanePos = this.worldToLaneNormalized(x, z, halfW, halfH);
+            const laneInfo = this.getClosestLaneEdgeInfo(
+                lanePos.nx,
+                lanePos.nz,
+                lanePolylines
+            );
+            const laneEdgeDist = laneInfo.edgeDist;
+            const radiusNorm = radius / Math.max(1, worldMin);
+            const hardLaneKeepoutNorm =
+                model.category === 'grass'
+                    ? 1.05 / Math.max(1, worldMin)
+                    : model.category === 'tree'
+                      ? 1.45 / Math.max(1, worldMin)
+                      : 0.92 / Math.max(1, worldMin);
+            if (laneEdgeDist < hardLaneKeepoutNorm) continue;
+            const laneSafetyNorm =
+                model.category === 'grass'
+                    ? 0.006 + radiusNorm * 0.34
+                    : model.category === 'rock'
+                      ? 0.018 + radiusNorm * 0.7
+                      : 0.022 + radiusNorm * 0.75;
+            const laneExtraNorm = this.getLaneExtraClearanceNorm(
+                laneInfo.laneIndex,
+                worldMin,
+                false
+            );
+            if (laneEdgeDist < laneThresholdNorm + laneSafetyNorm + laneExtraNorm) continue;
+
+            return { x, z };
+        }
+        return null;
+    }
+
+    private isNaturePointValid(
+        x: number,
+        z: number,
+        radius: number,
+        placed: NaturePlacement[],
+        buildingZones: NatureZone[]
+    ): boolean {
+        for (const zone of buildingZones) {
+            const dx = x - zone.x;
+            const dz = z - zone.z;
+            const rr = zone.radius + radius;
+            if (dx * dx + dz * dz < rr * rr) return false;
+        }
+        for (const p of placed) {
+            const dx = x - p.x;
+            const dz = z - p.z;
+            const rr = p.radius + radius;
+            if (dx * dx + dz * dz < rr * rr) return false;
+        }
+        return true;
+    }
+
+    private getClosestLaneEdgeInfo(
+        nx: number,
+        nz: number,
+        lanes: Array<Array<{ x: number; z: number }>>
+    ): { edgeDist: number; laneIndex: number } {
+        let minEdgeDist = Number.MAX_VALUE;
+        let laneIndex = 0;
+        for (let i = 0; i < lanes.length; i++) {
+            const lane = lanes[i];
+            const centerDist = this.distToPolyline(nx, nz, lane);
+            const edgeDist = centerDist - this.getLaneHalfWidthNormalized(i);
+            if (edgeDist < minEdgeDist) {
+                minEdgeDist = edgeDist;
+                laneIndex = i;
+            }
+        }
+        return {
+            edgeDist:
+                minEdgeDist -
+                MapGenerator.LANE_EDGE_SOFTNESS_NORM -
+                MapGenerator.LANE_NOISE_PAD_NORM,
+            laneIndex,
+        };
+    }
+
+    private getLaneHalfWidthNormalized(index: number): number {
+        if (index === 1) return MapGenerator.LANE_HALF_WIDTH_NORM;
+        return MapGenerator.LANE_HALF_WIDTH_WIDE_NORM;
+    }
+
+    private getLaneExtraClearanceNorm(
+        laneIndex: number,
+        worldMin: number,
+        forPatch: boolean
+    ): number {
+        const world = Math.max(1, worldMin);
+        // top(0)/mid(1) still stricter than bottom(2), but no longer so large that center becomes empty.
+        if (laneIndex === 0 || laneIndex === 1) {
+            return (forPatch ? 0.95 : 1.5) / world;
+        }
+        return (forPatch ? 0.45 : 0.55) / world;
+    }
+
+    private isInsideBuildingKeepout(
+        x: number,
+        z: number,
+        zones: NatureZone[],
+        padding: number
+    ): boolean {
+        for (const zone of zones) {
+            const dx = x - zone.x;
+            const dz = z - zone.z;
+            const rr = zone.radius + padding;
+            if (dx * dx + dz * dz < rr * rr) return true;
+        }
+        return false;
+    }
+
+    private worldToLaneNormalized(
+        x: number,
+        z: number,
+        halfW: number,
+        halfH: number
+    ): { nx: number; nz: number } {
+        const nx = (x + halfW) / (halfW * 2);
+        // Flip Z so lane sampling matches splatmap coordinate orientation.
+        const nz = 1 - (z + halfH) / (halfH * 2);
+        return {
+            nx: Math.max(0, Math.min(1, nx)),
+            nz: Math.max(0, Math.min(1, nz)),
+        };
+    }
+
+    private laneNormalizedToWorld(
+        nx: number,
+        nz: number,
+        halfW: number,
+        halfH: number
+    ): { x: number; z: number } {
+        const x = nx * (halfW * 2) - halfW;
+        const z = (1 - nz) * (halfH * 2) - halfH;
+        return { x, z };
+    }
+
+    private getLanePolylinesNormalized(): Array<Array<{ x: number; z: number }>> {
+        const baseNx = 0.05;
+        const baseNz = 0.95;
+        const enemyNx = 0.95;
+        const enemyNz = 0.05;
+        const topLane = [
+            { x: baseNx, z: baseNz },
+            { x: 0.06, z: 0.92 },
+            { x: 0.95, z: 0.92 },
+        ];
+        const midLane = [
+            { x: baseNx, z: baseNz },
+            { x: 0.35, z: 0.65 },
+            { x: 0.5, z: 0.5 },
+            { x: 0.65, z: 0.35 },
+            { x: enemyNx, z: enemyNz },
+        ];
+        const botLane = [
+            { x: baseNx, z: baseNz },
+            { x: 0.08, z: 0.94 },
+            { x: 0.08, z: 0.05 },
+        ];
+        return [topLane, midLane, botLane];
+    }
+
+    private getNatureBuildingExclusionZones(): NatureZone[] {
+        const zones: NatureZone[] = [];
+        zones.push({
+            x: GameConfig.MAP.BASE_SPAWN.x,
+            z: GameConfig.MAP.BASE_SPAWN.z,
+            radius: 6.2,
+        });
+        const pads = (GameConfig.BUILDING.PADS as ReadonlyArray<{ x: number; z: number; type: string }>) ?? [];
+        for (const pad of pads) {
+            let r = 4.2;
+            if (pad.type === 'spa') r = 10.2;
+            else if (pad.type === 'farm') r = 5.5;
+            else if (pad.type === 'barracks') r = 5.6;
+            else if (pad.type === 'frost_tower' || pad.type === 'lightning_tower' || pad.type === 'tower') r = 5.1;
+            else if (pad.type === 'wall') r = 4.2;
+            zones.push({ x: pad.x, z: pad.z, radius: r });
+        }
+        return zones;
+    }
+
+    private pickWeightedNatureModel(models: NatureModelPrefab[], rng: () => number): NatureModelPrefab {
+        if (models.length === 1) return models[0];
+        let total = 0;
+        for (const m of models) total += Math.max(0.0001, m.weight);
+        let t = rng() * total;
+        for (const m of models) {
+            t -= Math.max(0.0001, m.weight);
+            if (t <= 0) return m;
+        }
+        return models[models.length - 1];
+    }
+
+    private createSeededRandom(seed: number): () => number {
+        let s = (seed >>> 0) || 1;
+        return () => {
+            s = (1664525 * s + 1013904223) >>> 0;
+            return s / 4294967296;
+        };
+    }
+
+    private lerp(a: number, b: number, t: number): number {
+        return a + (b - a) * t;
+    }
+
+    private applyLayerRecursive(node: Node, layer: number): void {
+        node.layer = layer;
+        for (const child of node.children) {
+            this.applyLayerRecursive(child, layer);
+        }
     }
 }

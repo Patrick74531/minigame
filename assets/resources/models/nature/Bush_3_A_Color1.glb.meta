@@ -1,0 +1,143 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "215c0830-a088-4549-9f9c-69f6f510a2e3",
+  "files": [],
+  "subMetas": {
+    "25384": {
+      "importer": "gltf-embeded-image",
+      "uuid": "215c0830-a088-4549-9f9c-69f6f510a2e3@25384",
+      "displayName": "",
+      "id": "25384",
+      "name": "forest_texture.image",
+      "userData": {
+        "gltfIndex": 0,
+        "fixAlphaTransparencyArtifacts": true,
+        "hasAlpha": true,
+        "type": "texture"
+      },
+      "ver": "1.0.3",
+      "imported": true,
+      "files": [
+        ".json",
+        ".png"
+      ],
+      "subMetas": {}
+    },
+    "7ba74": {
+      "importer": "gltf-mesh",
+      "uuid": "215c0830-a088-4549-9f9c-69f6f510a2e3@7ba74",
+      "displayName": "",
+      "id": "7ba74",
+      "name": "Bush_3_A_Color1.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 202
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "e39f7": {
+      "importer": "texture",
+      "uuid": "215c0830-a088-4549-9f9c-69f6f510a2e3@e39f7",
+      "displayName": "",
+      "id": "e39f7",
+      "name": "UnnamedTexture.texture",
+      "userData": {
+        "wrapModeS": "repeat",
+        "wrapModeT": "repeat",
+        "minfilter": "linear",
+        "magfilter": "linear",
+        "mipfilter": "linear",
+        "anisotropy": 0,
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "215c0830-a088-4549-9f9c-69f6f510a2e3@25384"
+      },
+      "ver": "1.0.22",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "1eca8": {
+      "importer": "gltf-material",
+      "uuid": "215c0830-a088-4549-9f9c-69f6f510a2e3@1eca8",
+      "displayName": "",
+      "id": "1eca8",
+      "name": "forest.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "eaf11": {
+      "importer": "gltf-scene",
+      "uuid": "215c0830-a088-4549-9f9c-69f6f510a2e3@eaf11",
+      "displayName": "",
+      "id": "eaf11",
+      "name": "Bush_3_A_Color1.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [
+      {
+        "name": "forest_texture",
+        "uri": "215c0830-a088-4549-9f9c-69f6f510a2e3@25384"
+      }
+    ],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "215c0830-a088-4549-9f9c-69f6f510a2e3@7ba74"
+      ],
+      "skeletons": [],
+      "textures": [
+        "215c0830-a088-4549-9f9c-69f6f510a2e3@e39f7"
+      ],
+      "materials": [
+        "215c0830-a088-4549-9f9c-69f6f510a2e3@1eca8"
+      ],
+      "scenes": [
+        "215c0830-a088-4549-9f9c-69f6f510a2e3@eaf11"
+      ]
+    }
+  }
+}

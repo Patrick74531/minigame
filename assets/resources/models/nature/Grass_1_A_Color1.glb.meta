@@ -1,0 +1,143 @@
+{
+  "ver": "2.3.14",
+  "importer": "gltf",
+  "imported": true,
+  "uuid": "72b7f0f0-032a-4af7-96cd-364379658e6a",
+  "files": [],
+  "subMetas": {
+    "25384": {
+      "importer": "gltf-embeded-image",
+      "uuid": "72b7f0f0-032a-4af7-96cd-364379658e6a@25384",
+      "displayName": "",
+      "id": "25384",
+      "name": "forest_texture.image",
+      "userData": {
+        "gltfIndex": 0,
+        "fixAlphaTransparencyArtifacts": true,
+        "hasAlpha": true,
+        "type": "texture"
+      },
+      "ver": "1.0.3",
+      "imported": true,
+      "files": [
+        ".json",
+        ".png"
+      ],
+      "subMetas": {}
+    },
+    "7f241": {
+      "importer": "gltf-mesh",
+      "uuid": "72b7f0f0-032a-4af7-96cd-364379658e6a@7f241",
+      "displayName": "",
+      "id": "7f241",
+      "name": "Grass_1_A_Color1.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 40
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "e39f7": {
+      "importer": "texture",
+      "uuid": "72b7f0f0-032a-4af7-96cd-364379658e6a@e39f7",
+      "displayName": "",
+      "id": "e39f7",
+      "name": "UnnamedTexture.texture",
+      "userData": {
+        "wrapModeS": "repeat",
+        "wrapModeT": "repeat",
+        "minfilter": "linear",
+        "magfilter": "linear",
+        "mipfilter": "linear",
+        "anisotropy": 0,
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "72b7f0f0-032a-4af7-96cd-364379658e6a@25384"
+      },
+      "ver": "1.0.22",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "1eca8": {
+      "importer": "gltf-material",
+      "uuid": "72b7f0f0-032a-4af7-96cd-364379658e6a@1eca8",
+      "displayName": "",
+      "id": "1eca8",
+      "name": "forest.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "2d5bd": {
+      "importer": "gltf-scene",
+      "uuid": "72b7f0f0-032a-4af7-96cd-364379658e6a@2d5bd",
+      "displayName": "",
+      "id": "2d5bd",
+      "name": "Grass_1_A_Color1.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [
+      {
+        "name": "forest_texture",
+        "uri": "72b7f0f0-032a-4af7-96cd-364379658e6a@25384"
+      }
+    ],
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    },
+    "assetFinder": {
+      "meshes": [
+        "72b7f0f0-032a-4af7-96cd-364379658e6a@7f241"
+      ],
+      "skeletons": [],
+      "textures": [
+        "72b7f0f0-032a-4af7-96cd-364379658e6a@e39f7"
+      ],
+      "materials": [
+        "72b7f0f0-032a-4af7-96cd-364379658e6a@1eca8"
+      ],
+      "scenes": [
+        "72b7f0f0-032a-4af7-96cd-364379658e6a@2d5bd"
+      ]
+    }
+  }
+}
