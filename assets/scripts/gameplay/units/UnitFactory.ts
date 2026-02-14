@@ -997,6 +997,18 @@ export class UnitFactory {
             ];
             const selected = models[Math.floor(Math.random() * models.length)];
             anim.modelPath = `enemies/${selected}`;
+
+            // Adjust scale based on enemy type
+            if (selected.includes('Mech')) {
+                anim.visualScale = 1.5; // Mech reduced by 3x (4.5 / 3)
+            } else if (selected.startsWith('boss/')) {
+                anim.visualScale = 4.5;
+            } else if (selected.startsWith('flying/') || selected.includes('Rover')) {
+                anim.visualScale = 0.45; // Flying and Rovers get half size (0.45)
+            } else {
+                anim.visualScale = 0.9; // Other Vehicles (Tank, Truck, Turret) remain at 0.9
+            }
+
             // Scale and Offset are now handled by component defaults (4.5 and 0.5)
             // anim.rotationY = 180; // If needed
         }
