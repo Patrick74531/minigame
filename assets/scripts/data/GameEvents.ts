@@ -88,6 +88,12 @@ export const GameEvents = {
     // === 技能/特效系统 ===
     /** 应用AOE效果 { center: Vec3, radius: number, damage: number, slowPercent: number, slowDuration: number, effectType?: string } */
     APPLY_AOE_EFFECT: 'APPLY_AOE_EFFECT',
+
+    // === 建筑选择系统 ===
+    /** 请求展示塔防选择界面 { padNode: Node } */
+    REQUEST_TOWER_SELECTION: 'REQUEST_TOWER_SELECTION',
+    /** 玩家选择了塔防类型 { padNode: Node, buildingTypeId: string } */
+    TOWER_SELECTED: 'TOWER_SELECTED',
 } as const;
 
 /** 事件名称类型 */
@@ -142,4 +148,10 @@ export type GameEventPayloads = {
         slowDuration: number;
         effectType?: 'frost_rain' | 'glitch_interference' | 'generic';
     };
+
+    // === 建筑选择系统 ===
+    /** 请求展示塔防选择界面 { padNode: Node } */
+    [GameEvents.REQUEST_TOWER_SELECTION]: { padNode: Node };
+    /** 玩家选择了塔防类型 { padNode: Node, buildingTypeId: string } */
+    [GameEvents.TOWER_SELECTED]: { padNode: Node; buildingTypeId: string };
 };

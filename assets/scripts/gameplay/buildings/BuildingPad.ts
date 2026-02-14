@@ -30,6 +30,7 @@ import { HUDManager } from '../../ui/HUDManager';
 import { Hero } from '../units/Hero';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { BuildingText } from './BuildingText';
+import { GameManager } from '../../core/managers/GameManager';
 
 const { ccclass, property } = _decorator;
 
@@ -41,6 +42,7 @@ export enum BuildingPadState {
     BUILDING, // 建造中
     COMPLETE, // 建造完成 (Transient)
     UPGRADING, // 升级中
+    SELECTING, // 选择塔防类型中
 }
 
 /**
@@ -82,6 +84,9 @@ export class BuildingPad extends BaseComponent {
     private _heroInRange: boolean = false;
     private _heroNode: Node | null = null;
     private _padMaterial: Material | null = null;
+
+    private _initialBuildingTypeId: string = '';
+    private _isTowerSlot: boolean = false;
 
     // === Getters ===
 
@@ -139,6 +144,11 @@ export class BuildingPad extends BaseComponent {
         console.log(
             `[BuildingPad] start() \u88ab\u8c03\u7528, buildingTypeId=${this.buildingTypeId}`
         );
+        
+        // Save initial type and check if it is a tower slot
+        this._initialBuildingTypeId = this.buildingTypeId;
+        this._isTowerSlot = this.isTowerType(this.buildingTypeId);
+
         const config = this.buildingRegistry.get(this.buildingTypeId);
         this._config = config ?? null;
         if (!this._config) {
@@ -152,8 +162,19 @@ export class BuildingPad extends BaseComponent {
         if (this.lockWorldPosition) {
             this.applyFixedOffsetFromSpawn();
         }
+        
+        // Listen for tower selection
+        this.eventManager.on(GameEvents.TOWER_SELECTED, this.onTowerSelected, this);
 
         console.log(`[BuildingPad] 初始化: ${this.buildingName}, 需要 ${this._config.cost} 金币`);
+    }
+
+    protected onDestroy(): void {
+        this.eventManager.off(GameEvents.TOWER_SELECTED, this.onTowerSelected, this);
+    }
+    
+    private isTowerType(typeId: string): boolean {
+        return typeId === 'tower' || typeId === 'frost_tower' || typeId === 'lightning_tower';
     }
 
     private applyFixedOffsetFromSpawn(): void {
@@ -263,7 +284,9 @@ export class BuildingPad extends BaseComponent {
     /**
      * Standard Update Loop for Interaction
      */
-    protected update(dt: number): void {
+    protected update(_dt: number): void {
+        if (!this.gameManager.isPlaying) return;
+
         if (this._heroInArea && this._heroRef) {
             // Check state
             if (
@@ -301,8 +324,7 @@ export class BuildingPad extends BaseComponent {
             }
         }
     }
-    // Removed checkHeroInRange (Logic moved to Physics Trigger)
-
+    
     /**
      * 创建视觉元素（圆盘和数字）
      */
@@ -650,7 +672,12 @@ export class BuildingPad extends BaseComponent {
             // 检查是否建造/升级完成
             if (this.isComplete) {
                 if (this._state === BuildingPadState.WAITING) {
-                    this.onBuildComplete();
+                    // Check logic for Tower Selection
+                    if (this._isTowerSlot) {
+                        this.enterTowerSelection();
+                    } else {
+                        this.onBuildComplete();
+                    }
                 } else if (this._state === BuildingPadState.UPGRADING) {
                     this.onUpgradeComplete();
                 }
@@ -658,6 +685,40 @@ export class BuildingPad extends BaseComponent {
         }
 
         return toCollect;
+    }
+
+    private enterTowerSelection(): void {
+        this._state = BuildingPadState.SELECTING;
+        console.log(`[BuildingPad] Coins collected for Tower Slot. Requesting Selection...`);
+        this.eventManager.emit(GameEvents.REQUEST_TOWER_SELECTION, { padNode: this.node });
+    }
+    
+    private onTowerSelected(data: { padNode: Node, buildingTypeId: string }): void {
+        if (data.padNode !== this.node) return;
+        
+        console.log(`[BuildingPad] Tower Selected: ${data.buildingTypeId}`);
+        
+        // Update type and config
+        this.buildingTypeId = data.buildingTypeId;
+        this._config = this.buildingRegistry.get(this.buildingTypeId) ?? null;
+        
+        // Switch back to WAITING to check costs again vs collected coins
+        this._state = BuildingPadState.WAITING;
+        
+        // Update visuals to match new type cost (if different)
+        this.updateDisplay();
+        
+        // Check if we have enough coins now (if we selected a cheaper or same cost tower)
+        if (this.isComplete) {
+            this.onBuildComplete();
+        } else {
+            console.log(`[BuildingPad] Selected tower is more expensive. improved collection needed.`);
+            // Update HUD if hero is in area
+            if (this._heroInArea && this.hudManager) {
+                 const title = this.getHudTitle();
+                 this.hudManager.showBuildingInfo(title, this.requiredCoins, this.collectedCoins);
+            }
+        }
     }
 
     /**
@@ -725,8 +786,12 @@ export class BuildingPad extends BaseComponent {
             this.scheduleOnce(() => {
                 if (!this.node.isValid) return;
                 if (this._state !== BuildingPadState.WAITING || this._associatedBuilding) return;
+                
+                // Retry logic must also respect selection!
+                // If it failed, we assume the selection was already done OR it failed for other reasons.
+                // Since buildingTypeId is already set, we just try to complete.
                 if (this.isComplete) {
-                    this.onBuildComplete();
+                     this.onBuildComplete();
                 }
             }, 0.35);
             return;
@@ -798,6 +863,13 @@ export class BuildingPad extends BaseComponent {
         this._isAnimating = false;
         this._buildEmitAttempts = 0;
         this._buildAutoRetryRounds = 0;
+        
+        // Restore initial type if this was a tower slot
+        if (this._isTowerSlot) {
+            this.buildingTypeId = this._initialBuildingTypeId;
+            this._config = this.buildingRegistry.get(this.buildingTypeId) ?? null;
+        }
+        
         this.updateDisplay();
 
         if (this._heroInArea && this.hudManager) {
@@ -865,6 +937,10 @@ export class BuildingPad extends BaseComponent {
 
     private get hudManager(): HUDManager {
         return ServiceRegistry.get<HUDManager>('HUDManager') ?? HUDManager.instance;
+    }
+
+    private get gameManager(): GameManager {
+        return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
     }
 
     private get buildingRegistry(): BuildingRegistry {

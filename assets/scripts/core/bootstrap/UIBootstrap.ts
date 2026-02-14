@@ -5,6 +5,7 @@ import { HUDManager } from '../../ui/HUDManager';
 import { BuffCardUI } from '../../ui/BuffCardUI';
 import { WeaponSelectUI } from '../../ui/WeaponSelectUI';
 import { WeaponBarUI } from '../../ui/WeaponBarUI';
+import { TowerSelectUI } from '../../ui/TowerSelectUI';
 import { UIResponsive } from '../../ui/UIResponsive';
 import { ServiceRegistry } from '../managers/ServiceRegistry';
 import { GlitchWaveBehavior } from '../../gameplay/weapons/behaviors/GlitchWaveBehavior';
@@ -32,6 +33,7 @@ export class UIBootstrap {
         UIBootstrap.buffCardUI.initialize(canvas);
         UIBootstrap.weaponSelectUI.initialize(canvas);
         UIBootstrap.weaponBarUI.initialize(canvas);
+        UIBootstrap.towerSelectUI.initialize(canvas);
 
         // 绑定 UI 画布供 GlitchWave 故障闪屏使用
         GlitchWaveBehavior.bindUICanvas(canvas);
@@ -49,6 +51,10 @@ export class UIBootstrap {
 
     private static get weaponSelectUI(): WeaponSelectUI {
         return ServiceRegistry.get<WeaponSelectUI>('WeaponSelectUI') ?? WeaponSelectUI.instance;
+    }
+
+    private static get towerSelectUI(): TowerSelectUI {
+        return ServiceRegistry.get<TowerSelectUI>('TowerSelectUI') ?? TowerSelectUI.instance;
     }
 
     private static get weaponBarUI(): WeaponBarUI {

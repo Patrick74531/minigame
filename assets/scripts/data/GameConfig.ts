@@ -180,7 +180,7 @@ export const GameConfig = {
             },
             tower: {
                 nameKey: 'building.tower.name',
-                cost: 10,
+                cost: 12,
                 buildTime: 0,
                 descriptionKey: 'building.tower.description',
                 role: 'tower',
@@ -196,7 +196,7 @@ export const GameConfig = {
                 },
                 upgrades: {
                     maxLevel: 5,
-                    costMultiplier: 1.45,
+                    costMultiplier: 1.5,
                     statMultiplier: 1.2,
                     attackMultiplier: 1.22,
                     rangeMultiplier: 1.03,
@@ -229,7 +229,7 @@ export const GameConfig = {
                 },
                 upgrades: {
                     maxLevel: 5,
-                    costMultiplier: 1.45,
+                    costMultiplier: 1.5,
                     statMultiplier: 1.18,
                     attackMultiplier: 1.15,
                     rangeMultiplier: 1.03,
@@ -238,7 +238,7 @@ export const GameConfig = {
             },
             lightning_tower: {
                 nameKey: 'building.lightning_tower.name',
-                cost: 14,
+                cost: 12,
                 buildTime: 0,
                 descriptionKey: 'building.lightning_tower.description',
                 role: 'tower',
@@ -261,7 +261,7 @@ export const GameConfig = {
                 },
                 upgrades: {
                     maxLevel: 5,
-                    costMultiplier: 1.48,
+                    costMultiplier: 1.5,
                     statMultiplier: 1.2,
                     attackMultiplier: 1.2,
                     rangeMultiplier: 1.03,

@@ -33,6 +33,8 @@ export class GameManager extends Singleton<GameManager>() {
     private _coins: number = 0;
     private _score: number = 0;
     private _currentWave: number = 0;
+    /** 暂停请求计数：用于处理多个系统同时请求暂停的场景 */
+    private _pauseRequestCount: number = 0;
 
     // Public reference to Hero for global access (e.g. Magnet logic)
     public hero: Node | null = null;
@@ -73,6 +75,7 @@ export class GameManager extends Singleton<GameManager>() {
         this._coins = 0;
         this._score = 0;
         this._currentWave = 0;
+        this._pauseRequestCount = 0;
         this.hero = null;
         this.activeBuildings = [];
 
@@ -89,6 +92,7 @@ export class GameManager extends Singleton<GameManager>() {
         }
 
         this._gameState = GameState.PLAYING;
+        this._pauseRequestCount = 0;
         PhysicsSystem.instance.enable = true;
         this._coins = GameConfig.ECONOMY.INITIAL_COINS;
 
@@ -99,8 +103,13 @@ export class GameManager extends Singleton<GameManager>() {
      * 暂停游戏
      */
     public pauseGame(): void {
+        if (this._gameState === GameState.PAUSED) {
+            this._pauseRequestCount += 1;
+            return;
+        }
         if (this._gameState !== GameState.PLAYING) return;
 
+        this._pauseRequestCount = 1;
         this._gameState = GameState.PAUSED;
         PhysicsSystem.instance.enable = false;
         this.eventManager.emit(GameEvents.GAME_PAUSE);
@@ -111,7 +120,12 @@ export class GameManager extends Singleton<GameManager>() {
      */
     public resumeGame(): void {
         if (this._gameState !== GameState.PAUSED) return;
+        if (this._pauseRequestCount > 1) {
+            this._pauseRequestCount -= 1;
+            return;
+        }
 
+        this._pauseRequestCount = 0;
         this._gameState = GameState.PLAYING;
         PhysicsSystem.instance.enable = true;
         this.eventManager.emit(GameEvents.GAME_RESUME);
@@ -125,6 +139,7 @@ export class GameManager extends Singleton<GameManager>() {
         if (this._gameState === GameState.GAME_OVER) return;
 
         this._gameState = GameState.GAME_OVER;
+        this._pauseRequestCount = 0;
         PhysicsSystem.instance.enable = false;
         this.eventManager.emit(GameEvents.GAME_OVER, { victory });
     }
@@ -137,6 +152,7 @@ export class GameManager extends Singleton<GameManager>() {
         this._coins = 0;
         this._score = 0;
         this._currentWave = 0;
+        this._pauseRequestCount = 0;
     }
 
     // === 金币系统 ===
