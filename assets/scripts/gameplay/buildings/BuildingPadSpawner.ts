@@ -10,19 +10,28 @@ import { GameConfig } from '../../data/GameConfig';
  */
 export class BuildingPadSpawner {
     public static spawnPads(buildingContainer: Node, buildingManager: BuildingManager): void {
-        const padPositions = GameConfig.BUILDING.PADS;
+        const padPositions = GameConfig.BUILDING.PADS as Array<{
+            type: string;
+            x: number;
+            z: number;
+            angle?: number;
+        }>;
 
         for (const pos of padPositions) {
+            const angle = typeof pos.angle === 'number' ? pos.angle : 0;
+
             // Special handling for Spa: Pre-spawned, invalid interaction (no pad/upgrade)
             if (pos.type === 'spa') {
-                const buildingNode = BuildingFactory.createBuilding(
+                BuildingFactory.createBuilding(
                     buildingContainer,
                     pos.x,
                     pos.z,
-                    pos.type
+                    pos.type,
+                    undefined,
+                    angle
                 );
                 console.log(
-                    `[BuildingPadSpawner] Pre-spawned Static Spa at (${pos.x}, 0, ${pos.z})`
+                    `[BuildingPadSpawner] Pre-spawned Static Spa at (${pos.x}, 0, ${pos.z}), angle=${angle}`
                 );
                 // No pad, no upgrade zone.
                 continue;
@@ -31,8 +40,8 @@ export class BuildingPadSpawner {
             const padNode = new Node(`BuildingPad_${pos.type}`);
             buildingContainer.addChild(padNode);
             padNode.setPosition(pos.x, 0, pos.z);
-            if ((pos as any).angle) {
-                padNode.setRotationFromEuler(0, (pos as any).angle, 0);
+            if (Math.abs(angle) > 0.001) {
+                padNode.setRotationFromEuler(0, angle, 0);
             }
 
             console.log(

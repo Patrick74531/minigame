@@ -81,6 +81,8 @@ export class BuildingPad extends BaseComponent {
     private _state: BuildingPadState = BuildingPadState.WAITING;
     private _collectTimer: number = 0;
     private _label: Label | null = null;
+    private _costLabelNode: Node | null = null;
+    private _coinIconNode: Node | null = null;
     private _heroInRange: boolean = false;
     private _heroNode: Node | null = null;
     private _padMaterial: Material | null = null;
@@ -228,7 +230,7 @@ export class BuildingPad extends BaseComponent {
         // Force update properties even if component existed (e.g. from Prefab)
         col.isTrigger = true;
         col.center = new Vec3(0, 1.0, 0);
-        col.size = new Vec3(2.4, 2.0, 2.4);
+        col.size = new Vec3(2.0, 2.0, 2.0);
 
         col.setGroup(1 << 2); // BUILDING_PAD
         col.setMask(1 << 0); // Collide with HERO
@@ -326,7 +328,7 @@ export class BuildingPad extends BaseComponent {
     }
     
     /**
-     * 创建视觉元素（圆盘和数字）
+     * 创建视觉元素（正方形投放区 + 一行数字/金币）
      */
     private createVisuals(): void {
         // Root for all visuals, lifted slightly to avoid z-fighting with ground
@@ -339,82 +341,65 @@ export class BuildingPad extends BaseComponent {
         visualRoot.addChild(flatRoot);
         flatRoot.setRotationFromEuler(-90, 0, 0);
         flatRoot.addComponent(RenderRoot2D);
-        flatRoot.setScale(0.01, 0.01, 0.01); // Scale down to match world units
+        flatRoot.setScale(0.009, 0.009, 0.009); // Slightly smaller overall pad
 
         // -- Setup Helper for Dashed Drawing --
         const ctx = flatRoot.addComponent(Graphics);
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 4;
         ctx.strokeColor = Color.WHITE;
         ctx.lineJoin = Graphics.LineJoin.ROUND;
         ctx.lineCap = Graphics.LineCap.ROUND;
 
-        const w = 240;
-        const h = 240;
-        const r = 40;
-        // Use 0 radius or just skip corners to match request "No corner circles"
-        // drawing dashed rect with unconnected corners
-        this.drawDashedRectSimple(ctx, -w / 2, -h / 2, w, h, 20, 15);
+        const w = 176;
+        const h = 176;
+        this.drawDashedRectSimple(ctx, -w / 2, -h / 2, w, h, 14, 9);
 
         // -- Content Container (Label + Coin) --
         const contentNode = new Node('Content');
         flatRoot.addChild(contentNode);
+        contentNode.setPosition(0, 0, 0);
 
         // -- Cost Label --
-        // Positioned Top (y > 0)
         const labelNode = new Node('CostLabel');
         contentNode.addChild(labelNode);
-        // Moved Up slightly more to accommodate larger text
-        labelNode.setPosition(0, 60, 0);
+        labelNode.setPosition(-12, 0, 0);
+        this._costLabelNode = labelNode;
 
         const uiTransform = labelNode.addComponent(UITransform);
-        uiTransform.setContentSize(300, 150); // Increased size container
+        uiTransform.setContentSize(120, 72);
 
         this._label = labelNode.addComponent(Label);
         this._label.string = `${this.requiredCoins}`;
-        this._label.fontSize = 120; // Increased from 90
-        this._label.lineHeight = 120;
-        this._label.color = Color.WHITE;
+        this._label.fontSize = 58;
+        this._label.lineHeight = 62;
+        this._label.color = new Color(255, 235, 160, 255);
         this._label.isBold = true;
-        this._label.horizontalAlign = Label.HorizontalAlign.CENTER; // Center align
-        this._label.verticalAlign = Label.VerticalAlign.BOTTOM;
+        this._label.horizontalAlign = Label.HorizontalAlign.RIGHT;
+        this._label.verticalAlign = Label.VerticalAlign.CENTER;
 
         // Add outline for better visibility
         const outline = labelNode.addComponent(LabelOutline);
         outline.color = Color.BLACK;
-        outline.width = 6; // Thicker outline for larger text
+        outline.width = 4;
 
-        // 2. Coin Model (3D)
-        const loadCoin = (path: string, next?: () => void) => {
-            resources.load(path, Prefab, (err, prefab) => {
-                if (err || !prefab) {
-                    if (next) next();
-                    else console.warn(`[BuildingPad] Failed to load coin from ${path}:`, err);
-                    return;
-                }
-                if (!visualRoot.isValid) return;
+        // 2D Coin Icon (inline with number)
+        const coinNode = new Node('CoinInline');
+        contentNode.addChild(coinNode);
+        coinNode.setPosition(40, 0, 0);
+        this._coinIconNode = coinNode;
 
-                const coin = instantiate(prefab);
-                visualRoot.addChild(coin);
-
-                // Position: Bottom (World Z+)
-                // Text is at Y=+60 (flatRoot) => World Z=-0.6
-                // Coin should be at World Z=+0.7 to balance
-                coin.setPosition(0, 0, 0.7);
-
-                // Rotate to lie flat (-90 X)
-                coin.setRotationFromEuler(-90, 0, 0);
-
-                // Scale - Reduced further
-                // Previous 1.2. User said "smaller".
-                // Let's try 0.8.
-                const coinScale = 0.8;
-                coin.setScale(coinScale, coinScale, coinScale);
-            });
-        };
-
-        loadCoin('effects/star_coin', () => {
-            loadCoin('effects/star_coin/star_coin');
-        });
+        coinNode.addComponent(UITransform).setContentSize(44, 44);
+        const coinG = coinNode.addComponent(Graphics);
+        coinG.fillColor = new Color(240, 190, 60, 255);
+        coinG.circle(0, 0, 18);
+        coinG.fill();
+        coinG.strokeColor = new Color(120, 80, 20, 255);
+        coinG.lineWidth = 3;
+        coinG.circle(0, 0, 18);
+        coinG.stroke();
+        coinG.fillColor = new Color(255, 225, 120, 255);
+        coinG.circle(-4, 4, 6);
+        coinG.fill();
     }
 
     private drawDashedRectSimple(
@@ -427,7 +412,7 @@ export class BuildingPad extends BaseComponent {
         gap: number
     ): void {
         // Draw 4 independent dashed lines, leave corners open
-        const cornerGap = 20; // safe space from corner
+        const cornerGap = Math.min(20, Math.min(w, h) * 0.16); // safe space from corner
 
         // Top Edge (y+h)
         this.drawDashedLine(ctx, x + cornerGap, y + h, x + w - cornerGap, y + h, dash, gap);
@@ -477,10 +462,18 @@ export class BuildingPad extends BaseComponent {
 
             if (remaining <= 0) {
                 this._label.string = BuildingText.constructingLabel();
-                this._label.fontSize = 20; // Reduce size for text fit
+                this._label.fontSize = 24;
+                this._label.lineHeight = 30;
+                this._label.horizontalAlign = Label.HorizontalAlign.CENTER;
+                if (this._costLabelNode) this._costLabelNode.setPosition(0, 0, 0);
+                if (this._coinIconNode) this._coinIconNode.active = false;
             } else {
                 this._label.string = `${remaining}`;
-                this._label.fontSize = 50; // Restore size for number
+                this._label.fontSize = 58;
+                this._label.lineHeight = 62;
+                this._label.horizontalAlign = Label.HorizontalAlign.RIGHT;
+                if (this._costLabelNode) this._costLabelNode.setPosition(-12, 0, 0);
+                if (this._coinIconNode) this._coinIconNode.active = true;
             }
 
             if (this.progress >= 1) {
@@ -656,6 +649,7 @@ export class BuildingPad extends BaseComponent {
             if (this._associatedBuilding.level >= maxLvl) {
                 // Max Level Reached
                 if (this._label) this._label.string = BuildingText.maxLabel();
+                if (this._coinIconNode) this._coinIconNode.active = false;
                 return 0;
             }
         }
@@ -846,6 +840,7 @@ export class BuildingPad extends BaseComponent {
                     this._label.string = BuildingText.maxLabel();
                     this._label.color = Color.RED;
                 }
+                if (this._coinIconNode) this._coinIconNode.active = false;
             }
 
             this._isAnimating = false;
