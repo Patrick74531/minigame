@@ -27,6 +27,7 @@ import { HeroWeaponMountController } from './HeroWeaponMountController';
 import { AnimRootScaleLock } from '../visuals/AnimRootScaleLock';
 import { EnemyPaperDollAnimator } from '../visuals/EnemyPaperDollAnimator';
 import { EnemyRoboVacuumAnimator } from '../visuals/EnemyRoboVacuumAnimator';
+import { EnemyFlyingAnimator } from '../visuals/EnemyFlyingAnimator';
 import { SoldierGooseAnimator } from '../visuals/SoldierGooseAnimator';
 import { resolveHeroModelConfig } from './HeroModelConfig';
 import { WeaponType } from '../weapons/WeaponTypes';
@@ -954,43 +955,32 @@ export class UnitFactory {
     }
 
     private static attachEnemyVisual(root: Node, variant: EnemyVisualVariant): void {
-        if (variant === 'robovacuum') {
-            this.attachEnemyRoboVacuumVisual(root);
-            return;
-        }
-        this.attachEnemyPaperVisual(root);
+        this.attachEnemyFlyingVisual(root);
     }
 
-    private static attachEnemyPaperVisual(root: Node): void {
+    private static attachEnemyFlyingVisual(root: Node): void {
         if (!root.isValid) return;
-        const vacuum = root.getComponent(EnemyRoboVacuumAnimator);
-        if (vacuum) {
-            vacuum.destroy();
-        }
-        const vacuumRoot = root.getChildByName('EnemyVacuumRoot');
-        if (vacuumRoot && vacuumRoot.isValid) {
-            vacuumRoot.destroy();
-        }
-        if (root.getComponent(EnemyPaperDollAnimator)) return;
-        root.addComponent(EnemyPaperDollAnimator);
-        const hb = root.getComponent(HealthBar);
-        if (hb) {
-            hb.requestAnchorRefresh();
-        }
-    }
 
-    private static attachEnemyRoboVacuumVisual(root: Node): void {
-        if (!root.isValid) return;
+        // Cleanup old visuals if any
         const paper = root.getComponent(EnemyPaperDollAnimator);
-        if (paper) {
-            paper.destroy();
-        }
+        if (paper) paper.destroy();
+        const vacuum = root.getComponent(EnemyRoboVacuumAnimator);
+        if (vacuum) vacuum.destroy();
+        
         const paperRoot = root.getChildByName('EnemyPaperRoot');
-        if (paperRoot && paperRoot.isValid) {
-            paperRoot.destroy();
+        if (paperRoot) paperRoot.destroy();
+        const vacuumRoot = root.getChildByName('EnemyVacuumRoot');
+        if (vacuumRoot) vacuumRoot.destroy();
+
+        // Attach new animator
+        if (!root.getComponent(EnemyFlyingAnimator)) {
+            const anim = root.addComponent(EnemyFlyingAnimator);
+            anim.modelPath = 'enemies/Robot_Flying';
+            anim.modelPath = 'enemies/Robot_Flying';
+            // Scale and Offset are now handled by component defaults (4.5 and 0.5)
+            // anim.rotationY = 180; // If needed
         }
-        if (root.getComponent(EnemyRoboVacuumAnimator)) return;
-        root.addComponent(EnemyRoboVacuumAnimator);
+
         const hb = root.getComponent(HealthBar);
         if (hb) {
             hb.requestAnchorRefresh();
