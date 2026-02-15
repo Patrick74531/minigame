@@ -1,4 +1,4 @@
-import { _decorator, Vec3, ICollisionEvent, BoxCollider, RigidBody } from 'cc';
+import { _decorator, Vec3, ICollisionEvent, BoxCollider, RigidBody, Node } from 'cc';
 import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
 import { EventManager } from '../../core/managers/EventManager';
@@ -10,6 +10,7 @@ import { CombatService } from '../../core/managers/CombatService';
 import { Soldier } from './Soldier';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { EnemyVisualEvents } from '../visuals/EnemyVisualEvents';
+import { EnemyProjectile } from '../combat/EnemyProjectile';
 
 const { ccclass } = _decorator;
 
@@ -26,6 +27,14 @@ export class Enemy extends Unit {
     private static readonly FAR_LOGIC_STEP = 1 / 12;
     private static readonly FAR_LOGIC_DIST_SQ = 18 * 18;
     private static readonly MIN_ATTACK_RANGE = 0.3;
+    private static readonly RANGED_PROJECTILE_SPEED =
+        GameConfig.ENEMY.FLYING_RANGED.PROJECTILE_SPEED;
+    private static readonly RANGED_PROJECTILE_LIFETIME =
+        GameConfig.ENEMY.FLYING_RANGED.PROJECTILE_LIFETIME;
+    private static readonly RANGED_PROJECTILE_HIT_RADIUS =
+        GameConfig.ENEMY.FLYING_RANGED.PROJECTILE_HIT_RADIUS;
+    private static readonly RANGED_PROJECTILE_SPAWN_OFFSET_Y =
+        GameConfig.ENEMY.FLYING_RANGED.PROJECTILE_SPAWN_OFFSET_Y;
 
     // Target position (Base)
     private _targetPos: Vec3 = new Vec3(0, 0, 0);
@@ -43,8 +52,8 @@ export class Enemy extends Unit {
     private _gmRef: GameManager | null = null;
     private _emRef: EventManager | null = null;
 
-    /** Attack Type: 'standard' (stop & animate) or 'ram' (move & collide) */
-    public attackType: 'standard' | 'ram' = 'standard';
+    /** Attack Type: 'standard' (melee), 'ram' (move & collide) or 'ranged' (projectile) */
+    public attackType: 'standard' | 'ram' | 'ranged' = 'standard';
     private _ramAttackTimer: number = 0;
 
     protected initialize(): void {
@@ -72,6 +81,7 @@ export class Enemy extends Unit {
         this._aggroRange = GameConfig.ENEMY.AGGRO_RANGE;
         this._scanTimer = 0;
         this._logicAccum = Math.random() * Enemy.NEAR_LOGIC_STEP;
+        this._ramAttackTimer = 0;
         this.resetAttackVisualState();
     }
 
@@ -82,6 +92,29 @@ export class Enemy extends Unit {
             col.on('onCollisionStay', this.onCollisionStay, this);
             col.on('onCollisionExit', this.onCollisionExit, this);
         }
+    }
+
+    private fireRangedProjectile(target: IAttackable): void {
+        const parent = this.node.parent;
+        if (!parent || !parent.isValid) return;
+
+        const spawnPos = this.node.position.clone();
+        spawnPos.y += Enemy.RANGED_PROJECTILE_SPAWN_OFFSET_Y;
+
+        const targetPos = target.getWorldPosition();
+        const direction = new Vec3(targetPos.x - spawnPos.x, 0, targetPos.z - spawnPos.z);
+        if (direction.lengthSqr() <= 0.0001) return;
+
+        const projectileNode = new Node('EnemyProjectile');
+        projectileNode.setPosition(spawnPos);
+        parent.addChild(projectileNode);
+
+        const projectile = projectileNode.addComponent(EnemyProjectile);
+        projectile.speed = Enemy.RANGED_PROJECTILE_SPEED;
+        projectile.damage = this._stats.attack;
+        projectile.maxLifetime = Enemy.RANGED_PROJECTILE_LIFETIME;
+        projectile.hitRadius = Enemy.RANGED_PROJECTILE_HIT_RADIUS;
+        projectile.launch(direction, this);
     }
 
     public setTargetPosition(target: Vec3): void {
@@ -123,19 +156,12 @@ export class Enemy extends Unit {
         }
 
         // If Attacking, Don't move (unless it's a 'ram' type enemy)
-        if (
-            this._state === UnitState.ATTACKING &&
-            this.attackType !== 'ram'
-        ) {
+        if (this._state === UnitState.ATTACKING && this.attackType !== 'ram') {
             return;
         }
 
         // For Standard enemies: if target is in range, stop moving (handled by state transition usually, but double check here)
-        if (
-            this.attackType === 'standard' &&
-            this._target &&
-            this.isTargetInRange(this._target)
-        ) {
+        if (this.attackType !== 'ram' && this._target && this.isTargetInRange(this._target)) {
             return;
         }
 
@@ -237,9 +263,12 @@ export class Enemy extends Unit {
 
     protected performAttack(): void {
         if (this._target && this._target.isAlive) {
-            // Deal damage
             const damage = this._stats.attack;
-            this._target.takeDamage(damage, this);
+            if (this.attackType === 'ranged') {
+                this.fireRangedProjectile(this._target);
+            } else {
+                this._target.takeDamage(damage, this);
+            }
             this.node.emit(EnemyVisualEvents.ATTACK_PERFORMED, {
                 attackInterval: this._stats.attackInterval,
                 damage,
@@ -379,16 +408,21 @@ export class Enemy extends Unit {
             return;
         }
 
-        // 3. Check for nearby Soldiers
-        const provider = CombatService.provider;
-        if (provider && provider.findSoldierInRange) {
-            const soldier = provider.findSoldierInRange(myPos, this._aggroRange) as Soldier | null;
-            if (soldier && soldier.isAlive) {
-                this.setTarget(soldier);
-                this._state = this.isTargetInRange(soldier)
-                    ? UnitState.ATTACKING
-                    : UnitState.MOVING;
-                return;
+        // 3. Check for nearby Soldiers (ranged flying enemies ignore soldiers)
+        if (this.attackType !== 'ranged') {
+            const provider = CombatService.provider;
+            if (provider && provider.findSoldierInRange) {
+                const soldier = provider.findSoldierInRange(
+                    myPos,
+                    this._aggroRange
+                ) as Soldier | null;
+                if (soldier && soldier.isAlive) {
+                    this.setTarget(soldier);
+                    this._state = this.isTargetInRange(soldier)
+                        ? UnitState.ATTACKING
+                        : UnitState.MOVING;
+                    return;
+                }
             }
         }
 

@@ -966,7 +966,7 @@ export class UnitFactory {
         if (paper) paper.destroy();
         const vacuum = root.getComponent(EnemyRoboVacuumAnimator);
         if (vacuum) vacuum.destroy();
-        
+
         const paperRoot = root.getChildByName('EnemyPaperRoot');
         if (paperRoot) paperRoot.destroy();
         const vacuumRoot = root.getChildByName('EnemyVacuumRoot');
@@ -978,22 +978,22 @@ export class UnitFactory {
             anim.modelPath = 'enemies/boss/Robot_Flying';
             const models = [
                 // Bosses (Robots)
-                'boss/Robot_Flying', 
-                'boss/Robot_Large', 
-                'boss/Robot_Legs_Gun', 
-                'boss/Mech', 
-                
+                'boss/Robot_Flying',
+                'boss/Robot_Large',
+                'boss/Robot_Legs_Gun',
+                'boss/Mech',
+
                 // Vehicles (Ground)
-                'vehicle/Tank', 
-                'vehicle/Enemy_Turret', 
-                'vehicle/Enemy_Truck', 
-                'vehicle/Enemy_Rover', 
+                'vehicle/Tank',
+                'vehicle/Enemy_Turret',
+                'vehicle/Enemy_Truck',
+                'vehicle/Enemy_Rover',
                 'vehicle/Enemy_RoundRover',
 
                 // Flying (Spaceships)
-                'flying/Spaceship', 
-                'flying/Spaceship_02', 
-                'flying/Spaceship_03'
+                'flying/Spaceship',
+                'flying/Spaceship_02',
+                'flying/Spaceship_03',
             ];
             const selected = models[Math.floor(Math.random() * models.length)];
             anim.modelPath = `enemies/${selected}`;
@@ -1003,6 +1003,12 @@ export class UnitFactory {
             if (enemy) {
                 if (selected.includes('vehicle/')) {
                     enemy.attackType = 'ram';
+                } else if (selected.startsWith('flying/')) {
+                    enemy.attackType = 'ranged';
+                    enemy.setCombatProfile({
+                        aggroRange: GameConfig.ENEMY.FLYING_RANGED.AGGRO_RANGE,
+                        attackRange: GameConfig.ENEMY.FLYING_RANGED.ATTACK_RANGE,
+                    });
                 } else {
                     enemy.attackType = 'standard';
                 }

@@ -431,6 +431,21 @@ export const GameConfig = {
             SCALE_MULTIPLIER: 1.35,
             COIN_DROP_MULTIPLIER: 3.0,
         },
+        /** 飞行敌人（assets/resources/enemies/flying）远程直线弹道参数 */
+        FLYING_RANGED: {
+            /** 远程攻击射程 */
+            ATTACK_RANGE: 5.8,
+            /** 远程敌人的索敌范围 */
+            AGGRO_RANGE: 8.0,
+            /** 弹道速度（直线，不追踪） */
+            PROJECTILE_SPEED: 11,
+            /** 弹道存在时间（秒） */
+            PROJECTILE_LIFETIME: 2.2,
+            /** 命中半径（用于可躲避判定） */
+            PROJECTILE_HIT_RADIUS: 0.42,
+            /** 子弹出生高度偏移 */
+            PROJECTILE_SPAWN_OFFSET_Y: 0.9,
+        },
     },
 
     // === 英雄系统 ===
