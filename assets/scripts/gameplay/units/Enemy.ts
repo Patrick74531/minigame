@@ -43,6 +43,10 @@ export class Enemy extends Unit {
     private _gmRef: GameManager | null = null;
     private _emRef: EventManager | null = null;
 
+    /** Attack Type: 'standard' (stop & animate) or 'ram' (move & collide) */
+    public attackType: 'standard' | 'ram' = 'standard';
+    private _ramAttackTimer: number = 0;
+
     protected initialize(): void {
         super.initialize();
         this.unitType = UnitType.ENEMY;
@@ -118,10 +122,19 @@ export class Enemy extends Unit {
             this._rbCachedEnemy.setLinearVelocity(Vec3.ZERO);
         }
 
-        // If Attacking, Don't move
+        // If Attacking, Don't move (unless it's a 'ram' type enemy)
         if (
-            this._state === UnitState.ATTACKING ||
-            (this._target && this.isTargetInRange(this._target))
+            this._state === UnitState.ATTACKING &&
+            this.attackType !== 'ram'
+        ) {
+            return;
+        }
+
+        // For Standard enemies: if target is in range, stop moving (handled by state transition usually, but double check here)
+        if (
+            this.attackType === 'standard' &&
+            this._target &&
+            this.isTargetInRange(this._target)
         ) {
             return;
         }
@@ -291,6 +304,15 @@ export class Enemy extends Unit {
         }
 
         this.syncAttackVisualState();
+
+        // --- Ram Attack Logic ---
+        if (this.attackType === 'ram' && this._state === UnitState.ATTACKING) {
+            this._ramAttackTimer += tickDt;
+            if (this._ramAttackTimer >= this._stats.attackInterval) {
+                this._ramAttackTimer = 0;
+                this.performAttack();
+            }
+        }
     }
 
     protected isTargetInRange(target: IAttackable): boolean {

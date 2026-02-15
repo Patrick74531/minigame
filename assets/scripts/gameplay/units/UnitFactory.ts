@@ -998,6 +998,16 @@ export class UnitFactory {
             const selected = models[Math.floor(Math.random() * models.length)];
             anim.modelPath = `enemies/${selected}`;
 
+            // Determine attack type based on model
+            const enemy = root.getComponent(Enemy);
+            if (enemy) {
+                if (selected.includes('vehicle/')) {
+                    enemy.attackType = 'ram';
+                } else {
+                    enemy.attackType = 'standard';
+                }
+            }
+
             // Adjust scale based on enemy type
             if (selected.includes('Mech')) {
                 anim.visualScale = 1.5; // Mech reduced by 3x (4.5 / 3)
