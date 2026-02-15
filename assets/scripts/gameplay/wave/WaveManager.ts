@@ -16,14 +16,15 @@ import {
 } from './WaveConfigParsers';
 import { clamp, indexOfMax, randomInt, randomRange, toFinite, toPositiveInt } from './WaveMath';
 import { pickForecastEntry } from './WaveForecast';
+import { getEdgePosition, resolveSpawnPortals, type SpawnPortalPoint } from './WaveSpawnPortals';
 import {
-    getSpawnPosition,
-    resolveActivePortalCount,
-    resolveLaneByPortalIndex,
-    resolveSpawnPortals,
-    type SpawnLane,
-    type SpawnPortalPoint,
-} from './WaveSpawnPortals';
+    laneToForecastLane,
+    resolveLanePortalRouting,
+    ROUTE_LANE_SEQUENCE,
+    type LaneDirection2D,
+    type RouteLane,
+} from './WaveLaneRouting';
+import { LaneFogController } from './LaneFogController';
 import type {
     ArchetypeRuntimeState,
     BossArchetypeConfig,
@@ -73,9 +74,24 @@ export class WaveManager {
     private _waveConfig: WaveConfig | null = null;
     private _wavePlan: WaveSpawnPlan | null = null;
     private _waveSpawnCursor: number = 0;
-    private _forcedFirstSpawnPortalIndex: number | null = null;
+    private _forcedFirstSpawnLane: RouteLane | null = null;
     private _spawnPortals: SpawnPortalPoint[] = [];
     private _waveVisualOffset: number = 0;
+    private _portalIndexByLane: Record<RouteLane, number> = {
+        top: 0,
+        mid: 0,
+        bottom: 0,
+    };
+    private _laneDirectionByLane: Record<RouteLane, LaneDirection2D> = {
+        top: { x: 1, y: 0 },
+        mid: { x: Math.SQRT1_2, y: Math.SQRT1_2 },
+        bottom: { x: 0, y: 1 },
+    };
+    private _unlockedLanes: Set<RouteLane> = new Set<RouteLane>(['mid']);
+    private _nextUnlockLaneCursor: number = 1;
+    private _nextBossLaneCursor: number = 0;
+    private _spawnedEnemyMeta: Map<Node, { spawnType: SpawnType; lane: RouteLane }> = new Map();
+    private _laneFogController: LaneFogController = new LaneFogController();
 
     private _archetypes: EnemyArchetypeConfig[] = [];
     private _archetypeById: Map<string, EnemyArchetypeConfig> = new Map();
@@ -123,9 +139,29 @@ export class WaveManager {
         this._waveConfig = null;
         this._wavePlan = null;
         this._waveSpawnCursor = 0;
+        this._forcedFirstSpawnLane = null;
         this._spawnPortals = resolveSpawnPortals(
             baseNode?.position.x ?? GameConfig.MAP.BASE_SPAWN.x,
             baseNode?.position.z ?? GameConfig.MAP.BASE_SPAWN.z
+        );
+        const routing = resolveLanePortalRouting(
+            baseNode?.position.x ?? GameConfig.MAP.BASE_SPAWN.x,
+            baseNode?.position.z ?? GameConfig.MAP.BASE_SPAWN.z,
+            this._spawnPortals
+        );
+        this._portalIndexByLane = routing.portalIndexByLane;
+        this._laneDirectionByLane = routing.directionByLane;
+        this._unlockedLanes.clear();
+        this._unlockedLanes.add('mid');
+        this._nextUnlockLaneCursor = 1;
+        this._nextBossLaneCursor = 0;
+        this._spawnedEnemyMeta.clear();
+        this._laneFogController.initialize(
+            baseNode,
+            this._portalIndexByLane,
+            this._spawnPortals,
+            this._laneDirectionByLane,
+            this._unlockedLanes
         );
         this.loadInfiniteRandomizerConfig();
 
@@ -150,11 +186,17 @@ export class WaveManager {
 
     private onUnitDied(data: { unitType: string; node?: Node }): void {
         if (data.unitType !== UnitType.ENEMY || !data.node) return;
+        const meta = this._spawnedEnemyMeta.get(data.node);
+        if (meta?.spawnType === 'boss') {
+            this.onBossKilled(meta.lane);
+        }
+        this._spawnedEnemyMeta.delete(data.node);
         this.removeEnemy(data.node);
     }
 
     private onEnemyReachedBase(data: { enemy?: Node }): void {
         if (!data?.enemy) return;
+        this._spawnedEnemyMeta.delete(data.enemy);
         this.removeEnemy(data.enemy);
     }
 
@@ -220,7 +262,7 @@ export class WaveManager {
         this._waveConfig = null;
         this._wavePlan = null;
         this._waveSpawnCursor = 0;
-        this._forcedFirstSpawnPortalIndex = null;
+        this._forcedFirstSpawnLane = null;
         this._waveVisualOffset = waveNumber % 2;
 
         // Difficulty scaling from centralized config
@@ -304,6 +346,7 @@ export class WaveManager {
      * 每帧更新波次生成
      */
     public update(dt: number): void {
+        this._laneFogController.tick(dt);
         if (!this._waveActive || !this._waveConfig) return;
         const waveConfig = this._waveConfig;
 
@@ -388,6 +431,7 @@ export class WaveManager {
         if (idx !== -1) {
             this._enemies.splice(idx, 1);
         }
+        this._spawnedEnemyMeta.delete(enemy);
     }
 
     // === 私有方法 ===
@@ -401,14 +445,8 @@ export class WaveManager {
         if (!archetype) return;
 
         const visualVariant = this.resolveEnemyVisualVariant(this.totalSpawned);
-        const forcedPortalIndex =
-            this._waveSpawnCursor === 0
-                ? (this._forcedFirstSpawnPortalIndex ?? undefined)
-                : undefined;
-        const pos = getSpawnPosition(this._currentWave, this._spawnPortals, forcedPortalIndex);
-        if (this._waveSpawnCursor === 0) {
-            this._forcedFirstSpawnPortalIndex = null;
-        }
+        const spawnLane = this.resolveSpawnLane(entry.spawnType);
+        const pos = this.resolveSpawnPositionByLane(spawnLane);
         const spawnCombat = this.resolveSpawnCombatProfile(entry.spawnType);
         const power = clamp(archetype.power, 0.5, 3.0);
         const powerHpMultiplier = 0.65 + power * 0.85;
@@ -440,6 +478,7 @@ export class WaveManager {
             }
         );
         this._enemies.push(enemy);
+        this._spawnedEnemyMeta.set(enemy, { spawnType: entry.spawnType, lane: spawnLane });
 
         if (entry.spawnType === 'boss') {
             this.unlockBossModelForRegularPool(archetype.modelPath);
@@ -460,22 +499,91 @@ export class WaveManager {
         const entry = pickForecastEntry(wavePlan);
         if (!entry) return;
 
-        const activePortalCount = resolveActivePortalCount(waveNumber, this._spawnPortals.length);
-        const portalIndex =
-            activePortalCount > 0 ? randomInt(0, Math.max(0, activePortalCount - 1)) : 0;
-        this._forcedFirstSpawnPortalIndex = activePortalCount > 0 ? portalIndex : null;
+        const lane = this.resolveForecastLane(entry.spawnType);
+        this._forcedFirstSpawnLane = lane;
 
-        const lane: SpawnLane = resolveLaneByPortalIndex(
-            waveNumber,
-            this._spawnPortals,
-            portalIndex
-        );
         this.eventManager.emit(GameEvents.WAVE_FORECAST, {
             wave: waveNumber,
             archetypeId: entry.archetypeId,
-            lane,
+            lane: laneToForecastLane(lane),
             spawnType: entry.spawnType,
         });
+    }
+
+    private resolveSpawnLane(spawnType: SpawnType): RouteLane {
+        if (this._waveSpawnCursor === 0 && this._forcedFirstSpawnLane) {
+            const lane = this._forcedFirstSpawnLane;
+            this._forcedFirstSpawnLane = null;
+            return lane;
+        }
+
+        if (spawnType === 'boss') {
+            return this.getCurrentBossLane();
+        }
+        return this.pickRandomUnlockedLane();
+    }
+
+    private resolveForecastLane(spawnType: SpawnType): RouteLane {
+        if (spawnType === 'boss') {
+            return this.getCurrentBossLane();
+        }
+        return this.pickRandomUnlockedLane();
+    }
+
+    private getCurrentBossLane(): RouteLane {
+        return ROUTE_LANE_SEQUENCE[this._nextBossLaneCursor] ?? 'mid';
+    }
+
+    private pickRandomUnlockedLane(): RouteLane {
+        const lanes = ROUTE_LANE_SEQUENCE.filter(lane => this._unlockedLanes.has(lane));
+        if (lanes.length <= 0) return 'mid';
+        const idx = randomInt(0, Math.max(0, lanes.length - 1));
+        return lanes[idx] ?? 'mid';
+    }
+
+    private resolveSpawnPositionByLane(lane: RouteLane): SpawnPortalPoint {
+        const portalIndex = this._portalIndexByLane[lane];
+        const portal = this._spawnPortals[portalIndex] ?? getEdgePosition();
+        return this.samplePortalPosition(portal);
+    }
+
+    private samplePortalPosition(portal: SpawnPortalPoint): SpawnPortalPoint {
+        const jitterRadius = GameConfig.WAVE.INFINITE.SPAWN_PORTALS?.JITTER_RADIUS ?? 0;
+        if (jitterRadius <= 0) {
+            return { x: portal.x, y: portal.y };
+        }
+
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.sqrt(Math.random()) * jitterRadius;
+        const x = portal.x + Math.cos(angle) * radius;
+        const y = portal.y + Math.sin(angle) * radius;
+        const limits = GameConfig.MAP.LIMITS;
+        return {
+            x: Math.max(-limits.x, Math.min(limits.x, x)),
+            y: Math.max(-limits.z, Math.min(limits.z, y)),
+        };
+    }
+
+    private onBossKilled(_lane: RouteLane): void {
+        if (this._nextUnlockLaneCursor < ROUTE_LANE_SEQUENCE.length) {
+            const laneToUnlock = ROUTE_LANE_SEQUENCE[this._nextUnlockLaneCursor];
+            if (laneToUnlock) {
+                this.unlockLane(laneToUnlock);
+                this._nextBossLaneCursor = this._nextUnlockLaneCursor;
+                this._nextUnlockLaneCursor++;
+            }
+            return;
+        }
+
+        this._nextBossLaneCursor =
+            (this._nextBossLaneCursor + 1) % Math.max(1, ROUTE_LANE_SEQUENCE.length);
+    }
+
+    private unlockLane(lane: RouteLane): void {
+        if (this._unlockedLanes.has(lane)) return;
+        this._unlockedLanes.add(lane);
+        this._laneFogController.unlockLane(lane);
+        this.eventManager.emit(GameEvents.LANE_UNLOCKED, { lane });
     }
 
     private resolveSpawnCombatProfile(spawnType: SpawnType): SpawnCombatProfile {
@@ -1342,9 +1450,11 @@ export class WaveManager {
         this._enemies = [];
         this._wavePlan = null;
         this._waveSpawnCursor = 0;
-        this._forcedFirstSpawnPortalIndex = null;
+        this._forcedFirstSpawnLane = null;
         this._waveConfig = null;
         this._waveActive = false;
+        this._spawnedEnemyMeta.clear();
+        this._laneFogController.cleanup();
     }
 
     private get eventManager(): EventManager {

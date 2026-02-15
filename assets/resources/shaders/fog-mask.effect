@@ -1,0 +1,148 @@
+// Lane Fog Mask
+// Ground-space fog with dual noise flow and soft lane-edge masking.
+
+CCEffect %{
+  techniques:
+  - name: transparent
+    passes:
+    - vert: fog-mask-vs:vert
+      frag: fog-mask-fs:frag
+      depthStencilState:
+        depthTest: true
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendSrcAlpha: src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      properties:
+        fogTexA: { value: white }
+        fogTexB: { value: white }
+        tintColor: { value: [0.84, 0.9, 0.92, 1.0], editor: { type: color } }
+        flowA: { value: [0.19, 0.17, 0.010, 0.004] }
+        flowB: { value: [0.37, 0.31, -0.007, 0.005] }
+        laneWidth: { value: [5.4, 10.8, 1.8, 0.0] }
+        alphaParams: { value: [0.58, 0.26, 0.80, 0.18] }
+        noiseParams: { value: [0.72, 0.18, 1.35, 0.09] }
+        lanePointCount: { value: 2.0 }
+        lanePoint0: { value: [0.0, 0.0, 0.0, 0.0] }
+        lanePoint1: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint2: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint3: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint4: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint5: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint6: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint7: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint8: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint9: { value: [1.0, 0.0, 0.0, 0.0] }
+        time: { value: 0.0 }
+}%
+
+CCProgram fog-mask-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #include <builtin/uniforms/cc-local>
+
+  in vec3 a_position;
+  out vec2 v_worldXZ;
+
+  vec4 vert () {
+    vec4 worldPos = cc_matWorld * vec4(a_position, 1.0);
+    v_worldXZ = worldPos.xz;
+    return cc_matProj * cc_matView * worldPos;
+  }
+}%
+
+CCProgram fog-mask-fs %{
+  precision highp float;
+
+  in vec2 v_worldXZ;
+
+  uniform sampler2D fogTexA;
+  uniform sampler2D fogTexB;
+
+  uniform FogMaskParams {
+    vec4 tintColor;
+    vec4 flowA;
+    vec4 flowB;
+    vec4 laneWidth;
+    vec4 alphaParams;
+    vec4 noiseParams;
+    vec4 lanePoint0;
+    vec4 lanePoint1;
+    vec4 lanePoint2;
+    vec4 lanePoint3;
+    vec4 lanePoint4;
+    vec4 lanePoint5;
+    vec4 lanePoint6;
+    vec4 lanePoint7;
+    vec4 lanePoint8;
+    vec4 lanePoint9;
+    float lanePointCount;
+    float time;
+  };
+
+  float segmentDistance(vec2 p, vec2 a, vec2 b) {
+    vec2 ab = b - a;
+    float d = dot(ab, ab);
+    if (d <= 0.0001) return length(p - a);
+    float t = clamp(dot(p - a, ab) / d, 0.0, 1.0);
+    vec2 c = a + ab * t;
+    return length(p - c);
+  }
+
+  float maskedDistance(float d, float enabled) {
+    return mix(99999.0, d, enabled);
+  }
+
+  vec4 frag () {
+    vec2 p = v_worldXZ;
+    float count = lanePointCount;
+
+    float d0 = maskedDistance(segmentDistance(p, lanePoint0.xy, lanePoint1.xy), step(1.5, count));
+    float d1 = maskedDistance(segmentDistance(p, lanePoint1.xy, lanePoint2.xy), step(2.5, count));
+    float d2 = maskedDistance(segmentDistance(p, lanePoint2.xy, lanePoint3.xy), step(3.5, count));
+    float d3 = maskedDistance(segmentDistance(p, lanePoint3.xy, lanePoint4.xy), step(4.5, count));
+    float d4 = maskedDistance(segmentDistance(p, lanePoint4.xy, lanePoint5.xy), step(5.5, count));
+    float d5 = maskedDistance(segmentDistance(p, lanePoint5.xy, lanePoint6.xy), step(6.5, count));
+    float d6 = maskedDistance(segmentDistance(p, lanePoint6.xy, lanePoint7.xy), step(7.5, count));
+    float d7 = maskedDistance(segmentDistance(p, lanePoint7.xy, lanePoint8.xy), step(8.5, count));
+    float d8 = maskedDistance(segmentDistance(p, lanePoint8.xy, lanePoint9.xy), step(9.5, count));
+
+    float laneDist = min(min(min(d0, d1), min(d2, d3)), min(min(d4, d5), min(d6, min(d7, d8))));
+
+    vec2 uvA = p * flowA.xy + flowA.zw * time;
+    vec2 uvB = p * flowB.xy + flowB.zw * time;
+
+    float nA = texture(fogTexA, uvA).r;
+    float nB = texture(fogTexB, uvB).g;
+    float nMix = mix(nA, nB, 0.52);
+
+    vec2 warpUv = uvA * noiseParams.x + vec2(time * noiseParams.y, -time * noiseParams.y * 0.63);
+    float warp = (texture(fogTexB, warpUv).r - 0.5) * 2.0 * laneWidth.z;
+    float warpedDist = laneDist + warp;
+
+    float laneMask = 1.0 - smoothstep(laneWidth.x, laneWidth.y, warpedDist);
+    laneMask = clamp(laneMask, 0.0, 1.0);
+
+    float low = min(alphaParams.y, alphaParams.z);
+    float high = max(alphaParams.y, alphaParams.z);
+    float density = smoothstep(low, high, nMix);
+
+    // Tiny drifting bright puffs to fake lightweight particle accents.
+    vec2 moteUv = p * noiseParams.z + vec2(time * noiseParams.w, -time * noiseParams.w * 0.71);
+    float moteA = texture(fogTexA, moteUv).r;
+    float moteB = texture(fogTexB, moteUv * 1.73 + vec2(4.37, -2.11)).g;
+    float motes = smoothstep(0.74, 0.93, mix(moteA, moteB, 0.5)) * alphaParams.w;
+
+    float alpha = laneMask * clamp(density + motes, 0.0, 1.0) * alphaParams.x;
+    alpha = clamp(alpha, 0.0, 1.0);
+
+    vec3 color = tintColor.rgb * (0.92 + nMix * 0.16);
+    return vec4(color, alpha);
+  }
+}%
