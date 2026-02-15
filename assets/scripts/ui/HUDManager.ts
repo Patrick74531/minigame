@@ -1,4 +1,15 @@
-import { Node, Label, Color, UITransform, Widget, Graphics } from 'cc';
+import {
+    Node,
+    Label,
+    Color,
+    UITransform,
+    Widget,
+    Graphics,
+    UIOpacity,
+    Tween,
+    tween,
+    Vec3,
+} from 'cc';
 import { EventManager } from '../core/managers/EventManager';
 import { GameEvents } from '../data/GameEvents';
 import { UIFactory } from './UIFactory';
@@ -40,6 +51,14 @@ export class HUDManager {
     private _xpBarWidth: number = 260;
     private _xpBarHeight: number = 14;
 
+    // === 波前预告 UI ===
+    private _waveForecastRoot: Node | null = null;
+    private _waveForecastLabel: Label | null = null;
+    private _waveForecastBg: Graphics | null = null;
+    private _waveForecastOpacity: UIOpacity | null = null;
+    private readonly _waveForecastWidth: number = 620;
+    private readonly _waveForecastHeight: number = 66;
+
     /**
      * 初始化 HUD
      */
@@ -51,6 +70,7 @@ export class HUDManager {
         uiCanvas.getChildByName('BaseHPLabel')?.destroy();
         uiCanvas.getChildByName('BuildingInfo')?.destroy();
         uiCanvas.getChildByName('WaveLabel')?.destroy();
+        uiCanvas.getChildByName('WaveForecastBanner')?.destroy();
 
         // 创建金币显示
         this._coinLabel = UIFactory.createCoinDisplay(uiCanvas);
@@ -69,7 +89,7 @@ export class HUDManager {
         hpWidget.isAlignTop = true;
         hpWidget.isAlignHorizontalCenter = true;
         hpWidget.top = 20;
-        
+
         this._baseHpLabel.fontSize = 24;
 
         // 创建建造点信息显示
@@ -81,7 +101,7 @@ export class HUDManager {
             Localization.instance.t('ui.hud.wave', { wave: 1 }),
             'WaveLabel'
         );
-        
+
         // Position using Widget
         const waveWidget = this._waveLabel.node.addComponent(Widget);
         waveWidget.isAlignTop = true;
@@ -94,6 +114,7 @@ export class HUDManager {
 
         // 创建经验条 (Top Center)
         this.createXpBar(uiCanvas);
+        this.createWaveForecastBanner(uiCanvas);
 
         // 监听事件
         this.setupEventListeners();
@@ -129,6 +150,7 @@ export class HUDManager {
     private setupEventListeners(): void {
         // 监听波次开始
         this.eventManager.on(GameEvents.WAVE_START, this.onWaveStart, this);
+        this.eventManager.on(GameEvents.WAVE_FORECAST, this.onWaveForecast, this);
         this.eventManager.on(GameEvents.WAVE_COMPLETE, this.onWaveComplete, this);
         // 监听英雄经验变化
         this.eventManager.on(GameEvents.HERO_XP_GAINED, this.onXpGained, this);
@@ -205,8 +227,36 @@ export class HUDManager {
         this.updateWaveDisplay(wave);
     }
 
-    private onWaveComplete(data: { wave?: number; bonus?: number }): void {
+    private onWaveComplete(_data: { wave?: number; bonus?: number }): void {
         // 可以在这里显示波次完成的提示
+    }
+
+    private onWaveForecast(data: {
+        wave?: number;
+        archetypeId?: string;
+        lane?: 'left' | 'center' | 'right';
+        spawnType?: 'regular' | 'elite' | 'boss';
+    }): void {
+        const archetypeId = (data.archetypeId ?? '').trim();
+        if (!archetypeId) return;
+
+        const lane = data.lane ?? 'center';
+        const spawnType = data.spawnType ?? 'regular';
+        const enemyName = this.resolveForecastEnemyName(archetypeId);
+        const laneName = Localization.instance.t(`ui.waveForecast.lane.${lane}`);
+        const header = Localization.instance.t(
+            spawnType === 'boss' ? 'ui.waveForecast.header.boss' : 'ui.waveForecast.header.normal'
+        );
+        const body = Localization.instance.t(
+            spawnType === 'boss'
+                ? 'ui.waveForecast.message.boss'
+                : 'ui.waveForecast.message.normal',
+            {
+                enemy: enemyName,
+                lane: laneName,
+            }
+        );
+        this.showWaveForecastBanner(`${header} ${body}`, spawnType === 'boss');
     }
 
     private onXpGained(data: {
@@ -315,11 +365,116 @@ export class HUDManager {
         }
     }
 
+    private createWaveForecastBanner(parent: Node): void {
+        const root = new Node('WaveForecastBanner');
+        root.layer = UI_LAYER;
+        parent.addChild(root);
+
+        const transform = root.addComponent(UITransform);
+        transform.setContentSize(this._waveForecastWidth, this._waveForecastHeight);
+
+        const widget = root.addComponent(Widget);
+        widget.isAlignTop = true;
+        widget.isAlignHorizontalCenter = true;
+        widget.top = 66;
+
+        this._waveForecastOpacity = root.addComponent(UIOpacity);
+        this._waveForecastOpacity.opacity = 0;
+
+        const bgNode = new Node('WaveForecastBg');
+        bgNode.layer = UI_LAYER;
+        root.addChild(bgNode);
+        bgNode.addComponent(UITransform);
+        this._waveForecastBg = bgNode.addComponent(Graphics);
+
+        const labelNode = new Node('WaveForecastText');
+        labelNode.layer = UI_LAYER;
+        root.addChild(labelNode);
+        labelNode.addComponent(UITransform);
+        this._waveForecastLabel = labelNode.addComponent(Label);
+        this._waveForecastLabel.string = '';
+        this._waveForecastLabel.fontSize = 28;
+        this._waveForecastLabel.lineHeight = 34;
+        this._waveForecastLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this._waveForecastLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._waveForecastLabel.color = new Color(120, 235, 255, 255);
+
+        this._waveForecastRoot = root;
+        this.drawWaveForecastBackground(false);
+        root.active = false;
+    }
+
+    private resolveForecastEnemyName(archetypeId: string): string {
+        const key = `enemy.archetype.${archetypeId}`;
+        const localized = Localization.instance.t(key);
+        if (localized.startsWith('[[')) {
+            return archetypeId;
+        }
+        return localized;
+    }
+
+    private drawWaveForecastBackground(isBoss: boolean): void {
+        if (!this._waveForecastBg) return;
+        const bg = this._waveForecastBg;
+        const width = this._waveForecastWidth;
+        const height = this._waveForecastHeight;
+
+        bg.clear();
+        bg.fillColor = isBoss ? new Color(76, 18, 18, 235) : new Color(14, 34, 54, 225);
+        bg.roundRect(-width / 2, -height / 2, width, height, 10);
+        bg.fill();
+        bg.strokeColor = isBoss ? new Color(255, 110, 110, 255) : new Color(80, 210, 255, 255);
+        bg.lineWidth = 3;
+        bg.roundRect(-width / 2, -height / 2, width, height, 10);
+        bg.stroke();
+    }
+
+    private showWaveForecastBanner(text: string, isBoss: boolean): void {
+        if (!this._waveForecastRoot || !this._waveForecastLabel || !this._waveForecastOpacity) {
+            return;
+        }
+
+        this._waveForecastLabel.string = text;
+        this._waveForecastLabel.color = isBoss
+            ? new Color(255, 130, 130, 255)
+            : new Color(120, 235, 255, 255);
+        this.drawWaveForecastBackground(isBoss);
+
+        Tween.stopAllByTarget(this._waveForecastRoot);
+        Tween.stopAllByTarget(this._waveForecastOpacity);
+
+        this._waveForecastRoot.active = true;
+        this._waveForecastRoot.setScale(0.92, 0.92, 1);
+        this._waveForecastOpacity.opacity = 0;
+
+        tween(this._waveForecastRoot)
+            .to(0.14, { scale: new Vec3(1.03, 1.03, 1) })
+            .to(0.18, { scale: new Vec3(1, 1, 1) })
+            .start();
+
+        tween(this._waveForecastOpacity)
+            .to(0.14, { opacity: 255 })
+            .delay(2.2)
+            .to(0.25, { opacity: 0 })
+            .call(() => {
+                if (this._waveForecastRoot) {
+                    this._waveForecastRoot.active = false;
+                }
+            })
+            .start();
+    }
+
     /**
      * 清理
      */
     public cleanup(): void {
         this.eventManager.offAllByTarget(this);
+        if (this._waveForecastRoot) {
+            Tween.stopAllByTarget(this._waveForecastRoot);
+        }
+        if (this._waveForecastOpacity) {
+            Tween.stopAllByTarget(this._waveForecastOpacity);
+        }
         this._coinLabel = null;
         this._waveLabel = null;
         this._buildingInfoLabel = null;
@@ -327,6 +482,10 @@ export class HUDManager {
         this._xpBarBg = null;
         this._xpBarFg = null;
         this._levelLabel = null;
+        this._waveForecastRoot = null;
+        this._waveForecastLabel = null;
+        this._waveForecastBg = null;
+        this._waveForecastOpacity = null;
         this._uiCanvas = null;
     }
 

@@ -30,6 +30,7 @@ import { resolveHeroModelConfig } from './HeroModelConfig';
 import { WeaponType } from '../weapons/WeaponTypes';
 import { attachEnemyVisual } from './EnemyVisualFactory';
 import type { EnemyAttackType, EnemyVisualVariant } from './EnemyVisualTypes';
+import { findChildByName, findRightHandBone, pathBaseName } from './UnitFactoryHeroSearch';
 
 export type { EnemyAttackType, EnemyVisualVariant } from './EnemyVisualTypes';
 
@@ -686,20 +687,20 @@ export class UnitFactory {
             const cfg = visuals[type];
             const handName = cfg?.handBone;
             if (handName) {
-                handNode = this.findChildByName(model, handName);
+                handNode = findChildByName(model, handName);
                 if (handNode) break;
             }
         }
 
         if (!handNode) {
-            handNode = this.findRightHandBone(model);
+            handNode = findRightHandBone(model);
         }
         if (!handNode) {
             console.warn('[UnitFactory] Hero right hand bone not found for weapon mount.');
             return;
         }
 
-        const legacySocketInModel = this.findChildByName(model, this.HERO_WEAPON_SOCKET_NAME);
+        const legacySocketInModel = findChildByName(model, this.HERO_WEAPON_SOCKET_NAME);
         if (legacySocketInModel && legacySocketInModel.parent !== root) {
             legacySocketInModel.destroy();
         }
@@ -723,8 +724,7 @@ export class UnitFactory {
             prefabPath: sharedCfg?.prefab?.path ?? defaultPath,
             prefabFallbacks: sharedCfg?.prefab?.fallbacks ?? [],
         });
-        const preferredName =
-            this.pathBaseName(sharedCfg?.prefab?.path) ?? this.pathBaseName(defaultPath);
+        const preferredName = pathBaseName(sharedCfg?.prefab?.path) ?? pathBaseName(defaultPath);
         this.loadWeaponPrefab(
             paths,
             preferredName ?? 'blaster-h',
@@ -820,73 +820,6 @@ export class UnitFactory {
             // UUID 失败后回退路径方案，兼容资源重导入导致 UUID 变化
             tryLoadByPath();
         });
-    }
-
-    private static findChildByName(root: Node, name: string): Node | null {
-        if (root.name === name) return root;
-        for (const child of root.children) {
-            const found = this.findChildByName(child, name);
-            if (found) return found;
-        }
-        return null;
-    }
-
-    private static pathBaseName(path?: string): string | null {
-        if (!path) return null;
-        const trimmed = path.trim();
-        if (!trimmed) return null;
-        const idx = trimmed.lastIndexOf('/');
-        const base = idx >= 0 ? trimmed.slice(idx + 1) : trimmed;
-        return base || null;
-    }
-
-    private static findRightHandBone(root: Node): Node | null {
-        const exactNames = [
-            'mixamorig:RightHand',
-            'mixamorig_RightHand',
-            'RightHand',
-            'right_hand',
-            'Hand.R',
-            'hand_r',
-        ];
-        for (const name of exactNames) {
-            const node = this.findChildByName(root, name);
-            if (node) return node;
-        }
-
-        const allNodes: Node[] = [];
-        this.collectChildren(root, allNodes);
-        let best: Node | null = null;
-        let bestScore = -1;
-
-        for (const node of allNodes) {
-            const score = this.scoreRightHandName(node.name);
-            if (score > bestScore) {
-                best = node;
-                bestScore = score;
-            }
-        }
-        return bestScore >= 3 ? best : null;
-    }
-
-    private static collectChildren(root: Node, out: Node[]): void {
-        out.push(root);
-        for (const child of root.children) {
-            this.collectChildren(child, out);
-        }
-    }
-
-    private static scoreRightHandName(name: string): number {
-        if (!name) return 0;
-        const raw = name.toLowerCase();
-        const compact = raw.replace(/[^a-z0-9]/g, '');
-        let score = 0;
-        if (compact.includes('righthand')) score += 6;
-        if (compact.includes('hand') && compact.includes('right')) score += 4;
-        if (compact.includes('handr') || compact.includes('rhand')) score += 3;
-        if (compact.includes('right')) score += 1;
-        if (compact.includes('hand')) score += 1;
-        return score;
     }
 
     private static applyWeaponVisualMaterial(root: Node): void {

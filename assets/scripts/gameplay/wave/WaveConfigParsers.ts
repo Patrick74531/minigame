@@ -126,7 +126,7 @@ export function normalizeBossEventConfig(raw: unknown): BossEventConfig | null {
         BOSS_ONLY_WAVE: obj.BOSS_ONLY_WAVE !== false,
         ADDITIONAL_ENEMY_COUNT: toNonNegativeInt(obj.ADDITIONAL_ENEMY_COUNT, 0),
         COMBAT: {
-            BOSS_HP_MULTIPLIER: clamp(toFinite(obj.BOSS_HP_MULTIPLIER, 6.2), 1, 40),
+            BOSS_HP_MULTIPLIER: clamp(toFinite(obj.BOSS_HP_MULTIPLIER, 14), 1, 40),
             BOSS_ATTACK_MULTIPLIER: clamp(toFinite(obj.BOSS_ATTACK_MULTIPLIER, 3.2), 1, 20),
             BOSS_SPEED_MULTIPLIER: clamp(toFinite(obj.BOSS_SPEED_MULTIPLIER, 1), 0.4, 3),
             BOSS_SCALE_MULTIPLIER: clamp(toFinite(obj.BOSS_SCALE_MULTIPLIER, 1.75), 1, 8),

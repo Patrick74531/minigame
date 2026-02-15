@@ -34,6 +34,8 @@ export const GameEvents = {
     // === 波次系统 ===
     /** 波次开始 { wave?: number, waveIndex?: number, enemyCount?: number } */
     WAVE_START: 'WAVE_START',
+    /** 波前预告 { wave?: number, archetypeId?: string, lane?: 'left'|'center'|'right', spawnType?: 'regular'|'elite'|'boss' } */
+    WAVE_FORECAST: 'WAVE_FORECAST',
     /** 波次完成 { wave?: number, waveIndex?: number, bonus?: number } */
     WAVE_COMPLETE: 'WAVE_COMPLETE',
     /** 所有波次完成 */
@@ -116,6 +118,12 @@ export type GameEventPayloads = {
     [GameEvents.ENEMY_KILLED]: { enemy: Node; position?: Vec3 };
     [GameEvents.ENEMY_REACHED_BASE]: { enemy: Node; damage: number };
     [GameEvents.WAVE_START]: { wave?: number; waveIndex?: number; enemyCount?: number };
+    [GameEvents.WAVE_FORECAST]: {
+        wave?: number;
+        archetypeId?: string;
+        lane?: 'left' | 'center' | 'right';
+        spawnType?: 'regular' | 'elite' | 'boss';
+    };
     [GameEvents.WAVE_COMPLETE]: { wave?: number; waveIndex?: number; bonus?: number };
     [GameEvents.ALL_WAVES_COMPLETE]: void;
     [GameEvents.GAME_START]: void;

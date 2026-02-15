@@ -5,6 +5,8 @@ export interface SpawnPortalPoint {
     y: number;
 }
 
+export type SpawnLane = 'left' | 'center' | 'right';
+
 export function getEdgePosition(): SpawnPortalPoint {
     const limits = GameConfig.MAP.LIMITS;
     return { x: limits.x, y: limits.z };
@@ -12,14 +14,15 @@ export function getEdgePosition(): SpawnPortalPoint {
 
 export function getSpawnPosition(
     waveNumber: number,
-    portals: SpawnPortalPoint[]
+    portals: SpawnPortalPoint[],
+    forcedPortalIndex?: number
 ): SpawnPortalPoint {
     if (portals.length === 0) {
         return getEdgePosition();
     }
 
     const activeCount = resolveActivePortalCount(waveNumber, portals.length);
-    const portalIdx = Math.floor(Math.random() * activeCount);
+    const portalIdx = resolvePortalIndex(activeCount, forcedPortalIndex);
     const portal = portals[portalIdx];
     const jitterRadius = GameConfig.WAVE.INFINITE.SPAWN_PORTALS?.JITTER_RADIUS ?? 0;
     if (jitterRadius <= 0) {
@@ -44,6 +47,42 @@ export function resolveActivePortalCount(waveNumber: number, portalCount: number
     if (waveNumber >= openWave3) return Math.min(3, portalCount);
     if (waveNumber >= openWave2) return Math.min(2, portalCount);
     return Math.min(1, portalCount);
+}
+
+export function resolveLaneByPortalIndex(
+    waveNumber: number,
+    portals: SpawnPortalPoint[],
+    portalIndex: number
+): SpawnLane {
+    if (portals.length <= 0) return 'center';
+
+    const activeCount = resolveActivePortalCount(waveNumber, portals.length);
+    if (activeCount <= 1) return 'center';
+
+    const safePortalIndex = Math.max(0, Math.min(Math.floor(portalIndex), activeCount - 1));
+    const ordered = portals
+        .slice(0, activeCount)
+        .map((portal, idx) => ({ idx, portal }))
+        .sort((a, b) => {
+            if (a.portal.x !== b.portal.x) return a.portal.x - b.portal.x;
+            return a.portal.y - b.portal.y;
+        });
+
+    const rank = ordered.findIndex(item => item.idx === safePortalIndex);
+    if (rank <= 0) return 'left';
+    if (rank >= ordered.length - 1) return 'right';
+    return 'center';
+}
+
+function resolvePortalIndex(activeCount: number, forcedPortalIndex?: number): number {
+    if (activeCount <= 1) return 0;
+    if (typeof forcedPortalIndex === 'number' && Number.isFinite(forcedPortalIndex)) {
+        const safeForced = Math.floor(forcedPortalIndex);
+        if (safeForced >= 0 && safeForced < activeCount) {
+            return safeForced;
+        }
+    }
+    return Math.floor(Math.random() * activeCount);
 }
 
 export function resolveSpawnPortals(baseX: number, baseY: number): SpawnPortalPoint[] {

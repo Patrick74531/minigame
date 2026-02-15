@@ -15,7 +15,15 @@ import {
     normalizeRhythmTemplates,
 } from './WaveConfigParsers';
 import { clamp, indexOfMax, randomInt, randomRange, toFinite, toPositiveInt } from './WaveMath';
-import { getSpawnPosition, resolveSpawnPortals, type SpawnPortalPoint } from './WaveSpawnPortals';
+import { pickForecastEntry } from './WaveForecast';
+import {
+    getSpawnPosition,
+    resolveActivePortalCount,
+    resolveLaneByPortalIndex,
+    resolveSpawnPortals,
+    type SpawnLane,
+    type SpawnPortalPoint,
+} from './WaveSpawnPortals';
 import type {
     ArchetypeRuntimeState,
     BossArchetypeConfig,
@@ -65,6 +73,7 @@ export class WaveManager {
     private _waveConfig: WaveConfig | null = null;
     private _wavePlan: WaveSpawnPlan | null = null;
     private _waveSpawnCursor: number = 0;
+    private _forcedFirstSpawnPortalIndex: number | null = null;
     private _spawnPortals: SpawnPortalPoint[] = [];
     private _waveVisualOffset: number = 0;
 
@@ -208,8 +217,10 @@ export class WaveManager {
         this._bossSpawned = 0;
         this._enemySpawnTimer = 0;
         this._nextSpawnInterval = 0;
+        this._waveConfig = null;
         this._wavePlan = null;
         this._waveSpawnCursor = 0;
+        this._forcedFirstSpawnPortalIndex = null;
         this._waveVisualOffset = waveNumber % 2;
 
         // Difficulty scaling from centralized config
@@ -279,6 +290,8 @@ export class WaveManager {
                 `节奏=${wavePlan.rhythmTemplateId}`
         );
         console.log('═══════════════════════════════════════');
+
+        this.emitWaveForecast(waveNumber, wavePlan);
 
         this.eventManager.emit(GameEvents.WAVE_START, {
             wave: waveNumber,
@@ -388,7 +401,14 @@ export class WaveManager {
         if (!archetype) return;
 
         const visualVariant = this.resolveEnemyVisualVariant(this.totalSpawned);
-        const pos = getSpawnPosition(this._currentWave, this._spawnPortals);
+        const forcedPortalIndex =
+            this._waveSpawnCursor === 0
+                ? (this._forcedFirstSpawnPortalIndex ?? undefined)
+                : undefined;
+        const pos = getSpawnPosition(this._currentWave, this._spawnPortals, forcedPortalIndex);
+        if (this._waveSpawnCursor === 0) {
+            this._forcedFirstSpawnPortalIndex = null;
+        }
         const spawnCombat = this.resolveSpawnCombatProfile(entry.spawnType);
         const power = clamp(archetype.power, 0.5, 3.0);
         const powerHpMultiplier = 0.65 + power * 0.85;
@@ -436,12 +456,34 @@ export class WaveManager {
         return ((spawnIndex + this._waveVisualOffset) & 1) === 0 ? 'robot' : 'robovacuum';
     }
 
+    private emitWaveForecast(waveNumber: number, wavePlan: WaveSpawnPlan): void {
+        const entry = pickForecastEntry(wavePlan);
+        if (!entry) return;
+
+        const activePortalCount = resolveActivePortalCount(waveNumber, this._spawnPortals.length);
+        const portalIndex =
+            activePortalCount > 0 ? randomInt(0, Math.max(0, activePortalCount - 1)) : 0;
+        this._forcedFirstSpawnPortalIndex = activePortalCount > 0 ? portalIndex : null;
+
+        const lane: SpawnLane = resolveLaneByPortalIndex(
+            waveNumber,
+            this._spawnPortals,
+            portalIndex
+        );
+        this.eventManager.emit(GameEvents.WAVE_FORECAST, {
+            wave: waveNumber,
+            archetypeId: entry.archetypeId,
+            lane,
+            spawnType: entry.spawnType,
+        });
+    }
+
     private resolveSpawnCombatProfile(spawnType: SpawnType): SpawnCombatProfile {
         const elite = GameConfig.ENEMY.ELITE;
         if (spawnType === 'boss') {
             const combat = this._bossEventConfig?.COMBAT;
             return {
-                hpMultiplier: clamp(toFinite(combat?.BOSS_HP_MULTIPLIER, 6.2), 1, 40),
+                hpMultiplier: clamp(toFinite(combat?.BOSS_HP_MULTIPLIER, 14), 1, 40),
                 attackMultiplier: clamp(toFinite(combat?.BOSS_ATTACK_MULTIPLIER, 3.2), 1, 20),
                 speedMultiplier: clamp(toFinite(combat?.BOSS_SPEED_MULTIPLIER, 1), 0.4, 3),
                 scaleMultiplier: clamp(toFinite(combat?.BOSS_SCALE_MULTIPLIER, 1.75), 1, 8),
@@ -1300,6 +1342,7 @@ export class WaveManager {
         this._enemies = [];
         this._wavePlan = null;
         this._waveSpawnCursor = 0;
+        this._forcedFirstSpawnPortalIndex = null;
         this._waveConfig = null;
         this._waveActive = false;
     }

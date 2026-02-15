@@ -223,7 +223,7 @@ export const WAVE_INFINITE_CONFIG = {
         /** 若关闭 BOSS_ONLY_WAVE，可额外增加小怪数量 */
         ADDITIONAL_ENEMY_COUNT: 0,
         /** Boss 战斗强度（相对普通怪基础值） */
-        BOSS_HP_MULTIPLIER: 6.2,
+        BOSS_HP_MULTIPLIER: 14,
         BOSS_ATTACK_MULTIPLIER: 3.2,
         BOSS_SPEED_MULTIPLIER: 1.0,
         BOSS_SCALE_MULTIPLIER: 1.75,
