@@ -1,3 +1,5 @@
+import { WAVE_INFINITE_CONFIG } from './config/WaveInfiniteConfig';
+
 /**
  * 游戏配置常量
  * 集中管理所有可调参数，便于平衡和调试
@@ -617,53 +619,8 @@ export const GameConfig = {
         /**
          * 无限波次模式参数
          * NOTE: 仅用于 gameplay/wave/WaveManager (Infinite Mode)。
-         * 设计原则：敌人成长略快于英雄，迫使玩家利用建筑和卡牌体系
          */
-        INFINITE: {
-            BASE_COUNT: 30,
-            COUNT_PER_WAVE: 6,
-            COUNT_GROWTH_STEP_WAVES: 3,
-            COUNT_GROWTH_STEP_BONUS: 8,
-            BASE_HP_MULT: 1,
-            HP_MULT_PER_WAVE: 0.18,
-            BASE_ATTACK_MULT: 1,
-            ATTACK_MULT_PER_WAVE: 0.1,
-            BASE_SPEED_MULT: 1,
-            SPEED_MULT_PER_WAVE: 0.015,
-            MAX_SPEED_MULT: 1.55,
-            BASE_SPAWN_INTERVAL: 0.35,
-            SPAWN_INTERVAL_DECAY_PER_WAVE: 0.02,
-            MIN_SPAWN_INTERVAL: 0.12,
-            BONUS_PER_WAVE: 20,
-            BONUS_GROWTH_PER_WAVE: 4,
-            SPAWN_RANGE: 8,
-            /**
-             * 固定刷怪口设置
-             * - 基于“离基地最近角之外”的三个方向生成刷怪口
-             * - 三个刷怪口与基地保持等距，并按波次逐步解锁
-             * - 通过边缘留白避免刷在地图最角落
-             */
-            SPAWN_PORTALS: {
-                /** 第 2 个刷怪口解锁波次（含） */
-                OPEN_WAVE_2: 4,
-                /** 第 3 个刷怪口解锁波次（含） */
-                OPEN_WAVE_3: 8,
-                /** 刷怪口距离地图边缘的最小留白（世界坐标） */
-                EDGE_MARGIN: 4.0,
-                /** 共享刷怪半径比例（1 = 顶到边缘留白线） */
-                DISTANCE_FACTOR: 0.9,
-                /** 每个刷怪口的随机抖动半径 */
-                JITTER_RADIUS: 1.2,
-            },
-            ELITE: {
-                START_WAVE: 3,
-                INTERVAL: 2,
-                BASE_COUNT: 1,
-                COUNT_GROWTH_STEP_WAVES: 4,
-                MAX_COUNT: 6,
-                SPAWN_EVERY: 4,
-            },
-        },
+        INFINITE: WAVE_INFINITE_CONFIG,
     },
 
     // === 肉鸽卡牌系统 ===

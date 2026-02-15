@@ -25,14 +25,13 @@ import { GameConfig } from '../../data/GameConfig';
 import { HeroAnimationController } from './HeroAnimationController';
 import { HeroWeaponMountController } from './HeroWeaponMountController';
 import { AnimRootScaleLock } from '../visuals/AnimRootScaleLock';
-import { EnemyPaperDollAnimator } from '../visuals/EnemyPaperDollAnimator';
-import { EnemyRoboVacuumAnimator } from '../visuals/EnemyRoboVacuumAnimator';
-import { EnemyFlyingAnimator } from '../visuals/EnemyFlyingAnimator';
 import { SoldierGooseAnimator } from '../visuals/SoldierGooseAnimator';
 import { resolveHeroModelConfig } from './HeroModelConfig';
 import { WeaponType } from '../weapons/WeaponTypes';
+import { attachEnemyVisual } from './EnemyVisualFactory';
+import type { EnemyAttackType, EnemyVisualVariant } from './EnemyVisualTypes';
 
-export type EnemyVisualVariant = 'robot' | 'robovacuum';
+export type { EnemyAttackType, EnemyVisualVariant } from './EnemyVisualTypes';
 
 export interface EnemySpawnOptions {
     hpMultiplier?: number;
@@ -47,6 +46,12 @@ export interface EnemySpawnOptions {
     aggroRange?: number;
     /** 敌人外观变体 */
     visualVariant?: EnemyVisualVariant;
+    /** 敌人攻击类型（不传则按模型推断） */
+    attackType?: EnemyAttackType;
+    /** 敌人模型路径（resources 下相对路径，不含前缀） */
+    modelPath?: string;
+    /** 敌人可视缩放（不传则按模型推断） */
+    visualScale?: number;
 }
 
 /**
@@ -168,7 +173,11 @@ export class UnitFactory {
         // Set Target
         enemy.setTargetPosition(targetPos);
 
-        this.attachEnemyVisual(node, options.visualVariant ?? 'robot');
+        attachEnemyVisual(node, options.visualVariant ?? 'robot', {
+            modelPath: options.modelPath,
+            visualScale: options.visualScale,
+            attackType: options.attackType,
+        });
 
         // 血条（敌人使用 paper-doll，无骨骼头节点，关闭锚点探测避免浪费 CPU）
         // 仅在受伤时显示，避免大量敌人血条堆叠
@@ -951,87 +960,6 @@ export class UnitFactory {
         node.layer = layer;
         for (const child of node.children) {
             this.applyLayerRecursive(child, layer);
-        }
-    }
-
-    private static attachEnemyVisual(root: Node, variant: EnemyVisualVariant): void {
-        this.attachEnemyFlyingVisual(root);
-    }
-
-    private static attachEnemyFlyingVisual(root: Node): void {
-        if (!root.isValid) return;
-
-        // Cleanup old visuals if any
-        const paper = root.getComponent(EnemyPaperDollAnimator);
-        if (paper) paper.destroy();
-        const vacuum = root.getComponent(EnemyRoboVacuumAnimator);
-        if (vacuum) vacuum.destroy();
-
-        const paperRoot = root.getChildByName('EnemyPaperRoot');
-        if (paperRoot) paperRoot.destroy();
-        const vacuumRoot = root.getChildByName('EnemyVacuumRoot');
-        if (vacuumRoot) vacuumRoot.destroy();
-
-        // Attach new animator
-        if (!root.getComponent(EnemyFlyingAnimator)) {
-            const anim = root.addComponent(EnemyFlyingAnimator);
-            anim.modelPath = 'enemies/boss/Robot_Flying';
-            const models = [
-                // Bosses (Robots)
-                'boss/Robot_Flying',
-                'boss/Robot_Large',
-                'boss/Robot_Legs_Gun',
-                'boss/Mech',
-
-                // Vehicles (Ground)
-                'vehicle/Tank',
-                'vehicle/Enemy_Turret',
-                'vehicle/Enemy_Truck',
-                'vehicle/Enemy_Rover',
-                'vehicle/Enemy_RoundRover',
-
-                // Flying (Spaceships)
-                'flying/Spaceship',
-                'flying/Spaceship_02',
-                'flying/Spaceship_03',
-            ];
-            const selected = models[Math.floor(Math.random() * models.length)];
-            anim.modelPath = `enemies/${selected}`;
-
-            // Determine attack type based on model
-            const enemy = root.getComponent(Enemy);
-            if (enemy) {
-                if (selected.includes('vehicle/')) {
-                    enemy.attackType = 'ram';
-                } else if (selected.startsWith('flying/')) {
-                    enemy.attackType = 'ranged';
-                    enemy.setCombatProfile({
-                        aggroRange: GameConfig.ENEMY.FLYING_RANGED.AGGRO_RANGE,
-                        attackRange: GameConfig.ENEMY.FLYING_RANGED.ATTACK_RANGE,
-                    });
-                } else {
-                    enemy.attackType = 'standard';
-                }
-            }
-
-            // Adjust scale based on enemy type
-            if (selected.includes('Mech')) {
-                anim.visualScale = 1.5; // Mech reduced by 3x (4.5 / 3)
-            } else if (selected.startsWith('boss/')) {
-                anim.visualScale = 4.5;
-            } else if (selected.startsWith('flying/') || selected.includes('Rover')) {
-                anim.visualScale = 0.45; // Flying and Rovers get half size (0.45)
-            } else {
-                anim.visualScale = 0.9; // Other Vehicles (Tank, Truck, Turret) remain at 0.9
-            }
-
-            // Scale and Offset are now handled by component defaults (4.5 and 0.5)
-            // anim.rotationY = 180; // If needed
-        }
-
-        const hb = root.getComponent(HealthBar);
-        if (hb) {
-            hb.requestAnchorRefresh();
         }
     }
 

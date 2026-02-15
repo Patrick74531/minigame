@@ -72,17 +72,26 @@ export class EnemyFlyingAnimator extends Component {
 
     private loadModel(): void {
         resources.load(this.modelPath, Prefab, (err, prefab) => {
+            const owner = this.node as Node | null;
+            if (!owner || !owner.isValid) return;
             if (err) {
-                console.warn(`[EnemyFlyingAnimator] Failed to load at ${this.modelPath}, trying nested path...`);
+                console.warn(
+                    `[EnemyFlyingAnimator] Failed to load at ${this.modelPath}, trying nested path...`
+                );
                 // Retry with nested path (common GLTF import quirk)
                 const nestedPath = `${this.modelPath}/${this.modelPath.split('/').pop()}`;
                 resources.load(nestedPath, Prefab, (err2, prefab2) => {
-                     if (err2) {
-                         console.error(`[EnemyFlyingAnimator] Failed to load model at ${nestedPath}:`, err2);
-                         this.createFallback();
-                         return;
-                     }
-                     this.onModelLoaded(prefab2);
+                    const retryOwner = this.node as Node | null;
+                    if (!retryOwner || !retryOwner.isValid) return;
+                    if (err2) {
+                        console.error(
+                            `[EnemyFlyingAnimator] Failed to load model at ${nestedPath}:`,
+                            err2
+                        );
+                        this.createFallback();
+                        return;
+                    }
+                    this.onModelLoaded(prefab2);
                 });
                 return;
             }
@@ -92,10 +101,11 @@ export class EnemyFlyingAnimator extends Component {
 
     private onModelLoaded(prefab: Prefab): void {
         console.log(`[EnemyFlyingAnimator] Successfully loaded model.`);
-        if (!this.node.isValid) return;
+        const owner = this.node as Node | null;
+        if (!owner || !owner.isValid) return;
 
         this._model = instantiate(prefab);
-        this.node.addChild(this._model);
+        owner.addChild(this._model);
 
         this._model.setPosition(0, this.yOffset, 0);
         this._model.setScale(this.visualScale, this.visualScale, this.visualScale);
@@ -117,7 +127,9 @@ export class EnemyFlyingAnimator extends Component {
             this.updateAnimation(true);
         } else {
             // No skeleton found (e.g. Tank)
-            console.warn('[EnemyFlyingAnimator] No SkeletalAnimation found on loaded model. Using Tween fallback.');
+            console.warn(
+                '[EnemyFlyingAnimator] No SkeletalAnimation found on loaded model. Using Tween fallback.'
+            );
             this._useTween = true;
             this.updateAnimation(true);
         }
@@ -153,7 +165,7 @@ export class EnemyFlyingAnimator extends Component {
         if (!this._clipAttack) this._clipAttack = this._clipMove;
     }
 
-    protected update(dt: number): void {
+    protected update(_dt: number): void {
         if (!this._enemy || !this._model) return;
 
         const state = this._enemy.state;
@@ -236,19 +248,20 @@ export class EnemyFlyingAnimator extends Component {
     }
 
     private createFallback(): void {
-        if (!this.node.isValid) return;
+        const owner = this.node as Node | null;
+        if (!owner || !owner.isValid) return;
         const fallback = new Node('FallbackCube');
         const mr = fallback.addComponent(MeshRenderer);
         mr.mesh = utils.createMesh(primitives.box({ width: 0.5, height: 0.5, length: 0.5 }));
         const mat = new Material();
         mat.initialize({
             effectName: 'builtin-standard',
-            technique: 0
+            technique: 0,
         });
         mat.setProperty('mainColor', new Color(0, 0, 255, 255)); // Blue for load failure
         mr.material = mat;
-        
-        this.node.addChild(fallback);
+
+        owner.addChild(fallback);
         fallback.setPosition(0, 0.5, 0);
         console.warn('[EnemyFlyingAnimator] Created Fallback Cube due to load failure.');
     }
