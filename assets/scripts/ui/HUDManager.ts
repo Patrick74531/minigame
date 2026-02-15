@@ -632,10 +632,15 @@ export class HUDManager {
         const profile = resolveBossDialogueProfile({
             archetypeId: payload.archetypeId,
             modelPath: payload.modelPath,
-            fallbackName,
         });
-        this._bossIntroTitleLabel.string = `${profile.zhName} / ${profile.enName}`;
-        this._bossIntroQuoteLabel.string = `「${profile.zhLine}」\n"${profile.enLine}"`;
+        this._bossIntroTitleLabel.string = this.resolveLocalizedByKey(
+            profile.nameKey,
+            fallbackName
+        );
+        this._bossIntroQuoteLabel.string = this.resolveLocalizedByKey(
+            profile.lineKey,
+            Localization.instance.t('ui.bossIntro.line.default')
+        );
 
         Tween.stopAllByTarget(this._bossIntroRoot);
         Tween.stopAllByTarget(this._bossIntroOpacity);
@@ -678,9 +683,9 @@ export class HUDManager {
         this.stopBossPreviewMotion();
         host.removeAllChildren();
 
-        let preview = this.cloneBossVisualFromNode(payload.bossNode);
+        let preview = await this.instantiateBossPreviewFromModelPath(payload.modelPath);
         if (!preview) {
-            preview = await this.instantiateBossPreviewFromModelPath(payload.modelPath);
+            preview = this.cloneBossVisualFromNode(payload.bossNode);
         }
 
         if (token !== this._bossIntroToken) {
@@ -691,16 +696,6 @@ export class HUDManager {
         }
 
         if (!host.isValid || !preview) {
-            const fallback = new Node('BossPreviewFallback');
-            fallback.layer = UI_LAYER;
-            host.addChild(fallback);
-            fallback.addComponent(UITransform).setContentSize(180, 80);
-            const lbl = fallback.addComponent(Label);
-            lbl.string = 'BOSS';
-            lbl.fontSize = 42;
-            lbl.lineHeight = 44;
-            lbl.horizontalAlign = Label.HorizontalAlign.CENTER;
-            lbl.color = new Color(255, 216, 140, 255);
             return;
         }
 
@@ -724,6 +719,15 @@ export class HUDManager {
         }
 
         this.startBossPreviewMotion(preview, scale);
+    }
+
+    private resolveLocalizedByKey(key: string, fallback: string): string {
+        if (!key) return fallback;
+        const localized = Localization.instance.t(key);
+        if (localized.startsWith('[[')) {
+            return fallback;
+        }
+        return localized;
     }
 
     private startBossPreviewMotion(preview: Node, baseScale: number): void {

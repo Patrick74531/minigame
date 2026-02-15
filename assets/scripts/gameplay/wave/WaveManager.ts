@@ -120,8 +120,7 @@ export class WaveManager {
     private _bossState: Map<string, TemplateRuntimeState> = new Map();
     private _nextBossWave: number = 0;
     private _bossEchoes: BossEchoRuntimeState[] = [];
-    private _bossUnlockedModelPaths: Set<string> = new Set();
-    private _hasBossSpawnedAtLeastOnce: boolean = false;
+    private _bossUnlockedArchetypeIds: Set<string> = new Set();
 
     // === 初始化 ===
 
@@ -481,7 +480,7 @@ export class WaveManager {
         this._spawnedEnemyMeta.set(enemy, { spawnType: entry.spawnType, lane: spawnLane });
 
         if (entry.spawnType === 'boss') {
-            this.unlockBossModelForRegularPool(archetype.modelPath);
+            this.unlockBossArchetypeForRegularPool(entry.archetypeId, archetype.modelPath);
             this.eventManager.emit(GameEvents.BOSS_INTRO, {
                 bossNode: enemy,
                 archetypeId: entry.archetypeId,
@@ -805,20 +804,20 @@ export class WaveManager {
             this._nextBossWave = this.rollNextBossWave(1);
         } else {
             this._nextBossWave = Number.MAX_SAFE_INTEGER;
-            for (const archetype of this._archetypes) {
-                if (this.isBossModelPath(archetype.modelPath)) {
-                    this._bossUnlockedModelPaths.add(this.normalizeModelPath(archetype.modelPath));
-                }
-            }
         }
 
         this._recentWaveTypes = [];
         this._recentCombos = [];
         this._recentTagRatios = [];
         this._bossEchoes = [];
-        this._hasBossSpawnedAtLeastOnce = !this._bossEventConfig;
+        this._bossUnlockedArchetypeIds.clear();
         if (this._bossEventConfig) {
-            this._bossUnlockedModelPaths.clear();
+            return;
+        }
+        for (const archetype of this._archetypes) {
+            if (this.isBossModelPath(archetype.modelPath)) {
+                this._bossUnlockedArchetypeIds.add(archetype.id);
+            }
         }
     }
 
@@ -1010,16 +1009,13 @@ export class WaveManager {
 
     private canArchetypeEnterRegularPool(archetype: EnemyArchetypeConfig): boolean {
         if (!this.isBossModelPath(archetype.modelPath)) return true;
-        return (
-            this._hasBossSpawnedAtLeastOnce ||
-            this._bossUnlockedModelPaths.has(this.normalizeModelPath(archetype.modelPath))
-        );
+        if (!this._bossEventConfig) return true;
+        return this._bossUnlockedArchetypeIds.has(archetype.id);
     }
 
-    private unlockBossModelForRegularPool(modelPath: string): void {
+    private unlockBossArchetypeForRegularPool(archetypeId: string, modelPath: string): void {
         if (!this.isBossModelPath(modelPath)) return;
-        this._hasBossSpawnedAtLeastOnce = true;
-        this._bossUnlockedModelPaths.add(this.normalizeModelPath(modelPath));
+        this._bossUnlockedArchetypeIds.add(archetypeId);
     }
 
     private isBossModelPath(modelPath: string): boolean {
