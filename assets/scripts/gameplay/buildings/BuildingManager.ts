@@ -163,6 +163,10 @@ export class BuildingManager {
         return this._activeBuildings;
     }
 
+    public get unitContainer(): Node | null {
+        return this._unitContainer;
+    }
+
     public unregisterBuilding(building: Building): void {
         const idx = this._activeBuildings.indexOf(building);
         if (idx !== -1) {

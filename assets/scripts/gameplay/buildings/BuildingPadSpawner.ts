@@ -1,7 +1,9 @@
 import { Node } from 'cc';
 import { BuildingFactory } from './BuildingFactory';
+import { Building } from './Building';
 import { BuildingPad } from './BuildingPad';
 import { BuildingManager } from './BuildingManager';
+import { BuildingRegistry } from './BuildingRegistry';
 import { GameConfig } from '../../data/GameConfig';
 
 /**
@@ -9,6 +11,8 @@ import { GameConfig } from '../../data/GameConfig';
  * 负责根据配置生成建造点，减少 GameController 胶水逻辑
  */
 export class BuildingPadSpawner {
+    private static readonly PREBUILT_LEVEL1_TYPES = new Set(['barracks', 'farm']);
+
     public static spawnPads(buildingContainer: Node, buildingManager: BuildingManager): void {
         const padPositions = GameConfig.BUILDING.PADS as Array<{
             type: string;
@@ -52,10 +56,50 @@ export class BuildingPadSpawner {
             pad.buildingTypeId = pos.type;
 
             buildingManager.registerPad(pad);
+
+            if (!this.PREBUILT_LEVEL1_TYPES.has(pos.type)) {
+                continue;
+            }
+
+            const buildingNode = BuildingFactory.createBuilding(
+                buildingContainer,
+                pos.x,
+                pos.z,
+                pos.type,
+                buildingManager.unitContainer ?? undefined,
+                angle
+            );
+
+            if (!buildingNode) {
+                console.warn(
+                    `[BuildingPadSpawner] Failed to prebuild ${pos.type} at (${pos.x}, 0, ${pos.z})`
+                );
+                continue;
+            }
+
+            const building = buildingNode.getComponent(Building);
+            if (!building) {
+                console.warn(
+                    `[BuildingPadSpawner] Missing Building component on prebuilt ${pos.type} node.`
+                );
+                continue;
+            }
+
+            const baseCost = this.buildingRegistry.get(pos.type)?.cost ?? 0;
+            const nextUpgradeCost = Math.ceil(baseCost * building.upgradeCostMultiplier);
+            pad.initForExistingBuilding(building, nextUpgradeCost);
+
+            console.log(
+                `[BuildingPadSpawner] Prebuilt level-1 ${pos.type} at (${pos.x}, 0, ${pos.z}), next upgrade cost=${nextUpgradeCost}`
+            );
         }
 
         console.log(
             `[BuildingPadSpawner] 创建了 ${padPositions.length} 个建造点, 父节点: ${buildingContainer.name}`
         );
+    }
+
+    private static get buildingRegistry(): BuildingRegistry {
+        return BuildingRegistry.instance;
     }
 }

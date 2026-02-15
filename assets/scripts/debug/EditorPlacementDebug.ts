@@ -173,12 +173,8 @@ export class EditorPlacementDebug extends Component {
     }
 
     protected start(): void {
-        if (!this.showPadLabelsInGame) {
-            this.clearPadDebugLabels();
-            return;
-        }
-        this.syncPadDebugLabels();
-        this.schedule(this.syncPadDebugLabels, 0.5);
+        // Building pad debug labels are disabled globally.
+        this.clearPadDebugLabels();
     }
 
     protected onDestroy(): void {
@@ -304,9 +300,8 @@ export class EditorPlacementDebug extends Component {
         }
 
         this.syncBuildingRegistry();
-        if (this.showPadLabelsInGame) {
-            this.syncPadDebugLabels();
-        }
+        // Building pad debug labels are disabled globally.
+        this.clearPadDebugLabels();
     }
 
     /**
