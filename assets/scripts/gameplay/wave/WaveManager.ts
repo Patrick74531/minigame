@@ -53,6 +53,14 @@ export type { WaveConfig } from './WaveTypes';
  */
 export class WaveManager {
     private static _instance: WaveManager | null = null;
+    private static readonly LANE_UNLOCK_WARNING_SECONDS: number = 2.4;
+    private static readonly LANE_UNLOCK_FOCUS_INWARD: number = 8.5;
+    private static readonly LOCKED_LANE_PAD_TYPES: ReadonlySet<string> = new Set([
+        'tower',
+        'frost_tower',
+        'lightning_tower',
+        'wall',
+    ]);
 
     public static get instance(): WaveManager {
         if (!this._instance) {
@@ -90,6 +98,7 @@ export class WaveManager {
     private _unlockedLanes: Set<RouteLane> = new Set<RouteLane>(['mid']);
     private _nextUnlockLaneCursor: number = 1;
     private _nextBossLaneCursor: number = 0;
+    private _pendingLaneUnlock: { lane: RouteLane; remainSeconds: number } | null = null;
     private _spawnedEnemyMeta: Map<Node, { spawnType: SpawnType; lane: RouteLane }> = new Map();
     private _laneFogController: LaneFogController = new LaneFogController();
 
@@ -154,6 +163,7 @@ export class WaveManager {
         this._unlockedLanes.add('mid');
         this._nextUnlockLaneCursor = 1;
         this._nextBossLaneCursor = 0;
+        this._pendingLaneUnlock = null;
         this._spawnedEnemyMeta.clear();
         this._laneFogController.initialize(
             baseNode,
@@ -345,6 +355,7 @@ export class WaveManager {
      * 每帧更新波次生成
      */
     public update(dt: number): void {
+        this.tickPendingLaneUnlock(dt);
         this._laneFogController.tick(dt);
         if (!this._waveActive || !this._waveConfig) return;
         const waveConfig = this._waveConfig;
@@ -595,7 +606,7 @@ export class WaveManager {
         if (this._nextUnlockLaneCursor < ROUTE_LANE_SEQUENCE.length) {
             const laneToUnlock = ROUTE_LANE_SEQUENCE[this._nextUnlockLaneCursor];
             if (laneToUnlock) {
-                this.unlockLane(laneToUnlock);
+                this.scheduleLaneUnlock(laneToUnlock);
                 this._nextBossLaneCursor = this._nextUnlockLaneCursor;
                 this._nextUnlockLaneCursor++;
             }
@@ -611,6 +622,158 @@ export class WaveManager {
         this._unlockedLanes.add(lane);
         this._laneFogController.unlockLane(lane);
         this.eventManager.emit(GameEvents.LANE_UNLOCKED, { lane });
+    }
+
+    private scheduleLaneUnlock(lane: RouteLane): void {
+        if (this._unlockedLanes.has(lane)) return;
+        const remainSeconds = WaveManager.LANE_UNLOCK_WARNING_SECONDS;
+        this._pendingLaneUnlock = { lane, remainSeconds };
+        this.eventManager.emit(GameEvents.LANE_UNLOCK_IMMINENT, {
+            lane,
+            focusPosition: this.resolveLaneUnlockFocusPosition(lane),
+            padFocusPosition: this.resolveLaneUnlockPadFocusPosition(lane),
+            remainSeconds,
+        });
+    }
+
+    private tickPendingLaneUnlock(dt: number): void {
+        if (!this._pendingLaneUnlock) return;
+        this._pendingLaneUnlock.remainSeconds -= Math.max(0, dt);
+        if (this._pendingLaneUnlock.remainSeconds > 0) return;
+
+        const laneToUnlock = this._pendingLaneUnlock.lane;
+        this._pendingLaneUnlock = null;
+        this.unlockLane(laneToUnlock);
+    }
+
+    private resolveLaneUnlockFocusPosition(lane: RouteLane): Vec3 {
+        const portalIndex = this._portalIndexByLane[lane];
+        const portal = this._spawnPortals[portalIndex] ?? getEdgePosition();
+        const direction = this._laneDirectionByLane[lane] ?? this._laneDirectionByLane.mid;
+        const limits = GameConfig.MAP.LIMITS;
+        const inward = WaveManager.LANE_UNLOCK_FOCUS_INWARD;
+        const x = clamp(portal.x - direction.x * inward, -limits.x, limits.x);
+        const z = clamp(portal.y - direction.y * inward, -limits.z, limits.z);
+        const y = Math.max(1.2, GameConfig.PHYSICS.HERO_Y);
+        return new Vec3(x, y, z);
+    }
+
+    private resolveLaneUnlockPadFocusPosition(lane: RouteLane): Vec3 | undefined {
+        const pads =
+            (GameConfig.BUILDING.PADS as ReadonlyArray<{
+                type: string;
+                x: number;
+                z: number;
+            }>) ?? [];
+        if (pads.length <= 0) return undefined;
+
+        const polylines = this.getLanePolylinesWorld();
+        const baseX = this._baseNode?.position.x ?? GameConfig.MAP.BASE_SPAWN.x;
+        const baseZ = this._baseNode?.position.z ?? GameConfig.MAP.BASE_SPAWN.z;
+        let bestPad: { x: number; z: number } | null = null;
+        let bestDist = Number.POSITIVE_INFINITY;
+
+        for (const pad of pads) {
+            if (!WaveManager.LOCKED_LANE_PAD_TYPES.has(pad.type)) continue;
+            const padLane = this.resolveLaneByNearestPath(pad.x, pad.z, polylines);
+            if (padLane !== lane) continue;
+
+            const distToBase = Math.hypot(pad.x - baseX, pad.z - baseZ);
+            if (distToBase < bestDist) {
+                bestDist = distToBase;
+                bestPad = { x: pad.x, z: pad.z };
+            }
+        }
+
+        if (!bestPad) return undefined;
+        return new Vec3(bestPad.x, Math.max(1.2, GameConfig.PHYSICS.HERO_Y), bestPad.z);
+    }
+
+    private getLanePolylinesWorld(): Record<RouteLane, Array<{ x: number; z: number }>> {
+        const halfW = Math.max(1, GameConfig.MAP.LIMITS.x);
+        const halfH = Math.max(1, GameConfig.MAP.LIMITS.z);
+        const laneNormalizedToWorld = (nx: number, nz: number): { x: number; z: number } => ({
+            x: nx * (halfW * 2) - halfW,
+            z: (1 - nz) * (halfH * 2) - halfH,
+        });
+
+        return {
+            top: [
+                laneNormalizedToWorld(0.05, 0.95),
+                laneNormalizedToWorld(0.06, 0.92),
+                laneNormalizedToWorld(0.95, 0.92),
+            ],
+            mid: [
+                laneNormalizedToWorld(0.05, 0.95),
+                laneNormalizedToWorld(0.35, 0.65),
+                laneNormalizedToWorld(0.5, 0.5),
+                laneNormalizedToWorld(0.65, 0.35),
+                laneNormalizedToWorld(0.95, 0.05),
+            ],
+            bottom: [
+                laneNormalizedToWorld(0.05, 0.95),
+                laneNormalizedToWorld(0.08, 0.94),
+                laneNormalizedToWorld(0.08, 0.05),
+            ],
+        };
+    }
+
+    private resolveLaneByNearestPath(
+        x: number,
+        z: number,
+        polylines: Record<RouteLane, Array<{ x: number; z: number }>>
+    ): RouteLane {
+        let bestLane: RouteLane = 'mid';
+        let bestDistance = Number.POSITIVE_INFINITY;
+        for (const lane of ['mid', 'top', 'bottom'] as const) {
+            const distance = this.pointToPolylineDistance(x, z, polylines[lane]);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestLane = lane;
+            }
+        }
+        return bestLane;
+    }
+
+    private pointToPolylineDistance(
+        x: number,
+        z: number,
+        polyline: Array<{ x: number; z: number }>
+    ): number {
+        if (polyline.length <= 0) return Number.POSITIVE_INFINITY;
+        if (polyline.length === 1) {
+            return Math.hypot(x - polyline[0].x, z - polyline[0].z);
+        }
+
+        let best = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < polyline.length - 1; i++) {
+            const distance = this.pointToSegmentDistance(x, z, polyline[i], polyline[i + 1]);
+            if (distance < best) {
+                best = distance;
+            }
+        }
+        return best;
+    }
+
+    private pointToSegmentDistance(
+        px: number,
+        pz: number,
+        a: { x: number; z: number },
+        b: { x: number; z: number }
+    ): number {
+        const abx = b.x - a.x;
+        const abz = b.z - a.z;
+        const abLenSq = abx * abx + abz * abz;
+        if (abLenSq <= 0.0001) {
+            return Math.hypot(px - a.x, pz - a.z);
+        }
+
+        const apx = px - a.x;
+        const apz = pz - a.z;
+        const t = Math.max(0, Math.min(1, (apx * abx + apz * abz) / abLenSq));
+        const cx = a.x + abx * t;
+        const cz = a.z + abz * t;
+        return Math.hypot(px - cx, pz - cz);
     }
 
     private resolveSpawnCombatProfile(spawnType: SpawnType): SpawnCombatProfile {
@@ -1477,6 +1640,7 @@ export class WaveManager {
         this._forcedFirstSpawnLane = null;
         this._waveConfig = null;
         this._waveActive = false;
+        this._pendingLaneUnlock = null;
         this._spawnedEnemyMeta.clear();
         this._laneFogController.cleanup();
     }
