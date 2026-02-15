@@ -22,8 +22,8 @@ export const WAVE_INFINITE_CONFIG = {
     SPAWN_RANGE: 8,
     /**
      * 固定刷怪口设置
-     * - 基于“离基地最近角之外”的三个方向生成刷怪口
-     * - 三个刷怪口与基地保持等距，并按波次逐步解锁
+     * - 基于三条道路的末端锚点生成刷怪口
+     * - 三个刷怪口按波次逐步解锁
      * - 通过边缘留白避免刷在地图最角落
      */
     SPAWN_PORTALS: {
@@ -33,10 +33,10 @@ export const WAVE_INFINITE_CONFIG = {
         OPEN_WAVE_3: 8,
         /** 刷怪口距离地图边缘的最小留白（世界坐标） */
         EDGE_MARGIN: 4.0,
-        /** 共享刷怪半径比例（1 = 顶到边缘留白线） */
-        DISTANCE_FACTOR: 0.9,
+        /** 向道路末端推进比例（1 = 到道路末端锚点） */
+        DISTANCE_FACTOR: 0.96,
         /** 每个刷怪口的随机抖动半径 */
-        JITTER_RADIUS: 1.2,
+        JITTER_RADIUS: 0.85,
     },
     ELITE: {
         START_WAVE: 3,

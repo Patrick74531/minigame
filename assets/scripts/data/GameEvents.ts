@@ -38,6 +38,8 @@ export const GameEvents = {
     WAVE_FORECAST: 'WAVE_FORECAST',
     /** 波次完成 { wave?: number, waveIndex?: number, bonus?: number } */
     WAVE_COMPLETE: 'WAVE_COMPLETE',
+    /** Boss 出场演出 { bossNode: Node, archetypeId?: string, modelPath?: string, lane?: 'top'|'mid'|'bottom' } */
+    BOSS_INTRO: 'BOSS_INTRO',
     /** 道路解锁 { lane: 'top'|'mid'|'bottom' } */
     LANE_UNLOCKED: 'LANE_UNLOCKED',
     /** 所有波次完成 */
@@ -127,6 +129,12 @@ export type GameEventPayloads = {
         spawnType?: 'regular' | 'elite' | 'boss';
     };
     [GameEvents.WAVE_COMPLETE]: { wave?: number; waveIndex?: number; bonus?: number };
+    [GameEvents.BOSS_INTRO]: {
+        bossNode: Node;
+        archetypeId?: string;
+        modelPath?: string;
+        lane?: 'top' | 'mid' | 'bottom';
+    };
     [GameEvents.LANE_UNLOCKED]: { lane: 'top' | 'mid' | 'bottom' };
     [GameEvents.ALL_WAVES_COMPLETE]: void;
     [GameEvents.GAME_START]: void;

@@ -482,6 +482,12 @@ export class WaveManager {
 
         if (entry.spawnType === 'boss') {
             this.unlockBossModelForRegularPool(archetype.modelPath);
+            this.eventManager.emit(GameEvents.BOSS_INTRO, {
+                bossNode: enemy,
+                archetypeId: entry.archetypeId,
+                modelPath: archetype.modelPath,
+                lane: spawnLane,
+            });
         }
 
         // Notify centralized systems (e.g., CombatSystem) about new enemy
@@ -555,8 +561,30 @@ export class WaveManager {
 
         const angle = Math.random() * Math.PI * 2;
         const radius = Math.sqrt(Math.random()) * jitterRadius;
-        const x = portal.x + Math.cos(angle) * radius;
-        const y = portal.y + Math.sin(angle) * radius;
+        let x = portal.x + Math.cos(angle) * radius;
+        let y = portal.y + Math.sin(angle) * radius;
+
+        const base = this._baseNode;
+        if (base && base.isValid) {
+            const baseX = base.position.x;
+            const baseY = base.position.z;
+            const portalDx = portal.x - baseX;
+            const portalDy = portal.y - baseY;
+            const portalDist = Math.hypot(portalDx, portalDy);
+            if (portalDist > 0.0001) {
+                const nx = portalDx / portalDist;
+                const ny = portalDy / portalDist;
+                const candidateDx = x - baseX;
+                const candidateDy = y - baseY;
+                const candidateDist = Math.hypot(candidateDx, candidateDy);
+                const minDist = Math.max(0, portalDist - jitterRadius * 0.2);
+                if (candidateDist < minDist) {
+                    x = baseX + nx * minDist;
+                    y = baseY + ny * minDist;
+                }
+            }
+        }
+
         const limits = GameConfig.MAP.LIMITS;
         return {
             x: Math.max(-limits.x, Math.min(limits.x, x)),

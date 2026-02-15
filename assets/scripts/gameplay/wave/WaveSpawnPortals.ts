@@ -87,42 +87,10 @@ function resolvePortalIndex(activeCount: number, forcedPortalIndex?: number): nu
 
 export function resolveSpawnPortals(baseX: number, baseY: number): SpawnPortalPoint[] {
     const limits = GameConfig.MAP.LIMITS;
-    const corners = [
-        { x: -limits.x, y: -limits.z },
-        { x: limits.x, y: -limits.z },
-        { x: -limits.x, y: limits.z },
-        { x: limits.x, y: limits.z },
-    ];
-
     const portalsCfg = GameConfig.WAVE.INFINITE.SPAWN_PORTALS;
     const maxMargin = Math.max(0, Math.min(limits.x, limits.z) - 0.5);
     const edgeMargin = Math.min(maxMargin, Math.max(0, portalsCfg?.EDGE_MARGIN ?? 4));
-    const distanceFactor = Math.max(0.3, Math.min(1, portalsCfg?.DISTANCE_FACTOR ?? 0.9));
-
-    let nearestIdx = 0;
-    let nearestDistSq = Infinity;
-    for (let i = 0; i < corners.length; i++) {
-        const dx = corners[i].x - baseX;
-        const dy = corners[i].y - baseY;
-        const distSq = dx * dx + dy * dy;
-        if (distSq < nearestDistSq) {
-            nearestDistSq = distSq;
-            nearestIdx = i;
-        }
-    }
-
-    const candidates = corners
-        .map((point, idx) => ({ idx, point }))
-        .filter(item => item.idx !== nearestIdx)
-        .map(item => {
-            const dx = item.point.x - baseX;
-            const dy = item.point.y - baseY;
-            return {
-                point: item.point,
-                distSq: dx * dx + dy * dy,
-            };
-        })
-        .sort((a, b) => b.distSq - a.distSq);
+    const distanceFactor = Math.max(0.3, Math.min(1, portalsCfg?.DISTANCE_FACTOR ?? 0.96));
     const minX = -limits.x + edgeMargin;
     const maxX = limits.x - edgeMargin;
     const minY = -limits.z + edgeMargin;
@@ -131,86 +99,30 @@ export function resolveSpawnPortals(baseX: number, baseY: number): SpawnPortalPo
     const safeMaxX = minX < maxX ? maxX : limits.x;
     const safeMinY = minY < maxY ? minY : -limits.z;
     const safeMaxY = minY < maxY ? maxY : limits.z;
+    const laneEndAnchors = [
+        laneNormalizedToWorld(0.95, 0.92, limits.x, limits.z),
+        laneNormalizedToWorld(0.95, 0.05, limits.x, limits.z),
+        laneNormalizedToWorld(0.08, 0.05, limits.x, limits.z),
+    ];
 
-    const directionalPortals = candidates
-        .map(item => {
-            const dirX = item.point.x - baseX;
-            const dirY = item.point.y - baseY;
-            const len = Math.hypot(dirX, dirY);
-            if (len <= 0.0001) return null;
-            const nx = dirX / len;
-            const ny = dirY / len;
-            const maxDistance = resolveRayDistanceToBounds(
-                baseX,
-                baseY,
-                nx,
-                ny,
-                safeMinX,
-                safeMaxX,
-                safeMinY,
-                safeMaxY
-            );
-            if (!Number.isFinite(maxDistance) || maxDistance <= 0.01) return null;
-            return {
-                nx,
-                ny,
-                maxDistance,
-            };
-        })
-        .filter(
-            (
-                item
-            ): item is {
-                nx: number;
-                ny: number;
-                maxDistance: number;
-            } => !!item
-        );
-
-    if (directionalPortals.length === 0) {
-        return candidates.map(item => item.point);
-    }
-
-    let sharedDistance = Infinity;
-    for (const portal of directionalPortals) {
-        sharedDistance = Math.min(sharedDistance, portal.maxDistance);
-    }
-    if (!Number.isFinite(sharedDistance) || sharedDistance <= 0.01) {
-        return candidates.map(item => item.point);
-    }
-
-    const spawnDistance = sharedDistance * distanceFactor;
-    return directionalPortals.map(portal => ({
-        x: baseX + portal.nx * spawnDistance,
-        y: baseY + portal.ny * spawnDistance,
-    }));
+    return laneEndAnchors.map(anchor => {
+        const targetX = baseX + (anchor.x - baseX) * distanceFactor;
+        const targetY = baseY + (anchor.y - baseY) * distanceFactor;
+        return {
+            x: Math.max(safeMinX, Math.min(safeMaxX, targetX)),
+            y: Math.max(safeMinY, Math.min(safeMaxY, targetY)),
+        };
+    });
 }
 
-function resolveRayDistanceToBounds(
-    originX: number,
-    originY: number,
-    dirX: number,
-    dirY: number,
-    minX: number,
-    maxX: number,
-    minY: number,
-    maxY: number
-): number {
-    let maxDistance = Infinity;
-
-    if (Math.abs(dirX) > 0.0001) {
-        const tx = dirX > 0 ? (maxX - originX) / dirX : (minX - originX) / dirX;
-        if (tx > 0) {
-            maxDistance = Math.min(maxDistance, tx);
-        }
-    }
-
-    if (Math.abs(dirY) > 0.0001) {
-        const ty = dirY > 0 ? (maxY - originY) / dirY : (minY - originY) / dirY;
-        if (ty > 0) {
-            maxDistance = Math.min(maxDistance, ty);
-        }
-    }
-
-    return maxDistance;
+function laneNormalizedToWorld(
+    nx: number,
+    nz: number,
+    halfW: number,
+    halfH: number
+): SpawnPortalPoint {
+    return {
+        x: nx * (halfW * 2) - halfW,
+        y: (1 - nz) * (halfH * 2) - halfH,
+    };
 }
