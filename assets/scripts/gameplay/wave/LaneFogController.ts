@@ -56,7 +56,6 @@ type FogLayerSpec = {
 
 const FOG_EFFECT_PATH = 'shaders/fog-mask';
 const FOG_TEX_PRIMARY = 'textures/fog';
-const FOG_TEX_SECONDARY = 'textures/fog';
 
 const START_AFTER_FIRST_TOWER_MID = 2.8;
 const START_AFTER_FIRST_TOWER_SIDE = 0;
@@ -144,7 +143,6 @@ export class LaneFogController {
 
     private _fogEffect: EffectAsset | null = null;
     private _fogTexA: Texture2D | null = null;
-    private _fogTexB: Texture2D | null = null;
 
     public initialize(
         baseNode: Node,
@@ -220,14 +218,12 @@ export class LaneFogController {
 
         this._fogEffect = null;
         this._fogTexA = null;
-        this._fogTexB = null;
     }
 
     private async prepareAssetsAndBuild(): Promise<void> {
-        const [effect, texA, texB] = await Promise.all([
+        const [effect, texA] = await Promise.all([
             this.loadEffectAsset(FOG_EFFECT_PATH),
             this.loadTexture(FOG_TEX_PRIMARY),
-            this.loadTexture(FOG_TEX_SECONDARY),
         ]);
 
         if (this._disposed || !this._root || !this._root.isValid || !effect) {
@@ -235,11 +231,11 @@ export class LaneFogController {
         }
 
         this._fogEffect = effect;
-        this._fogTexA = texA ?? texB;
-        this._fogTexB = texB ?? texA;
+        this._fogTexA = texA;
 
-        if (this._fogTexA) this.setTextureRepeat(this._fogTexA);
-        if (this._fogTexB) this.setTextureRepeat(this._fogTexB);
+        if (this._fogTexA) {
+            this.setTextureRepeat(this._fogTexA);
+        }
 
         this.buildBlockedLaneFog();
     }
@@ -314,8 +310,10 @@ export class LaneFogController {
         const material = new Material();
         material.initialize({ effectAsset: this._fogEffect, technique: spec.technique });
 
-        if (this._fogTexA) material.setProperty('fogTexA', this._fogTexA);
-        if (this._fogTexB) material.setProperty('fogTexB', this._fogTexB);
+        if (this._fogTexA) {
+            material.setProperty('fogTexA', this._fogTexA);
+            material.setProperty('fogTexB', this._fogTexA);
+        }
 
         const tint = this.resolveLaneTint(lane);
         material.setProperty('tintColor', tint);
