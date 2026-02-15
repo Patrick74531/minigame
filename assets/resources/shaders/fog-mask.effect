@@ -3,7 +3,7 @@
 
 CCEffect %{
   techniques:
-  - name: transparent
+  - name: ground
     passes:
     - vert: fog-mask-vs:vert
       frag: fog-mask-fs:frag
@@ -28,6 +28,45 @@ CCEffect %{
         laneWidth: { value: [5.4, 10.8, 1.8, 0.0] }
         alphaParams: { value: [0.58, 0.26, 0.80, 0.18] }
         noiseParams: { value: [0.72, 0.18, 1.35, 0.09] }
+        baseMask: { value: [0.0, 0.0, 11.2, 4.8] }
+        lanePointCount: { value: 2.0 }
+        lanePoint0: { value: [0.0, 0.0, 0.0, 0.0] }
+        lanePoint1: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint2: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint3: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint4: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint5: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint6: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint7: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint8: { value: [1.0, 0.0, 0.0, 0.0] }
+        lanePoint9: { value: [1.0, 0.0, 0.0, 0.0] }
+        time: { value: 0.0 }
+  - name: overlay
+    passes:
+    - vert: fog-mask-vs:vert
+      frag: fog-mask-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendSrcAlpha: src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      properties:
+        fogTexA: { value: white }
+        fogTexB: { value: white }
+        tintColor: { value: [0.84, 0.9, 0.92, 1.0], editor: { type: color } }
+        flowA: { value: [0.19, 0.17, 0.010, 0.004] }
+        flowB: { value: [0.37, 0.31, -0.007, 0.005] }
+        laneWidth: { value: [5.4, 10.8, 1.8, 0.0] }
+        alphaParams: { value: [0.58, 0.26, 0.80, 0.18] }
+        noiseParams: { value: [0.72, 0.18, 1.35, 0.09] }
+        baseMask: { value: [0.0, 0.0, 11.2, 4.8] }
         lanePointCount: { value: 2.0 }
         lanePoint0: { value: [0.0, 0.0, 0.0, 0.0] }
         lanePoint1: { value: [1.0, 0.0, 0.0, 0.0] }
@@ -72,6 +111,7 @@ CCProgram fog-mask-fs %{
     vec4 laneWidth;
     vec4 alphaParams;
     vec4 noiseParams;
+    vec4 baseMask;
     vec4 lanePoint0;
     vec4 lanePoint1;
     vec4 lanePoint2;
@@ -140,6 +180,12 @@ CCProgram fog-mask-fs %{
     float motes = smoothstep(0.74, 0.93, mix(moteA, moteB, 0.5)) * alphaParams.w;
 
     float alpha = laneMask * clamp(density + motes, 0.0, 1.0) * alphaParams.x;
+
+    float baseDist = length(p - baseMask.xy);
+    float baseFeather = max(0.01, baseMask.w);
+    float baseFade = smoothstep(baseMask.z, baseMask.z + baseFeather, baseDist);
+    alpha *= baseFade;
+
     alpha = clamp(alpha, 0.0, 1.0);
 
     vec3 color = tintColor.rgb * (0.92 + nMix * 0.16);

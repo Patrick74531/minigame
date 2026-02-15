@@ -32,29 +32,82 @@ type ConfigPad = {
 
 type LaneFogRuntime = {
     root: Node;
-    material: Material;
+    layers: Array<{
+        material: Material;
+        baseOpacity: number;
+        timeOffset: number;
+        moteStrength: number;
+    }>;
     fadeState: { factor: number };
-    baseOpacity: number;
     time: number;
+};
+
+type FogLayerSpec = {
+    name: string;
+    y: number;
+    technique: number;
+    opacityScale: number;
+    widthScale: number;
+    flowScale: number;
+    noiseScale: number;
+    timeOffset: number;
+    moteScale: number;
 };
 
 const FOG_EFFECT_PATH = 'shaders/fog-mask';
 const FOG_TEX_PRIMARY = 'textures/fog';
 const FOG_TEX_SECONDARY = 'textures/fog';
 
-const START_AFTER_FIRST_TOWER = 2.8;
+const START_AFTER_FIRST_TOWER_MID = 2.8;
+const START_AFTER_FIRST_TOWER_SIDE = 0;
 const SAMPLE_STEP = 2.2;
 const MAX_LANE_POINTS = 10;
 
-const LANE_INNER_WIDTH = 5.4;
-const LANE_OUTER_WIDTH = 10.8;
-const LANE_NOISE_WARP = 1.8;
+const LANE_INNER_WIDTH = 8.4;
+const LANE_OUTER_WIDTH = 18.6;
+const LANE_NOISE_WARP = 2.4;
 const ALPHA_NOISE_LOW = 0.24;
 const ALPHA_NOISE_HIGH = 0.8;
 const MOTE_STRENGTH = 0.2;
+const BASE_CLEAR_RADIUS = 11.2;
+const BASE_CLEAR_FEATHER = 4.8;
 
 const MAP_PADDING = 1.5;
-const FOG_Y = 0.16;
+const FOG_LAYER_SPECS: ReadonlyArray<FogLayerSpec> = [
+    {
+        name: 'ground',
+        y: 0.16,
+        technique: 0,
+        opacityScale: 1.0,
+        widthScale: 1.0,
+        flowScale: 1.0,
+        noiseScale: 1.0,
+        timeOffset: 0,
+        moteScale: 1.0,
+    },
+    {
+        name: 'midVolume',
+        y: 1.55,
+        technique: 1,
+        opacityScale: 0.62,
+        widthScale: 1.18,
+        flowScale: 0.84,
+        noiseScale: 1.22,
+        timeOffset: 1.7,
+        moteScale: 0.82,
+    },
+    {
+        name: 'highVolume',
+        y: 3.0,
+        technique: 1,
+        opacityScale: 0.44,
+        widthScale: 1.38,
+        flowScale: 0.72,
+        noiseScale: 1.36,
+        timeOffset: 3.3,
+        moteScale: 0.68,
+    },
+];
 
 const TOWER_TYPES = new Set(['tower', 'frost_tower', 'lightning_tower']);
 
@@ -142,7 +195,9 @@ export class LaneFogController {
     public tick(dt: number): void {
         for (const runtime of this._laneRuntimes.values()) {
             runtime.time += dt;
-            runtime.material.setProperty('time', runtime.time);
+            for (const layer of runtime.layers) {
+                layer.material.setProperty('time', runtime.time + layer.timeOffset);
+            }
         }
     }
 
@@ -206,31 +261,22 @@ export class LaneFogController {
         laneRoot.layer = this._root.layer;
         this._root.addChild(laneRoot);
 
-        const plane = new Node(`FogMask_${lane}`);
-        plane.layer = laneRoot.layer;
-        laneRoot.addChild(plane);
-        plane.setPosition(0, FOG_Y, 0);
-
-        const renderer = plane.addComponent(MeshRenderer);
-        renderer.mesh = this.getFogPlaneMesh();
-
-        const material = this.createLaneMaterial(lane, lanePath);
-        if (!material) {
+        const runtimeLayers = this.createLaneFogLayers(laneRoot, lane, lanePath);
+        if (runtimeLayers.length <= 0) {
             laneRoot.destroy();
             return;
         }
-        renderer.material = material;
 
-        const baseOpacity = this.resolveLaneBaseOpacity(lane);
         const runtime: LaneFogRuntime = {
             root: laneRoot,
-            material,
+            layers: runtimeLayers,
             fadeState: { factor: 1 },
-            baseOpacity,
             time: Math.random() * 9.0,
         };
         this.applyOpacity(runtime, 1);
-        runtime.material.setProperty('time', runtime.time);
+        for (const layer of runtime.layers) {
+            layer.material.setProperty('time', runtime.time + layer.timeOffset);
+        }
 
         this._laneRuntimes.set(lane, runtime);
     }
@@ -260,12 +306,13 @@ export class LaneFogController {
 
     private createLaneMaterial(
         lane: RouteLane,
-        lanePath: Array<{ x: number; z: number }>
+        lanePath: Array<{ x: number; z: number }>,
+        spec: FogLayerSpec
     ): Material | null {
         if (!this._fogEffect) return null;
 
         const material = new Material();
-        material.initialize({ effectAsset: this._fogEffect });
+        material.initialize({ effectAsset: this._fogEffect, technique: spec.technique });
 
         if (this._fogTexA) material.setProperty('fogTexA', this._fogTexA);
         if (this._fogTexB) material.setProperty('fogTexB', this._fogTexB);
@@ -277,8 +324,8 @@ export class LaneFogController {
         material.setProperty(
             'flowA',
             new Vec4(
-                0.16 + flowSeed * 0.08,
-                0.15 + flowSeed * 0.07,
+                (0.16 + flowSeed * 0.08) * spec.flowScale,
+                (0.15 + flowSeed * 0.07) * spec.flowScale,
                 0.012 + flowSeed * 0.007,
                 0.004 + flowSeed * 0.004
             )
@@ -286,8 +333,8 @@ export class LaneFogController {
         material.setProperty(
             'flowB',
             new Vec4(
-                0.34 + flowSeed * 0.11,
-                0.3 + flowSeed * 0.09,
+                (0.34 + flowSeed * 0.11) * spec.flowScale,
+                (0.3 + flowSeed * 0.09) * spec.flowScale,
                 -(0.009 + flowSeed * 0.006),
                 0.006 + flowSeed * 0.004
             )
@@ -295,20 +342,39 @@ export class LaneFogController {
 
         material.setProperty(
             'laneWidth',
-            new Vec4(LANE_INNER_WIDTH, LANE_OUTER_WIDTH, LANE_NOISE_WARP, 0)
+            new Vec4(
+                LANE_INNER_WIDTH * spec.widthScale,
+                LANE_OUTER_WIDTH * spec.widthScale,
+                LANE_NOISE_WARP,
+                0
+            )
         );
         material.setProperty(
             'alphaParams',
             new Vec4(
-                this.resolveLaneBaseOpacity(lane),
+                this.resolveLaneBaseOpacity(lane) * spec.opacityScale,
                 ALPHA_NOISE_LOW,
                 ALPHA_NOISE_HIGH,
-                MOTE_STRENGTH
+                MOTE_STRENGTH * spec.moteScale
             )
         );
         material.setProperty(
             'noiseParams',
-            new Vec4(0.68 + flowSeed * 0.14, 0.17 + flowSeed * 0.05, 1.28 + flowSeed * 0.26, 0.08)
+            new Vec4(
+                (0.68 + flowSeed * 0.14) * spec.noiseScale,
+                0.17 + flowSeed * 0.05,
+                (1.28 + flowSeed * 0.26) * spec.noiseScale,
+                0.08
+            )
+        );
+        material.setProperty(
+            'baseMask',
+            new Vec4(
+                this._baseX,
+                this._baseZ,
+                BASE_CLEAR_RADIUS * spec.widthScale,
+                BASE_CLEAR_FEATHER
+            )
         );
         material.setProperty('lanePointCount', Math.min(MAX_LANE_POINTS, lanePath.length));
 
@@ -321,17 +387,53 @@ export class LaneFogController {
         return material;
     }
 
+    private createLaneFogLayers(
+        laneRoot: Node,
+        lane: RouteLane,
+        lanePath: Array<{ x: number; z: number }>
+    ): LaneFogRuntime['layers'] {
+        const layers: LaneFogRuntime['layers'] = [];
+        for (const spec of FOG_LAYER_SPECS) {
+            const plane = new Node(`FogMask_${lane}_${spec.name}`);
+            plane.layer = this._root?.layer ?? 0;
+            plane.setPosition(0, spec.y, 0);
+            laneRoot.addChild(plane);
+
+            const renderer = plane.addComponent(MeshRenderer);
+            renderer.mesh = this.getFogPlaneMesh();
+
+            const material = this.createLaneMaterial(lane, lanePath, spec);
+            if (!material) {
+                if (plane.isValid) {
+                    plane.destroy();
+                }
+                continue;
+            }
+
+            renderer.material = material;
+            layers.push({
+                material,
+                baseOpacity: this.resolveLaneBaseOpacity(lane) * spec.opacityScale,
+                timeOffset: spec.timeOffset,
+                moteStrength: MOTE_STRENGTH * spec.moteScale,
+            });
+        }
+        return layers;
+    }
+
     private applyOpacity(runtime: LaneFogRuntime, factor: number): void {
         const clamped = Math.max(0, Math.min(1, factor));
-        runtime.material.setProperty(
-            'alphaParams',
-            new Vec4(
-                runtime.baseOpacity * clamped,
-                ALPHA_NOISE_LOW,
-                ALPHA_NOISE_HIGH,
-                MOTE_STRENGTH
-            )
-        );
+        for (const layer of runtime.layers) {
+            layer.material.setProperty(
+                'alphaParams',
+                new Vec4(
+                    layer.baseOpacity * clamped,
+                    ALPHA_NOISE_LOW,
+                    ALPHA_NOISE_HIGH,
+                    layer.moteStrength
+                )
+            );
+        }
     }
 
     private resolveLaneBaseOpacity(lane: RouteLane): number {
@@ -384,8 +486,10 @@ export class LaneFogController {
             return Math.min(fallback, Math.max(2.2, laneLength - 2.2));
         }
 
-        const candidate = firstTowerDist + START_AFTER_FIRST_TOWER;
-        return Math.max(2.2, Math.min(candidate, Math.max(2.2, laneLength - 1.8)));
+        const startOffset =
+            lane === 'mid' ? START_AFTER_FIRST_TOWER_MID : START_AFTER_FIRST_TOWER_SIDE;
+        const candidate = firstTowerDist + startOffset;
+        return Math.max(0.8, Math.min(candidate, Math.max(0.8, laneLength - 1.8)));
     }
 
     private resolveFogEndDistance(lane: RouteLane, laneLength: number): number {
