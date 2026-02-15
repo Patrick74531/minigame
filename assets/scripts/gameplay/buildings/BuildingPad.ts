@@ -16,6 +16,9 @@ import {
     RigidBody,
     Graphics,
     LabelOutline,
+    Sprite,
+    SpriteFrame,
+    Texture2D,
     Prefab,
     resources,
     instantiate,
@@ -54,6 +57,45 @@ export class BuildingPad extends BaseComponent {
     private static readonly BUILD_CONFIRM_DELAY = 0.25;
     private static readonly BUILD_MAX_RETRY = 3;
     private static readonly BUILD_AUTO_RETRY_ROUNDS = 2;
+    private static readonly TOWER_ICON_TEXTURE_PATHS = [
+        'icon/tower_icon',
+        'icon/tower_icon/texture',
+        'icon/tower_icon.webp',
+        'icon/tower_icon.webp/texture',
+    ];
+    private static _towerIconFrame: SpriteFrame | null = null;
+    private static _towerIconLoading = false;
+    private static _towerIconWaiting = new Set<Sprite>();
+
+    private static readonly FARM_ICON_TEXTURE_PATHS = [
+        'icon/coin_icon',
+        'icon/coin_icon/texture',
+        'icon/coin_icon.webp',
+        'icon/coin_icon.webp/texture',
+    ];
+    private static _farmIconFrame: SpriteFrame | null = null;
+    private static _farmIconLoading = false;
+    private static _farmIconWaiting = new Set<Sprite>();
+
+    private static readonly BARRACKS_ICON_TEXTURE_PATHS = [
+        'icon/soldier',
+        'icon/soldier/texture',
+        'icon/soldier.webp',
+        'icon/soldier.webp/texture',
+    ];
+    private static _barracksIconFrame: SpriteFrame | null = null;
+    private static _barracksIconLoading = false;
+    private static _barracksIconWaiting = new Set<Sprite>();
+
+    private static readonly WALL_ICON_TEXTURE_PATHS = [
+        'icon/fence',
+        'icon/fence/texture',
+        'icon/fence.webp',
+        'icon/fence.webp/texture',
+    ];
+    private static _wallIconFrame: SpriteFrame | null = null;
+    private static _wallIconLoading = false;
+    private static _wallIconWaiting = new Set<Sprite>();
 
     /** 建筑类型 ID */
     @property
@@ -83,6 +125,7 @@ export class BuildingPad extends BaseComponent {
     private _label: Label | null = null;
     private _costLabelNode: Node | null = null;
     private _coinIconNode: Node | null = null;
+    private _functionIconNode: Node | null = null;
     private _heroInRange: boolean = false;
     private _heroNode: Node | null = null;
     private _padMaterial: Material | null = null;
@@ -146,7 +189,7 @@ export class BuildingPad extends BaseComponent {
         console.log(
             `[BuildingPad] start() \u88ab\u8c03\u7528, buildingTypeId=${this.buildingTypeId}`
         );
-        
+
         // Save initial type and check if it is a tower slot
         this._initialBuildingTypeId = this.buildingTypeId;
         this._isTowerSlot = this.isTowerType(this.buildingTypeId);
@@ -164,7 +207,7 @@ export class BuildingPad extends BaseComponent {
         if (this.lockWorldPosition) {
             this.applyFixedOffsetFromSpawn();
         }
-        
+
         // Listen for tower selection
         this.eventManager.on(GameEvents.TOWER_SELECTED, this.onTowerSelected, this);
 
@@ -174,7 +217,7 @@ export class BuildingPad extends BaseComponent {
     protected onDestroy(): void {
         this.eventManager.off(GameEvents.TOWER_SELECTED, this.onTowerSelected, this);
     }
-    
+
     private isTowerType(typeId: string): boolean {
         return typeId === 'tower' || typeId === 'frost_tower' || typeId === 'lightning_tower';
     }
@@ -326,7 +369,7 @@ export class BuildingPad extends BaseComponent {
             }
         }
     }
-    
+
     /**
      * 创建视觉元素（正方形投放区 + 一行数字/金币）
      */
@@ -350,28 +393,35 @@ export class BuildingPad extends BaseComponent {
         ctx.lineJoin = Graphics.LineJoin.ROUND;
         ctx.lineCap = Graphics.LineCap.ROUND;
 
-        const w = 176;
-        const h = 176;
+        const w = 196;
+        const h = 196;
         this.drawDashedRectSimple(ctx, -w / 2, -h / 2, w, h, 14, 9);
 
         // -- Content Container (Label + Coin) --
         const contentNode = new Node('Content');
         flatRoot.addChild(contentNode);
-        contentNode.setPosition(0, 0, 0);
+        contentNode.setPosition(0, -6, 0);
+
+        const hasFunctionIcon =
+            this.buildingTypeId === 'tower' ||
+            this.buildingTypeId === 'farm' ||
+            this.buildingTypeId === 'barracks' ||
+            this.buildingTypeId === 'wall';
+        const costRowY = hasFunctionIcon ? -16 : 0;
 
         // -- Cost Label --
         const labelNode = new Node('CostLabel');
         contentNode.addChild(labelNode);
-        labelNode.setPosition(-12, 0, 0);
+        labelNode.setPosition(-18, costRowY, 0);
         this._costLabelNode = labelNode;
 
         const uiTransform = labelNode.addComponent(UITransform);
-        uiTransform.setContentSize(120, 72);
+        uiTransform.setContentSize(128, 64);
 
         this._label = labelNode.addComponent(Label);
         this._label.string = `${this.requiredCoins}`;
-        this._label.fontSize = 58;
-        this._label.lineHeight = 62;
+        this._label.fontSize = 50;
+        this._label.lineHeight = 54;
         this._label.color = new Color(255, 235, 160, 255);
         this._label.isBold = true;
         this._label.horizontalAlign = Label.HorizontalAlign.RIGHT;
@@ -385,21 +435,296 @@ export class BuildingPad extends BaseComponent {
         // 2D Coin Icon (inline with number)
         const coinNode = new Node('CoinInline');
         contentNode.addChild(coinNode);
-        coinNode.setPosition(40, 0, 0);
+        coinNode.setPosition(48, costRowY, 0);
         this._coinIconNode = coinNode;
 
-        coinNode.addComponent(UITransform).setContentSize(44, 44);
+        coinNode.addComponent(UITransform).setContentSize(40, 40);
         const coinG = coinNode.addComponent(Graphics);
         coinG.fillColor = new Color(240, 190, 60, 255);
-        coinG.circle(0, 0, 18);
+        coinG.circle(0, 0, 16);
         coinG.fill();
         coinG.strokeColor = new Color(120, 80, 20, 255);
-        coinG.lineWidth = 3;
-        coinG.circle(0, 0, 18);
+        coinG.lineWidth = 2.5;
+        coinG.circle(0, 0, 16);
         coinG.stroke();
         coinG.fillColor = new Color(255, 225, 120, 255);
-        coinG.circle(-4, 4, 6);
+        coinG.circle(-3, 3, 5);
         coinG.fill();
+
+        // Optional function icon: building-specific icon for key pads.
+        if (this.buildingTypeId === 'tower') {
+            const iconNode = new Node('FunctionIcon');
+            contentNode.addChild(iconNode);
+            iconNode.setPosition(0, 50, 0);
+            this._functionIconNode = iconNode;
+            this.createTowerFunctionIcon(iconNode);
+        } else if (this.buildingTypeId === 'farm') {
+            const iconNode = new Node('FunctionIcon');
+            contentNode.addChild(iconNode);
+            iconNode.setPosition(0, 50, 0);
+            this._functionIconNode = iconNode;
+            this.createFarmFunctionIcon(iconNode);
+        } else if (this.buildingTypeId === 'barracks') {
+            const iconNode = new Node('FunctionIcon');
+            contentNode.addChild(iconNode);
+            iconNode.setPosition(0, 50, 0);
+            this._functionIconNode = iconNode;
+            this.createBarracksFunctionIcon(iconNode);
+        } else if (this.buildingTypeId === 'wall') {
+            const iconNode = new Node('FunctionIcon');
+            contentNode.addChild(iconNode);
+            iconNode.setPosition(0, 50, 0);
+            this._functionIconNode = iconNode;
+            this.createWallFunctionIcon(iconNode);
+        }
+    }
+
+    private createTowerFunctionIcon(parent: Node): void {
+        const spriteNode = new Node('SpriteIcon');
+        parent.addChild(spriteNode);
+        spriteNode.setPosition(0, 0, 0);
+
+        const transform = spriteNode.addComponent(UITransform);
+        transform.setContentSize(48, 48);
+
+        const sprite = spriteNode.addComponent(Sprite);
+        sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+        this.bindTowerIcon(sprite);
+    }
+
+    private bindTowerIcon(sprite: Sprite): void {
+        if (BuildingPad._towerIconFrame) {
+            sprite.spriteFrame = BuildingPad._towerIconFrame;
+            return;
+        }
+
+        BuildingPad._towerIconWaiting.add(sprite);
+        if (BuildingPad._towerIconLoading) return;
+        BuildingPad._towerIconLoading = true;
+
+        this.loadTowerIconTexture(0, tex => {
+            BuildingPad._towerIconLoading = false;
+            if (!tex) {
+                console.error(
+                    '[BuildingPad] Failed to load tower icon texture from paths:',
+                    BuildingPad.TOWER_ICON_TEXTURE_PATHS
+                );
+                BuildingPad._towerIconWaiting.clear();
+                return;
+            }
+
+            const frame = new SpriteFrame();
+            frame.texture = tex;
+            BuildingPad._towerIconFrame = frame;
+
+            for (const waiting of BuildingPad._towerIconWaiting) {
+                if (!waiting || !waiting.node || !waiting.node.isValid) continue;
+                waiting.spriteFrame = frame;
+            }
+            BuildingPad._towerIconWaiting.clear();
+        });
+    }
+
+    private loadTowerIconTexture(idx: number, done: (tex: Texture2D | null) => void): void {
+        if (idx >= BuildingPad.TOWER_ICON_TEXTURE_PATHS.length) {
+            done(null);
+            return;
+        }
+
+        const path = BuildingPad.TOWER_ICON_TEXTURE_PATHS[idx];
+        resources.load(path, Texture2D, (err, tex) => {
+            if (!err && tex) {
+                done(tex);
+                return;
+            }
+            this.loadTowerIconTexture(idx + 1, done);
+        });
+    }
+
+    private createFarmFunctionIcon(parent: Node): void {
+        const spriteNode = new Node('SpriteIcon');
+        parent.addChild(spriteNode);
+        spriteNode.setPosition(0, 0, 0);
+
+        const transform = spriteNode.addComponent(UITransform);
+        transform.setContentSize(48, 48);
+
+        const sprite = spriteNode.addComponent(Sprite);
+        sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+        this.bindFarmIcon(sprite);
+    }
+
+    private bindFarmIcon(sprite: Sprite): void {
+        if (BuildingPad._farmIconFrame) {
+            sprite.spriteFrame = BuildingPad._farmIconFrame;
+            return;
+        }
+
+        BuildingPad._farmIconWaiting.add(sprite);
+        if (BuildingPad._farmIconLoading) return;
+        BuildingPad._farmIconLoading = true;
+
+        this.loadFarmIconTexture(0, tex => {
+            BuildingPad._farmIconLoading = false;
+            if (!tex) {
+                console.error(
+                    '[BuildingPad] Failed to load farm icon texture from paths:',
+                    BuildingPad.FARM_ICON_TEXTURE_PATHS
+                );
+                BuildingPad._farmIconWaiting.clear();
+                return;
+            }
+
+            const frame = new SpriteFrame();
+            frame.texture = tex;
+            BuildingPad._farmIconFrame = frame;
+
+            for (const waiting of BuildingPad._farmIconWaiting) {
+                if (!waiting || !waiting.node || !waiting.node.isValid) continue;
+                waiting.spriteFrame = frame;
+            }
+            BuildingPad._farmIconWaiting.clear();
+        });
+    }
+
+    private loadFarmIconTexture(idx: number, done: (tex: Texture2D | null) => void): void {
+        if (idx >= BuildingPad.FARM_ICON_TEXTURE_PATHS.length) {
+            done(null);
+            return;
+        }
+
+        const path = BuildingPad.FARM_ICON_TEXTURE_PATHS[idx];
+        resources.load(path, Texture2D, (err, tex) => {
+            if (!err && tex) {
+                done(tex);
+                return;
+            }
+            this.loadFarmIconTexture(idx + 1, done);
+        });
+    }
+
+    private createBarracksFunctionIcon(parent: Node): void {
+        const spriteNode = new Node('SpriteIcon');
+        parent.addChild(spriteNode);
+        spriteNode.setPosition(0, 0, 0);
+
+        const transform = spriteNode.addComponent(UITransform);
+        transform.setContentSize(48, 48);
+
+        const sprite = spriteNode.addComponent(Sprite);
+        sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+        this.bindBarracksIcon(sprite);
+    }
+
+    private bindBarracksIcon(sprite: Sprite): void {
+        if (BuildingPad._barracksIconFrame) {
+            sprite.spriteFrame = BuildingPad._barracksIconFrame;
+            return;
+        }
+
+        BuildingPad._barracksIconWaiting.add(sprite);
+        if (BuildingPad._barracksIconLoading) return;
+        BuildingPad._barracksIconLoading = true;
+
+        this.loadBarracksIconTexture(0, tex => {
+            BuildingPad._barracksIconLoading = false;
+            if (!tex) {
+                console.error(
+                    '[BuildingPad] Failed to load barracks icon texture from paths:',
+                    BuildingPad.BARRACKS_ICON_TEXTURE_PATHS
+                );
+                BuildingPad._barracksIconWaiting.clear();
+                return;
+            }
+
+            const frame = new SpriteFrame();
+            frame.texture = tex;
+            BuildingPad._barracksIconFrame = frame;
+
+            for (const waiting of BuildingPad._barracksIconWaiting) {
+                if (!waiting || !waiting.node || !waiting.node.isValid) continue;
+                waiting.spriteFrame = frame;
+            }
+            BuildingPad._barracksIconWaiting.clear();
+        });
+    }
+
+    private loadBarracksIconTexture(idx: number, done: (tex: Texture2D | null) => void): void {
+        if (idx >= BuildingPad.BARRACKS_ICON_TEXTURE_PATHS.length) {
+            done(null);
+            return;
+        }
+
+        const path = BuildingPad.BARRACKS_ICON_TEXTURE_PATHS[idx];
+        resources.load(path, Texture2D, (err, tex) => {
+            if (!err && tex) {
+                done(tex);
+                return;
+            }
+            this.loadBarracksIconTexture(idx + 1, done);
+        });
+    }
+
+    private createWallFunctionIcon(parent: Node): void {
+        const spriteNode = new Node('SpriteIcon');
+        parent.addChild(spriteNode);
+        spriteNode.setPosition(0, 0, 0);
+
+        const transform = spriteNode.addComponent(UITransform);
+        transform.setContentSize(48, 48);
+
+        const sprite = spriteNode.addComponent(Sprite);
+        sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+        this.bindWallIcon(sprite);
+    }
+
+    private bindWallIcon(sprite: Sprite): void {
+        if (BuildingPad._wallIconFrame) {
+            sprite.spriteFrame = BuildingPad._wallIconFrame;
+            return;
+        }
+
+        BuildingPad._wallIconWaiting.add(sprite);
+        if (BuildingPad._wallIconLoading) return;
+        BuildingPad._wallIconLoading = true;
+
+        this.loadWallIconTexture(0, tex => {
+            BuildingPad._wallIconLoading = false;
+            if (!tex) {
+                console.error(
+                    '[BuildingPad] Failed to load wall icon texture from paths:',
+                    BuildingPad.WALL_ICON_TEXTURE_PATHS
+                );
+                BuildingPad._wallIconWaiting.clear();
+                return;
+            }
+
+            const frame = new SpriteFrame();
+            frame.texture = tex;
+            BuildingPad._wallIconFrame = frame;
+
+            for (const waiting of BuildingPad._wallIconWaiting) {
+                if (!waiting || !waiting.node || !waiting.node.isValid) continue;
+                waiting.spriteFrame = frame;
+            }
+            BuildingPad._wallIconWaiting.clear();
+        });
+    }
+
+    private loadWallIconTexture(idx: number, done: (tex: Texture2D | null) => void): void {
+        if (idx >= BuildingPad.WALL_ICON_TEXTURE_PATHS.length) {
+            done(null);
+            return;
+        }
+
+        const path = BuildingPad.WALL_ICON_TEXTURE_PATHS[idx];
+        resources.load(path, Texture2D, (err, tex) => {
+            if (!err && tex) {
+                done(tex);
+                return;
+            }
+            this.loadWallIconTexture(idx + 1, done);
+        });
     }
 
     private drawDashedRectSimple(
@@ -459,21 +784,26 @@ export class BuildingPad extends BaseComponent {
     private updateDisplay(): void {
         if (this._label) {
             const remaining = this.requiredCoins - this._collectedCoins;
+            const hasFunctionIcon = !!this._functionIconNode;
+            const activeCostY = hasFunctionIcon ? -16 : 0;
+            const completeCostY = hasFunctionIcon ? -8 : 0;
 
             if (remaining <= 0) {
                 this._label.string = BuildingText.constructingLabel();
                 this._label.fontSize = 24;
                 this._label.lineHeight = 30;
                 this._label.horizontalAlign = Label.HorizontalAlign.CENTER;
-                if (this._costLabelNode) this._costLabelNode.setPosition(0, 0, 0);
+                if (this._costLabelNode) this._costLabelNode.setPosition(0, completeCostY, 0);
                 if (this._coinIconNode) this._coinIconNode.active = false;
+                if (this._functionIconNode) this._functionIconNode.active = false;
             } else {
                 this._label.string = `${remaining}`;
-                this._label.fontSize = 58;
-                this._label.lineHeight = 62;
+                this._label.fontSize = 50;
+                this._label.lineHeight = 54;
                 this._label.horizontalAlign = Label.HorizontalAlign.RIGHT;
-                if (this._costLabelNode) this._costLabelNode.setPosition(-12, 0, 0);
+                if (this._costLabelNode) this._costLabelNode.setPosition(-18, activeCostY, 0);
                 if (this._coinIconNode) this._coinIconNode.active = true;
+                if (this._functionIconNode) this._functionIconNode.active = true;
             }
 
             if (this.progress >= 1) {
@@ -686,31 +1016,33 @@ export class BuildingPad extends BaseComponent {
         console.log(`[BuildingPad] Coins collected for Tower Slot. Requesting Selection...`);
         this.eventManager.emit(GameEvents.REQUEST_TOWER_SELECTION, { padNode: this.node });
     }
-    
-    private onTowerSelected(data: { padNode: Node, buildingTypeId: string }): void {
+
+    private onTowerSelected(data: { padNode: Node; buildingTypeId: string }): void {
         if (data.padNode !== this.node) return;
-        
+
         console.log(`[BuildingPad] Tower Selected: ${data.buildingTypeId}`);
-        
+
         // Update type and config
         this.buildingTypeId = data.buildingTypeId;
         this._config = this.buildingRegistry.get(this.buildingTypeId) ?? null;
-        
+
         // Switch back to WAITING to check costs again vs collected coins
         this._state = BuildingPadState.WAITING;
-        
+
         // Update visuals to match new type cost (if different)
         this.updateDisplay();
-        
+
         // Check if we have enough coins now (if we selected a cheaper or same cost tower)
         if (this.isComplete) {
             this.onBuildComplete();
         } else {
-            console.log(`[BuildingPad] Selected tower is more expensive. improved collection needed.`);
+            console.log(
+                `[BuildingPad] Selected tower is more expensive. improved collection needed.`
+            );
             // Update HUD if hero is in area
             if (this._heroInArea && this.hudManager) {
-                 const title = this.getHudTitle();
-                 this.hudManager.showBuildingInfo(title, this.requiredCoins, this.collectedCoins);
+                const title = this.getHudTitle();
+                this.hudManager.showBuildingInfo(title, this.requiredCoins, this.collectedCoins);
             }
         }
     }
@@ -780,12 +1112,12 @@ export class BuildingPad extends BaseComponent {
             this.scheduleOnce(() => {
                 if (!this.node.isValid) return;
                 if (this._state !== BuildingPadState.WAITING || this._associatedBuilding) return;
-                
+
                 // Retry logic must also respect selection!
                 // If it failed, we assume the selection was already done OR it failed for other reasons.
                 // Since buildingTypeId is already set, we just try to complete.
                 if (this.isComplete) {
-                     this.onBuildComplete();
+                    this.onBuildComplete();
                 }
             }, 0.35);
             return;
@@ -858,13 +1190,13 @@ export class BuildingPad extends BaseComponent {
         this._isAnimating = false;
         this._buildEmitAttempts = 0;
         this._buildAutoRetryRounds = 0;
-        
+
         // Restore initial type if this was a tower slot
         if (this._isTowerSlot) {
             this.buildingTypeId = this._initialBuildingTypeId;
             this._config = this.buildingRegistry.get(this.buildingTypeId) ?? null;
         }
-        
+
         this.updateDisplay();
 
         if (this._heroInArea && this.hudManager) {
