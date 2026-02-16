@@ -5,7 +5,6 @@ import { HealthBar } from '../../ui/HealthBar';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
 import { PoolManager } from '../../core/managers/PoolManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
-import { IAttackable } from '../../core/interfaces/IAttackable';
 
 const { ccclass } = _decorator;
 
@@ -32,9 +31,9 @@ export class Soldier extends Unit {
     private static readonly BASE_MODEL_SCALE = 0.3;
     private static readonly BASE_HEALTH_BAR_Y_OFFSET = 1.2;
     private static readonly VISUAL_SIZE_GAIN = 1.65;
-    private static readonly PROACTIVE_RETARGET_INTERVAL = 0.18;
-    private static readonly RETARGET_SWITCH_BUFFER = 0.55;
-    private static readonly ATTACK_CHASE_BUFFER = 0.15;
+    private static readonly RETARGET_INTERVAL = 0.1;
+    private static readonly EXPLOSION_TRIGGER_DISTANCE = 0.95;
+    private static readonly EXPLOSION_DAMAGE_MULTIPLIER = 1.2;
     private static readonly DEFAULT_GROWTH: BarracksGrowthConfig = {
         HP_LINEAR: 0.26,
         HP_QUADRATIC: 0.02,
@@ -51,7 +50,7 @@ export class Soldier extends Unit {
 
     /** 当前追踪的敌人节点（外部可读取） */
     public currentTarget: Node | null = null;
-    private _fallbackTimer: number = 0;
+    private _retargetTimer: number = Soldier.RETARGET_INTERVAL;
     /** 产兵所属建筑 UUID */
     public ownerBuildingId: string | null = null;
     /** 出生来源对象池名（用于死亡回池） */
@@ -61,11 +60,7 @@ export class Soldier extends Unit {
     /** 缓存 RigidBody 引用，避免每帧 getComponent */
     private _rbCached: RigidBody | null = null;
     private _rbLookedUp: boolean = false;
-    /** 卡住检测（移动状态下长期位移过小则重置目标） */
-    private _stuckTimer: number = 0;
-    private _proactiveRetargetTimer: number = 0;
-    private _lastPosX: number = 0;
-    private _lastPosZ: number = 0;
+    private _hasExploded: boolean = false;
     /** 复用临时向量 */
     private static readonly _tmpVel = new Vec3();
     private static readonly _tmpLookAt = new Vec3();
@@ -91,9 +86,7 @@ export class Soldier extends Unit {
         bar.width = 60;
         bar.height = 6;
 
-        this._fallbackTimer = this.getFallbackReacquireInterval();
-        this._proactiveRetargetTimer = 0;
-        this.resetMotionTracking();
+        this._retargetTimer = Soldier.RETARGET_INTERVAL;
         this.applyBarracksLevel(1);
     }
 
@@ -104,9 +97,12 @@ export class Soldier extends Unit {
         this.ownerBuildingId = null;
         this.spawnPoolName = null;
         this.spawnedFromPool = false;
-        this._fallbackTimer = this.getFallbackReacquireInterval();
-        this._proactiveRetargetTimer = 0;
-        this.resetMotionTracking();
+        this._hasExploded = false;
+        // CRITICAL: Reset RigidBody cache — stale references from previous lifecycle
+        // cause setLinearVelocity to silently fail ("ghost soldier" bug)
+        this._rbCached = null;
+        this._rbLookedUp = false;
+        this._retargetTimer = Soldier.RETARGET_INTERVAL;
         this.applyBarracksLevel(1);
     }
 
@@ -158,81 +154,40 @@ export class Soldier extends Unit {
         if (!this.isAlive) return;
         if (!this.gameManager.isPlaying) return;
 
-        // 调用父类更新
-        super.update(dt);
+        // Simplified control loop:
+        // periodic global retarget -> if target exists, move/explode; otherwise idle.
+        this._retargetTimer += dt;
+        if (this._retargetTimer >= Soldier.RETARGET_INTERVAL) {
+            this._retargetTimer = 0;
+            this.refreshNearestTarget();
+        }
 
-        // Mirror target for external reads (CombatSystem assigns target)
-        this.currentTarget = this.target ? this.target.node : null;
-
-        // Clear dead targets early to allow re-acquisition
-        if (
-            this.target &&
-            (!this.target.isAlive || !this.target.node || !this.target.node.isValid)
-        ) {
+        if (!this.hasValidTarget()) {
             this.setTarget(null);
             this.currentTarget = null;
             this._state = UnitState.IDLE;
             this.stopMovement();
-            this._fallbackTimer = this.getFallbackReacquireInterval();
-            this._proactiveRetargetTimer = 0;
-            this.tryAcquireTargetFallback();
+            return;
         }
 
-        // Fallback: ensure soldiers can still find targets if CombatSystem is missing or stalled
-        if (!this.target) {
-            if (this._state !== UnitState.IDLE) {
-                this._state = UnitState.IDLE;
-                this.stopMovement();
-            }
-            this._fallbackTimer += dt;
-            if (this._fallbackTimer >= this.getFallbackReacquireInterval()) {
-                this._fallbackTimer = 0;
-                this.tryAcquireTargetFallback();
-            }
-        } else {
-            this._fallbackTimer = 0;
-            if (this._state === UnitState.IDLE) {
-                this._state = UnitState.MOVING;
-            }
-            if (this._state !== UnitState.ATTACKING) {
-                this._proactiveRetargetTimer += dt;
-                if (this._proactiveRetargetTimer >= Soldier.PROACTIVE_RETARGET_INTERVAL) {
-                    this._proactiveRetargetTimer = 0;
-                    this.tryAcquireTargetFallback(true);
-                }
-            } else {
-                this._proactiveRetargetTimer = 0;
-            }
-            if (
-                this._state === UnitState.ATTACKING &&
-                !this.isTargetWithinAttackWindow(this._target, Soldier.ATTACK_CHASE_BUFFER)
-            ) {
-                this._state = UnitState.MOVING;
-            }
-        }
-
-        this.updateStuckState(dt);
+        this.currentTarget = this._target!.node;
+        this._state = UnitState.MOVING;
+        super.update(dt);
     }
 
     /**
      * 由 CombatSystem 调用，设置并进入追击状态
      */
     public engageTarget(target: Unit): void {
+        if (!target || !target.isAlive || !target.node || !target.node.isValid) return;
         this.setTarget(target);
         this._state = UnitState.MOVING;
         this.currentTarget = target.node;
-        this._stuckTimer = 0;
-        this._proactiveRetargetTimer = 0;
+        this._retargetTimer = 0;
     }
 
     protected updateMovement(dt: number): void {
-        if (
-            !this.isAlive ||
-            !this._target ||
-            !this._target.isAlive ||
-            !this._target.node ||
-            !this._target.node.isValid
-        ) {
+        if (!this.hasValidTarget()) {
             this._state = UnitState.IDLE;
             this.currentTarget = null;
             this.setTarget(null);
@@ -245,11 +200,10 @@ export class Soldier extends Unit {
         const dx = targetPos.x - myPos.x;
         const dz = targetPos.z - myPos.z; // 3D
         const distSq = dx * dx + dz * dz;
-        const rangeSq = this._stats.attackRange * this._stats.attackRange;
-
-        if (distSq <= rangeSq) {
-            this._state = UnitState.ATTACKING;
-            this.stopMovement();
+        const triggerRangeSq =
+            Soldier.EXPLOSION_TRIGGER_DISTANCE * Soldier.EXPLOSION_TRIGGER_DISTANCE;
+        if (distSq <= triggerRangeSq) {
+            this.explode();
             return;
         }
 
@@ -283,23 +237,14 @@ export class Soldier extends Unit {
     }
 
     protected performAttack(): void {
-        if (!this._target || !this._target.isAlive) {
-            this.setTarget(null);
-            this.currentTarget = null;
-            this._state = UnitState.IDLE;
-            this.stopMovement();
-            return;
-        }
-        if (!this.isTargetWithinAttackWindow(this._target, Soldier.ATTACK_CHASE_BUFFER)) {
-            this._state = UnitState.MOVING;
-            return;
-        }
-        this._target.takeDamage(this._stats.attack, this);
+        // Soldier combat is movement-driven; keep this as safe fallback.
+        this.explode();
     }
 
     protected onDeath(): void {
         this.stopMovement();
         this.currentTarget = null;
+        this.setTarget(null);
         const bar = this.node.getComponent(HealthBar);
         if (bar && bar.isValid) {
             bar.enabled = false;
@@ -313,22 +258,30 @@ export class Soldier extends Unit {
         this.node.destroy();
     }
 
-    /**
-     * Fallback targeting when CombatSystem is not running.
-     * NOTE: Keep lightweight. This exists for safety only.
-     */
-    private tryAcquireTargetFallback(allowRetarget: boolean = false): void {
+    private refreshNearestTarget(): void {
+        const nearest = this.findNearestEnemyUnit();
+        if (!nearest) {
+            this.setTarget(null);
+            return;
+        }
+        if (this._target !== nearest) {
+            this.setTarget(nearest);
+        }
+    }
+
+    private findNearestEnemyUnit(): Unit | null {
         const enemies = EnemyQuery.getEnemies();
-        if (!enemies || enemies.length === 0) return;
+        if (!enemies || enemies.length <= 0) return null;
 
         const myPos = this.node.position;
         let nearestUnit: Unit | null = null;
-        let minDistSq = Infinity;
+        let minDistSq = Number.POSITIVE_INFINITY;
 
         for (const enemy of enemies) {
-            if (!enemy || !enemy.isValid) continue;
+            if (!enemy || !enemy.isValid || !enemy.activeInHierarchy) continue;
             const unit = enemy.getComponent(Unit);
-            if (!unit || !unit.isAlive) continue;
+            if (!unit || !unit.isAlive || !unit.node || !unit.node.isValid) continue;
+
             const dx = enemy.position.x - myPos.x;
             const dz = enemy.position.z - myPos.z;
             const distSq = dx * dx + dz * dz;
@@ -338,89 +291,57 @@ export class Soldier extends Unit {
             }
         }
 
-        if (!nearestUnit) return;
-        if (!allowRetarget) {
-            this.engageTarget(nearestUnit);
-            return;
-        }
-        if (!this._target || !this._target.isAlive || !this._target.node?.isValid) {
-            this.engageTarget(nearestUnit);
-            return;
-        }
-        if (this._target === nearestUnit) return;
-
-        const curDx = this._target.node.position.x - myPos.x;
-        const curDz = this._target.node.position.z - myPos.z;
-        const currentDistSq = curDx * curDx + curDz * curDz;
-        const switchBufferSq = Soldier.RETARGET_SWITCH_BUFFER * Soldier.RETARGET_SWITCH_BUFFER;
-        if (minDistSq + switchBufferSq < currentDistSq) {
-            this.engageTarget(nearestUnit);
-        }
+        return nearestUnit;
     }
 
-    private isTargetWithinAttackWindow(target: IAttackable | null, extraRange: number): boolean {
-        if (!target || !target.isAlive || !target.node || !target.node.isValid) {
-            return false;
-        }
-        const myPos = this.node.position;
-        const targetPos = target.node.position;
-        const dx = targetPos.x - myPos.x;
-        const dz = targetPos.z - myPos.z;
-        const distSq = dx * dx + dz * dz;
-        const range = Math.max(0.05, this._stats.attackRange + Math.max(0, extraRange));
-        return distSq <= range * range;
+    private hasValidTarget(): boolean {
+        return !!(
+            this._target &&
+            this._target.isAlive &&
+            this._target.node &&
+            this._target.node.isValid &&
+            this._target.node.activeInHierarchy
+        );
     }
 
     private get poolManager(): PoolManager {
         return ServiceRegistry.get<PoolManager>('PoolManager') ?? PoolManager.instance;
     }
 
-    private getFallbackReacquireInterval(): number {
-        return Math.min(0.2, GameConfig.COMBAT.TARGET_CHECK_INTERVAL);
-    }
+    private explode(): void {
+        if (this._hasExploded || !this.isAlive) return;
+        this._hasExploded = true;
+        this.stopMovement();
 
-    private resetMotionTracking(): void {
-        this._stuckTimer = 0;
-        this._lastPosX = this.node.position.x;
-        this._lastPosZ = this.node.position.z;
-    }
+        const radius = this.resolveExplosionRadius();
+        const radiusSq = radius * radius;
+        const damage = Math.max(
+            1,
+            Math.floor(this._stats.attack * Soldier.EXPLOSION_DAMAGE_MULTIPLIER)
+        );
+        const myPos = this.node.position;
 
-    private updateStuckState(dt: number): void {
-        const pos = this.node.position;
-        const dx = pos.x - this._lastPosX;
-        const dz = pos.z - this._lastPosZ;
-        const movedSq = dx * dx + dz * dz;
-        this._lastPosX = pos.x;
-        this._lastPosZ = pos.z;
+        const enemies = EnemyQuery.getEnemies();
+        for (const enemy of enemies) {
+            if (!enemy || !enemy.isValid || !enemy.activeInHierarchy) continue;
+            const unit = enemy.getComponent(Unit);
+            if (!unit || !unit.isAlive || !unit.node || !unit.node.isValid) continue;
 
-        if (
-            this._state !== UnitState.MOVING ||
-            !this._target ||
-            !this._target.isAlive ||
-            !this._target.node ||
-            !this._target.node.isValid
-        ) {
-            this._stuckTimer = 0;
-            return;
-        }
-
-        // If soldier keeps "moving" but hardly changes position, force a retarget.
-        if (movedSq < 0.0004) {
-            this._stuckTimer += dt;
-            if (this._stuckTimer >= 0.45) {
-                this.setTarget(null);
-                this.currentTarget = null;
-                this._state = UnitState.IDLE;
-                this.stopMovement();
-                this._fallbackTimer = this.getFallbackReacquireInterval();
-                this._stuckTimer = 0;
-                this._proactiveRetargetTimer = 0;
-                this.tryAcquireTargetFallback();
+            const dx = unit.node.position.x - myPos.x;
+            const dz = unit.node.position.z - myPos.z;
+            const distSq = dx * dx + dz * dz;
+            if (distSq <= radiusSq) {
+                unit.takeDamage(damage, this);
             }
-            return;
         }
 
-        this._stuckTimer = 0;
+        this.setTarget(null);
+        this.currentTarget = null;
+        this.die();
+    }
+
+    private resolveExplosionRadius(): number {
+        return Math.max(0.8, Math.min(2.4, this._stats.attackRange * 0.9));
     }
 
     private stopMovement(): void {

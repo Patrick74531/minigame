@@ -98,6 +98,18 @@ export class CombatSystem extends Component implements CombatProvider {
             const enemy = data.node.getComponent(Enemy);
             if (enemy) {
                 this.unregisterEnemy(enemy);
+                // Immediately reassign all soldiers that were targeting this enemy
+                for (const soldier of this._soldiers) {
+                    if (!soldier.isAlive || !soldier.node?.isValid) continue;
+                    if (
+                        soldier.target === enemy ||
+                        !soldier.target ||
+                        !soldier.target.isAlive ||
+                        !soldier.target.node?.isValid
+                    ) {
+                        this.tryAssignNearestEnemy(soldier);
+                    }
+                }
                 this.scheduleImmediateRetarget();
             }
         } else if (data.unitType === 'soldier') {
@@ -151,19 +163,25 @@ export class CombatSystem extends Component implements CombatProvider {
         CombatSystem.compactArray(this._soldiers);
 
         for (const soldier of this._soldiers) {
-            if (
-                !soldier.target ||
-                !soldier.target.isAlive ||
-                !soldier.target.node?.isValid ||
-                soldier.state === UnitState.IDLE
-            ) {
+            // Reassign if: no target, target dead/invalid, or soldier idle
+            const targetInvalid =
+                !soldier.target || !soldier.target.isAlive || !soldier.target.node?.isValid;
+            if (targetInvalid || soldier.state === UnitState.IDLE) {
                 this.tryAssignNearestEnemy(soldier);
             }
         }
     }
 
     private tryAssignNearestEnemy(soldier: Soldier): void {
-        if (!soldier || !soldier.isAlive || !soldier.node || !soldier.node.isValid) return;
+        if (
+            !soldier ||
+            !soldier.isAlive ||
+            !soldier.node ||
+            !soldier.node.isValid ||
+            !soldier.node.activeInHierarchy
+        ) {
+            return;
+        }
         const nearestEnemy = this.findNearestEnemy(soldier);
         if (nearestEnemy) {
             soldier.engageTarget(nearestEnemy);
@@ -175,13 +193,20 @@ export class CombatSystem extends Component implements CombatProvider {
     }
 
     /** 原地移除无效元素（swap-remove，O(n)，零分配） */
-    private static compactArray<T extends { isAlive: boolean; node: { isValid: boolean } }>(
+    private static compactArray<T extends { isAlive: boolean; node: { isValid: boolean } | null }>(
         arr: T[]
     ): void {
         let write = 0;
         for (let read = 0; read < arr.length; read++) {
-            if (arr[read].isAlive && arr[read].node.isValid) {
-                arr[write++] = arr[read];
+            const item = arr[read];
+            if (
+                item &&
+                item.isAlive &&
+                item.node &&
+                item.node.isValid &&
+                item.node.activeInHierarchy
+            ) {
+                arr[write++] = item;
             }
         }
         arr.length = write;
@@ -194,7 +219,14 @@ export class CombatSystem extends Component implements CombatProvider {
         const myPos = soldier.node.position;
 
         for (const enemy of this._enemies) {
-            if (!enemy.isAlive) continue;
+            if (
+                !enemy.isAlive ||
+                !enemy.node ||
+                !enemy.node.isValid ||
+                !enemy.node.activeInHierarchy
+            ) {
+                continue;
+            }
 
             const dx = enemy.node.position.x - myPos.x;
             const dz = enemy.node.position.z - myPos.z;
@@ -221,7 +253,14 @@ export class CombatSystem extends Component implements CombatProvider {
         const pz = position.z ?? position.y ?? 0;
 
         for (const enemy of this._enemies) {
-            if (!enemy.isAlive) continue;
+            if (
+                !enemy.isAlive ||
+                !enemy.node ||
+                !enemy.node.isValid ||
+                !enemy.node.activeInHierarchy
+            ) {
+                continue;
+            }
 
             const dx = enemy.node.position.x - px;
             const dz = enemy.node.position.z - pz;
@@ -248,7 +287,14 @@ export class CombatSystem extends Component implements CombatProvider {
         const pz = position.z ?? position.y ?? 0;
 
         for (const soldier of this._soldiers) {
-            if (!soldier.isAlive) continue;
+            if (
+                !soldier.isAlive ||
+                !soldier.node ||
+                !soldier.node.isValid ||
+                !soldier.node.activeInHierarchy
+            ) {
+                continue;
+            }
 
             const dx = soldier.node.position.x - px;
             const dz = soldier.node.position.z - pz;

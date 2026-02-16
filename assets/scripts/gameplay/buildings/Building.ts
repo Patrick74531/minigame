@@ -389,9 +389,12 @@ export class Building extends BaseComponent implements IAttackable {
             this._spawnTimer += dt;
 
             if (this._spawnTimer >= this.spawnInterval) {
-                this._spawnTimer = 0;
+                this._spawnTimer -= this.spawnInterval;
                 this.spawnSoldierBatch();
             }
+        } else {
+            // 满员时重置计时器，避免士兵死亡后立刻爆发产兵
+            this._spawnTimer = 0;
         }
     }
 
