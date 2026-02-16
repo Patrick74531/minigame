@@ -1,7 +1,8 @@
-import { _decorator, Component, Vec3, PhysicsSystem, geometry, CapsuleCollider, Vec2 } from 'cc';
+import { _decorator, Component, Vec3, PhysicsSystem, geometry, Vec2 } from 'cc';
 import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass, property } = _decorator;
+const PHYSICS_GROUP_WALL = 1 << 5;
 
 @ccclass('CharacterMover')
 export class CharacterMover extends Component {
@@ -49,7 +50,8 @@ export class CharacterMover extends Component {
         Vec3.normalize(ray.d, moveVec);
 
         // Sweep
-        const mask = 0xffffffff;
+        // Wall colliders are enemy-only blockers; hero movement queries should ignore them.
+        const mask = 0xffffffff & ~PHYSICS_GROUP_WALL;
         const maxDist = moveDist + 0.1; // Check slightly further
 
         let finalX = targetPos.x;

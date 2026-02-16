@@ -61,6 +61,8 @@ export interface BuildingUpgradeConfig {
 @ccclass('Building')
 export class Building extends BaseComponent implements IAttackable {
     private static _latestBaseLevel: number = 1;
+    private static readonly PHYSICS_GROUP_ENEMY = 1 << 3;
+    private static readonly PHYSICS_GROUP_WALL = 1 << 5;
     private static readonly FARM_STACK_BASE_POS: ReadonlyArray<{ x: number; z: number }> =
         GameConfig.BUILDING.FARM_STACK.BASE_POS;
     private static readonly FARM_STACK_BASE_Y = GameConfig.BUILDING.FARM_STACK.BASE_Y;
@@ -229,10 +231,10 @@ export class Building extends BaseComponent implements IAttackable {
         col.size = new Vec3(10, 2, 1);
         col.center = new Vec3(0, 1, 0);
 
-        // 墙体保留在 DEFAULT 组；仅与 ENEMY 组碰撞。
-        // Hero/Soldier（DEFAULT）因 mask 不匹配可直接穿过。
-        col.setGroup(1 << 0);
-        col.setMask(1 << 3);
+        // 墙体使用独立组，仅与 ENEMY 组碰撞。
+        // Hero/Soldier 不再受墙体碰撞影响，可稳定穿过。
+        col.setGroup(Building.PHYSICS_GROUP_WALL);
+        col.setMask(Building.PHYSICS_GROUP_ENEMY);
     }
 
     private shouldUseSolidObstaclePhysics(): boolean {

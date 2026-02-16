@@ -31,6 +31,7 @@ import { GameEvents } from '../../data/GameEvents';
 import { EventManager } from '../../core/managers/EventManager';
 
 const { ccclass, property } = _decorator;
+const PHYSICS_GROUP_WALL = 1 << 5;
 
 /**
  * 英雄单位
@@ -132,7 +133,7 @@ export class Hero extends Unit {
         }
 
         col.setGroup(1 << 0);
-        col.setMask(0xffffffff);
+        col.setMask(0xffffffff & ~PHYSICS_GROUP_WALL);
 
         this.syncRuntimeStats();
     }

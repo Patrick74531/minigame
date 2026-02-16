@@ -1,6 +1,7 @@
 import { _decorator, Component } from 'cc';
 import { Soldier } from '../units/Soldier';
 import { Enemy } from '../units/Enemy';
+import { UnitState } from '../units/Unit';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { CombatService, CombatProvider } from '../../core/managers/CombatService';
@@ -25,7 +26,6 @@ export class CombatSystem extends Component implements CombatProvider {
     public get activeEnemies(): Enemy[] {
         return this._enemies;
     }
-
 
     /** 所有活跃的士兵 */
     private _soldiers: Soldier[] = [];
@@ -72,6 +72,18 @@ export class CombatSystem extends Component implements CombatProvider {
             if (enemy) {
                 this.registerEnemy(enemy);
                 this.scheduleImmediateRetarget();
+                for (const soldier of this._soldiers) {
+                    if (!soldier.isAlive || !soldier.node?.isValid) continue;
+                    const target = soldier.target;
+                    if (
+                        !target ||
+                        !target.isAlive ||
+                        !target.node?.isValid ||
+                        soldier.state === UnitState.IDLE
+                    ) {
+                        this.tryAssignNearestEnemy(soldier);
+                    }
+                }
             }
         } else if (data.unitType === 'soldier') {
             const soldier = data.node.getComponent(Soldier);
@@ -139,7 +151,12 @@ export class CombatSystem extends Component implements CombatProvider {
         CombatSystem.compactArray(this._soldiers);
 
         for (const soldier of this._soldiers) {
-            if (!soldier.target || !soldier.target.isAlive || !soldier.target.node?.isValid) {
+            if (
+                !soldier.target ||
+                !soldier.target.isAlive ||
+                !soldier.target.node?.isValid ||
+                soldier.state === UnitState.IDLE
+            ) {
                 this.tryAssignNearestEnemy(soldier);
             }
         }

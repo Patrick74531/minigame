@@ -5,6 +5,7 @@ import { HealthBar } from '../../ui/HealthBar';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
 import { PoolManager } from '../../core/managers/PoolManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import { IAttackable } from '../../core/interfaces/IAttackable';
 
 const { ccclass } = _decorator;
 
@@ -30,18 +31,22 @@ interface BarracksGrowthConfig {
 export class Soldier extends Unit {
     private static readonly BASE_MODEL_SCALE = 0.3;
     private static readonly BASE_HEALTH_BAR_Y_OFFSET = 1.2;
+    private static readonly VISUAL_SIZE_GAIN = 1.65;
+    private static readonly PROACTIVE_RETARGET_INTERVAL = 0.18;
+    private static readonly RETARGET_SWITCH_BUFFER = 0.55;
+    private static readonly ATTACK_CHASE_BUFFER = 0.15;
     private static readonly DEFAULT_GROWTH: BarracksGrowthConfig = {
-        HP_LINEAR: 0.2,
-        HP_QUADRATIC: 0.015,
-        ATTACK_LINEAR: 0.12,
-        ATTACK_QUADRATIC: 0.02,
-        ATTACK_INTERVAL_DECAY_PER_LEVEL: 0.05,
-        ATTACK_INTERVAL_MIN_MULTIPLIER: 0.72,
-        ATTACK_RANGE_LINEAR: 0.03,
-        MOVE_SPEED_LINEAR: 0.035,
-        SIZE_LINEAR: 0.08,
-        SIZE_QUADRATIC: 0.008,
-        SIZE_MAX_MULTIPLIER: 1.55,
+        HP_LINEAR: 0.26,
+        HP_QUADRATIC: 0.02,
+        ATTACK_LINEAR: 0.18,
+        ATTACK_QUADRATIC: 0.025,
+        ATTACK_INTERVAL_DECAY_PER_LEVEL: 0.06,
+        ATTACK_INTERVAL_MIN_MULTIPLIER: 0.62,
+        ATTACK_RANGE_LINEAR: 0.04,
+        MOVE_SPEED_LINEAR: 0.04,
+        SIZE_LINEAR: 0.14,
+        SIZE_QUADRATIC: 0.018,
+        SIZE_MAX_MULTIPLIER: 2.2,
     };
 
     /** 当前追踪的敌人节点（外部可读取） */
@@ -58,6 +63,7 @@ export class Soldier extends Unit {
     private _rbLookedUp: boolean = false;
     /** 卡住检测（移动状态下长期位移过小则重置目标） */
     private _stuckTimer: number = 0;
+    private _proactiveRetargetTimer: number = 0;
     private _lastPosX: number = 0;
     private _lastPosZ: number = 0;
     /** 复用临时向量 */
@@ -86,6 +92,7 @@ export class Soldier extends Unit {
         bar.height = 6;
 
         this._fallbackTimer = this.getFallbackReacquireInterval();
+        this._proactiveRetargetTimer = 0;
         this.resetMotionTracking();
         this.applyBarracksLevel(1);
     }
@@ -98,6 +105,7 @@ export class Soldier extends Unit {
         this.spawnPoolName = null;
         this.spawnedFromPool = false;
         this._fallbackTimer = this.getFallbackReacquireInterval();
+        this._proactiveRetargetTimer = 0;
         this.resetMotionTracking();
         this.applyBarracksLevel(1);
     }
@@ -163,11 +171,19 @@ export class Soldier extends Unit {
         ) {
             this.setTarget(null);
             this.currentTarget = null;
+            this._state = UnitState.IDLE;
+            this.stopMovement();
             this._fallbackTimer = this.getFallbackReacquireInterval();
+            this._proactiveRetargetTimer = 0;
+            this.tryAcquireTargetFallback();
         }
 
         // Fallback: ensure soldiers can still find targets if CombatSystem is missing or stalled
         if (!this.target) {
+            if (this._state !== UnitState.IDLE) {
+                this._state = UnitState.IDLE;
+                this.stopMovement();
+            }
             this._fallbackTimer += dt;
             if (this._fallbackTimer >= this.getFallbackReacquireInterval()) {
                 this._fallbackTimer = 0;
@@ -175,6 +191,24 @@ export class Soldier extends Unit {
             }
         } else {
             this._fallbackTimer = 0;
+            if (this._state === UnitState.IDLE) {
+                this._state = UnitState.MOVING;
+            }
+            if (this._state !== UnitState.ATTACKING) {
+                this._proactiveRetargetTimer += dt;
+                if (this._proactiveRetargetTimer >= Soldier.PROACTIVE_RETARGET_INTERVAL) {
+                    this._proactiveRetargetTimer = 0;
+                    this.tryAcquireTargetFallback(true);
+                }
+            } else {
+                this._proactiveRetargetTimer = 0;
+            }
+            if (
+                this._state === UnitState.ATTACKING &&
+                !this.isTargetWithinAttackWindow(this._target, Soldier.ATTACK_CHASE_BUFFER)
+            ) {
+                this._state = UnitState.MOVING;
+            }
         }
 
         this.updateStuckState(dt);
@@ -188,6 +222,7 @@ export class Soldier extends Unit {
         this._state = UnitState.MOVING;
         this.currentTarget = target.node;
         this._stuckTimer = 0;
+        this._proactiveRetargetTimer = 0;
     }
 
     protected updateMovement(dt: number): void {
@@ -201,6 +236,7 @@ export class Soldier extends Unit {
             this._state = UnitState.IDLE;
             this.currentTarget = null;
             this.setTarget(null);
+            this.stopMovement();
             return;
         }
 
@@ -213,6 +249,7 @@ export class Soldier extends Unit {
 
         if (distSq <= rangeSq) {
             this._state = UnitState.ATTACKING;
+            this.stopMovement();
             return;
         }
 
@@ -246,11 +283,22 @@ export class Soldier extends Unit {
     }
 
     protected performAttack(): void {
-        if (!this._target || !this._target.isAlive) return;
+        if (!this._target || !this._target.isAlive) {
+            this.setTarget(null);
+            this.currentTarget = null;
+            this._state = UnitState.IDLE;
+            this.stopMovement();
+            return;
+        }
+        if (!this.isTargetWithinAttackWindow(this._target, Soldier.ATTACK_CHASE_BUFFER)) {
+            this._state = UnitState.MOVING;
+            return;
+        }
         this._target.takeDamage(this._stats.attack, this);
     }
 
     protected onDeath(): void {
+        this.stopMovement();
         this.currentTarget = null;
         const bar = this.node.getComponent(HealthBar);
         if (bar && bar.isValid) {
@@ -269,31 +317,58 @@ export class Soldier extends Unit {
      * Fallback targeting when CombatSystem is not running.
      * NOTE: Keep lightweight. This exists for safety only.
      */
-    private tryAcquireTargetFallback(): void {
+    private tryAcquireTargetFallback(allowRetarget: boolean = false): void {
         const enemies = EnemyQuery.getEnemies();
         if (!enemies || enemies.length === 0) return;
 
         const myPos = this.node.position;
-        let nearest: Node | null = null;
-        let minDist = Infinity;
+        let nearestUnit: Unit | null = null;
+        let minDistSq = Infinity;
 
         for (const enemy of enemies) {
             if (!enemy || !enemy.isValid) continue;
+            const unit = enemy.getComponent(Unit);
+            if (!unit || !unit.isAlive) continue;
             const dx = enemy.position.x - myPos.x;
             const dz = enemy.position.z - myPos.z;
-            const dist = Math.sqrt(dx * dx + dz * dz);
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = enemy;
+            const distSq = dx * dx + dz * dz;
+            if (distSq < minDistSq) {
+                minDistSq = distSq;
+                nearestUnit = unit;
             }
         }
 
-        if (nearest) {
-            const unit = nearest.getComponent(Unit);
-            if (unit && unit.isAlive) {
-                this.engageTarget(unit);
-            }
+        if (!nearestUnit) return;
+        if (!allowRetarget) {
+            this.engageTarget(nearestUnit);
+            return;
         }
+        if (!this._target || !this._target.isAlive || !this._target.node?.isValid) {
+            this.engageTarget(nearestUnit);
+            return;
+        }
+        if (this._target === nearestUnit) return;
+
+        const curDx = this._target.node.position.x - myPos.x;
+        const curDz = this._target.node.position.z - myPos.z;
+        const currentDistSq = curDx * curDx + curDz * curDz;
+        const switchBufferSq = Soldier.RETARGET_SWITCH_BUFFER * Soldier.RETARGET_SWITCH_BUFFER;
+        if (minDistSq + switchBufferSq < currentDistSq) {
+            this.engageTarget(nearestUnit);
+        }
+    }
+
+    private isTargetWithinAttackWindow(target: IAttackable | null, extraRange: number): boolean {
+        if (!target || !target.isAlive || !target.node || !target.node.isValid) {
+            return false;
+        }
+        const myPos = this.node.position;
+        const targetPos = target.node.position;
+        const dx = targetPos.x - myPos.x;
+        const dz = targetPos.z - myPos.z;
+        const distSq = dx * dx + dz * dz;
+        const range = Math.max(0.05, this._stats.attackRange + Math.max(0, extraRange));
+        return distSq <= range * range;
     }
 
     private get poolManager(): PoolManager {
@@ -336,13 +411,26 @@ export class Soldier extends Unit {
                 this.setTarget(null);
                 this.currentTarget = null;
                 this._state = UnitState.IDLE;
+                this.stopMovement();
                 this._fallbackTimer = this.getFallbackReacquireInterval();
                 this._stuckTimer = 0;
+                this._proactiveRetargetTimer = 0;
+                this.tryAcquireTargetFallback();
             }
             return;
         }
 
         this._stuckTimer = 0;
+    }
+
+    private stopMovement(): void {
+        if (!this._rbLookedUp) {
+            this._rbCached = this.node.getComponent(RigidBody);
+            this._rbLookedUp = true;
+        }
+        if (!this._rbCached || this._rbCached.type !== RigidBody.Type.DYNAMIC) return;
+        Soldier._tmpVel.set(0, 0, 0);
+        this._rbCached.setLinearVelocity(Soldier._tmpVel);
     }
 
     private curveMultiplier(levelOffset: number, linear: number, quadratic: number): number {
@@ -365,21 +453,25 @@ export class Soldier extends Unit {
     }
 
     private applyModelScale(sizeMultiplier: number): void {
+        const effectiveSize = Math.max(1, sizeMultiplier);
+        const visualSizeMultiplier = 1 + (effectiveSize - 1) * Soldier.VISUAL_SIZE_GAIN;
+
         const bar = this.node.getComponent(HealthBar);
         if (bar) {
-            bar.yOffset = Soldier.BASE_HEALTH_BAR_Y_OFFSET * Math.max(1, sizeMultiplier * 0.92);
+            bar.yOffset =
+                Soldier.BASE_HEALTH_BAR_Y_OFFSET * Math.max(1, visualSizeMultiplier * 0.92);
         }
 
         const gooseAnimator = this.node.getComponent('SoldierGooseAnimator') as
             | (Component & { setModelScaleMultiplier?: (multiplier: number) => void })
             | null;
         if (gooseAnimator?.setModelScaleMultiplier) {
-            gooseAnimator.setModelScaleMultiplier(sizeMultiplier);
+            gooseAnimator.setModelScaleMultiplier(visualSizeMultiplier);
             return;
         }
 
         // Fallback: if visual animator is missing, use node scale directly.
-        const modelScale = Soldier.BASE_MODEL_SCALE * Math.max(0.8, sizeMultiplier);
+        const modelScale = Soldier.BASE_MODEL_SCALE * Math.max(0.8, visualSizeMultiplier);
         this.node.setScale(modelScale, modelScale, modelScale);
     }
 }

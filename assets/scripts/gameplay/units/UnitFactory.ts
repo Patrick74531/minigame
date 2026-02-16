@@ -60,6 +60,10 @@ export interface EnemySpawnOptions {
  * 负责创建和配置所有单位实体
  */
 export class UnitFactory {
+    private static readonly GROUP_DEFAULT = 1 << 0;
+    private static readonly GROUP_ENEMY = 1 << 3;
+    private static readonly GROUP_BULLET = 1 << 4;
+    private static readonly GROUP_WALL = 1 << 5;
     private static readonly HERO_RUN_SPEED = 1.0;
     private static readonly HERO_IDLE_SPEED = 0.25;
     private static readonly HERO_WEAPON_SOCKET_NAME = 'HeroWeaponSocket';
@@ -142,14 +146,19 @@ export class UnitFactory {
         rb.linearDamping = GameConfig.PHYSICS.UNIT_LINEAR_DAMPING; // Low damping
         rb.angularFactor = new Vec3(0, 0, 0); // Lock rotation
         rb.linearFactor = new Vec3(1, 0, 1);
-        rb.group = 1 << 3; // GROUP_ENEMY
+        rb.group = UnitFactory.GROUP_ENEMY;
 
         const col = node.addComponent(BoxCollider);
         col.size = new Vec3(1, 1, 1);
         col.isTrigger = false; // Solid for collision
-        col.setGroup(1 << 3); // ENEMY
-        // Collide with DEFAULT (buildings/hero/soldier), ENEMY and BULLET.
-        col.setMask((1 << 0) | (1 << 3) | (1 << 4));
+        col.setGroup(UnitFactory.GROUP_ENEMY);
+        // Collide with DEFAULT (buildings/hero/soldier), ENEMY, BULLET and WALL.
+        col.setMask(
+            UnitFactory.GROUP_DEFAULT |
+                UnitFactory.GROUP_ENEMY |
+                UnitFactory.GROUP_BULLET |
+                UnitFactory.GROUP_WALL
+        );
 
         const hpMultiplier = options.hpMultiplier ?? 1;
         const attackMultiplier = options.attackMultiplier ?? 1;
@@ -241,8 +250,9 @@ export class UnitFactory {
         const col = node.addComponent(BoxCollider);
         col.size = new Vec3(1, 1, 1);
         col.isTrigger = false;
-        col.setGroup(1 << 0);
-        col.setMask(0xffffffff);
+        col.setGroup(UnitFactory.GROUP_DEFAULT);
+        // Soldiers should not be blocked by wall-only colliders.
+        col.setMask(UnitFactory.GROUP_DEFAULT | UnitFactory.GROUP_ENEMY | UnitFactory.GROUP_BULLET);
 
         const soldier = node.addComponent(Soldier);
         soldier.initStats({
