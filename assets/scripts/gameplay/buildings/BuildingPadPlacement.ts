@@ -8,8 +8,21 @@ type ScaleLike = {
 type VisualScaleResolver = (typeId: string) => ScaleLike | null | undefined;
 
 export class BuildingPadPlacement {
+    private static readonly BASE_PAD_OFFSET_RADIUS_FACTOR = 0.25;
+
     public static isTowerType(typeId: string): boolean {
         return typeId === 'tower' || typeId === 'frost_tower' || typeId === 'lightning_tower';
+    }
+
+    private static resolveOffsetCollectRadius(
+        buildingTypeId: string,
+        collectRadius: number
+    ): number {
+        if (buildingTypeId !== 'base') {
+            return collectRadius;
+        }
+        // 基地升级点：保留较大的收集半径，但位移只取部分半径，避免 pad 离基地过远。
+        return Math.max(0.35, collectRadius * this.BASE_PAD_OFFSET_RADIUS_FACTOR);
     }
 
     public static estimateBuildingHalfSize(
@@ -47,7 +60,8 @@ export class BuildingPadPlacement {
         }
 
         const buildingHalfSize = this.estimateBuildingHalfSize(buildingTypeId, resolveVisualScale);
-        const offsetDistance = buildingHalfSize + collectRadius + gap;
+        const placementRadius = this.resolveOffsetCollectRadius(buildingTypeId, collectRadius);
+        const offsetDistance = buildingHalfSize + placementRadius + gap;
 
         padNode.setWorldPosition(
             originalPosition.x + forward.x * offsetDistance,
@@ -78,7 +92,8 @@ export class BuildingPadPlacement {
             buildingHalfSize = 3.8;
         }
 
-        const offsetDistance = buildingHalfSize + collectRadius + gap;
+        const placementRadius = this.resolveOffsetCollectRadius(buildingTypeId, collectRadius);
+        const offsetDistance = buildingHalfSize + placementRadius + gap;
         const worldPos = buildingNode.worldPosition;
         padNode.setWorldPosition(
             worldPos.x + forward.x * offsetDistance,
