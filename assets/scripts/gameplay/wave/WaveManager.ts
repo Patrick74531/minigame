@@ -1,6 +1,7 @@
 import { Node, Vec3 } from 'cc';
 import { GameEvents } from '../../data/GameEvents';
 import { UnitFactory } from '../units/UnitFactory';
+import { Enemy } from '../units/Enemy';
 import type { EnemyVisualVariant } from '../units/EnemyVisualTypes';
 import { Unit, UnitType } from '../units/Unit';
 import { GameConfig } from '../../data/GameConfig';
@@ -248,6 +249,7 @@ export class WaveManager {
         slowPercent: number;
         slowDuration: number;
         effectType?: 'frost_rain' | 'glitch_interference' | 'generic';
+        laneFilter?: RouteLane;
     }): void {
         const radiusSqr = data.radius * data.radius;
         const center = data.center;
@@ -262,6 +264,12 @@ export class WaveManager {
             const distSqr = dx * dx + dz * dz;
 
             if (distSqr <= radiusSqr) {
+                if (data.laneFilter) {
+                    const enemyComp = enemy.getComponent(Enemy);
+                    if (!enemyComp || enemyComp.routeLane !== data.laneFilter) {
+                        continue;
+                    }
+                }
                 const u = enemy.getComponent(Unit);
 
                 if (u && u.isAlive) {
@@ -530,6 +538,10 @@ export class WaveManager {
                 visualScale,
             }
         );
+        const enemyComp = enemy.getComponent(Enemy);
+        if (enemyComp) {
+            enemyComp.setRouteLane(spawnLane);
+        }
         this._enemies.push(enemy);
         this._spawnedEnemyMeta.set(enemy, { spawnType: entry.spawnType, lane: spawnLane });
 

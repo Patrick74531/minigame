@@ -14,6 +14,7 @@ import { EnemyProjectile, EnemyProjectileVisualStyle } from '../combat/EnemyProj
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
 
 const { ccclass } = _decorator;
+type RouteLane = 'top' | 'mid' | 'bottom';
 
 /**
  * Enemy Unit
@@ -46,6 +47,7 @@ export class Enemy extends Unit {
     private _isAttackVisualActive: boolean = false;
     private _logicAccum: number = 0;
     private _aggroRange: number = GameConfig.ENEMY.AGGRO_RANGE;
+    private _routeLane: RouteLane = 'mid';
     /** 缓存 paper-doll 视觉判断（避免每 tick getChildByName） */
     private _usesPaperDoll: boolean | null = null;
     /** 缓存 RigidBody（避免每 tick getComponent） */
@@ -85,6 +87,7 @@ export class Enemy extends Unit {
         this._isElite = false;
         this._coinDropMultiplier = 1;
         this._aggroRange = GameConfig.ENEMY.AGGRO_RANGE;
+        this._routeLane = 'mid';
         this._scanTimer = 0;
         this._logicAccum = Math.random() * Enemy.NEAR_LOGIC_STEP;
         this._ramAttackTimer = 0;
@@ -154,6 +157,14 @@ export class Enemy extends Unit {
         if (config.attackRange !== undefined) {
             this._stats.attackRange = Math.max(Enemy.MIN_ATTACK_RANGE, config.attackRange);
         }
+    }
+
+    public setRouteLane(lane: RouteLane): void {
+        this._routeLane = lane;
+    }
+
+    public get routeLane(): RouteLane {
+        return this._routeLane;
     }
 
     public get isElite(): boolean {

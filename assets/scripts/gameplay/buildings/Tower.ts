@@ -13,6 +13,7 @@ import {
 } from 'cc';
 import { Building, BuildingType } from './Building';
 import { Bullet } from '../combat/Bullet';
+import { Enemy } from '../units/Enemy';
 import { Unit } from '../units/Unit';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
 import { GameEvents } from '../../data/GameEvents';
@@ -21,6 +22,12 @@ import { WeaponVFX } from '../weapons/WeaponVFX';
 import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass, property } = _decorator;
+type RouteLane = 'top' | 'mid' | 'bottom';
+type TowerLanePolicy = {
+    primaryLane: RouteLane;
+    allowTopLane: boolean;
+    allowBottomLane: boolean;
+};
 
 /**
  * 防御塔
@@ -42,6 +49,7 @@ export class Tower extends Building {
     private static readonly TOWER_MG_MODEL_NODE_NAME = Tower.TOWER_MG.MODEL_NODE_NAME;
     private static readonly TOWER_MG_MUZZLE_FALLBACK_Y = Tower.TOWER_MG.MUZZLE_FALLBACK_Y;
     private static readonly TOWER_MG_MUZZLE_TOP_INSET = Tower.TOWER_MG.MUZZLE_TOP_INSET;
+    private static _lanePolylines: Record<RouteLane, Array<{ x: number; z: number }>> | null = null;
 
     @property
     public attackRange: number = 8;
@@ -89,6 +97,7 @@ export class Tower extends Building {
     private _attackTimer: number = 0;
     private _target: Node | null = null;
     private _cachedMachineGunMuzzleY: number | null = null;
+    private _lanePolicy: TowerLanePolicy | null = null;
 
     // Cache material for bullet? Maybe separate factory.
 
@@ -110,6 +119,8 @@ export class Tower extends Building {
                 // Check range
                 const dist = this.getDistance(this._target);
                 if (dist > this.attackRange) {
+                    this._target = null;
+                } else if (!this.isEnemyAllowedByLane(this._target)) {
                     this._target = null;
                 } else {
                     // Check if alive
@@ -162,6 +173,7 @@ export class Tower extends Building {
             if (!enemy.isValid) continue;
             const unit = enemy.getComponent(Unit);
             if (!unit || !unit.isAlive) continue;
+            if (!this.isEnemyAllowedByLane(enemy)) continue;
 
             const dx = enemy.position.x - myPos.x;
             const dz = enemy.position.z - myPos.z;
@@ -308,6 +320,10 @@ export class Tower extends Building {
         bullet.chainCount = this.chainCount + levelBonus * this.chainCountPerLevel;
         bullet.chainRange = this.chainRange;
         bullet.chainWidth = 1 + levelBonus * 0.3; // 每级增加 30% 宽度
+        bullet.laneFilter =
+            this.buildingTypeId === BuildingType.LIGHTNING_TOWER
+                ? this.getLanePolicy().primaryLane
+                : '';
 
         bullet.setTarget(target);
     }
@@ -397,6 +413,7 @@ export class Tower extends Building {
         bullet.chainCount = this.chainCount + chainLevelBonus * this.chainCountPerLevel;
         bullet.chainRange = this.chainRange;
         bullet.chainWidth = 1 + chainLevelBonus * 0.3;
+        bullet.laneFilter = '';
 
         const speed = this.projectileSpeed + (Math.random() - 0.5) * 2;
         bullet.speed = speed;
@@ -476,6 +493,7 @@ export class Tower extends Building {
             slowPercent: this.bulletSlowPercent,
             slowDuration: this.bulletSlowDuration,
             effectType: 'frost_rain',
+            laneFilter: this.getLanePolicy().primaryLane,
         });
     }
 
@@ -496,5 +514,143 @@ export class Tower extends Building {
         const dx = target.position.x - this.node.position.x;
         const dz = target.position.z - this.node.position.z;
         return Math.sqrt(dx * dx + dz * dz);
+    }
+
+    private isEnemyAllowedByLane(enemyNode: Node): boolean {
+        const enemy = enemyNode.getComponent(Enemy);
+        if (!enemy) return true;
+
+        const lane = enemy.routeLane;
+        const policy = this.getLanePolicy();
+        if (lane === policy.primaryLane) return true;
+        if (lane === 'top') return policy.allowTopLane;
+        if (lane === 'bottom') return policy.allowBottomLane;
+        return false;
+    }
+
+    private getLanePolicy(): TowerLanePolicy {
+        if (this._lanePolicy) {
+            return this._lanePolicy;
+        }
+        this._lanePolicy = this.computeLanePolicy();
+        return this._lanePolicy;
+    }
+
+    private computeLanePolicy(): TowerLanePolicy {
+        const pos = this.node.position;
+        const laneDistances = this.getLaneDistances(pos.x, pos.z);
+        let primaryLane: RouteLane = 'mid';
+        let bestDistance = laneDistances.mid;
+        if (laneDistances.top < bestDistance) {
+            primaryLane = 'top';
+            bestDistance = laneDistances.top;
+        }
+        if (laneDistances.bottom < bestDistance) {
+            primaryLane = 'bottom';
+        }
+
+        const isMachineGunTower = this.buildingTypeId === BuildingType.TOWER;
+        let allowTopLane = false;
+        let allowBottomLane = false;
+
+        if (isMachineGunTower && primaryLane === 'mid') {
+            // 中路两侧机枪塔可“偏向”一侧副路；冰塔/电塔仅允许本路。
+            if (laneDistances.top + 0.35 < laneDistances.bottom) {
+                allowTopLane = true;
+            } else if (laneDistances.bottom + 0.35 < laneDistances.top) {
+                allowBottomLane = true;
+            }
+        }
+
+        return {
+            primaryLane,
+            allowTopLane,
+            allowBottomLane,
+        };
+    }
+
+    private getLaneDistances(x: number, z: number): Record<RouteLane, number> {
+        const polylines = Tower.getLanePolylinesWorld();
+        return {
+            top: Tower.pointToPolylineDistance(x, z, polylines.top),
+            mid: Tower.pointToPolylineDistance(x, z, polylines.mid),
+            bottom: Tower.pointToPolylineDistance(x, z, polylines.bottom),
+        };
+    }
+
+    private static getLanePolylinesWorld(): Record<RouteLane, Array<{ x: number; z: number }>> {
+        if (Tower._lanePolylines) {
+            return Tower._lanePolylines;
+        }
+
+        const halfW = Math.max(1, GameConfig.MAP.LIMITS.x);
+        const halfH = Math.max(1, GameConfig.MAP.LIMITS.z);
+        const laneNormalizedToWorld = (nx: number, nz: number): { x: number; z: number } => ({
+            x: nx * (halfW * 2) - halfW,
+            z: (1 - nz) * (halfH * 2) - halfH,
+        });
+
+        Tower._lanePolylines = {
+            top: [
+                laneNormalizedToWorld(0.05, 0.95),
+                laneNormalizedToWorld(0.06, 0.92),
+                laneNormalizedToWorld(0.95, 0.92),
+            ],
+            mid: [
+                laneNormalizedToWorld(0.05, 0.95),
+                laneNormalizedToWorld(0.35, 0.65),
+                laneNormalizedToWorld(0.5, 0.5),
+                laneNormalizedToWorld(0.65, 0.35),
+                laneNormalizedToWorld(0.95, 0.05),
+            ],
+            bottom: [
+                laneNormalizedToWorld(0.05, 0.95),
+                laneNormalizedToWorld(0.08, 0.94),
+                laneNormalizedToWorld(0.08, 0.05),
+            ],
+        };
+
+        return Tower._lanePolylines;
+    }
+
+    private static pointToPolylineDistance(
+        x: number,
+        z: number,
+        polyline: Array<{ x: number; z: number }>
+    ): number {
+        if (polyline.length <= 0) return Number.POSITIVE_INFINITY;
+        if (polyline.length === 1) {
+            return Math.hypot(x - polyline[0].x, z - polyline[0].z);
+        }
+
+        let best = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < polyline.length - 1; i++) {
+            const distance = Tower.pointToSegmentDistance(x, z, polyline[i], polyline[i + 1]);
+            if (distance < best) {
+                best = distance;
+            }
+        }
+        return best;
+    }
+
+    private static pointToSegmentDistance(
+        px: number,
+        pz: number,
+        a: { x: number; z: number },
+        b: { x: number; z: number }
+    ): number {
+        const abx = b.x - a.x;
+        const abz = b.z - a.z;
+        const abLenSq = abx * abx + abz * abz;
+        if (abLenSq <= 0.0001) {
+            return Math.hypot(px - a.x, pz - a.z);
+        }
+
+        const apx = px - a.x;
+        const apz = pz - a.z;
+        const t = Math.max(0, Math.min(1, (apx * abx + apz * abz) / abLenSq));
+        const cx = a.x + abx * t;
+        const cz = a.z + abz * t;
+        return Math.hypot(px - cx, pz - cz);
     }
 }

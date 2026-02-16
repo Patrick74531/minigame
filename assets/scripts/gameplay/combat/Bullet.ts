@@ -1,5 +1,6 @@
 import { _decorator, Node, Vec3, BoxCollider, ITriggerEvent, RigidBody, Tween } from 'cc';
 import { BaseComponent } from '../../core/base/BaseComponent';
+import { Enemy } from '../units/Enemy';
 import { Unit, UnitType } from '../units/Unit';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
@@ -11,6 +12,7 @@ import { EnemyQuery } from '../../core/managers/EnemyQuery';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 
 const { ccclass, property } = _decorator;
+type RouteLane = 'top' | 'mid' | 'bottom';
 
 /**
  * 子弹组件
@@ -38,6 +40,8 @@ export class Bullet extends BaseComponent implements IPoolable {
     public chainCount: number = 0;
     public chainRange: number = 0;
     public chainWidth: number = 1; // 闪电链宽度倍率（随塔等级缩放）
+    /** 可选：限制链式目标所属路（空字符串 = 不限制） */
+    public laneFilter: '' | RouteLane = '';
 
     // === Crit Properties ===
     public critRate: number = 0;
@@ -115,6 +119,7 @@ export class Bullet extends BaseComponent implements IPoolable {
         this.chainCount = 0;
         this.chainRange = 0;
         this.chainWidth = 1;
+        this.laneFilter = '';
         this.critRate = 0;
         this.critDamage = 1.5;
         this.orientXAxis = false;
@@ -467,32 +472,40 @@ export class Bullet extends BaseComponent implements IPoolable {
             const dmg = Math.floor(chainDmg);
             chainDmg *= 0.8; // 每次递减 20%
 
-            this.scheduleOnce(() => {
-                if (!target.node.isValid) return;
+            this.scheduleOnce(
+                () => {
+                    if (!target.node.isValid) return;
 
-                // 绘制闪电
-                if (parent.isValid) {
-                    EffectFactory.createLightningBolt(parent, startPos, target.node.position, this.chainWidth);
-                }
-
-                // 造成伤害
-                if (target.unit.isValid && target.unit.isAlive) {
-                    target.unit.takeDamage(dmg);
-                    if (this.slowPercent > 0) {
-                        target.unit.applySlow(this.slowPercent, this.slowDuration);
+                    // 绘制闪电
+                    if (parent.isValid) {
+                        EffectFactory.createLightningBolt(
+                            parent,
+                            startPos,
+                            target.node.position,
+                            this.chainWidth
+                        );
                     }
-                }
 
-                // 击中特效
-                if (parent.isValid) {
-                    WeaponVFX.createHitSpark(parent, target.node.position.clone());
-                }
+                    // 造成伤害
+                    if (target.unit.isValid && target.unit.isAlive) {
+                        target.unit.takeDamage(dmg);
+                        if (this.slowPercent > 0) {
+                            target.unit.applySlow(this.slowPercent, this.slowDuration);
+                        }
+                    }
 
-                // 最后一个目标：回收子弹
-                if (i === chainTargets.length - 1) {
-                    this.recycle();
-                }
-            }, CHAIN_DELAY * (i + 1));
+                    // 击中特效
+                    if (parent.isValid) {
+                        WeaponVFX.createHitSpark(parent, target.node.position.clone());
+                    }
+
+                    // 最后一个目标：回收子弹
+                    if (i === chainTargets.length - 1) {
+                        this.recycle();
+                    }
+                },
+                CHAIN_DELAY * (i + 1)
+            );
 
             prevPos = target.node.position.clone();
         }
@@ -508,6 +521,10 @@ export class Bullet extends BaseComponent implements IPoolable {
             if (!enemy.isValid || enemy === excludeNode || this._hitNodes.has(enemy)) continue;
             const unit = enemy.getComponent(Unit);
             if (!unit || !unit.isAlive) continue;
+            if (this.laneFilter) {
+                const enemyComp = enemy.getComponent(Enemy);
+                if (!enemyComp || enemyComp.routeLane !== this.laneFilter) continue;
+            }
 
             const dx = enemy.position.x - fromPos.x;
             const dz = enemy.position.z - fromPos.z;
