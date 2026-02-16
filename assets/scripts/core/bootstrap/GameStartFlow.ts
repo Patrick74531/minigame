@@ -35,7 +35,7 @@ export class GameStartFlow {
         const spawned = SpawnBootstrap.spawn(ctx.containers);
         ctx.onSpawned?.(spawned.base, spawned.hero);
 
-        SpawnBootstrap.startWaves(ctx.waveLoop, 2);
+        SpawnBootstrap.startWaves(ctx.waveLoop, GameConfig.WAVE.FIRST_WAVE_DELAY);
 
         console.log(`[Game] 💰 初始金币: ${game.coins}`);
     }

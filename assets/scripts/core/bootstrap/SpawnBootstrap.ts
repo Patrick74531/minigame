@@ -47,7 +47,10 @@ export class SpawnBootstrap {
         return { base, hero };
     }
 
-    public static startWaves(waveLoop: WaveLoop | null, delaySeconds: number = 2): void {
+    public static startWaves(
+        waveLoop: WaveLoop | null,
+        delaySeconds: number = GameConfig.WAVE.FIRST_WAVE_DELAY
+    ): void {
         if (!waveLoop) return;
         waveLoop.initialize(SpawnBootstrap.waveManager, SpawnBootstrap.gameManager, delaySeconds);
     }
