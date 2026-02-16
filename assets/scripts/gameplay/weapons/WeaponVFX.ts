@@ -35,6 +35,8 @@ export class WeaponVFX {
 
     private static _matCache: Map<string, Material> = new Map();
     private static _meshCache: Map<string, Mesh> = new Map();
+    public static readonly HERO_MG_BULLET_POOL_KEY = 'mg_bullet';
+    public static readonly TOWER_MG_BULLET_POOL_KEY = 'tower_mg_bullet';
 
     // ========== 复用的常量向量（避免热路径 new Vec3） ==========
     private static readonly _SCALE_ZERO = new Vec3(0, 0, 0);
@@ -44,6 +46,8 @@ export class WeaponVFX {
     private static _initialized: boolean = false;
     private static _bulletTex: Texture2D | null = null;
     private static _bulletTexLoading: boolean = false;
+    private static _towerBulletTex: Texture2D | null = null;
+    private static _towerBulletTexLoading: boolean = false;
     private static _deathRayPrefab: Prefab | null = null;
     private static _deathRayPrefabLoading: boolean = false;
     private static _deathRayPrefabPool: Node[] = [];
@@ -68,15 +72,21 @@ export class WeaponVFX {
         ProjectilePool.register('vfx_beam_pulse', () => this._createVfxNode('BeamPulse'), 2);
         // Laser Tower Bolt (Stripped skill8)
         ProjectilePool.register(
-            'laser_bolt', 
-            () => this._createLaserBoltNode(), 
+            'laser_bolt',
+            () => this._createLaserBoltNode(),
             0,
-            (node) => this._cleanupLaserBoltNode(node) // Custom Recycle Handler
+            node => this._cleanupLaserBoltNode(node) // Custom Recycle Handler
         );
         // 机枪子弹池 + 弹壳池
-        ProjectilePool.register('mg_bullet', () => this._createMGBulletNode(), 40);
+        ProjectilePool.register(this.HERO_MG_BULLET_POOL_KEY, () => this._createMGBulletNode(), 40);
+        ProjectilePool.register(
+            this.TOWER_MG_BULLET_POOL_KEY,
+            () => this._createTowerMGBulletNode(),
+            60
+        );
         ProjectilePool.register('mg_casing', () => this._createCasingNode(), 10);
         this._ensureBulletTexture();
+        this._ensureTowerBulletTexture();
         this._ensureDeathRayPrefab();
         this._ensureFlamePrefab();
     }
@@ -115,6 +125,42 @@ export class WeaponVFX {
                     tex.image = imgAsset;
                     this._bulletTex = tex;
                     console.log('[WeaponVFX] Bullet texture loaded (ImageAsset → Texture2D)');
+                });
+            });
+        });
+    }
+
+    private static _ensureTowerBulletTexture(): void {
+        if (this._towerBulletTex || this._towerBulletTexLoading) return;
+        this._towerBulletTexLoading = true;
+
+        resources.load('textures/tower_bullet/texture', Texture2D, (err, texture) => {
+            if (!err && texture) {
+                this._towerBulletTexLoading = false;
+                this._towerBulletTex = texture;
+                console.log('[WeaponVFX] Tower bullet texture loaded (Texture2D)');
+                return;
+            }
+            resources.load('textures/tower_bullet', Texture2D, (err2, tex2) => {
+                if (!err2 && tex2) {
+                    this._towerBulletTexLoading = false;
+                    this._towerBulletTex = tex2;
+                    console.log('[WeaponVFX] Tower bullet texture loaded (Texture2D direct)');
+                    return;
+                }
+                resources.load('textures/tower_bullet', ImageAsset, (err3, imgAsset) => {
+                    this._towerBulletTexLoading = false;
+                    if (err3 || !imgAsset) {
+                        console.warn(
+                            '[WeaponVFX] Tower bullet texture load failed, fallback to default bullet texture.',
+                            '\n  Please open project in Cocos Creator editor to generate tower_bullet.webp.meta'
+                        );
+                        return;
+                    }
+                    const tex = new Texture2D();
+                    tex.image = imgAsset;
+                    this._towerBulletTex = tex;
+                    console.log('[WeaponVFX] Tower bullet texture loaded (ImageAsset → Texture2D)');
                 });
             });
         });
@@ -229,8 +275,6 @@ export class WeaponVFX {
         return true;
     }
 
-
-
     // ========== 持续火焰 API（喷火器专用） ==========
 
     /** 借出一个持续播放的火焰节点（调用方负责 update + stop） */
@@ -272,29 +316,29 @@ export class WeaponVFX {
 
     // ========== 持续枪口火焰（机枪专用，零开销） ==========
 
-    /** 
-     * 创建一个挂载在父节点下的微缩版火焰，初始状态为隐藏 
+    /**
+     * 创建一个挂载在父节点下的微缩版火焰，初始状态为隐藏
      * 用于机枪高频射击时的枪口闪光（复用同一个节点，避免 destroy）
      */
     public static createPersistentMuzzleFlame(parent: Node): Node | null {
         this._ensureFlamePrefab();
         if (!this._flamePrefab) return null;
-        
+
         // 直接使用 instantiate 而非 borrow，因为这个节点会长期驻留直到武器销毁
         // 机枪射速极快，borrow/return 开销不如长期持有划算
         const node = instantiate(this._flamePrefab);
         parent.addChild(node);
         node.name = 'PersistentMuzzleFlame';
-        
+
         // 初始隐藏缩小
-        node.setScale(0, 0, 0); 
+        node.setScale(0, 0, 0);
         this._setFlamePrefabPlayback(node, true); // 保持粒子播放状态，靠缩放/透明度控制可见性
-        
+
         return node;
     }
 
-    /** 
-     * 触发一次枪口闪光脉冲 
+    /**
+     * 触发一次枪口闪光脉冲
      * 只是瞬间放大然后迅速缩小，不涉及对象创建销毁
      */
     public static pulseMuzzleFlame(node: Node, sizeScale: number = 1.0): void {
@@ -309,11 +353,11 @@ export class WeaponVFX {
 
         // 瞬间放大 -> 迅速回缩
         const peakScale = 0.35 * sizeScale * (0.8 + Math.random() * 0.4);
-        
+
         // 使用简单的缩放动画模拟喷射
         // 0 -> Peak (0.02s) -> 0 (0.05s)
         node.setScale(peakScale * 0.5, peakScale, peakScale); // 初始略大
-        
+
         tween(node)
             .to(0.04, { scale: new Vec3(peakScale * 0.8, peakScale * 1.5, peakScale * 0.8) })
             .to(0.06, { scale: new Vec3(0, 0, 0) })
@@ -548,19 +592,47 @@ export class WeaponVFX {
 
     // ========== 机枪精灵子弹（池化 + 贴图） ==========
 
+    public static acquireTowerMGBullet(): Node | null {
+        return ProjectilePool.get(this.TOWER_MG_BULLET_POOL_KEY);
+    }
+
+    private static _createSpriteBulletNode(name: string): Node {
+        const node = new Node(name);
+        node.layer = 1 << 0;
+        const renderer = node.addComponent(MeshRenderer);
+        renderer.mesh = this.getFlatQuadMesh(1, 1);
+        renderer.setMaterial(this.getUnlitMat(Color.WHITE), 0);
+        return node;
+    }
+
     /**
      * 工厂：创建机枪子弹节点（带贴图的 billboard 面片）
      * 由 ProjectilePool 调用，预热 + 按需扩容
      */
     private static _createMGBulletNode(): Node {
-        const node = new Node('MG_Bullet');
-        node.layer = 1 << 0;
-        const renderer = node.addComponent(MeshRenderer);
-        // 默认尺寸，fire() 时通过 setScale 调整
-        renderer.mesh = this.getFlatQuadMesh(1, 1);
-        // 先用白色 unlit；fire() 时根据等级换材质
-        renderer.setMaterial(this.getUnlitMat(Color.WHITE), 0);
-        return node;
+        return this._createSpriteBulletNode('MG_Bullet');
+    }
+
+    private static _createTowerMGBulletNode(): Node {
+        return this._createSpriteBulletNode('Tower_MG_Bullet');
+    }
+
+    private static _configureSpriteBullet(
+        node: Node,
+        w: number,
+        l: number,
+        color: Color,
+        texture: Texture2D | null
+    ): void {
+        const renderer = node.getComponent(MeshRenderer);
+        if (!renderer) return;
+        if (texture) {
+            renderer.setMaterial(this.getSpriteMat(color, texture), 0);
+        } else {
+            renderer.setMaterial(this.getUnlitMat(color), 0);
+        }
+        // X=长度（匹配贴图水平方向），Z=宽度；mesh 保持 1×1 避免缓存碎片
+        node.setScale(l, 1, w);
     }
 
     /**
@@ -571,15 +643,11 @@ export class WeaponVFX {
      * @param color   色调
      */
     public static configureMGBullet(node: Node, w: number, l: number, color: Color): void {
-        const renderer = node.getComponent(MeshRenderer);
-        if (!renderer) return;
-        if (this._bulletTex) {
-            renderer.setMaterial(this.getSpriteMat(color, this._bulletTex), 0);
-        } else {
-            renderer.setMaterial(this.getUnlitMat(color), 0);
-        }
-        // X=长度（匹配贴图水平方向），Z=宽度；mesh 保持 1×1 避免缓存碎片
-        node.setScale(l, 1, w);
+        this._configureSpriteBullet(node, w, l, color, this._bulletTex);
+    }
+
+    public static configureTowerMGBullet(node: Node, w: number, l: number, color: Color): void {
+        this._configureSpriteBullet(node, w, l, color, this._towerBulletTex ?? this._bulletTex);
     }
 
     /**
@@ -640,7 +708,7 @@ export class WeaponVFX {
     private static _stripLaserBolt(node: Node): void {
         const root = node.getChildByName('root');
         if (!root) return;
-        
+
         // Hide distractors
         const hideList = ['glow', 'hit', 'fasan', 'rune', 'liudong'];
         hideList.forEach(name => {
@@ -651,13 +719,13 @@ export class WeaponVFX {
         // Setup Beam Core
         const juan = root.getChildByName('juan');
         if (juan) {
-             juan.active = true;
-             // Stop any animation that might override scale
-             const anim = juan.getComponent(Animation) ?? root.getComponent(Animation);
-             if (anim) {
-                 anim.stop();
-                 anim.enabled = false;
-             }
+            juan.active = true;
+            // Stop any animation that might override scale
+            const anim = juan.getComponent(Animation) ?? root.getComponent(Animation);
+            if (anim) {
+                anim.stop();
+                anim.enabled = false;
+            }
         }
     }
 
@@ -669,13 +737,13 @@ export class WeaponVFX {
 
         // Handle fallback case if instantiation failed primarily
         if (node.name === 'LaserBolt_Fallback') {
-             if (this._deathRayPrefab) {
-                 // Recover
-                 node.destroy();
-                 return this._createLaserBoltNode();
-             }
-             ProjectilePool.put('laser_bolt', node);
-             return null;
+            if (this._deathRayPrefab) {
+                // Recover
+                node.destroy();
+                return this._createLaserBoltNode();
+            }
+            ProjectilePool.put('laser_bolt', node);
+            return null;
         }
 
         // Setup for this shot
@@ -696,9 +764,9 @@ export class WeaponVFX {
                     anim.stop();
                     anim.enabled = false;
                 }
-                
+
                 // Thicker (0.15) and Shorter (allow down to 0.2)
-                juan.setScale(0.15, 0.15, Math.max(0.2, length)); 
+                juan.setScale(0.15, 0.15, Math.max(0.2, length));
             }
         }
 
@@ -903,7 +971,6 @@ export class WeaponVFX {
             .start();
     }
 
-
     /** 破坏死光特效（仅 skill8 prefab 路径，无手写 fallback） */
     public static createDestructionRay(
         parent: Node,
@@ -977,7 +1044,6 @@ export class WeaponVFX {
             .start();
     }
 
-
     // ========== 模拟回音特效（Glitch Wave） ==========
 
     public static createEchoWave(
@@ -998,7 +1064,7 @@ export class WeaponVFX {
             const container = new Node('EchoWaveContainer');
             parent.addChild(container);
             container.setPosition(center);
-            
+
             // 用户反馈要“水平贴地”
             // commonLight 原本可能是竖着的，这里通过容器旋转将其放平
             // 尝试 x=-90 度
@@ -1008,7 +1074,7 @@ export class WeaponVFX {
             // 用户反馈特效太大，手动缩放 0.15 倍
             const finalScale = opts.scale * 0.15;
             container.setScale(finalScale, finalScale, finalScale);
-            
+
             const node = instantiate(prefab);
             container.addChild(node);
             node.setPosition(0, 0, 0);
@@ -1041,13 +1107,13 @@ export class WeaponVFX {
             meshes.forEach(mesh => {
                 // 获取材质实例（会克隆材质，互不影响）
                 // 注意：accessing .material getter creates an instance automatically
-                const mat = mesh.material; 
+                const mat = mesh.material;
                 if (mat) {
                     // 尝试设置 mainColor 或 tintColor (通用属性名)
                     // 内置 unlit/builtin-standard 通常用 mainColor
                     // 粒子材质可能用 tintColor
                     mat.setProperty('mainColor', opts.color);
-                    mat.setProperty('tintColor', opts.color); 
+                    mat.setProperty('tintColor', opts.color);
                 }
             });
 

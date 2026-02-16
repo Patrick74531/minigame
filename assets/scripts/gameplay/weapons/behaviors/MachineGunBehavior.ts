@@ -3,7 +3,6 @@ import { WeaponBehavior } from '../WeaponBehavior';
 import { WeaponType, WeaponLevelStats } from '../WeaponTypes';
 import { WeaponVFX } from '../WeaponVFX';
 import { Bullet } from '../../combat/Bullet';
-import { GameConfig } from '../../../data/GameConfig';
 import { ProjectilePool } from '../vfx/ProjectilePool';
 import { ScreenShake } from '../vfx/ScreenShake';
 import { Unit } from '../../units/Unit';
@@ -123,17 +122,13 @@ export class MachineGunBehavior extends WeaponBehavior {
         if (flameNode) {
             // 将火焰移动到枪口位置 (比子弹生成点稍微靠后一点，贴近枪管)
             // 子弹偏移是 1.2，火焰改用 0.6，使其更贴近角色（任务->人物）
-            flameNode.setPosition(
-                spawnPos.x + dirX * 0.6,
-                spawnPos.y,
-                spawnPos.z + dirZ * 0.6
-            );
+            flameNode.setPosition(spawnPos.x + dirX * 0.6, spawnPos.y, spawnPos.z + dirZ * 0.6);
             // 触发脉冲
             WeaponVFX.pulseMuzzleFlame(flameNode, 1.0 + level * 0.1);
         }
 
         // ==================== 单发子弹（直线飞行） ====================
-        const node = ProjectilePool.get('mg_bullet');
+        const node = ProjectilePool.get(WeaponVFX.HERO_MG_BULLET_POOL_KEY);
         if (!node) return;
 
         const sizeJitter = 0.9 + Math.random() * 0.2;
@@ -147,7 +142,7 @@ export class MachineGunBehavior extends WeaponBehavior {
             bullet = node.addComponent(Bullet);
         }
         bullet.resetState();
-        bullet.poolKey = 'mg_bullet';
+        bullet.poolKey = WeaponVFX.HERO_MG_BULLET_POOL_KEY;
         bullet.orientXAxis = true; // 贴图水平朝右，用 +X 轴对齐飞行方向
         bullet.pierce = true; // 穿透直线上所有敌人
         bullet.useManualHitDetection = true; // 手动碰撞检测（防隧穿 + 降物理开销）

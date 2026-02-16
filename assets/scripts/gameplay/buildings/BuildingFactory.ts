@@ -132,7 +132,7 @@ export class BuildingFactory {
         // Custom Tower Config
         tower.attackRange = towerConfig.stats?.attackRange ?? 18;
         tower.attackDamage = towerConfig.stats?.attackDamage ?? 26;
-        tower.attackInterval = towerConfig.stats?.attackInterval ?? 0.45;
+        tower.attackInterval = towerConfig.stats?.attackInterval ?? 0.32;
         tower.setUpgradeConfig({
             maxLevel: towerConfig.upgrades?.maxLevel ?? GameConfig.BUILDING.DEFAULT_MAX_LEVEL,
             costMultiplier:
@@ -142,7 +142,7 @@ export class BuildingFactory {
         tower.setTowerUpgradeConfig({
             attackMultiplier: towerConfig.upgrades?.attackMultiplier ?? 1.22,
             rangeMultiplier: towerConfig.upgrades?.rangeMultiplier ?? 1.03,
-            intervalMultiplier: towerConfig.upgrades?.intervalMultiplier ?? 0.95,
+            intervalMultiplier: towerConfig.upgrades?.intervalMultiplier ?? 0.92,
             chainRangePerLevel: towerConfig.upgrades?.chainRangePerLevel ?? 0,
         });
 

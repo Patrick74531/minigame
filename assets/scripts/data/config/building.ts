@@ -111,7 +111,7 @@ export const BUILDING_CONFIG = {
                 hp: 300,
                 attackRange: 18,
                 attackDamage: 26,
-                attackInterval: 0.45,
+                attackInterval: 0.32,
             },
             upgrades: {
                 maxLevel: 5,
@@ -119,7 +119,7 @@ export const BUILDING_CONFIG = {
                 statMultiplier: 1.2,
                 attackMultiplier: 1.22,
                 rangeMultiplier: 1.03,
-                intervalMultiplier: 0.95,
+                intervalMultiplier: 0.92,
             },
         },
         frost_tower: {

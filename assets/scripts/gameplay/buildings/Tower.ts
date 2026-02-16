@@ -11,12 +11,10 @@ import {
     Tween,
     Quat,
 } from 'cc';
-import { Building } from './Building';
+import { Building, BuildingType } from './Building';
 import { Bullet } from '../combat/Bullet';
 import { Unit } from '../units/Unit';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
-import { EventManager } from '../../core/managers/EventManager';
-import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../data/GameEvents';
 import { EffectFactory } from '../effects/EffectFactory';
 import { WeaponVFX } from '../weapons/WeaponVFX';
@@ -29,6 +27,19 @@ const { ccclass, property } = _decorator;
  */
 @ccclass('Tower')
 export class Tower extends Building {
+    private static readonly TOWER_MG_BULLET_SPAWN_Y = 1.5;
+    private static readonly TOWER_MG_BULLET_WIDTH_BASE = 0.3;
+    private static readonly TOWER_MG_BULLET_LENGTH_BASE = 0.48;
+    private static readonly TOWER_MG_BULLET_WIDTH_PER_LEVEL = 0.03;
+    private static readonly TOWER_MG_BULLET_LENGTH_PER_LEVEL = 0.05;
+    private static readonly TOWER_MG_BULLET_SPREAD_DEG = 2.2;
+    private static readonly TOWER_MG_BULLET_MAX_LIFETIME = 1.4;
+    private static readonly TOWER_MG_BURST_BASE = 2;
+    private static readonly TOWER_MG_BURST_ANGLE_STEP_DEG = 0.9;
+    private static readonly TOWER_MG_MODEL_NODE_NAME = 'RifleTowerModel';
+    private static readonly TOWER_MG_MUZZLE_FALLBACK_Y = 1.9;
+    private static readonly TOWER_MG_MUZZLE_TOP_INSET = 0.12;
+
     @property
     public attackRange: number = 8;
 
@@ -74,6 +85,7 @@ export class Tower extends Building {
 
     private _attackTimer: number = 0;
     private _target: Node | null = null;
+    private _cachedMachineGunMuzzleY: number | null = null;
 
     // Cache material for bullet? Maybe separate factory.
 
@@ -180,7 +192,11 @@ export class Tower extends Building {
 
         this.attackDamage = Math.floor(this.attackDamage * this.attackMultiplier);
         this.attackRange *= this.rangeMultiplier;
-        this.attackInterval = Math.max(0.2, this.attackInterval * this.intervalMultiplier);
+        const minAttackInterval = this.shouldUseMachineGunStyleProjectile() ? 0.12 : 0.2;
+        this.attackInterval = Math.max(
+            minAttackInterval,
+            this.attackInterval * this.intervalMultiplier
+        );
         if (this.chainRangePerLevel > 0) {
             this.chainRange += this.chainRangePerLevel;
         }
@@ -211,16 +227,22 @@ export class Tower extends Building {
             return;
         }
 
+        // 基础机枪塔：复用寡妇机枪的弹道表现（精灵子弹 + 直线飞行 + 手动命中检测）
+        // 需求：不带击退，保持默认 Bullet.resetState() 的 knockbackForce=0。
+        if (this.shouldUseMachineGunStyleProjectile() && this.fireMachineGunBurst(target)) {
+            return;
+        }
+
         // Create Bullet
         let bulletNode: Node | null = null;
-        
+
         if (this.useLaserVisual) {
-             bulletNode = WeaponVFX.createLaserBolt(0.3); // Shortened length (Half of 0.6)
-             if (!bulletNode) {
-                 bulletNode = new Node('Bullet'); // Fallback
-             } else {
-                 bulletNode.name = 'LaserBullet';
-             }
+            bulletNode = WeaponVFX.createLaserBolt(0.3); // Shortened length (Half of 0.6)
+            if (!bulletNode) {
+                bulletNode = new Node('Bullet'); // Fallback
+            } else {
+                bulletNode.name = 'LaserBullet';
+            }
         } else {
             bulletNode = new Node('Bullet');
         }
@@ -249,8 +271,8 @@ export class Tower extends Building {
             renderer.material = material;
         } else {
             // For laser, Bullet.ts expects us to handle orientation, but LaserBolt has its own axis.
-            // WeaponVFX.createLaserBolt returns a node where Z is length. 
-            // Bullet.ts attempts to lookAt target. 
+            // WeaponVFX.createLaserBolt returns a node where Z is length.
+            // Bullet.ts attempts to lookAt target.
             // If we want the bolt to fly like a projectile, we need to ensure Bullet.ts rotates it correctly.
             // The laser bolt prefab (skill8/juan) likely faces Z or has a specific rotation.
             // In WeaponVFX._stripLaserBolt, 'juan' is used.
@@ -263,10 +285,10 @@ export class Tower extends Building {
         const bullet = bulletNode.getComponent(Bullet) ?? bulletNode.addComponent(Bullet);
         // If it was a laser bolt from pool, it might already have Bullet? Unlikely from WeaponVFX factory.
         // Actually WeaponVFX just returns a visual node. We attach Bullet logic here.
-        
+
         // For Laser Visual, we might need to tell Bullet to orient specifically if the model is rotated.
         if (this.useLaserVisual) {
-            // Bullet.ts usually looks at target (-Z forward). 
+            // Bullet.ts usually looks at target (-Z forward).
             // If our mesh (juan) is elongated along Z, we probably want it to face target.
             // If juan is Z-aligned, lookAt works if we want it to fly "lengthwise".
         }
@@ -285,6 +307,157 @@ export class Tower extends Building {
         bullet.chainWidth = 1 + levelBonus * 0.3; // 每级增加 30% 宽度
 
         bullet.setTarget(target);
+    }
+
+    private shouldUseMachineGunStyleProjectile(): boolean {
+        return this.buildingTypeId === BuildingType.TOWER && !this.useLaserVisual;
+    }
+
+    private getMachineGunBurstCount(): number {
+        return Tower.TOWER_MG_BURST_BASE;
+    }
+
+    private fireMachineGunBurst(target: Node): boolean {
+        const burstCount = this.getMachineGunBurstCount();
+        let fired = false;
+
+        for (let i = 0; i < burstCount; i++) {
+            const offsetIndex = i - (burstCount - 1) * 0.5;
+            const spreadOffsetDeg = offsetIndex * Tower.TOWER_MG_BURST_ANGLE_STEP_DEG;
+            fired = this.fireMachineGunStyleBullet(target, spreadOffsetDeg) || fired;
+        }
+
+        return fired;
+    }
+
+    private fireMachineGunStyleBullet(target: Node, spreadOffsetDeg: number = 0): boolean {
+        if (!target || !target.isValid) return false;
+        const levelBonus = Math.max(0, this.level - 1);
+        const bulletW =
+            Tower.TOWER_MG_BULLET_WIDTH_BASE + levelBonus * Tower.TOWER_MG_BULLET_WIDTH_PER_LEVEL;
+        const bulletL =
+            Tower.TOWER_MG_BULLET_LENGTH_BASE + levelBonus * Tower.TOWER_MG_BULLET_LENGTH_PER_LEVEL;
+        const sizeJitter = 0.9 + Math.random() * 0.2;
+
+        const spawnPos = new Vec3(
+            this.node.position.x,
+            this.resolveMachineGunSpawnY(),
+            this.node.position.z
+        );
+
+        const targetCenterY = target.position.y + 0.5;
+        const dx = target.position.x - spawnPos.x;
+        const dy = targetCenterY - spawnPos.y;
+        const dz = target.position.z - spawnPos.z;
+        const dist3d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist3d <= 0.001) {
+            return false;
+        }
+
+        const parent = this.node.parent ?? this.node;
+        const bulletNode = WeaponVFX.acquireTowerMGBullet();
+        if (!bulletNode) return false;
+
+        WeaponVFX.configureTowerMGBullet(
+            bulletNode,
+            bulletW * sizeJitter,
+            bulletL * sizeJitter,
+            Color.WHITE
+        );
+
+        const dirX = dx / dist3d;
+        const dirY = dy / dist3d;
+        const dirZ = dz / dist3d;
+
+        const muzzlePos = new Vec3(spawnPos.x + dirX * 1.2, spawnPos.y, spawnPos.z + dirZ * 1.2);
+
+        parent.addChild(bulletNode);
+        bulletNode.setPosition(muzzlePos);
+
+        let bullet = bulletNode.getComponent(Bullet);
+        if (!bullet) {
+            bullet = bulletNode.addComponent(Bullet);
+        }
+
+        bullet.resetState();
+        bullet.poolKey = WeaponVFX.TOWER_MG_BULLET_POOL_KEY;
+        bullet.orientXAxis = true;
+        bullet.useManualHitDetection = true;
+        bullet.maxLifetime = Tower.TOWER_MG_BULLET_MAX_LIFETIME;
+        bullet.disablePhysics();
+        bullet.damage = this.attackDamage;
+        bullet.slowPercent = this.bulletSlowPercent;
+        bullet.explosionRadius = this.bulletExplosionRadius;
+        bullet.slowDuration = this.bulletSlowDuration;
+
+        const chainLevelBonus = Math.max(0, this.level - 1);
+        bullet.chainCount = this.chainCount + chainLevelBonus * this.chainCountPerLevel;
+        bullet.chainRange = this.chainRange;
+        bullet.chainWidth = 1 + chainLevelBonus * 0.3;
+
+        const speed = this.projectileSpeed + (Math.random() - 0.5) * 2;
+        bullet.speed = speed;
+
+        const spread = Tower.TOWER_MG_BULLET_SPREAD_DEG;
+        const randomJitter = (Math.random() - 0.5) * spread;
+        const totalAngle = ((spreadOffsetDeg + randomJitter) * Math.PI) / 180;
+        const cos = Math.cos(totalAngle);
+        const sin = Math.sin(totalAngle);
+        const vx = (dirX * cos - dirZ * sin) * speed;
+        const vy = dirY * speed;
+        const vz = (dirX * sin + dirZ * cos) * speed;
+        bullet.velocity.set(vx, vy, vz);
+
+        const yDeg = Math.atan2(-vz, vx) * (180 / Math.PI) + 180;
+        bulletNode.setRotationFromEuler(0, yDeg, 0);
+
+        return true;
+    }
+
+    private resolveMachineGunSpawnY(): number {
+        if (this._cachedMachineGunMuzzleY !== null) {
+            return this._cachedMachineGunMuzzleY;
+        }
+
+        const modelRoot = this.node.getChildByName(Tower.TOWER_MG_MODEL_NODE_NAME);
+        if (!modelRoot || !modelRoot.isValid) {
+            return this.node.position.y + Tower.TOWER_MG_MUZZLE_FALLBACK_Y;
+        }
+
+        const renderers = modelRoot.getComponentsInChildren(MeshRenderer);
+        let maxWorldY = Number.NEGATIVE_INFINITY;
+
+        for (const renderer of renderers) {
+            const mesh = (
+                renderer as unknown as {
+                    mesh?: {
+                        struct?: { maxPosition?: { y?: number } };
+                        _struct?: { maxPosition?: { y?: number } };
+                    };
+                }
+            ).mesh;
+            if (!mesh) continue;
+
+            const rawMaxY = mesh?.struct?.maxPosition?.y ?? mesh?._struct?.maxPosition?.y;
+            if (typeof rawMaxY !== 'number' || !Number.isFinite(rawMaxY)) continue;
+
+            const worldScaleY =
+                Math.abs(renderer.node.worldScale.y) > 1e-6
+                    ? Math.abs(renderer.node.worldScale.y)
+                    : 1;
+            const worldTopY = renderer.node.worldPosition.y + rawMaxY * worldScaleY;
+            if (worldTopY > maxWorldY) {
+                maxWorldY = worldTopY;
+            }
+        }
+
+        if (!Number.isFinite(maxWorldY)) {
+            return this.node.position.y + Tower.TOWER_MG_MUZZLE_FALLBACK_Y;
+        }
+
+        const muzzleY = maxWorldY - Tower.TOWER_MG_MUZZLE_TOP_INSET;
+        this._cachedMachineGunMuzzleY = muzzleY;
+        return muzzleY;
     }
 
     private emitFrostRainAoE(target: Node, radiusOverride?: number): void {
@@ -321,6 +494,4 @@ export class Tower extends Building {
         const dz = target.position.z - this.node.position.z;
         return Math.sqrt(dx * dx + dz * dz);
     }
-
-
 }
