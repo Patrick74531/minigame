@@ -206,9 +206,10 @@ export class Building extends BaseComponent implements IAttackable {
         let rb = this.node.getComponent(RigidBody);
         let col = this.node.getComponent(BoxCollider);
 
-        // 仅墙体作为硬阻挡；其余建筑允许英雄穿过。
-        const shouldBlockHero = this.buildingType === BuildingType.WALL;
-        if (!shouldBlockHero) {
+        // 仅墙体作为“敌人专用”阻挡：
+        // - 敌人不能穿过（会被碰撞阻挡）
+        // - 英雄/士兵可穿过（不与墙体碰撞）
+        if (!this.shouldUseSolidObstaclePhysics()) {
             this.clearObstaclePhysics();
             return;
         }
@@ -223,13 +224,19 @@ export class Building extends BaseComponent implements IAttackable {
             col = this.node.addComponent(BoxCollider);
         }
         col.enabled = true;
-        col.isTrigger = false; // Physical Obstacle
-        col.size = new Vec3(1, 2, 1); // Standard Building Size (Approx)
+        col.isTrigger = false;
+        // 栅栏是横向长条模型，使用更宽的碰撞体覆盖主体长度。
+        col.size = new Vec3(10, 2, 1);
         col.center = new Vec3(0, 1, 0);
 
-        // Ensure it blocks Hero
-        col.setGroup(1 << 0); // DEFAULT (Walls etc)
-        col.setMask(0xffffffff);
+        // 墙体保留在 DEFAULT 组；仅与 ENEMY 组碰撞。
+        // Hero/Soldier（DEFAULT）因 mask 不匹配可直接穿过。
+        col.setGroup(1 << 0);
+        col.setMask(1 << 3);
+    }
+
+    private shouldUseSolidObstaclePhysics(): boolean {
+        return this.buildingType === BuildingType.WALL;
     }
 
     private clearObstaclePhysics(): void {
