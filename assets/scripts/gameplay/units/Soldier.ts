@@ -5,6 +5,7 @@ import { HealthBar } from '../../ui/HealthBar';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
 import { PoolManager } from '../../core/managers/PoolManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import { EffectFactory } from '../effects/EffectFactory';
 
 const { ccclass } = _decorator;
 
@@ -33,7 +34,9 @@ export class Soldier extends Unit {
     private static readonly VISUAL_SIZE_GAIN = 1.65;
     private static readonly RETARGET_INTERVAL = 0.1;
     private static readonly EXPLOSION_TRIGGER_DISTANCE = 0.95;
-    private static readonly EXPLOSION_DAMAGE_MULTIPLIER = 1.2;
+    private static readonly EXPLOSION_DAMAGE_MULTIPLIER = 1.35;
+    private static readonly EXPLOSION_TOWER_DAMAGE_FACTOR = 2.0;
+    private static readonly EXPLOSION_VFX_LEVEL_GAIN = 0.2;
     private static readonly DEFAULT_GROWTH: BarracksGrowthConfig = {
         HP_LINEAR: 0.26,
         HP_QUADRATIC: 0.02,
@@ -61,6 +64,7 @@ export class Soldier extends Unit {
     private _rbCached: RigidBody | null = null;
     private _rbLookedUp: boolean = false;
     private _hasExploded: boolean = false;
+    private _barracksLevel: number = 1;
     /** 复用临时向量 */
     private static readonly _tmpVel = new Vec3();
     private static readonly _tmpLookAt = new Vec3();
@@ -103,6 +107,7 @@ export class Soldier extends Unit {
         this._rbCached = null;
         this._rbLookedUp = false;
         this._retargetTimer = Soldier.RETARGET_INTERVAL;
+        this._barracksLevel = 1;
         this.applyBarracksLevel(1);
     }
 
@@ -116,6 +121,7 @@ export class Soldier extends Unit {
      */
     public applyBarracksLevel(level: number): void {
         const safeLevel = Math.max(1, Math.floor(level || 1));
+        this._barracksLevel = safeLevel;
         const n = safeLevel - 1;
         const growth = this.getGrowthConfig();
 
@@ -195,8 +201,17 @@ export class Soldier extends Unit {
             return;
         }
 
+        const target = this._target;
+        if (!target || !target.node || !target.node.isValid) {
+            this._state = UnitState.IDLE;
+            this.currentTarget = null;
+            this.setTarget(null);
+            this.stopMovement();
+            return;
+        }
+
         const myPos = this.node.position;
-        const targetPos = this._target.node.position;
+        const targetPos = target.node.position;
         const dx = targetPos.x - myPos.x;
         const dz = targetPos.z - myPos.z; // 3D
         const distSq = dx * dx + dz * dz;
@@ -315,11 +330,10 @@ export class Soldier extends Unit {
 
         const radius = this.resolveExplosionRadius();
         const radiusSq = radius * radius;
-        const damage = Math.max(
-            1,
-            Math.floor(this._stats.attack * Soldier.EXPLOSION_DAMAGE_MULTIPLIER)
-        );
+        const damage = this.resolveExplosionDamage();
         const myPos = this.node.position;
+
+        this.playExplosionVfx(myPos, radius);
 
         const enemies = EnemyQuery.getEnemies();
         for (const enemy of enemies) {
@@ -342,6 +356,51 @@ export class Soldier extends Unit {
 
     private resolveExplosionRadius(): number {
         return Math.max(0.8, Math.min(2.4, this._stats.attackRange * 0.9));
+    }
+
+    private resolveExplosionDamage(): number {
+        const scaledBySelf = Math.max(
+            1,
+            Math.floor(this._stats.attack * Soldier.EXPLOSION_DAMAGE_MULTIPLIER)
+        );
+        const towerSingleHit = this.resolveTowerSingleHitDamage();
+        const minByTower = Math.ceil(towerSingleHit * Soldier.EXPLOSION_TOWER_DAMAGE_FACTOR);
+        return Math.max(scaledBySelf, minByTower);
+    }
+
+    private resolveTowerSingleHitDamage(): number {
+        const rawDamage = (
+            GameConfig.BUILDING as unknown as {
+                TYPES?: {
+                    tower?: {
+                        stats?: {
+                            attackDamage?: number;
+                        };
+                    };
+                };
+            }
+        ).TYPES?.tower?.stats?.attackDamage;
+
+        if (typeof rawDamage === 'number' && Number.isFinite(rawDamage) && rawDamage > 0) {
+            return rawDamage;
+        }
+
+        return 1;
+    }
+
+    private playExplosionVfx(origin: Vec3, gameplayRadius: number): void {
+        const parent = this.node.parent ?? this.node;
+        EffectFactory.createGooseExplosion(
+            parent,
+            origin.clone(),
+            this.resolveExplosionVfxRadius(gameplayRadius)
+        );
+    }
+
+    private resolveExplosionVfxRadius(gameplayRadius: number): number {
+        const levelBonus = Math.max(0, this._barracksLevel - 1);
+        const levelScale = 1 + levelBonus * Soldier.EXPLOSION_VFX_LEVEL_GAIN;
+        return Math.max(0.8, gameplayRadius * levelScale);
     }
 
     private stopMovement(): void {

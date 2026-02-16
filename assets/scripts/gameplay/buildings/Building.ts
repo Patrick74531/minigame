@@ -336,8 +336,8 @@ export class Building extends BaseComponent implements IAttackable {
 
         // Scale core stats
         this.maxHp = Math.floor(this.maxHp * this.statMultiplier);
-        // Barracks upgrade should scale batch quantity, not spawn cadence.
-        if (this.spawnInterval > 0 && this.buildingType !== BuildingType.BARRACKS) {
+        // 兵营升级：缩短产兵间隔（同时间隔始终只产 1 只）。
+        if (this.spawnInterval > 0 && this.buildingType === BuildingType.BARRACKS) {
             this.spawnInterval = Math.max(0.5, this.spawnInterval * this.spawnIntervalMultiplier);
         }
         if (this.maxUnitsPerLevel > 0) {
@@ -405,10 +405,8 @@ export class Building extends BaseComponent implements IAttackable {
         const remainCapacity = this.maxUnits - this._activeUnits;
         if (remainCapacity <= 0) return;
 
-        const batchCount = Math.min(this.resolveSpawnBatchCount(), remainCapacity);
-        for (let i = 0; i < batchCount; i++) {
-            this.spawnSoldier(i, batchCount);
-        }
+        // 需求：每次产兵仅生成 1 只。
+        this.spawnSoldier(0, 1);
     }
 
     private spawnSoldier(slotIndex: number = 0, totalInBatch: number = 1): void {

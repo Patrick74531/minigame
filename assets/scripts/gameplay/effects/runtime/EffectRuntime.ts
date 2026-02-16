@@ -1,6 +1,11 @@
 import { Node, Vec3 } from 'cc';
 
 export type EffectPayloadMap = {
+    gooseExplosion: {
+        parent: Node;
+        position: Vec3;
+        radius: number;
+    };
     frostExplosion: {
         parent: Node;
         position: Vec3;

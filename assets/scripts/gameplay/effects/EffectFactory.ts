@@ -7,6 +7,11 @@ import { EffectRuntime } from './runtime/EffectRuntime';
  * 对外保持稳定 API；内部通过 Runtime + 模块注册分发。
  */
 export class EffectFactory {
+    public static createGooseExplosion(parent: Node, position: Vec3, radius: number): void {
+        ensureEffectModulesRegistered();
+        EffectRuntime.play('gooseExplosion', { parent, position, radius });
+    }
+
     public static createFrostExplosion(parent: Node, position: Vec3, radius: number): void {
         ensureEffectModulesRegistered();
         EffectRuntime.play('frostExplosion', { parent, position, radius });
@@ -22,7 +27,12 @@ export class EffectFactory {
         EffectRuntime.play('glitchInterference', { parent, position, radius });
     }
 
-    public static createLightningBolt(parent: Node, startPos: Vec3, endPos: Vec3, width: number = 1): void {
+    public static createLightningBolt(
+        parent: Node,
+        startPos: Vec3,
+        endPos: Vec3,
+        width: number = 1
+    ): void {
         ensureEffectModulesRegistered();
         EffectRuntime.play('lightningBolt', { parent, startPos, endPos, width });
     }
