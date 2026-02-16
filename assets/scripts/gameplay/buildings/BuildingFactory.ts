@@ -199,6 +199,8 @@ export class BuildingFactory {
         }
 
         renderer.material = material;
+        renderer.shadowCastingMode = 1;
+        renderer.receiveShadow = true;
         return node;
     }
 
@@ -603,6 +605,11 @@ export class BuildingFactory {
 
     private static applyLayerRecursive(root: Node, layer: number): void {
         root.layer = layer;
+        const mesh = root.getComponent(MeshRenderer);
+        if (mesh) {
+            mesh.shadowCastingMode = 1;
+            mesh.receiveShadow = true;
+        }
         for (const child of root.children) {
             this.applyLayerRecursive(child, layer);
         }

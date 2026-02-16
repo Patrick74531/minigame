@@ -223,6 +223,9 @@ export class MapGenerator extends Component {
 
         const renderer = groundNode.addComponent(MeshRenderer);
         renderer.mesh = mesh;
+        // Ground should receive projected shadows.
+        renderer.receiveShadow = true;
+        renderer.shadowCastingMode = 0;
 
         // Generate splatmap texture
         const splatTex = this.generateSplatmapTexture(cols, rows);
@@ -1483,11 +1486,20 @@ export class MapGenerator extends Component {
             if (!node || !node.isValid) return null;
             node.name = `${model.modelName}_${index}`;
             this.applyLayerRecursive(node, parent.layer);
+            this.applyNatureShadowSettingsRecursive(node);
             parent.addChild(node);
             return node;
         } catch (e) {
             console.warn('[MapGenerator] instantiate nature prefab failed', model.basePath, e);
             return null;
+        }
+    }
+
+    private applyNatureShadowSettingsRecursive(root: Node): void {
+        const renderers = root.getComponentsInChildren(MeshRenderer);
+        for (const renderer of renderers) {
+            renderer.shadowCastingMode = 1;
+            renderer.receiveShadow = true;
         }
     }
 

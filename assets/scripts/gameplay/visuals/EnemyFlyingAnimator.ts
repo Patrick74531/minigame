@@ -105,6 +105,7 @@ export class EnemyFlyingAnimator extends Component {
         if (!owner || !owner.isValid) return;
 
         this._model = instantiate(prefab);
+        this.applyShadowSettingsRecursive(this._model);
         owner.addChild(this._model);
 
         this._model.setPosition(0, this.yOffset, 0);
@@ -132,6 +133,14 @@ export class EnemyFlyingAnimator extends Component {
             );
             this._useTween = true;
             this.updateAnimation(true);
+        }
+    }
+
+    private applyShadowSettingsRecursive(root: Node): void {
+        const renderers = root.getComponentsInChildren(MeshRenderer);
+        for (const renderer of renderers) {
+            renderer.shadowCastingMode = 1;
+            renderer.receiveShadow = true;
         }
     }
 

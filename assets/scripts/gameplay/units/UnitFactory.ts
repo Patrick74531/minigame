@@ -300,6 +300,8 @@ export class UnitFactory {
         }
 
         renderer.material = material;
+        renderer.shadowCastingMode = 1;
+        renderer.receiveShadow = true;
         return node;
     }
 
@@ -891,6 +893,11 @@ export class UnitFactory {
 
     private static applyLayerRecursive(node: Node, layer: number): void {
         node.layer = layer;
+        const mesh = node.getComponent(MeshRenderer);
+        if (mesh) {
+            mesh.shadowCastingMode = 1;
+            mesh.receiveShadow = true;
+        }
         for (const child of node.children) {
             this.applyLayerRecursive(child, layer);
         }
