@@ -97,7 +97,7 @@ export class Building extends BaseComponent implements IAttackable {
 
     @property
     public maxUnits: number = 10;
-    
+
     public tauntRange: number = 0;
 
     @property
@@ -209,16 +209,10 @@ export class Building extends BaseComponent implements IAttackable {
         let rb = this.node.getComponent(RigidBody);
         let col = this.node.getComponent(BoxCollider);
 
-        // Spa is not an obstacle (can be walked through)
-        if (this.buildingType === BuildingType.SPA) {
-            if (col && col.isValid) {
-                col.destroy();
-                col = null;
-            }
-            if (rb && rb.isValid) {
-                rb.destroy();
-                rb = null;
-            }
+        // 仅墙体作为硬阻挡；其余建筑允许英雄穿过。
+        const shouldBlockHero = this.buildingType === BuildingType.WALL;
+        if (!shouldBlockHero) {
+            this.clearObstaclePhysics();
             return;
         }
 
@@ -226,6 +220,7 @@ export class Building extends BaseComponent implements IAttackable {
             rb = this.node.addComponent(RigidBody);
         }
         rb.type = RigidBody.Type.STATIC;
+        rb.useGravity = false;
 
         if (!col) {
             col = this.node.addComponent(BoxCollider);
@@ -238,6 +233,19 @@ export class Building extends BaseComponent implements IAttackable {
         // Ensure it blocks Hero
         col.setGroup(1 << 0); // DEFAULT (Walls etc)
         col.setMask(0xffffffff);
+    }
+
+    private clearObstaclePhysics(): void {
+        const col = this.node.getComponent(BoxCollider);
+        if (col && col.isValid) {
+            col.enabled = false;
+            col.destroy();
+        }
+
+        const rb = this.node.getComponent(RigidBody);
+        if (rb && rb.isValid) {
+            rb.destroy();
+        }
     }
 
     protected cleanup(): void {
@@ -589,6 +597,9 @@ export class Building extends BaseComponent implements IAttackable {
     }
 
     protected onDestroyed(): void {
+        // 保底：建筑销毁时立即移除物理阻挡，避免残留不可见碰撞。
+        this.clearObstaclePhysics();
+
         // Unregister from global list
         const idx = this.gameManager.activeBuildings.indexOf(this.node);
         if (idx !== -1) {
