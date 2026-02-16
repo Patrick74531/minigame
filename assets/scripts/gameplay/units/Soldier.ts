@@ -34,9 +34,16 @@ export class Soldier extends Unit {
     private static readonly VISUAL_SIZE_GAIN = 1.65;
     private static readonly RETARGET_INTERVAL = 0.1;
     private static readonly EXPLOSION_TRIGGER_DISTANCE = 0.95;
+    private static readonly CHARGE_TRIGGER_DISTANCE = 3.2;
+    private static readonly CHARGE_SPEED_MULTIPLIER = 1.85;
     private static readonly EXPLOSION_DAMAGE_MULTIPLIER = 1.35;
     private static readonly EXPLOSION_TOWER_DAMAGE_FACTOR = 2.0;
-    private static readonly EXPLOSION_VFX_LEVEL_GAIN = 0.2;
+    private static readonly EXPLOSION_RADIUS_BASE = 1.25;
+    private static readonly EXPLOSION_RADIUS_FROM_ATTACK_RANGE = 1.15;
+    private static readonly EXPLOSION_RADIUS_LEVEL_LINEAR = 0.22;
+    private static readonly EXPLOSION_RADIUS_LEVEL_QUADRATIC = 0.03;
+    private static readonly EXPLOSION_RADIUS_MAX = 4.6;
+    private static readonly EXPLOSION_VFX_RADIUS_PAD = 1.08;
     private static readonly DEFAULT_GROWTH: BarracksGrowthConfig = {
         HP_LINEAR: 0.26,
         HP_QUADRATIC: 0.02,
@@ -224,7 +231,7 @@ export class Soldier extends Unit {
 
         // 向目标移动
         const distance = Math.sqrt(distSq);
-        const speed = this._stats.moveSpeed;
+        const speed = this._stats.moveSpeed * this.resolveChaseSpeedMultiplier(distance);
         const dirX = dx / distance;
         const dirZ = dz / distance;
 
@@ -355,7 +362,14 @@ export class Soldier extends Unit {
     }
 
     private resolveExplosionRadius(): number {
-        return Math.max(0.8, Math.min(2.4, this._stats.attackRange * 0.9));
+        const n = Math.max(0, this._barracksLevel - 1);
+        const fromAttackRange =
+            this._stats.attackRange * Soldier.EXPLOSION_RADIUS_FROM_ATTACK_RANGE;
+        const levelBonus =
+            n * Soldier.EXPLOSION_RADIUS_LEVEL_LINEAR +
+            n * n * Soldier.EXPLOSION_RADIUS_LEVEL_QUADRATIC;
+        const radius = Math.max(Soldier.EXPLOSION_RADIUS_BASE, fromAttackRange + levelBonus);
+        return Math.max(0.8, Math.min(Soldier.EXPLOSION_RADIUS_MAX, radius));
     }
 
     private resolveExplosionDamage(): number {
@@ -398,9 +412,14 @@ export class Soldier extends Unit {
     }
 
     private resolveExplosionVfxRadius(gameplayRadius: number): number {
-        const levelBonus = Math.max(0, this._barracksLevel - 1);
-        const levelScale = 1 + levelBonus * Soldier.EXPLOSION_VFX_LEVEL_GAIN;
-        return Math.max(0.8, gameplayRadius * levelScale);
+        return Math.max(0.8, gameplayRadius * Soldier.EXPLOSION_VFX_RADIUS_PAD);
+    }
+
+    private resolveChaseSpeedMultiplier(distanceToTarget: number): number {
+        if (distanceToTarget <= Soldier.CHARGE_TRIGGER_DISTANCE) {
+            return Soldier.CHARGE_SPEED_MULTIPLIER;
+        }
+        return 1;
     }
 
     private stopMovement(): void {

@@ -41,6 +41,9 @@ export class SoldierGooseAnimator extends Component {
     @property
     public attackFps: number = 14;
 
+    @property
+    public idleFps: number = 8;
+
     private static readonly _stripCache = new Map<string, SpriteFrame[]>();
 
     private _soldier: Soldier | null = null;
@@ -78,18 +81,13 @@ export class SoldierGooseAnimator extends Component {
             this.applyCurrentFrame();
         }
 
-        if (this._state === UnitState.IDLE) {
-            this.applyCurrentFrame();
-            return;
-        }
-
         const frames = this.getFramesByState(this._state);
         if (frames.length <= 1) {
             this.applyCurrentFrame();
             return;
         }
 
-        const fps = this._state === UnitState.ATTACKING ? this.attackFps : this.moveFps;
+        const fps = this.resolveFpsByState(this._state);
         const interval = 1 / Math.max(1, fps);
         this._frameTimer += dt;
         while (this._frameTimer >= interval) {
@@ -115,17 +113,26 @@ export class SoldierGooseAnimator extends Component {
     }
 
     private getFramesByState(state: UnitState): SpriteFrame[] {
+        if (state === UnitState.IDLE) {
+            return this._attackFrames.length > 0 ? this._attackFrames : this._runFrames;
+        }
         if (state === UnitState.ATTACKING) {
             return this._attackFrames.length > 0 ? this._attackFrames : this._runFrames;
         }
         return this._runFrames.length > 0 ? this._runFrames : this._attackFrames;
     }
 
+    private resolveFpsByState(state: UnitState): number {
+        if (state === UnitState.IDLE) return this.idleFps;
+        if (state === UnitState.ATTACKING) return this.attackFps;
+        return this.moveFps;
+    }
+
     private applyCurrentFrame(): void {
         if (!this._sprite) return;
         const frames = this.getFramesByState(this._state);
         if (frames.length <= 0) return;
-        const index = this._state === UnitState.IDLE ? 0 : this._frameIndex % frames.length;
+        const index = this._frameIndex % frames.length;
         const frame = frames[index];
         if (this._sprite.spriteFrame !== frame) {
             this._sprite.spriteFrame = frame;
