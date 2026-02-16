@@ -65,6 +65,10 @@ const MAX_LANE_POINTS = 10;
 const LANE_INNER_WIDTH = 8.4;
 const LANE_OUTER_WIDTH = 18.6;
 const LANE_NOISE_WARP = 2.4;
+const LANE_OUTER_WIDTH_MAX_RATIO = 0.42;
+const LANE_INNER_TO_OUTER_RATIO = 0.58;
+const LANE_MIN_OUTER_WIDTH = 7.6;
+const LANE_MIN_INNER_WIDTH = 3.8;
 const ALPHA_NOISE_LOW = 0.24;
 const ALPHA_NOISE_HIGH = 0.8;
 const MOTE_STRENGTH = 0.2;
@@ -338,14 +342,10 @@ export class LaneFogController {
             )
         );
 
+        const laneMaskWidths = this.resolveLaneMaskWidths(spec.widthScale);
         material.setProperty(
             'laneWidth',
-            new Vec4(
-                LANE_INNER_WIDTH * spec.widthScale,
-                LANE_OUTER_WIDTH * spec.widthScale,
-                LANE_NOISE_WARP,
-                0
-            )
+            new Vec4(laneMaskWidths.inner, laneMaskWidths.outer, LANE_NOISE_WARP, 0)
         );
         material.setProperty(
             'alphaParams',
@@ -383,6 +383,25 @@ export class LaneFogController {
 
         material.setProperty('time', 0);
         return material;
+    }
+
+    private resolveLaneMaskWidths(widthScale: number): { inner: number; outer: number } {
+        const safeScale = Math.max(0.35, widthScale);
+        const scaledInner = Math.max(0.8, LANE_INNER_WIDTH * safeScale);
+        const scaledOuter = Math.max(scaledInner + 0.25, LANE_OUTER_WIDTH * safeScale);
+
+        const mapHalfMin = Math.max(1, Math.min(GameConfig.MAP.LIMITS.x, GameConfig.MAP.LIMITS.z));
+        const outerCap = Math.max(LANE_MIN_OUTER_WIDTH, mapHalfMin * LANE_OUTER_WIDTH_MAX_RATIO);
+        const clampedOuter = Math.min(scaledOuter, outerCap);
+
+        const maxInnerByOuter = clampedOuter * LANE_INNER_TO_OUTER_RATIO;
+        const innerCap = Math.max(LANE_MIN_INNER_WIDTH, maxInnerByOuter);
+        const clampedInner = Math.min(scaledInner, innerCap, clampedOuter - 0.2);
+
+        return {
+            inner: Math.max(0.8, clampedInner),
+            outer: Math.max(clampedInner + 0.2, clampedOuter),
+        };
     }
 
     private createLaneFogLayers(
