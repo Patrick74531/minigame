@@ -18,6 +18,9 @@ CCEffect %{
         splatMap:     { value: black }
         grassTiling:  { value: [8.0, 8.0, 0.0, 0.0] }
         dirtTiling:   { value: [8.0, 8.0, 0.0, 0.0] }
+        splatTexel:   { value: [0.00390625, 0.00390625, 0.0, 0.0] }
+        lightDir:     { value: [-0.35, 1.0, 0.25, 0.0] }
+        lightingParams: { value: [0.62, 0.52, 2.4, 0.16] }
 }%
 
 CCProgram terrain-vs %{
@@ -48,6 +51,9 @@ CCProgram terrain-fs %{
   uniform TerrainParams {
     vec4 grassTiling;
     vec4 dirtTiling;
+    vec4 splatTexel;
+    vec4 lightDir;
+    vec4 lightingParams;
   };
 
   vec4 frag () {
@@ -63,6 +69,22 @@ CCProgram terrain-fs %{
 
     // Blend: mask=0 → grass, mask=1 → dirt
     vec4 finalColor = mix(grassColor, dirtColor, mask);
+
+    // Pseudo lighting from splat-map gradient to avoid overly flat unlit ground.
+    float maskL = texture(splatMap, v_uv - vec2(splatTexel.x, 0.0)).r;
+    float maskR = texture(splatMap, v_uv + vec2(splatTexel.x, 0.0)).r;
+    float maskD = texture(splatMap, v_uv - vec2(0.0, splatTexel.y)).r;
+    float maskU = texture(splatMap, v_uv + vec2(0.0, splatTexel.y)).r;
+    vec2 grad = vec2(maskR - maskL, maskU - maskD);
+
+    vec3 pseudoNormal = normalize(vec3(-grad.x * lightingParams.z, 1.0, -grad.y * lightingParams.z));
+    vec3 l = normalize(lightDir.xyz);
+    float ndl = max(dot(pseudoNormal, l), 0.0);
+    float litFactor = clamp(lightingParams.x + ndl * lightingParams.y, 0.0, 1.35);
+
+    float edgeOcc = clamp(length(grad) * lightingParams.w, 0.0, 0.25);
+    finalColor.rgb *= litFactor * (1.0 - edgeOcc);
+
     finalColor.a = 1.0;
 
     return finalColor;

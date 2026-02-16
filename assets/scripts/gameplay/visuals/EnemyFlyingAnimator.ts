@@ -15,6 +15,7 @@ import {
     Tween,
     Vec3,
 } from 'cc';
+import { GameConfig } from '../../data/GameConfig';
 import { Enemy } from '../units/Enemy';
 import { UnitState } from '../units/Unit';
 
@@ -108,9 +109,13 @@ export class EnemyFlyingAnimator extends Component {
         this.applyShadowSettingsRecursive(this._model);
         owner.addChild(this._model);
 
-        this._model.setPosition(0, this.yOffset, 0);
         this._model.setScale(this.visualScale, this.visualScale, this.visualScale);
         this._model.setRotationFromEuler(0, this.rotationY, 0);
+
+        const ownerScaleY = Math.max(Math.abs(owner.scale.y), 0.0001);
+        const rootAnchorCompensation = (this.yOffset - GameConfig.PHYSICS.ENEMY_Y) / ownerScaleY;
+        const autoGroundOffset = this.estimateNodeGroundOffset(this._model);
+        this._model.setPosition(0, rootAnchorCompensation + autoGroundOffset, 0);
 
         this._baseScale.set(this.visualScale, this.visualScale, this.visualScale);
 
@@ -140,8 +145,47 @@ export class EnemyFlyingAnimator extends Component {
         const renderers = root.getComponentsInChildren(MeshRenderer);
         for (const renderer of renderers) {
             renderer.shadowCastingMode = 1;
-            renderer.receiveShadow = true;
+            renderer.receiveShadow = 1;
         }
+    }
+
+    private estimateNodeGroundOffset(root: Node): number {
+        let minLocalY = Number.POSITIVE_INFINITY;
+
+        const renderers = root.getComponentsInChildren(MeshRenderer);
+        for (const renderer of renderers) {
+            const mesh = (renderer as unknown as { mesh?: any }).mesh;
+            if (!mesh) continue;
+
+            const rawMinY = mesh?.struct?.minPosition?.y ?? mesh?._struct?.minPosition?.y;
+            if (typeof rawMinY !== 'number' || !Number.isFinite(rawMinY)) continue;
+
+            const sampled = this.sampleRendererMinYRelativeToRoot(renderer.node, root, rawMinY);
+            if (sampled < minLocalY) {
+                minLocalY = sampled;
+            }
+        }
+
+        if (!Number.isFinite(minLocalY)) {
+            return 0;
+        }
+
+        return -minLocalY;
+    }
+
+    private sampleRendererMinYRelativeToRoot(node: Node, root: Node, localMinY: number): number {
+        let y = localMinY;
+        let cur: Node | null = node;
+
+        while (cur && cur !== root) {
+            y = cur.position.y + y * cur.scale.y;
+            cur = cur.parent;
+        }
+
+        if (cur === root) {
+            return root.position.y + y * root.scale.y;
+        }
+        return y;
     }
 
     private detectClips(): void {

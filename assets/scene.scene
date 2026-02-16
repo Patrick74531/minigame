@@ -395,13 +395,13 @@
       "z": 0
     },
     "_distance": 0,
-    "_planeBias": 0.05,
+    "_planeBias": 0.01,
     "_shadowColor": {
       "__type__": "cc.Color",
-      "r": 76,
-      "g": 76,
-      "b": 76,
-      "a": 128
+      "r": 70,
+      "g": 70,
+      "b": 70,
+      "a": 148
     },
     "_maxReceived": 4,
     "_size": {

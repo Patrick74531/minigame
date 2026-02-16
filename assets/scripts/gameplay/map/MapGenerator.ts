@@ -134,30 +134,39 @@ export class MapGenerator extends Component {
         this.buildMapFromData(mapGrid);
     }
 
-    private pointToSegmentDistance(p: {x:number, z:number}, v: {x:number, z:number}, w: {x:number, z:number}): number {
-        const l2 = (v.x - w.x)**2 + (v.z - w.z)**2;
-        if (l2 === 0) return Math.sqrt((p.x - v.x)**2 + (p.z - v.z)**2);
+    private pointToSegmentDistance(
+        p: { x: number; z: number },
+        v: { x: number; z: number },
+        w: { x: number; z: number }
+    ): number {
+        const l2 = (v.x - w.x) ** 2 + (v.z - w.z) ** 2;
+        if (l2 === 0) return Math.sqrt((p.x - v.x) ** 2 + (p.z - v.z) ** 2);
         let t = ((p.x - v.x) * (w.x - v.x) + (p.z - v.z) * (w.z - v.z)) / l2;
         t = Math.max(0, Math.min(1, t));
         const projX = v.x + t * (w.x - v.x);
         const projZ = v.z + t * (w.z - v.z);
-        return Math.sqrt((p.x - projX)**2 + (p.z - projZ)**2);
+        return Math.sqrt((p.x - projX) ** 2 + (p.z - projZ) ** 2);
     }
 
-    private pointToBezierDistance(p: {x:number, z:number}, p0: {x:number, z:number}, p1: {x:number, z:number}, p2: {x:number, z:number}): number {
+    private pointToBezierDistance(
+        p: { x: number; z: number },
+        p0: { x: number; z: number },
+        p1: { x: number; z: number },
+        p2: { x: number; z: number }
+    ): number {
         // Approximate distance by sampling
         // Analytical distance to Bezier is complex (solving 5th deg polynomial)
         // Sampling 20 points matches "rasterization" needs for grid
         let minDist = Number.MAX_VALUE;
         const samples = 30;
-        for(let i=0; i<=samples; i++) {
+        for (let i = 0; i <= samples; i++) {
             const t = i / samples;
             const it = 1 - t;
             // Quadratic Bezier: (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
-            const bx = it*it*p0.x + 2*it*t*p1.x + t*t*p2.x;
-            const bz = it*it*p0.z + 2*it*t*p1.z + t*t*p2.z;
-            const dist = Math.sqrt((p.x - bx)**2 + (p.z - bz)**2);
-            if(dist < minDist) minDist = dist;
+            const bx = it * it * p0.x + 2 * it * t * p1.x + t * t * p2.x;
+            const bz = it * it * p0.z + 2 * it * t * p1.z + t * t * p2.z;
+            const dist = Math.sqrt((p.x - bx) ** 2 + (p.z - bz) ** 2);
+            if (dist < minDist) minDist = dist;
         }
         return minDist;
     }
@@ -224,7 +233,7 @@ export class MapGenerator extends Component {
         const renderer = groundNode.addComponent(MeshRenderer);
         renderer.mesh = mesh;
         // Ground should receive projected shadows.
-        renderer.receiveShadow = true;
+        renderer.receiveShadow = 1;
         renderer.shadowCastingMode = 0;
 
         // Generate splatmap texture
@@ -252,7 +261,9 @@ export class MapGenerator extends Component {
         ]);
 
         if (!grassTex || !dirtTex) {
-            console.warn('[MapGenerator] Failed to load grass or dirt texture, keeping fallback color');
+            console.warn(
+                '[MapGenerator] Failed to load grass or dirt texture, keeping fallback color'
+            );
             return;
         }
 
@@ -262,7 +273,7 @@ export class MapGenerator extends Component {
 
         // Create splatmap material
         const mat = new Material();
-        
+
         // Load the effect asset first to ensure it's available
         const effectAsset = await this.loadEffectAsset('shaders/terrain-splat');
         if (!effectAsset) {
@@ -291,6 +302,12 @@ export class MapGenerator extends Component {
         mat.setProperty('splatMap', splatTex);
         mat.setProperty('grassTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
         mat.setProperty('dirtTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
+        mat.setProperty(
+            'splatTexel',
+            new Vec4(1 / MapGenerator.SPLAT_SIZE, 1 / MapGenerator.SPLAT_SIZE, 0, 0)
+        );
+        mat.setProperty('lightDir', new Vec4(-0.35, 1.0, 0.25, 0));
+        mat.setProperty('lightingParams', new Vec4(0.62, 0.52, 2.4, 0.16));
 
         renderer.material = mat;
         this._terrainMaterial = mat;
@@ -330,26 +347,26 @@ export class MapGenerator extends Component {
         // Removed segment connecting to BR (Right Edge Road).
         const topLane = [
             { x: baseNx, z: baseNz },
-            { x: 0.06, z: 0.92 },    
-            { x: 0.95, z: 0.92 }     // End at TR (inset Y)
+            { x: 0.06, z: 0.92 },
+            { x: 0.95, z: 0.92 }, // End at TR (inset Y)
         ];
 
         // Mid Lane: Diagonal TL -> BR (unchanged)
         const midLane = [
             { x: baseNx, z: baseNz },
-            { x: 0.35, z: 0.65 },   
-            { x: 0.5, z: 0.5 },     
-            { x: 0.65, z: 0.35 },   
-            { x: enemyNx, z: enemyNz }
+            { x: 0.35, z: 0.65 },
+            { x: 0.5, z: 0.5 },
+            { x: 0.65, z: 0.35 },
+            { x: enemyNx, z: enemyNz },
         ];
 
         // Bot/Left Lane: Strictly Left Edge
         // Start TL -> Go along Left edge -> End at BL corner (0.05, 0.05).
         // Removed segment connecting to BR (Bottom Edge Road).
-        const botLane = [ 
+        const botLane = [
             { x: baseNx, z: baseNz },
-            { x: 0.08, z: 0.94 },   
-            { x: 0.08, z: 0.05 }    // End at BL (inset X) 
+            { x: 0.08, z: 0.94 },
+            { x: 0.08, z: 0.05 }, // End at BL (inset X)
         ];
 
         // Lane half-width in normalized space
@@ -367,9 +384,15 @@ export class MapGenerator extends Component {
 
                 // Distance to each lane (polyline distance)
                 // Top and Bot lanes are wider now
-                const dTop = Math.max(0, this.distToPolyline(nx, nz, topLane) - (laneHalfWidthWide - laneHalfWidth));
+                const dTop = Math.max(
+                    0,
+                    this.distToPolyline(nx, nz, topLane) - (laneHalfWidthWide - laneHalfWidth)
+                );
                 const dMid = this.distToPolyline(nx, nz, midLane);
-                const dBot = Math.max(0, this.distToPolyline(nx, nz, botLane) - (laneHalfWidthWide - laneHalfWidth));
+                const dBot = Math.max(
+                    0,
+                    this.distToPolyline(nx, nz, botLane) - (laneHalfWidthWide - laneHalfWidth)
+                );
 
                 const minDist = Math.min(dTop, dMid, dBot);
 
@@ -378,24 +401,30 @@ export class MapGenerator extends Component {
                 const adjustedDist = minDist + noiseVal;
 
                 // Smoothstep: 0 at lane center, 1 at edge
-                const t = this.smoothstep(laneHalfWidth - edgeSoftness, laneHalfWidth + edgeSoftness, adjustedDist);
+                const t = this.smoothstep(
+                    laneHalfWidth - edgeSoftness,
+                    laneHalfWidth + edgeSoftness,
+                    adjustedDist
+                );
 
                 // mask: 1 = dirt (inside lane), 0 = grass (outside)
                 const mask = 1.0 - t;
                 const byte = Math.floor(Math.max(0, Math.min(1, mask)) * 255);
 
                 const idx = (py * S + px) * 4;
-                data[idx + 0] = byte;  // R
-                data[idx + 1] = byte;  // G
-                data[idx + 2] = byte;  // B
-                data[idx + 3] = 255;   // A
+                data[idx + 0] = byte; // R
+                data[idx + 1] = byte; // G
+                data[idx + 2] = byte; // B
+                data[idx + 3] = 255; // A
             }
         }
 
         // Create Texture2D from pixel data
         const tex = new Texture2D();
         // Use Texture2D.PixelFormat if available, otherwise use raw value for RGBA8888
-        const pixFmt = (Texture2D as unknown as { PixelFormat?: { RGBA8888?: number } }).PixelFormat?.RGBA8888 ?? 35;
+        const pixFmt =
+            (Texture2D as unknown as { PixelFormat?: { RGBA8888?: number } }).PixelFormat
+                ?.RGBA8888 ?? 35;
         const img = new ImageAsset({
             _data: data,
             _compressed: false,
@@ -405,7 +434,8 @@ export class MapGenerator extends Component {
         });
         tex.image = img;
         // Set filters: LINEAR = 2
-        const filterLinear = (Texture2D as unknown as { Filter?: { LINEAR?: number } }).Filter?.LINEAR ?? 2;
+        const filterLinear =
+            (Texture2D as unknown as { Filter?: { LINEAR?: number } }).Filter?.LINEAR ?? 2;
         const texAny = tex as Texture2D & {
             setFilters?: (min: number, mag: number) => void;
             setWrapMode?: (u: number, v: number) => void;
@@ -414,7 +444,9 @@ export class MapGenerator extends Component {
             texAny.setFilters(filterLinear, filterLinear);
         }
         // CLAMP_TO_EDGE = 0
-        const clamp = (Texture2D as unknown as { WrapMode?: { CLAMP_TO_EDGE?: number } }).WrapMode?.CLAMP_TO_EDGE ?? 0;
+        const clamp =
+            (Texture2D as unknown as { WrapMode?: { CLAMP_TO_EDGE?: number } }).WrapMode
+                ?.CLAMP_TO_EDGE ?? 0;
         if (texAny.setWrapMode) {
             texAny.setWrapMode(clamp, clamp);
         }
@@ -422,14 +454,10 @@ export class MapGenerator extends Component {
     }
 
     /** Distance from point (px,pz) to a polyline defined by an array of points */
-    private distToPolyline(px: number, pz: number, points: {x: number, z: number}[]): number {
+    private distToPolyline(px: number, pz: number, points: { x: number; z: number }[]): number {
         let minDist = Number.MAX_VALUE;
         for (let i = 0; i < points.length - 1; i++) {
-            const d = this.pointToSegmentDistance(
-                { x: px, z: pz },
-                points[i],
-                points[i + 1]
-            );
+            const d = this.pointToSegmentDistance({ x: px, z: pz }, points[i], points[i + 1]);
             if (d < minDist) minDist = d;
         }
         return minDist;
@@ -620,14 +648,10 @@ export class MapGenerator extends Component {
         }
     }
 
-
-
     private hash01(seed: number): number {
         const s = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
         return s - Math.floor(s);
     }
-
-
 
     private getColorMaterial(color: Color): Material {
         const key = `${color.r}_${color.g}_${color.b}_${color.a}`;
@@ -1007,7 +1031,11 @@ export class MapGenerator extends Component {
                 if (!node) continue;
 
                 node.setPosition(point.x, 0, point.z);
-                node.setRotationFromEuler(this.lerp(-7, 7, rng()), this.lerp(0, 360, rng()), this.lerp(-7, 7, rng()));
+                node.setRotationFromEuler(
+                    this.lerp(-7, 7, rng()),
+                    this.lerp(0, 360, rng()),
+                    this.lerp(-7, 7, rng())
+                );
                 node.setScale(scale, scale, scale);
 
                 placed.push({ x: point.x, z: point.z, radius, category: model.category });
@@ -1054,9 +1082,7 @@ export class MapGenerator extends Component {
             const lane = lanePolylines[laneIndex];
             if (lane.length < 2) continue;
 
-            const worldPoints = lane.map(p =>
-                this.laneNormalizedToWorld(p.x, p.z, halfW, halfH)
-            );
+            const worldPoints = lane.map(p => this.laneNormalizedToWorld(p.x, p.z, halfW, halfH));
             const segLens: number[] = [];
             let totalLen = 0;
             for (let i = 0; i < worldPoints.length - 1; i++) {
@@ -1099,12 +1125,20 @@ export class MapGenerator extends Component {
                             const alongJitter = this.lerp(-0.72, 0.72, rng());
                             const x = px + tx * alongJitter + nx * offset * side;
                             const z = pz + tz * alongJitter + nz * offset * side;
-                            if (x < -halfW + 1.2 || x > halfW - 1.2 || z < -halfH + 1.2 || z > halfH - 1.2) continue;
+                            if (
+                                x < -halfW + 1.2 ||
+                                x > halfW - 1.2 ||
+                                z < -halfH + 1.2 ||
+                                z > halfH - 1.2
+                            )
+                                continue;
 
                             const model = this.pickWeightedNatureModel(treeModels, rng);
                             const miniScaleFactor = this.lerp(0.48, 0.84, Math.pow(rng(), 0.72));
                             const baseScaleT = Math.pow(rng(), 0.65);
-                            const scale = this.lerp(model.scaleMin, model.scaleMax, baseScaleT) * miniScaleFactor;
+                            const scale =
+                                this.lerp(model.scaleMin, model.scaleMax, baseScaleT) *
+                                miniScaleFactor;
                             const radius = model.radius * scale * 0.44;
                             if (this.isInsideBuildingKeepout(x, z, buildingZones, 1.0)) continue;
                             if (
@@ -1220,11 +1254,7 @@ export class MapGenerator extends Component {
                 if (!this.isNaturePointValid(cx, cz, 1.0, placed, buildingZones)) continue;
                 if (this.isInsideBuildingKeepout(cx, cz, buildingZones, 1.25)) continue;
                 const lanePos = this.worldToLaneNormalized(cx, cz, halfW, halfH);
-                const laneInfo = this.getClosestLaneEdgeInfo(
-                    lanePos.nx,
-                    lanePos.nz,
-                    lanePolylines
-                );
+                const laneInfo = this.getClosestLaneEdgeInfo(lanePos.nx, lanePos.nz, lanePolylines);
                 const minCenterClearance = laneInfo.laneIndex === 2 ? 1.6 / world : 2.7 / world;
                 if (laneInfo.edgeDist < minCenterClearance) continue;
                 foundCenter = true;
@@ -1364,7 +1394,8 @@ export class MapGenerator extends Component {
             const radial = clusterRadius * Math.pow(rng(), 0.6);
             const x = centerX + Math.cos(angle) * radial + this.lerp(-0.2, 0.2, rng());
             const z = centerZ + Math.sin(angle) * radial + this.lerp(-0.2, 0.2, rng());
-            if (x < -halfW + 1.2 || x > halfW - 1.2 || z < -halfH + 1.2 || z > halfH - 1.2) continue;
+            if (x < -halfW + 1.2 || x > halfW - 1.2 || z < -halfH + 1.2 || z > halfH - 1.2)
+                continue;
             if (category === 'tree') {
                 const edgeMarginWorld = 7.2;
                 const edgeDistWorld = Math.min(halfW - Math.abs(x), halfH - Math.abs(z));
@@ -1382,14 +1413,14 @@ export class MapGenerator extends Component {
             if (!this.isNaturePointValid(x, z, placementRadius, placed, buildingZones)) continue;
 
             const lanePos = this.worldToLaneNormalized(x, z, halfW, halfH);
-            const laneInfo = this.getClosestLaneEdgeInfo(
-                lanePos.nx,
-                lanePos.nz,
-                lanePolylines
-            );
+            const laneInfo = this.getClosestLaneEdgeInfo(lanePos.nx, lanePos.nz, lanePolylines);
             const radiusNorm = placementRadius / world;
             const hardLaneKeepoutNorm =
-                category === 'grass' ? 1.05 / world : category === 'tree' ? 1.45 / world : 0.92 / world;
+                category === 'grass'
+                    ? 1.05 / world
+                    : category === 'tree'
+                      ? 1.45 / world
+                      : 0.92 / world;
             if (laneInfo.edgeDist < hardLaneKeepoutNorm) continue;
             const laneSafetyNorm =
                 category === 'grass'
@@ -1403,13 +1434,10 @@ export class MapGenerator extends Component {
                 category === 'grass'
             );
             const laneThresholdNorm = model.avoidLaneWorld / world;
-            if (laneInfo.edgeDist < laneThresholdNorm * 0.52 + laneSafetyNorm + laneExtraNorm) continue;
+            if (laneInfo.edgeDist < laneThresholdNorm * 0.52 + laneSafetyNorm + laneExtraNorm)
+                continue;
 
-            const node = this.instantiateNatureNode(
-                model,
-                root,
-                startIndex + created
-            );
+            const node = this.instantiateNatureNode(model, root, startIndex + created);
             if (!node) continue;
             node.setPosition(x, 0, z);
             if (category === 'grass') {
@@ -1442,11 +1470,16 @@ export class MapGenerator extends Component {
         return created;
     }
 
-    private async loadAvailableNaturePrefabs(modelDefs: NatureModelDef[]): Promise<NatureModelPrefab[]> {
+    private async loadAvailableNaturePrefabs(
+        modelDefs: NatureModelDef[]
+    ): Promise<NatureModelPrefab[]> {
         const available: NatureModelPrefab[] = [];
         for (const def of modelDefs) {
             const modelName = def.basePath.split('/').pop() || 'NatureModel';
-            const prefab = await this.loadPrefabWithFallbacks([def.basePath, `${def.basePath}/${modelName}`]);
+            const prefab = await this.loadPrefabWithFallbacks([
+                def.basePath,
+                `${def.basePath}/${modelName}`,
+            ]);
             if (!prefab) continue;
             available.push({ ...def, prefab, modelName });
         }
@@ -1477,9 +1510,7 @@ export class MapGenerator extends Component {
     ): Node | null {
         if (!parent || !parent.isValid) return null;
         const prefab = model.prefab;
-        const prefabValid =
-            !!prefab &&
-            !!(prefab as unknown as { isValid?: boolean }).isValid;
+        const prefabValid = !!prefab && !!(prefab as unknown as { isValid?: boolean }).isValid;
         if (!prefabValid) return null;
         try {
             const node = instantiate(prefab);
@@ -1499,7 +1530,7 @@ export class MapGenerator extends Component {
         const renderers = root.getComponentsInChildren(MeshRenderer);
         for (const renderer of renderers) {
             renderer.shadowCastingMode = 1;
-            renderer.receiveShadow = true;
+            renderer.receiveShadow = 1;
         }
     }
 
@@ -1543,20 +1574,12 @@ export class MapGenerator extends Component {
             for (let attempt = 0; attempt < 420; attempt++) {
                 centerX = this.lerp(-halfW + minEdgeInset, halfW - minEdgeInset, rng());
                 centerZ = this.lerp(-halfH + minEdgeInset, halfH - minEdgeInset, rng());
-                if (!this.isNaturePointValid(centerX, centerZ, 0.72, placed, buildingZones)) continue;
+                if (!this.isNaturePointValid(centerX, centerZ, 0.72, placed, buildingZones))
+                    continue;
                 if (this.isInsideBuildingKeepout(centerX, centerZ, buildingZones, 1.0)) continue;
 
-                const lanePos = this.worldToLaneNormalized(
-                    centerX,
-                    centerZ,
-                    halfW,
-                    halfH
-                );
-                const laneInfo = this.getClosestLaneEdgeInfo(
-                    lanePos.nx,
-                    lanePos.nz,
-                    lanePolylines
-                );
+                const lanePos = this.worldToLaneNormalized(centerX, centerZ, halfW, halfH);
+                const laneInfo = this.getClosestLaneEdgeInfo(lanePos.nx, lanePos.nz, lanePolylines);
                 const laneEdgeDist = laneInfo.edgeDist;
                 const hardLaneKeepoutNorm = 1.15 / Math.max(1, worldMin);
                 if (laneEdgeDist < hardLaneKeepoutNorm) continue;
@@ -1566,7 +1589,8 @@ export class MapGenerator extends Component {
                     true
                 );
                 const patchGuardNorm = 0.16 / Math.max(1, worldMin);
-                if (laneEdgeDist < laneThresholdNorm * 1.1 + patchGuardNorm + laneExtraNorm) continue;
+                if (laneEdgeDist < laneThresholdNorm * 1.1 + patchGuardNorm + laneExtraNorm)
+                    continue;
                 foundCenter = true;
                 break;
             }
@@ -1596,12 +1620,7 @@ export class MapGenerator extends Component {
                     const jitterZ = this.lerp(-0.016, 0.016, rng());
                     const x = centerX + (localX + jitterX) * cosA - (localZ + jitterZ) * sinA;
                     const z = centerZ + (localX + jitterX) * sinA + (localZ + jitterZ) * cosA;
-                    const lanePos = this.worldToLaneNormalized(
-                        x,
-                        z,
-                        halfW,
-                        halfH
-                    );
+                    const lanePos = this.worldToLaneNormalized(x, z, halfW, halfH);
                     const model = this.pickWeightedNatureModel(models, rng);
                     const scale = this.lerp(model.scaleMin, model.scaleMax, Math.pow(rng(), 1.55));
                     const radius = 0.07 * scale;
@@ -1621,15 +1640,15 @@ export class MapGenerator extends Component {
                     if (laneEdgeDist < laneKeepoutNorm) continue;
                     if (this.isInsideBuildingKeepout(x, z, buildingZones, 0.85)) continue;
                     if (!this.isNaturePointValid(x, z, radius, placed, buildingZones)) continue;
-                    const node = this.instantiateNatureNode(
-                        model,
-                        root,
-                        startIndex + created
-                    );
+                    const node = this.instantiateNatureNode(model, root, startIndex + created);
                     if (!node) continue;
 
                     node.setPosition(x, 0, z);
-                    node.setRotationFromEuler(this.lerp(-4, 4, rng()), this.lerp(-12, 12, rng()) + (angle * 180) / Math.PI, this.lerp(-4, 4, rng()));
+                    node.setRotationFromEuler(
+                        this.lerp(-4, 4, rng()),
+                        this.lerp(-12, 12, rng()) + (angle * 180) / Math.PI,
+                        this.lerp(-4, 4, rng())
+                    );
                     node.setScale(scale, scale, scale);
 
                     placed.push({ x, z, radius, category: 'grass' });
@@ -1680,8 +1699,7 @@ export class MapGenerator extends Component {
                 : p.category === 'tree' || p.category === 'rock'
         );
         const laneThresholdNorm = model.avoidLaneWorld / Math.max(1, worldMin);
-        const minGap =
-            model.category === 'grass' ? 0.01 : model.category === 'rock' ? 0.95 : 0.4;
+        const minGap = model.category === 'grass' ? 0.01 : model.category === 'rock' ? 0.95 : 0.4;
         const attemptLimit =
             model.category === 'grass' ? 2200 : model.category === 'rock' ? 500 : 260;
         const clusterRadiusMax = model.category === 'grass' ? 1.45 : 4.2;
@@ -1707,17 +1725,33 @@ export class MapGenerator extends Component {
             } else if (rng() < model.edgeBias) {
                 const side = Math.floor(rng() * 4);
                 if (side === 0) {
-                    x = this.lerp(-halfW + minEdgeInset, -halfW + minEdgeInset + edgeBandDepth, rng());
+                    x = this.lerp(
+                        -halfW + minEdgeInset,
+                        -halfW + minEdgeInset + edgeBandDepth,
+                        rng()
+                    );
                     z = this.lerp(-halfH + minEdgeInset, halfH - minEdgeInset, rng());
                 } else if (side === 1) {
-                    x = this.lerp(halfW - minEdgeInset - edgeBandDepth, halfW - minEdgeInset, rng());
+                    x = this.lerp(
+                        halfW - minEdgeInset - edgeBandDepth,
+                        halfW - minEdgeInset,
+                        rng()
+                    );
                     z = this.lerp(-halfH + minEdgeInset, halfH - minEdgeInset, rng());
                 } else if (side === 2) {
                     x = this.lerp(-halfW + minEdgeInset, halfW - minEdgeInset, rng());
-                    z = this.lerp(-halfH + minEdgeInset, -halfH + minEdgeInset + edgeBandDepth, rng());
+                    z = this.lerp(
+                        -halfH + minEdgeInset,
+                        -halfH + minEdgeInset + edgeBandDepth,
+                        rng()
+                    );
                 } else {
                     x = this.lerp(-halfW + minEdgeInset, halfW - minEdgeInset, rng());
-                    z = this.lerp(halfH - minEdgeInset - edgeBandDepth, halfH - minEdgeInset, rng());
+                    z = this.lerp(
+                        halfH - minEdgeInset - edgeBandDepth,
+                        halfH - minEdgeInset,
+                        rng()
+                    );
                 }
             } else {
                 x = this.lerp(-halfW + minEdgeInset, halfW - minEdgeInset, rng());
@@ -1743,11 +1777,7 @@ export class MapGenerator extends Component {
             if (!this.isNaturePointValid(x, z, radius, placed, buildingZones)) continue;
 
             const lanePos = this.worldToLaneNormalized(x, z, halfW, halfH);
-            const laneInfo = this.getClosestLaneEdgeInfo(
-                lanePos.nx,
-                lanePos.nz,
-                lanePolylines
-            );
+            const laneInfo = this.getClosestLaneEdgeInfo(lanePos.nx, lanePos.nz, lanePolylines);
             const laneEdgeDist = laneInfo.edgeDist;
             const radiusNorm = radius / Math.max(1, worldMin);
             const hardLaneKeepoutNorm =
@@ -1913,20 +1943,30 @@ export class MapGenerator extends Component {
             z: GameConfig.MAP.BASE_SPAWN.z,
             radius: 6.2,
         });
-        const pads = (GameConfig.BUILDING.PADS as ReadonlyArray<{ x: number; z: number; type: string }>) ?? [];
+        const pads =
+            (GameConfig.BUILDING.PADS as ReadonlyArray<{ x: number; z: number; type: string }>) ??
+            [];
         for (const pad of pads) {
             let r = 4.2;
             if (pad.type === 'spa') r = 10.2;
             else if (pad.type === 'farm') r = 5.5;
             else if (pad.type === 'barracks') r = 5.6;
-            else if (pad.type === 'frost_tower' || pad.type === 'lightning_tower' || pad.type === 'tower') r = 5.1;
+            else if (
+                pad.type === 'frost_tower' ||
+                pad.type === 'lightning_tower' ||
+                pad.type === 'tower'
+            )
+                r = 5.1;
             else if (pad.type === 'wall') r = 4.2;
             zones.push({ x: pad.x, z: pad.z, radius: r });
         }
         return zones;
     }
 
-    private pickWeightedNatureModel(models: NatureModelPrefab[], rng: () => number): NatureModelPrefab {
+    private pickWeightedNatureModel(
+        models: NatureModelPrefab[],
+        rng: () => number
+    ): NatureModelPrefab {
         if (models.length === 1) return models[0];
         let total = 0;
         for (const m of models) total += Math.max(0.0001, m.weight);
@@ -1939,7 +1979,7 @@ export class MapGenerator extends Component {
     }
 
     private createSeededRandom(seed: number): () => number {
-        let s = (seed >>> 0) || 1;
+        let s = seed >>> 0 || 1;
         return () => {
             s = (1664525 * s + 1013904223) >>> 0;
             return s / 4294967296;

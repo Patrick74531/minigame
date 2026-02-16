@@ -60,6 +60,7 @@ function attachEnemyFlyingVisual(root: Node, options?: EnemyVisualSelectionOptio
             options?.modelPath ??
             ENEMY_MODEL_POOL[Math.floor(Math.random() * ENEMY_MODEL_POOL.length)];
         anim.modelPath = `enemies/${selected}`;
+        anim.yOffset = resolveEnemyModelYOffsetByModelPath(selected);
 
         const enemy = root.getComponent(Enemy);
         if (enemy) {
@@ -100,4 +101,14 @@ export function resolveEnemyVisualScaleByModelPath(modelPath: string): number {
         return 0.45;
     }
     return 0.9;
+}
+
+function resolveEnemyModelYOffsetByModelPath(modelPath: string): number {
+    if (modelPath.indexOf('flying/') === 0) {
+        return 0.3;
+    }
+    if (modelPath.indexOf('Robot_Flying') !== -1) {
+        return 0.28;
+    }
+    return 0.04;
 }

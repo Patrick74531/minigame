@@ -301,7 +301,7 @@ export class UnitFactory {
 
         renderer.material = material;
         renderer.shadowCastingMode = 1;
-        renderer.receiveShadow = true;
+        renderer.receiveShadow = 1;
         return node;
     }
 
@@ -323,9 +323,16 @@ export class UnitFactory {
             model.name = 'HeroModel';
             const config = resolveHeroModelConfig();
             const scale = Math.max(config.transformScale, 0.05);
-            model.setPosition(0, config.transformOffsetY, 0);
             model.setScale(scale, scale, scale);
             model.setRotationFromEuler(0, config.transformRotY, 0);
+            const rootScaleY = Math.max(Math.abs(root.scale.y), 0.0001);
+            const rootAnchorCompensation = -GameConfig.PHYSICS.HERO_Y / rootScaleY;
+            const autoGroundOffset = this.estimateNodeGroundOffset(model);
+            model.setPosition(
+                0,
+                config.transformOffsetY + rootAnchorCompensation + autoGroundOffset,
+                0
+            );
             this.applyLayerRecursive(model, root.layer);
             root.addChild(model);
 
@@ -398,6 +405,49 @@ export class UnitFactory {
     private static getModelSkeletalAnimation(model: Node): SkeletalAnimation | null {
         const skels = model.getComponentsInChildren(SkeletalAnimation);
         return skels[0] ?? null;
+    }
+
+    private static estimateNodeGroundOffset(root: Node): number {
+        let minLocalY = Number.POSITIVE_INFINITY;
+
+        const renderers = root.getComponentsInChildren(MeshRenderer);
+        for (const renderer of renderers) {
+            const mesh = (renderer as unknown as { mesh?: any }).mesh;
+            if (!mesh) continue;
+
+            const rawMinY = mesh?.struct?.minPosition?.y ?? mesh?._struct?.minPosition?.y;
+            if (typeof rawMinY !== 'number' || !Number.isFinite(rawMinY)) continue;
+
+            const sampled = this.sampleRendererMinYRelativeToRoot(renderer.node, root, rawMinY);
+            if (sampled < minLocalY) {
+                minLocalY = sampled;
+            }
+        }
+
+        if (!Number.isFinite(minLocalY)) {
+            return 0;
+        }
+
+        return -minLocalY;
+    }
+
+    private static sampleRendererMinYRelativeToRoot(
+        node: Node,
+        root: Node,
+        localMinY: number
+    ): number {
+        let y = localMinY;
+        let cur: Node | null = node;
+
+        while (cur && cur !== root) {
+            y = cur.position.y + y * cur.scale.y;
+            cur = cur.parent;
+        }
+
+        if (cur === root) {
+            return root.position.y + y * root.scale.y;
+        }
+        return y;
     }
 
     private static ensureRunClip(
@@ -896,7 +946,7 @@ export class UnitFactory {
         const mesh = node.getComponent(MeshRenderer);
         if (mesh) {
             mesh.shadowCastingMode = 1;
-            mesh.receiveShadow = true;
+            mesh.receiveShadow = 1;
         }
         for (const child of node.children) {
             this.applyLayerRecursive(child, layer);

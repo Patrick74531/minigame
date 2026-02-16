@@ -9,6 +9,7 @@ import { SunflowerPreview } from '../visuals/SunflowerPreview';
 export class BuildingModelVisuals {
     private static _barracksModelPrefab: Prefab | null = null;
     private static _barracksModelLoading: boolean = false;
+    private static _barracksModelAutoGroundOffset: number | null = null;
     private static _pendingBarracksModelNodes: Node[] = [];
     private static readonly BARRACKS_MODEL_PREFAB_PATHS = [
         'building/barn_3d',
@@ -19,11 +20,12 @@ export class BuildingModelVisuals {
     ];
     private static readonly BARRACKS_MODEL_NODE_NAME = 'BarracksBarnModel';
     private static readonly BARRACKS_MODEL_SCALE = 6.0;
-    private static readonly BARRACKS_MODEL_Y_OFFSET = 1.3;
+    private static readonly BARRACKS_MODEL_Y_OFFSET = 0.15;
     private static readonly BARRACKS_MODEL_Y_ROTATION = 180;
 
     private static _lightningTowerModelPrefab: Prefab | null = null;
     private static _lightningTowerModelLoading: boolean = false;
+    private static _lightningTowerModelAutoGroundOffset: number | null = null;
     private static _pendingLightningTowerModelNodes: Node[] = [];
     private static readonly LIGHTNING_TOWER_MODEL_PREFAB_PATHS = [
         'building/radar_3d',
@@ -31,7 +33,7 @@ export class BuildingModelVisuals {
     ];
     private static readonly LIGHTNING_TOWER_MODEL_NODE_NAME = 'LightningRadarModel';
     private static readonly LIGHTNING_TOWER_MODEL_SCALE = 2;
-    private static readonly LIGHTNING_TOWER_MODEL_Y_OFFSET = 1.7;
+    private static readonly LIGHTNING_TOWER_MODEL_Y_OFFSET = 0.08;
     private static readonly LIGHTNING_TOWER_MODEL_Y_ROTATION = 0;
     private static readonly LIGHTNING_TOWER_DEFAULT_NODE_SCALE = { x: 0.4, y: 0.8, z: 0.4 };
 
@@ -48,6 +50,7 @@ export class BuildingModelVisuals {
 
     private static _spaModelPrefab: Prefab | null = null;
     private static _spaModelLoading: boolean = false;
+    private static _spaModelAutoGroundOffset: number | null = null;
     private static _pendingSpaModelNodes: Node[] = [];
     private static readonly SPA_MODEL_PREFAB_PATHS = ['building/spa', 'building/spa/spa'];
     private static readonly SPA_MODEL_NODE_NAME = 'SpaModel';
@@ -58,6 +61,7 @@ export class BuildingModelVisuals {
 
     private static _rifleTowerModelPrefab: Prefab | null = null;
     private static _rifleTowerModelLoading: boolean = false;
+    private static _rifleTowerModelAutoGroundOffset: number | null = null;
     private static _pendingRifleTowerModelNodes: Node[] = [];
     private static readonly RIFLE_TOWER_MODEL_PREFAB_PATHS = [
         'building/rifle_tower',
@@ -71,6 +75,7 @@ export class BuildingModelVisuals {
 
     private static _fencebarModelPrefab: Prefab | null = null;
     private static _fencebarModelLoading: boolean = false;
+    private static _fencebarModelAutoGroundOffset: number | null = null;
     private static _pendingFencebarModelNodes: Node[] = [];
     private static readonly FENCEBAR_MODEL_PREFAB_PATHS = [
         'building/fencebar',
@@ -78,17 +83,18 @@ export class BuildingModelVisuals {
     ];
     private static readonly FENCEBAR_MODEL_NODE_NAME = 'FencebarModel';
     private static readonly FENCEBAR_MODEL_SCALE = 1.0;
-    private static readonly FENCEBAR_MODEL_Y_OFFSET = 0.51;
+    private static readonly FENCEBAR_MODEL_Y_OFFSET = 0.05;
     private static readonly FENCEBAR_MODEL_Y_ROTATION = 0;
     private static readonly FENCEBAR_DEFAULT_NODE_SCALE = { x: 0.8, y: 0.8, z: 0.8 };
 
     private static _farmModelPrefab: Prefab | null = null;
     private static _farmModelLoading: boolean = false;
+    private static _farmModelAutoGroundOffset: number | null = null;
     private static _pendingFarmModelNodes: Node[] = [];
     private static readonly FARM_MODEL_PREFAB_PATHS = ['building/gold', 'building/gold/gold'];
     private static readonly FARM_MODEL_NODE_NAME = 'FarmModel';
     private static readonly FARM_MODEL_SCALE = 4.0;
-    private static readonly FARM_MODEL_Y_OFFSET = 1.0;
+    private static readonly FARM_MODEL_Y_OFFSET = 0.12;
     private static readonly FARM_MODEL_Y_ROTATION = -45;
     private static readonly FARM_DEFAULT_NODE_SCALE = { x: 1, y: 1, z: 1 };
 
@@ -217,6 +223,10 @@ export class BuildingModelVisuals {
     private static onBarracksPrefabLoaded(prefab: Prefab): void {
         this._barracksModelLoading = false;
         this._barracksModelPrefab = prefab;
+        this._barracksModelAutoGroundOffset = this.estimateModelGroundOffset(
+            prefab,
+            this.BARRACKS_MODEL_SCALE
+        );
         const pending = this._pendingBarracksModelNodes.splice(0);
         for (const n of pending) {
             if (!n || !n.isValid) continue;
@@ -239,7 +249,8 @@ export class BuildingModelVisuals {
 
         const model = instantiate(prefab);
         model.name = this.BARRACKS_MODEL_NODE_NAME;
-        model.setPosition(0, this.BARRACKS_MODEL_Y_OFFSET, 0);
+        const groundOffset = this.getBarracksModelGroundOffset(prefab);
+        model.setPosition(0, this.BARRACKS_MODEL_Y_OFFSET + groundOffset, 0);
         model.setScale(
             this.BARRACKS_MODEL_SCALE,
             this.BARRACKS_MODEL_SCALE,
@@ -306,6 +317,10 @@ export class BuildingModelVisuals {
     private static onLightningTowerModelPrefabLoaded(prefab: Prefab): void {
         this._lightningTowerModelLoading = false;
         this._lightningTowerModelPrefab = prefab;
+        this._lightningTowerModelAutoGroundOffset = this.estimateModelGroundOffset(
+            prefab,
+            this.LIGHTNING_TOWER_MODEL_SCALE
+        );
         const pending = this._pendingLightningTowerModelNodes.splice(0);
         for (const n of pending) {
             if (!n || !n.isValid) continue;
@@ -336,7 +351,12 @@ export class BuildingModelVisuals {
             node,
             this.LIGHTNING_TOWER_DEFAULT_NODE_SCALE
         );
-        model.setPosition(0, this.LIGHTNING_TOWER_MODEL_Y_OFFSET / parentScaleY, 0);
+        const groundOffset = this.getLightningTowerModelGroundOffset(prefab);
+        model.setPosition(
+            0,
+            (this.LIGHTNING_TOWER_MODEL_Y_OFFSET + groundOffset * scaleFactor) / parentScaleY,
+            0
+        );
         model.setScale(
             (this.LIGHTNING_TOWER_MODEL_SCALE * scaleFactor) / parentScaleX,
             (this.LIGHTNING_TOWER_MODEL_SCALE * scaleFactor) / parentScaleY,
@@ -396,7 +416,10 @@ export class BuildingModelVisuals {
     private static onBaseModelPrefabLoaded(prefab: Prefab): void {
         this._baseModelLoading = false;
         this._baseModelPrefab = prefab;
-        this._baseModelAutoGroundOffset = this.estimateModelGroundOffset(prefab);
+        this._baseModelAutoGroundOffset = this.estimateModelGroundOffset(
+            prefab,
+            this.BASE_MODEL_SCALE
+        );
         const pending = this._pendingBaseModelNodes.splice(0);
         for (const n of pending) {
             if (!n || !n.isValid) continue;
@@ -442,12 +465,75 @@ export class BuildingModelVisuals {
 
     private static getBaseModelGroundOffset(prefab: Prefab): number {
         if (this._baseModelAutoGroundOffset === null) {
-            this._baseModelAutoGroundOffset = this.estimateModelGroundOffset(prefab);
+            this._baseModelAutoGroundOffset = this.estimateModelGroundOffset(
+                prefab,
+                this.BASE_MODEL_SCALE
+            );
         }
         return this._baseModelAutoGroundOffset ?? 0;
     }
 
-    private static estimateModelGroundOffset(prefab: Prefab): number {
+    private static getBarracksModelGroundOffset(prefab: Prefab): number {
+        if (this._barracksModelAutoGroundOffset === null) {
+            this._barracksModelAutoGroundOffset = this.estimateModelGroundOffset(
+                prefab,
+                this.BARRACKS_MODEL_SCALE
+            );
+        }
+        return this._barracksModelAutoGroundOffset ?? 0;
+    }
+
+    private static getLightningTowerModelGroundOffset(prefab: Prefab): number {
+        if (this._lightningTowerModelAutoGroundOffset === null) {
+            this._lightningTowerModelAutoGroundOffset = this.estimateModelGroundOffset(
+                prefab,
+                this.LIGHTNING_TOWER_MODEL_SCALE
+            );
+        }
+        return this._lightningTowerModelAutoGroundOffset ?? 0;
+    }
+
+    private static getRifleTowerModelGroundOffset(prefab: Prefab): number {
+        if (this._rifleTowerModelAutoGroundOffset === null) {
+            this._rifleTowerModelAutoGroundOffset = this.estimateModelGroundOffset(
+                prefab,
+                this.RIFLE_TOWER_MODEL_SCALE
+            );
+        }
+        return this._rifleTowerModelAutoGroundOffset ?? 0;
+    }
+
+    private static getSpaModelGroundOffset(prefab: Prefab): number {
+        if (this._spaModelAutoGroundOffset === null) {
+            this._spaModelAutoGroundOffset = this.estimateModelGroundOffset(
+                prefab,
+                this.SPA_MODEL_SCALE
+            );
+        }
+        return this._spaModelAutoGroundOffset ?? 0;
+    }
+
+    private static getFencebarModelGroundOffset(prefab: Prefab): number {
+        if (this._fencebarModelAutoGroundOffset === null) {
+            this._fencebarModelAutoGroundOffset = this.estimateModelGroundOffset(
+                prefab,
+                this.FENCEBAR_MODEL_SCALE
+            );
+        }
+        return this._fencebarModelAutoGroundOffset ?? 0;
+    }
+
+    private static getFarmModelGroundOffset(prefab: Prefab): number {
+        if (this._farmModelAutoGroundOffset === null) {
+            this._farmModelAutoGroundOffset = this.estimateModelGroundOffset(
+                prefab,
+                this.FARM_MODEL_SCALE
+            );
+        }
+        return this._farmModelAutoGroundOffset ?? 0;
+    }
+
+    private static estimateModelGroundOffset(prefab: Prefab, modelScale: number): number {
         const probe = instantiate(prefab);
         let minLocalY = Number.POSITIVE_INFINITY;
 
@@ -473,7 +559,7 @@ export class BuildingModelVisuals {
             return 0;
         }
 
-        return Math.max(0, -minLocalY * this.BASE_MODEL_SCALE);
+        return -minLocalY * modelScale;
     }
 
     private static tryAttachRifleTowerModel(node: Node): boolean {
@@ -502,6 +588,10 @@ export class BuildingModelVisuals {
     private static onRifleTowerModelPrefabLoaded(prefab: Prefab): void {
         this._rifleTowerModelLoading = false;
         this._rifleTowerModelPrefab = prefab;
+        this._rifleTowerModelAutoGroundOffset = this.estimateModelGroundOffset(
+            prefab,
+            this.RIFLE_TOWER_MODEL_SCALE
+        );
         const pending = this._pendingRifleTowerModelNodes.splice(0);
         for (const n of pending) {
             if (!n || !n.isValid) continue;
@@ -521,8 +611,13 @@ export class BuildingModelVisuals {
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
         const scaleFactor = this.getUniformScaleFactor(node, this.RIFLE_TOWER_DEFAULT_NODE_SCALE);
+        const groundOffset = this.getRifleTowerModelGroundOffset(prefab);
 
-        model.setPosition(0, this.RIFLE_TOWER_MODEL_Y_OFFSET / parentScaleY, 0);
+        model.setPosition(
+            0,
+            (this.RIFLE_TOWER_MODEL_Y_OFFSET + groundOffset * scaleFactor) / parentScaleY,
+            0
+        );
         model.setScale(
             (this.RIFLE_TOWER_MODEL_SCALE * scaleFactor) / parentScaleX,
             (this.RIFLE_TOWER_MODEL_SCALE * scaleFactor) / parentScaleY,
@@ -566,6 +661,10 @@ export class BuildingModelVisuals {
     private static onSpaModelPrefabLoaded(prefab: Prefab): void {
         this._spaModelLoading = false;
         this._spaModelPrefab = prefab;
+        this._spaModelAutoGroundOffset = this.estimateModelGroundOffset(
+            prefab,
+            this.SPA_MODEL_SCALE
+        );
         const pending = this._pendingSpaModelNodes.splice(0);
         for (const n of pending) {
             if (!n || !n.isValid) continue;
@@ -585,8 +684,13 @@ export class BuildingModelVisuals {
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
         const scaleFactor = this.getUniformScaleFactor(node, this.SPA_DEFAULT_NODE_SCALE);
+        const groundOffset = this.getSpaModelGroundOffset(prefab);
 
-        model.setPosition(0, this.SPA_MODEL_Y_OFFSET / parentScaleY, 0);
+        model.setPosition(
+            0,
+            (this.SPA_MODEL_Y_OFFSET + groundOffset * scaleFactor) / parentScaleY,
+            0
+        );
         model.setScale(
             (this.SPA_MODEL_SCALE * scaleFactor) / parentScaleX,
             (this.SPA_MODEL_SCALE * scaleFactor) / parentScaleY,
@@ -630,6 +734,10 @@ export class BuildingModelVisuals {
     private static onFencebarModelPrefabLoaded(prefab: Prefab): void {
         this._fencebarModelLoading = false;
         this._fencebarModelPrefab = prefab;
+        this._fencebarModelAutoGroundOffset = this.estimateModelGroundOffset(
+            prefab,
+            this.FENCEBAR_MODEL_SCALE
+        );
         const pending = this._pendingFencebarModelNodes.splice(0);
         for (const n of pending) {
             if (!n || !n.isValid) continue;
@@ -648,8 +756,13 @@ export class BuildingModelVisuals {
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
         const scaleFactor = this.getUniformScaleFactor(node, this.FENCEBAR_DEFAULT_NODE_SCALE);
+        const groundOffset = this.getFencebarModelGroundOffset(prefab);
 
-        container.setPosition(0, this.FENCEBAR_MODEL_Y_OFFSET / parentScaleY, 0);
+        container.setPosition(
+            0,
+            (this.FENCEBAR_MODEL_Y_OFFSET + groundOffset * scaleFactor) / parentScaleY,
+            0
+        );
         container.setRotationFromEuler(0, this.FENCEBAR_MODEL_Y_ROTATION, 0);
 
         const containerScaleX = (this.FENCEBAR_MODEL_SCALE * scaleFactor) / parentScaleX;
@@ -745,6 +858,10 @@ export class BuildingModelVisuals {
     private static onFarmPrefabLoaded(prefab: Prefab): void {
         this._farmModelLoading = false;
         this._farmModelPrefab = prefab;
+        this._farmModelAutoGroundOffset = this.estimateModelGroundOffset(
+            prefab,
+            this.FARM_MODEL_SCALE
+        );
         const pending = this._pendingFarmModelNodes.splice(0);
         for (const n of pending) {
             if (!n || !n.isValid) continue;
@@ -766,10 +883,15 @@ export class BuildingModelVisuals {
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
         const scaleFactor = this.getUniformScaleFactor(node, this.FARM_DEFAULT_NODE_SCALE);
+        const groundOffset = this.getFarmModelGroundOffset(prefab);
 
         const model = instantiate(prefab);
         model.name = this.FARM_MODEL_NODE_NAME;
-        model.setPosition(0, this.FARM_MODEL_Y_OFFSET / parentScaleY, 0);
+        model.setPosition(
+            0,
+            (this.FARM_MODEL_Y_OFFSET + groundOffset * scaleFactor) / parentScaleY,
+            0
+        );
         model.setScale(
             (this.FARM_MODEL_SCALE * scaleFactor) / parentScaleX,
             (this.FARM_MODEL_SCALE * scaleFactor) / parentScaleY,
