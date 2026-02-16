@@ -4,6 +4,7 @@ import { MAP_CONFIG } from './config/map';
 import { BUILDING_CONFIG } from './config/building';
 import { ENEMY_CONFIG } from './config/enemy';
 import { HERO_CONFIG } from './config/hero';
+import { ACTIVE_BALANCE_PRESET, BALANCE, BALANCE_SCHEMES } from './config/balance';
 
 /**
  * 游戏配置常量
@@ -59,7 +60,7 @@ export const GameConfig = {
     // === 经济系统 ===
     ECONOMY: {
         /** 初始金币 */
-        INITIAL_COINS: 100,
+        INITIAL_COINS: BALANCE.economy.initialCoins,
         /** 金币飞行到HUD的时间（秒） */
         COIN_FLY_DURATION: 0.5,
         /** 金币收集范围 (3D units) */
@@ -82,15 +83,15 @@ export const GameConfig = {
     // === 士兵系统 ===
     SOLDIER: {
         /** 基础移动速度 (units/second) - Was 100/60 ~ 1.6 */
-        MOVE_SPEED: 3.5,
+        MOVE_SPEED: BALANCE.soldier.moveSpeed,
         /** 基础攻击力 */
-        BASE_ATTACK: 10,
+        BASE_ATTACK: BALANCE.soldier.baseAttack,
         /** 基础血量 */
-        BASE_HP: 50,
+        BASE_HP: BALANCE.soldier.baseHp,
         /** 攻击间隔（秒） */
-        ATTACK_INTERVAL: 1,
+        ATTACK_INTERVAL: BALANCE.soldier.attackInterval,
         /** 攻击范围 (3D units) */
-        ATTACK_RANGE: 1.5,
+        ATTACK_RANGE: BALANCE.soldier.attackRange,
         /**
          * 兵营等级对新生成士兵的成长曲线（level 从 1 开始）
          * 公式示例：
@@ -99,17 +100,17 @@ export const GameConfig = {
          * - 攻击间隔倍率 = max(ATTACK_INTERVAL_MIN_MULTIPLIER, 1 - ATTACK_INTERVAL_DECAY_PER_LEVEL*n)
          */
         BARRACKS_GROWTH: {
-            HP_LINEAR: 0.2,
-            HP_QUADRATIC: 0.015,
-            ATTACK_LINEAR: 0.12,
-            ATTACK_QUADRATIC: 0.02,
-            ATTACK_INTERVAL_DECAY_PER_LEVEL: 0.05,
-            ATTACK_INTERVAL_MIN_MULTIPLIER: 0.72,
-            ATTACK_RANGE_LINEAR: 0.03,
-            MOVE_SPEED_LINEAR: 0.035,
-            SIZE_LINEAR: 0.08,
-            SIZE_QUADRATIC: 0.008,
-            SIZE_MAX_MULTIPLIER: 1.55,
+            HP_LINEAR: BALANCE.soldier.growth.hpLinear,
+            HP_QUADRATIC: BALANCE.soldier.growth.hpQuadratic,
+            ATTACK_LINEAR: BALANCE.soldier.growth.attackLinear,
+            ATTACK_QUADRATIC: BALANCE.soldier.growth.attackQuadratic,
+            ATTACK_INTERVAL_DECAY_PER_LEVEL: BALANCE.soldier.growth.attackIntervalDecayPerLevel,
+            ATTACK_INTERVAL_MIN_MULTIPLIER: BALANCE.soldier.growth.attackIntervalMinMultiplier,
+            ATTACK_RANGE_LINEAR: BALANCE.soldier.growth.attackRangeLinear,
+            MOVE_SPEED_LINEAR: BALANCE.soldier.growth.moveSpeedLinear,
+            SIZE_LINEAR: BALANCE.soldier.growth.sizeLinear,
+            SIZE_QUADRATIC: BALANCE.soldier.growth.sizeQuadratic,
+            SIZE_MAX_MULTIPLIER: BALANCE.soldier.growth.sizeMaxMultiplier,
         },
     },
 
@@ -124,13 +125,13 @@ export const GameConfig = {
         /** 最大等级 */
         MAX_LEVEL: 30,
         /** 升级所需经验基础值 */
-        XP_BASE: 20,
+        XP_BASE: BALANCE.heroLevel.xpBase,
         /** 每级经验增长倍率 */
-        XP_GROWTH: 1.18,
+        XP_GROWTH: BALANCE.heroLevel.xpGrowth,
         /** 击杀普通敌人获得的经验 */
-        XP_PER_KILL: 5,
+        XP_PER_KILL: BALANCE.heroLevel.xpPerKill,
         /** 击杀精英敌人获得的经验 */
-        XP_PER_ELITE_KILL: 20,
+        XP_PER_ELITE_KILL: BALANCE.heroLevel.xpPerEliteKill,
         /**
          * 每级属性增长（复合倍率 / 加算）
          * multiply: 每级乘算倍率（如 1.08 = +8%/级）
@@ -138,13 +139,13 @@ export const GameConfig = {
          * cap:      属性上限（可选）
          */
         GROWTH: {
-            maxHp: { multiply: 1.03 },
-            attack: { multiply: 1.08 },
-            critRate: { add: 0.012, cap: 0.5 },
-            critDamage: { add: 0.06 },
-            moveSpeed: { multiply: 1.015 },
-            attackRange: { multiply: 1.005 },
-            attackInterval: { multiply: 0.985 },
+            maxHp: { multiply: BALANCE.heroLevel.growth.maxHpMultiply },
+            attack: { multiply: BALANCE.heroLevel.growth.attackMultiply },
+            critRate: { add: BALANCE.heroLevel.growth.critRateAdd, cap: 0.5 },
+            critDamage: { add: BALANCE.heroLevel.growth.critDamageAdd },
+            moveSpeed: { multiply: BALANCE.heroLevel.growth.moveSpeedMultiply },
+            attackRange: { multiply: BALANCE.heroLevel.growth.attackRangeMultiply },
+            attackInterval: { multiply: BALANCE.heroLevel.growth.attackIntervalMultiply },
         } as Record<string, { multiply?: number; add?: number; cap?: number }>,
     },
 
@@ -161,6 +162,40 @@ export const GameConfig = {
          * NOTE: 仅用于 gameplay/wave/WaveManager (Infinite Mode)。
          */
         INFINITE: WAVE_INFINITE_CONFIG,
+    },
+
+    // === 平衡方案元信息 ===
+    BALANCE: {
+        /** 当前生效的平衡方案 */
+        ACTIVE_PRESET: ACTIVE_BALANCE_PRESET,
+        /** 当前方案假设参数（便于调试显示） */
+        ASSUMPTIONS: BALANCE.assumptions,
+        /** 方案指标（便于在调试面板快速比较） */
+        SCHEMES: BALANCE_SCHEMES.map(scheme => ({
+            id: scheme.id,
+            label: scheme.label,
+            assumptions: scheme.assumptions,
+            analytics: scheme.analytics,
+        })),
+        /** 英雄技能/武器倍率（用于运行时二次缩放） */
+        HERO_SKILL: {
+            WEAPON_DAMAGE_MULTIPLIER: BALANCE.heroSkill.weaponDamageMultiplier,
+            WEAPON_ATTACK_INTERVAL_MULTIPLIER: BALANCE.heroSkill.weaponAttackIntervalMultiplier,
+            WEAPON_RANGE_MULTIPLIER: BALANCE.heroSkill.weaponRangeMultiplier,
+            WEAPON_TYPE_DAMAGE_SCALE: {
+                MACHINE_GUN: BALANCE.heroSkill.weaponTypeDamageScale.machineGun,
+                FLAMETHROWER: BALANCE.heroSkill.weaponTypeDamageScale.flamethrower,
+                CANNON: BALANCE.heroSkill.weaponTypeDamageScale.cannon,
+                GLITCH_WAVE: BALANCE.heroSkill.weaponTypeDamageScale.glitchWave,
+            },
+            BUFF_MULTIPLY_SCALE: BALANCE.heroSkill.buffMultiplyScale,
+            BUFF_ADD_SCALE: BALANCE.heroSkill.buffAddScale,
+            BUFF_RARITY_SCALE: {
+                BLUE: BALANCE.heroSkill.buffRarityScale.blue,
+                PURPLE: BALANCE.heroSkill.buffRarityScale.purple,
+                GOLD: BALANCE.heroSkill.buffRarityScale.gold,
+            },
+        },
     },
 
     // === 肉鸽卡牌系统 ===

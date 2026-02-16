@@ -25,7 +25,7 @@ export class Base extends Building {
         this.upgradeCostMultiplier = GameConfig.BUILDING.BASE_UPGRADE.COST_MULTIPLIER;
         this.statMultiplier = GameConfig.BUILDING.BASE_UPGRADE.HP_MULTIPLIER;
         super.initialize();
-        
+
         // Setup BuildingPad
         this.createUpgradePad();
 
@@ -46,9 +46,11 @@ export class Base extends Building {
 
         const pad = padNode.addComponent(BuildingPad);
         pad.buildingTypeId = 'base';
-        pad.collectRadius = GameConfig.BUILDING.UPGRADE_PAD.RADIUS;
+        pad.collectRadius = GameConfig.BUILDING.BASE_UPGRADE.COLLECT_RADIUS;
+        pad.collectRate = GameConfig.BUILDING.BASE_UPGRADE.COLLECT_RATE;
+        pad.collectInterval = GameConfig.BUILDING.BASE_UPGRADE.COLLECT_INTERVAL;
         pad.lockWorldPosition = false;
-        
+
         // Ensure pad is registered with manager to get Hero reference
         const buildingManager = ServiceRegistry.get<any>('BuildingManager'); // Avoid circular dependency import if strict
         if (buildingManager && buildingManager.registerPad) {
@@ -58,10 +60,10 @@ export class Base extends Building {
         // Initialize for existing building (Base starts at Lv1)
         const startCost = GameConfig.BUILDING.BASE_UPGRADE.START_COST;
         pad.initForExistingBuilding(this, startCost);
-        
+
         // Position it
         pad.placeUpgradeZoneInFront(this.node, true);
-        
+
         this._upgradePad = pad;
     }
 
@@ -73,7 +75,7 @@ export class Base extends Building {
     }
 
     private onEnemyReachedBase(data: { damage?: number }): void {
-        const damage = data?.damage ?? 10;
+        const damage = data?.damage ?? GameConfig.ENEMY.BASE_REACH_DAMAGE;
         if (!this.isAlive) return;
         this.takeDamage(damage);
     }
@@ -113,9 +115,7 @@ export class Base extends Building {
         this.gameManager.gameOver(false); // Victory = false
     }
 
-
     private get hudManager(): HUDManager {
         return ServiceRegistry.get<HUDManager>('HUDManager') ?? HUDManager.instance;
     }
-
 }

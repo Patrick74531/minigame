@@ -297,7 +297,7 @@ export class Enemy extends Unit {
         this.resetAttackVisualState();
         this.eventManager.emit(GameEvents.ENEMY_REACHED_BASE, {
             enemy: this.node,
-            damage: 10,
+            damage: GameConfig.ENEMY.BASE_REACH_DAMAGE,
         });
 
         this._state = UnitState.DEAD;

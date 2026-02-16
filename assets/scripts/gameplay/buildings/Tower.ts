@@ -18,6 +18,7 @@ import { EnemyQuery } from '../../core/managers/EnemyQuery';
 import { GameEvents } from '../../data/GameEvents';
 import { EffectFactory } from '../effects/EffectFactory';
 import { WeaponVFX } from '../weapons/WeaponVFX';
+import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass, property } = _decorator;
 
@@ -27,18 +28,20 @@ const { ccclass, property } = _decorator;
  */
 @ccclass('Tower')
 export class Tower extends Building {
-    private static readonly TOWER_MG_BULLET_SPAWN_Y = 1.5;
-    private static readonly TOWER_MG_BULLET_WIDTH_BASE = 0.3;
-    private static readonly TOWER_MG_BULLET_LENGTH_BASE = 0.48;
-    private static readonly TOWER_MG_BULLET_WIDTH_PER_LEVEL = 0.03;
-    private static readonly TOWER_MG_BULLET_LENGTH_PER_LEVEL = 0.05;
-    private static readonly TOWER_MG_BULLET_SPREAD_DEG = 2.2;
-    private static readonly TOWER_MG_BULLET_MAX_LIFETIME = 1.4;
-    private static readonly TOWER_MG_BURST_BASE = 2;
-    private static readonly TOWER_MG_BURST_ANGLE_STEP_DEG = 0.9;
-    private static readonly TOWER_MG_MODEL_NODE_NAME = 'RifleTowerModel';
-    private static readonly TOWER_MG_MUZZLE_FALLBACK_Y = 1.9;
-    private static readonly TOWER_MG_MUZZLE_TOP_INSET = 0.12;
+    private static readonly TOWER_MG = GameConfig.BUILDING.TOWER_MACHINE_GUN;
+    private static readonly TOWER_MG_BULLET_SPAWN_Y = Tower.TOWER_MG.BULLET_SPAWN_Y;
+    private static readonly TOWER_MG_BULLET_WIDTH_BASE = Tower.TOWER_MG.BULLET_WIDTH_BASE;
+    private static readonly TOWER_MG_BULLET_LENGTH_BASE = Tower.TOWER_MG.BULLET_LENGTH_BASE;
+    private static readonly TOWER_MG_BULLET_WIDTH_PER_LEVEL = Tower.TOWER_MG.BULLET_WIDTH_PER_LEVEL;
+    private static readonly TOWER_MG_BULLET_LENGTH_PER_LEVEL =
+        Tower.TOWER_MG.BULLET_LENGTH_PER_LEVEL;
+    private static readonly TOWER_MG_BULLET_SPREAD_DEG = Tower.TOWER_MG.BULLET_SPREAD_DEG;
+    private static readonly TOWER_MG_BULLET_MAX_LIFETIME = Tower.TOWER_MG.BULLET_MAX_LIFETIME;
+    private static readonly TOWER_MG_BURST_BASE = Tower.TOWER_MG.BURST_BASE;
+    private static readonly TOWER_MG_BURST_ANGLE_STEP_DEG = Tower.TOWER_MG.BURST_ANGLE_STEP_DEG;
+    private static readonly TOWER_MG_MODEL_NODE_NAME = Tower.TOWER_MG.MODEL_NODE_NAME;
+    private static readonly TOWER_MG_MUZZLE_FALLBACK_Y = Tower.TOWER_MG.MUZZLE_FALLBACK_Y;
+    private static readonly TOWER_MG_MUZZLE_TOP_INSET = Tower.TOWER_MG.MUZZLE_TOP_INSET;
 
     @property
     public attackRange: number = 8;

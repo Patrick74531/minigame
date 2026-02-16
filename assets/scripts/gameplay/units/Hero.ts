@@ -64,6 +64,7 @@ export class Hero extends Unit {
     /** buff 卡片累计倍率 / 加算（分层叠加） */
     private _buffMultipliers: Record<string, number> = {};
     private _buffAdditives: Record<string, number> = {};
+    private _appliedBaseUpgradeLevel: number = 1;
     private static readonly _tmpLookAt = new Vec3();
 
     public onDespawn(): void {
@@ -89,6 +90,7 @@ export class Hero extends Unit {
         };
         this._buffMultipliers = {};
         this._buffAdditives = {};
+        this._appliedBaseUpgradeLevel = 1;
 
         this.initStats({ ...this._baseStats });
 
@@ -146,10 +148,12 @@ export class Hero extends Unit {
 
         // 监听升级事件
         this._eventMgr.on(GameEvents.HERO_LEVEL_UP, this.onLevelUp, this);
+        this._eventMgr.on(GameEvents.BASE_UPGRADE_READY, this.onBaseUpgradeReady, this);
     }
 
     protected onDestroy(): void {
         this._eventMgr.off(GameEvents.HERO_LEVEL_UP, this.onLevelUp, this);
+        this._eventMgr.off(GameEvents.BASE_UPGRADE_READY, this.onBaseUpgradeReady, this);
     }
 
     private get _eventMgr(): EventManager {
@@ -252,8 +256,7 @@ export class Hero extends Unit {
         if (manager.activeWeapon) {
             const behavior = WeaponBehaviorFactory.get(manager.activeWeapon.type);
             const shouldFire =
-                this._target &&
-                (behavior?.isContinuous || this._customWeaponTimer <= 0);
+                this._target && (behavior?.isContinuous || this._customWeaponTimer <= 0);
             if (shouldFire) {
                 this.performAttack();
             } else if (!this._target) {
@@ -274,22 +277,40 @@ export class Hero extends Unit {
             const def = manager.getWeaponDef(active.type);
             if (def) {
                 const rawStats = getWeaponLevelStats(def, active.level);
-                const effectiveStats = this.getEffectiveWeaponStats(rawStats);
+                const effectiveStats = this.getEffectiveWeaponStats(rawStats, active.type);
                 return effectiveStats.range ?? this._stats.attackRange;
             }
         }
         return this._stats.attackRange;
     }
 
-    private getEffectiveWeaponStats(base: WeaponLevelStats): WeaponLevelStats {
+    private getEffectiveWeaponStats(base: WeaponLevelStats, weaponType?: string): WeaponLevelStats {
         const baseRange = Math.max(0.0001, this._baseStats.attackRange);
         const baseInterval = Math.max(0.0001, this._baseStats.attackInterval);
         const rangeMultiplier = this._stats.attackRange / baseRange;
         const intervalMultiplier = this._stats.attackInterval / baseInterval;
+        const heroSkill = GameConfig.BALANCE.HERO_SKILL;
+        const typeScaleMap = heroSkill.WEAPON_TYPE_DAMAGE_SCALE;
+        const typeDamageScale =
+            weaponType === 'machine_gun'
+                ? typeScaleMap.MACHINE_GUN
+                : weaponType === 'flamethrower'
+                  ? typeScaleMap.FLAMETHROWER
+                  : weaponType === 'cannon'
+                    ? typeScaleMap.CANNON
+                    : weaponType === 'glitch_wave'
+                      ? typeScaleMap.GLITCH_WAVE
+                      : 1;
         return {
             ...base,
-            range: Math.max(0.1, base.range * rangeMultiplier),
-            attackInterval: Math.max(0.05, base.attackInterval * intervalMultiplier),
+            damage: Math.max(1, base.damage * heroSkill.WEAPON_DAMAGE_MULTIPLIER * typeDamageScale),
+            range: Math.max(0.1, base.range * rangeMultiplier * heroSkill.WEAPON_RANGE_MULTIPLIER),
+            attackInterval: Math.max(
+                0.05,
+                base.attackInterval *
+                    intervalMultiplier *
+                    heroSkill.WEAPON_ATTACK_INTERVAL_MULTIPLIER
+            ),
         };
     }
 
@@ -398,7 +419,10 @@ export class Hero extends Unit {
             const behavior = WeaponBehaviorFactory.get(active.type);
             const def = manager.getWeaponDef(active.type);
             if (behavior && def) {
-                const stats = this.getEffectiveWeaponStats(getWeaponLevelStats(def, active.level));
+                const stats = this.getEffectiveWeaponStats(
+                    getWeaponLevelStats(def, active.level),
+                    active.type
+                );
                 const parent = this.node.parent;
                 if (!parent) return;
 
@@ -443,6 +467,30 @@ export class Hero extends Unit {
         this.recalcStats();
         // 升级回满血
         this._stats.currentHp = this._stats.maxHp;
+        this.updateHealthBar();
+    }
+
+    private onBaseUpgradeReady(data: { baseLevel: number }): void {
+        const targetLevel = Math.max(1, Math.floor(data?.baseLevel ?? 1));
+        if (targetLevel <= this._appliedBaseUpgradeLevel) return;
+
+        const buff = GameConfig.BUILDING.BASE_UPGRADE.HERO_BUFF;
+        for (let level = this._appliedBaseUpgradeLevel + 1; level <= targetLevel; level++) {
+            this._buffMultipliers.maxHp = (this._buffMultipliers.maxHp ?? 1) * buff.HP_MULTIPLIER;
+            this._buffMultipliers.attack =
+                (this._buffMultipliers.attack ?? 1) * buff.ATTACK_MULTIPLIER;
+            this._buffMultipliers.attackInterval =
+                (this._buffMultipliers.attackInterval ?? 1) * buff.ATTACK_INTERVAL_MULTIPLIER;
+            this._buffMultipliers.moveSpeed =
+                (this._buffMultipliers.moveSpeed ?? 1) * buff.MOVE_SPEED_MULTIPLIER;
+            this._buffAdditives.attackRange =
+                (this._buffAdditives.attackRange ?? 0) + buff.ATTACK_RANGE_BONUS;
+        }
+
+        this._appliedBaseUpgradeLevel = targetLevel;
+        this.recalcStats();
+        const healAmount = Math.floor(this._stats.maxHp * buff.HEAL_PERCENT);
+        this.heal(Math.max(1, healAmount), false);
         this.updateHealthBar();
     }
 

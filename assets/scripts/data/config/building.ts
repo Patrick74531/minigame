@@ -1,11 +1,13 @@
+import { BALANCE } from './balance';
+
 /**
  * 建筑系统配置
  */
 export const BUILDING_CONFIG = {
     /** 兵营产兵间隔（秒）（legacy fallback） */
-    SPAWN_INTERVAL: 4.5,
+    SPAWN_INTERVAL: BALANCE.building.barracks.spawnInterval,
     /** 兵营最大产兵数（legacy fallback） */
-    MAX_SOLDIERS_PER_BARRACKS: 3,
+    MAX_SOLDIERS_PER_BARRACKS: BALANCE.building.barracks.maxUnits,
     /** 建筑血量（legacy fallback） */
     BASE_HP: 500,
     /** 基地初始血量（与建筑默认 HP 区分，避免误改） */
@@ -13,7 +15,7 @@ export const BUILDING_CONFIG = {
     /** 全局默认升级上限 */
     DEFAULT_MAX_LEVEL: 5,
     /** 全局默认升级成本倍率 */
-    DEFAULT_COST_MULTIPLIER: 1.45,
+    DEFAULT_COST_MULTIPLIER: BALANCE.building.defaultCostMultiplier,
     /** 升级投放区（建造后）参数 */
     UPGRADE_PAD: {
         /** 投放区半径（视觉与触发区共用） */
@@ -26,34 +28,62 @@ export const BUILDING_CONFIG = {
     /** 基地升级系统 */
     BASE_UPGRADE: {
         /** 基地升级起始花费（英雄携带金币） */
-        START_COST: 20,
+        START_COST: BALANCE.building.baseUpgrade.startCost,
         /** 基地升级花费倍率 */
-        COST_MULTIPLIER: 1.6,
+        COST_MULTIPLIER: BALANCE.building.baseUpgrade.costMultiplier,
         /** 基地最大等级 */
         MAX_LEVEL: 5,
         /** 每次升级基地血量倍率 */
-        HP_MULTIPLIER: 1.45,
+        HP_MULTIPLIER: BALANCE.building.baseUpgrade.hpMultiplier,
         /** 基地自动收集金币半径 */
-        COLLECT_RADIUS: 3.0,
+        COLLECT_RADIUS: BALANCE.building.baseUpgrade.collectRadius,
         /** 每次收集金币数量 */
-        COLLECT_RATE: 2,
+        COLLECT_RATE: BALANCE.building.baseUpgrade.collectRate,
         /** 收集间隔（秒） */
-        COLLECT_INTERVAL: 0.1,
+        COLLECT_INTERVAL: BALANCE.building.baseUpgrade.collectInterval,
         /** 兵营单批次产兵基础数量 */
-        SOLDIER_BATCH_BASE: 1,
+        SOLDIER_BATCH_BASE: BALANCE.building.baseUpgrade.soldierBatchBase,
         /** 基地每升 1 级，兵营单批次额外产兵数量 */
-        SOLDIER_BATCH_BONUS_PER_LEVEL: 1,
+        SOLDIER_BATCH_BONUS_PER_LEVEL: BALANCE.building.baseUpgrade.soldierBatchBonusPerLevel,
         /** 兵营单批次产兵上限（防止峰值过高） */
-        SOLDIER_BATCH_MAX: 5,
+        SOLDIER_BATCH_MAX: BALANCE.building.baseUpgrade.soldierBatchMax,
         /** 基地每次升级对英雄的增益 */
         HERO_BUFF: {
-            HP_MULTIPLIER: 1.12,
-            ATTACK_MULTIPLIER: 1.12,
-            ATTACK_INTERVAL_MULTIPLIER: 0.97,
-            MOVE_SPEED_MULTIPLIER: 1.03,
-            ATTACK_RANGE_BONUS: 0.1,
-            HEAL_PERCENT: 0.35,
+            HP_MULTIPLIER: BALANCE.building.baseUpgrade.heroBuff.hpMultiplier,
+            ATTACK_MULTIPLIER: BALANCE.building.baseUpgrade.heroBuff.attackMultiplier,
+            ATTACK_INTERVAL_MULTIPLIER:
+                BALANCE.building.baseUpgrade.heroBuff.attackIntervalMultiplier,
+            MOVE_SPEED_MULTIPLIER: BALANCE.building.baseUpgrade.heroBuff.moveSpeedMultiplier,
+            ATTACK_RANGE_BONUS: BALANCE.building.baseUpgrade.heroBuff.attackRangeBonus,
+            HEAL_PERCENT: BALANCE.building.baseUpgrade.heroBuff.healPercent,
         },
+    },
+    /** 机枪塔弹道参数（避免散落在 Tower.ts 中硬编码） */
+    TOWER_MACHINE_GUN: {
+        BULLET_SPAWN_Y: BALANCE.building.tower.machineGun.bulletSpawnY,
+        BULLET_WIDTH_BASE: BALANCE.building.tower.machineGun.bulletWidthBase,
+        BULLET_LENGTH_BASE: BALANCE.building.tower.machineGun.bulletLengthBase,
+        BULLET_WIDTH_PER_LEVEL: BALANCE.building.tower.machineGun.bulletWidthPerLevel,
+        BULLET_LENGTH_PER_LEVEL: BALANCE.building.tower.machineGun.bulletLengthPerLevel,
+        BULLET_SPREAD_DEG: BALANCE.building.tower.machineGun.bulletSpreadDeg,
+        BULLET_MAX_LIFETIME: BALANCE.building.tower.machineGun.bulletMaxLifetime,
+        BURST_BASE: BALANCE.building.tower.machineGun.burstBase,
+        BURST_ANGLE_STEP_DEG: BALANCE.building.tower.machineGun.burstAngleStepDeg,
+        MODEL_NODE_NAME: BALANCE.building.tower.machineGun.modelNodeName,
+        MUZZLE_FALLBACK_Y: BALANCE.building.tower.machineGun.muzzleFallbackY,
+        MUZZLE_TOP_INSET: BALANCE.building.tower.machineGun.muzzleTopInset,
+    },
+    /** 农场金币堆叠参数 */
+    FARM_STACK: {
+        BASE_POS: [
+            { x: 2.65, z: -0.48 },
+            { x: 3.55, z: -0.48 },
+            { x: 2.65, z: 0.48 },
+            { x: 3.55, z: 0.48 },
+        ],
+        BASE_Y: BALANCE.building.farm.stack.baseY,
+        MAX_HEIGHT: BALANCE.building.farm.stack.maxHeight,
+        COIN_VALUE: BALANCE.building.farm.stack.coinValue,
     },
     /**
      * 建筑类型配置
@@ -62,7 +92,7 @@ export const BUILDING_CONFIG = {
     TYPES: {
         barracks: {
             nameKey: 'building.barracks.name',
-            cost: 6,
+            cost: BALANCE.building.costs.barracks,
             buildTime: 0,
             descriptionKey: 'building.barracks.description',
             role: 'barracks',
@@ -71,24 +101,24 @@ export const BUILDING_CONFIG = {
                 scale: { x: 0.54, y: 0.54, z: 0.54 },
             },
             stats: {
-                hp: 180,
+                hp: BALANCE.building.barracks.hp,
             },
             features: {
-                spawnInterval: 4.5,
-                maxUnits: 3,
+                spawnInterval: BALANCE.building.barracks.spawnInterval,
+                maxUnits: BALANCE.building.barracks.maxUnits,
             },
             upgrades: {
                 maxLevel: 5,
-                costMultiplier: 1.4,
-                statMultiplier: 1.18,
-                spawnIntervalMultiplier: 0.92,
-                maxUnitsPerLevel: 1,
-                spawnBatchPerLevel: 1,
+                costMultiplier: BALANCE.building.upgradeCostMultiplier.barracks,
+                statMultiplier: BALANCE.building.barracks.statMultiplier,
+                spawnIntervalMultiplier: BALANCE.building.barracks.spawnIntervalMultiplier,
+                maxUnitsPerLevel: BALANCE.building.barracks.maxUnitsPerLevel,
+                spawnBatchPerLevel: BALANCE.building.barracks.spawnBatchPerLevel,
             },
         },
         base: {
             nameKey: 'building.base.name',
-            cost: 20,
+            cost: BALANCE.building.costs.base,
             buildTime: 0,
             descriptionKey: 'building.base.description',
             role: 'building',
@@ -99,7 +129,7 @@ export const BUILDING_CONFIG = {
         },
         tower: {
             nameKey: 'building.tower.name',
-            cost: 12,
+            cost: BALANCE.building.costs.tower,
             buildTime: 0,
             descriptionKey: 'building.tower.description',
             role: 'tower',
@@ -108,23 +138,23 @@ export const BUILDING_CONFIG = {
                 scale: { x: 0.72, y: 1.44, z: 0.72 },
             },
             stats: {
-                hp: 300,
-                attackRange: 18,
-                attackDamage: 26,
-                attackInterval: 0.32,
+                hp: BALANCE.building.tower.hp,
+                attackRange: BALANCE.building.tower.attackRange,
+                attackDamage: BALANCE.building.tower.attackDamage,
+                attackInterval: BALANCE.building.tower.attackInterval,
             },
             upgrades: {
                 maxLevel: 5,
-                costMultiplier: 1.5,
-                statMultiplier: 1.2,
-                attackMultiplier: 1.22,
-                rangeMultiplier: 1.03,
-                intervalMultiplier: 0.92,
+                costMultiplier: BALANCE.building.upgradeCostMultiplier.tower,
+                statMultiplier: BALANCE.building.tower.statMultiplier,
+                attackMultiplier: BALANCE.building.tower.attackMultiplier,
+                rangeMultiplier: BALANCE.building.tower.rangeMultiplier,
+                intervalMultiplier: BALANCE.building.tower.intervalMultiplier,
             },
         },
         frost_tower: {
             nameKey: 'building.frost_tower.name',
-            cost: 12,
+            cost: BALANCE.building.costs.frostTower,
             buildTime: 0,
             descriptionKey: 'building.frost_tower.description',
             role: 'tower',
@@ -133,31 +163,31 @@ export const BUILDING_CONFIG = {
                 scale: { x: 0.52, y: 1.02, z: 0.52 },
             },
             stats: {
-                hp: 280,
-                attackRange: 16,
-                attackDamage: 12,
-                attackInterval: 0.8,
+                hp: BALANCE.building.frostTower.hp,
+                attackRange: BALANCE.building.frostTower.attackRange,
+                attackDamage: BALANCE.building.frostTower.attackDamage,
+                attackInterval: BALANCE.building.frostTower.attackInterval,
             },
             features: {
                 bulletColorHex: '#0096FF',
-                bulletExplosionRadius: 2.8,
-                bulletSlowPercent: 0.45,
-                bulletSlowDuration: 2.2,
+                bulletExplosionRadius: BALANCE.building.frostTower.bulletExplosionRadius,
+                bulletSlowPercent: BALANCE.building.frostTower.bulletSlowPercent,
+                bulletSlowDuration: BALANCE.building.frostTower.bulletSlowDuration,
                 directRainCast: true,
                 rainRadiusPerLevel: 0.22,
             },
             upgrades: {
                 maxLevel: 5,
-                costMultiplier: 1.5,
-                statMultiplier: 1.18,
-                attackMultiplier: 1.15,
-                rangeMultiplier: 1.03,
-                intervalMultiplier: 0.96,
+                costMultiplier: BALANCE.building.upgradeCostMultiplier.frostTower,
+                statMultiplier: BALANCE.building.frostTower.statMultiplier,
+                attackMultiplier: BALANCE.building.frostTower.attackMultiplier,
+                rangeMultiplier: BALANCE.building.frostTower.rangeMultiplier,
+                intervalMultiplier: BALANCE.building.frostTower.intervalMultiplier,
             },
         },
         lightning_tower: {
             nameKey: 'building.lightning_tower.name',
-            cost: 12,
+            cost: BALANCE.building.costs.lightningTower,
             buildTime: 0,
             descriptionKey: 'building.lightning_tower.description',
             role: 'tower',
@@ -166,31 +196,31 @@ export const BUILDING_CONFIG = {
                 scale: { x: 0.4, y: 0.8, z: 0.4 },
             },
             stats: {
-                hp: 260,
-                attackRange: 17,
-                attackDamage: 12,
-                attackInterval: 0.95,
+                hp: BALANCE.building.lightningTower.hp,
+                attackRange: BALANCE.building.lightningTower.attackRange,
+                attackDamage: BALANCE.building.lightningTower.attackDamage,
+                attackInterval: BALANCE.building.lightningTower.attackInterval,
             },
             features: {
-                chainCount: 3,
+                chainCount: BALANCE.building.lightningTower.chainCount,
                 chainCountPerLevel: 1,
-                chainRange: 6,
+                chainRange: BALANCE.building.lightningTower.chainRange,
                 bulletColorHex: '#A020F0',
                 useLaserVisual: true,
             },
             upgrades: {
                 maxLevel: 5,
-                costMultiplier: 1.5,
-                statMultiplier: 1.2,
-                attackMultiplier: 1.2,
-                rangeMultiplier: 1.03,
-                intervalMultiplier: 0.95,
-                chainRangePerLevel: 0.5,
+                costMultiplier: BALANCE.building.upgradeCostMultiplier.lightningTower,
+                statMultiplier: BALANCE.building.lightningTower.statMultiplier,
+                attackMultiplier: BALANCE.building.lightningTower.attackMultiplier,
+                rangeMultiplier: BALANCE.building.lightningTower.rangeMultiplier,
+                intervalMultiplier: BALANCE.building.lightningTower.intervalMultiplier,
+                chainRangePerLevel: BALANCE.building.lightningTower.chainRangePerLevel,
             },
         },
         farm: {
             nameKey: 'building.farm.name',
-            cost: 18,
+            cost: BALANCE.building.costs.farm,
             buildTime: 0,
             descriptionKey: 'building.farm.description',
             role: 'building',
@@ -199,22 +229,22 @@ export const BUILDING_CONFIG = {
                 scale: { x: 1.2, y: 0.6, z: 1.2 },
             },
             stats: {
-                hp: 150,
+                hp: BALANCE.building.farm.hp,
             },
             features: {
-                incomePerTick: 1,
-                incomeInterval: 6,
+                incomePerTick: BALANCE.building.farm.incomePerTick,
+                incomeInterval: BALANCE.building.farm.incomeInterval,
             },
             upgrades: {
                 maxLevel: 5,
-                costMultiplier: 1.42,
-                statMultiplier: 1.18,
-                incomeMultiplier: 1.25,
+                costMultiplier: BALANCE.building.upgradeCostMultiplier.farm,
+                statMultiplier: BALANCE.building.farm.statMultiplier,
+                incomeMultiplier: BALANCE.building.farm.incomeMultiplier,
             },
         },
         wall: {
             nameKey: 'building.wall.name',
-            cost: 6,
+            cost: BALANCE.building.costs.wall,
             buildTime: 0,
             descriptionKey: 'building.wall.description',
             role: 'building',
@@ -223,13 +253,13 @@ export const BUILDING_CONFIG = {
                 scale: { x: 0.8, y: 0.8, z: 0.8 },
             },
             stats: {
-                hp: 1100,
-                tauntRange: 15,
+                hp: BALANCE.building.wall.hp,
+                tauntRange: BALANCE.building.wall.tauntRange,
             },
             upgrades: {
                 maxLevel: 5,
-                costMultiplier: 1.35,
-                statMultiplier: 1.25,
+                costMultiplier: BALANCE.building.upgradeCostMultiplier.wall,
+                statMultiplier: BALANCE.building.wall.statMultiplier,
             },
         },
         spa: {
@@ -243,17 +273,17 @@ export const BUILDING_CONFIG = {
                 scale: { x: 9, y: 9, z: 9 },
             },
             stats: {
-                hp: 800,
+                hp: BALANCE.building.spa.hp,
             },
             features: {
-                healRate: 5,
-                healInterval: 1,
-                healRadius: 5,
+                healPercentPerSecond: BALANCE.building.spa.healPercentPerSecond,
+                healInterval: BALANCE.building.spa.healInterval,
+                healRadius: BALANCE.building.spa.healRadius,
             },
             upgrades: {
                 maxLevel: 5,
                 costMultiplier: 0,
-                statMultiplier: 1.2,
+                statMultiplier: BALANCE.building.spa.statMultiplier,
             },
         },
     },

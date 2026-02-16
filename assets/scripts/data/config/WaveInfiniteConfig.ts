@@ -1,25 +1,27 @@
+import { BALANCE } from './balance';
+
 /**
  * 无限波次模式参数
  * 设计原则：敌人成长略快于英雄，迫使玩家利用建筑和卡牌体系
  */
 export const WAVE_INFINITE_CONFIG = {
-    BASE_COUNT: 30,
-    COUNT_PER_WAVE: 6,
-    COUNT_GROWTH_STEP_WAVES: 3,
-    COUNT_GROWTH_STEP_BONUS: 8,
+    BASE_COUNT: BALANCE.waveInfinite.baseCount,
+    COUNT_PER_WAVE: BALANCE.waveInfinite.countPerWave,
+    COUNT_GROWTH_STEP_WAVES: BALANCE.waveInfinite.countGrowthStepWaves,
+    COUNT_GROWTH_STEP_BONUS: BALANCE.waveInfinite.countGrowthStepBonus,
     BASE_HP_MULT: 1,
-    HP_MULT_PER_WAVE: 0.18,
+    HP_MULT_PER_WAVE: BALANCE.waveInfinite.hpMultPerWave,
     BASE_ATTACK_MULT: 1,
-    ATTACK_MULT_PER_WAVE: 0.1,
+    ATTACK_MULT_PER_WAVE: BALANCE.waveInfinite.attackMultPerWave,
     BASE_SPEED_MULT: 1,
-    SPEED_MULT_PER_WAVE: 0.015,
-    MAX_SPEED_MULT: 1.55,
-    BASE_SPAWN_INTERVAL: 0.35,
-    SPAWN_INTERVAL_DECAY_PER_WAVE: 0.02,
-    MIN_SPAWN_INTERVAL: 0.12,
-    BONUS_PER_WAVE: 20,
-    BONUS_GROWTH_PER_WAVE: 4,
-    SPAWN_RANGE: 8,
+    SPEED_MULT_PER_WAVE: BALANCE.waveInfinite.speedMultPerWave,
+    MAX_SPEED_MULT: BALANCE.waveInfinite.maxSpeedMult,
+    BASE_SPAWN_INTERVAL: BALANCE.waveInfinite.baseSpawnInterval,
+    SPAWN_INTERVAL_DECAY_PER_WAVE: BALANCE.waveInfinite.spawnIntervalDecayPerWave,
+    MIN_SPAWN_INTERVAL: BALANCE.waveInfinite.minSpawnInterval,
+    BONUS_PER_WAVE: BALANCE.waveInfinite.bonusPerWave,
+    BONUS_GROWTH_PER_WAVE: BALANCE.waveInfinite.bonusGrowthPerWave,
+    SPAWN_RANGE: BALANCE.waveInfinite.spawnRange,
     /**
      * 固定刷怪口设置
      * - 基于三条道路的末端锚点生成刷怪口
@@ -28,46 +30,46 @@ export const WAVE_INFINITE_CONFIG = {
      */
     SPAWN_PORTALS: {
         /** 第 2 个刷怪口解锁波次（含） */
-        OPEN_WAVE_2: 4,
+        OPEN_WAVE_2: BALANCE.waveDirector.spawnPortals.openWave2,
         /** 第 3 个刷怪口解锁波次（含） */
-        OPEN_WAVE_3: 8,
+        OPEN_WAVE_3: BALANCE.waveDirector.spawnPortals.openWave3,
         /** 刷怪口距离地图边缘的最小留白（世界坐标） */
-        EDGE_MARGIN: 4.0,
+        EDGE_MARGIN: BALANCE.waveDirector.spawnPortals.edgeMargin,
         /** 向道路末端推进比例（1 = 到道路末端锚点） */
-        DISTANCE_FACTOR: 0.96,
+        DISTANCE_FACTOR: BALANCE.waveDirector.spawnPortals.distanceFactor,
         /** 每个刷怪口的随机抖动半径 */
-        JITTER_RADIUS: 0.85,
+        JITTER_RADIUS: BALANCE.waveDirector.spawnPortals.jitterRadius,
     },
     ELITE: {
-        START_WAVE: 3,
-        INTERVAL: 2,
-        BASE_COUNT: 1,
-        COUNT_GROWTH_STEP_WAVES: 4,
-        MAX_COUNT: 6,
-        SPAWN_EVERY: 4,
+        START_WAVE: BALANCE.waveDirector.elite.startWave,
+        INTERVAL: BALANCE.waveDirector.elite.interval,
+        BASE_COUNT: BALANCE.waveDirector.elite.baseCount,
+        COUNT_GROWTH_STEP_WAVES: BALANCE.waveDirector.elite.countGrowthStepWaves,
+        MAX_COUNT: BALANCE.waveDirector.elite.maxCount,
+        SPAWN_EVERY: BALANCE.waveDirector.elite.spawnEvery,
     },
     /**
      * 无限模式怪物抽样参数（带冷却的约束随机）
      */
     RANDOMIZER: {
         /** 每波抽取怪物类型数量 */
-        PICK_TYPES_PER_WAVE: 3,
+        PICK_TYPES_PER_WAVE: BALANCE.waveDirector.randomizer.pickTypesPerWave,
         /** 组合记忆窗口（最近 M 波禁止完全相同三类型组合） */
-        COMBO_MEMORY_WAVES: 4,
+        COMBO_MEMORY_WAVES: BALANCE.waveDirector.randomizer.comboMemoryWaves,
         /** 最近几波出现过的类型施加惩罚 */
-        RECENT_TYPE_PENALTY_WAVES: 2,
+        RECENT_TYPE_PENALTY_WAVES: BALANCE.waveDirector.randomizer.recentTypePenaltyWaves,
         /** 最近类型惩罚系数 */
-        RECENT_TYPE_PENALTY: 0.42,
+        RECENT_TYPE_PENALTY: BALANCE.waveDirector.randomizer.recentTypePenalty,
         /** 最近 K 波统计窗口（用于均衡惩罚） */
-        RECENT_WINDOW_WAVES: 8,
+        RECENT_WINDOW_WAVES: BALANCE.waveDirector.randomizer.recentWindowWaves,
         /** tag 占比统计窗口 */
-        TAG_DOMINANCE_WINDOW_WAVES: 3,
+        TAG_DOMINANCE_WINDOW_WAVES: BALANCE.waveDirector.randomizer.tagDominanceWindowWaves,
         /** tag 连续占比阈值 */
-        TAG_DOMINANCE_THRESHOLD: 0.62,
+        TAG_DOMINANCE_THRESHOLD: BALANCE.waveDirector.randomizer.tagDominanceThreshold,
         /** tag 超阈值降权系数 */
-        TAG_DOMINANCE_PENALTY: 0.55,
+        TAG_DOMINANCE_PENALTY: BALANCE.waveDirector.randomizer.tagDominancePenalty,
         /** 最小权重下限（防止 0 权重死锁） */
-        MIN_WEIGHT_FLOOR: 0.01,
+        MIN_WEIGHT_FLOOR: BALANCE.waveDirector.randomizer.minWeightFloor,
     },
     /**
      * 怪物类型池（按类型而不是单个实体）
@@ -214,37 +216,37 @@ export const WAVE_INFINITE_CONFIG = {
     BOSS_EVENT: {
         ENABLED: true,
         /** 触发间隔（随机区间） */
-        INTERVAL_MIN_WAVES: 6,
-        INTERVAL_MAX_WAVES: 8,
+        INTERVAL_MIN_WAVES: BALANCE.waveDirector.bossEvent.intervalMinWaves,
+        INTERVAL_MAX_WAVES: BALANCE.waveDirector.bossEvent.intervalMaxWaves,
         /** Boss 自身冷却（波数） */
-        BOSS_COOLDOWN_WAVES: 12,
+        BOSS_COOLDOWN_WAVES: BALANCE.waveDirector.bossEvent.bossCooldownWaves,
         /** Boss 波是否仅刷 Boss（不混入普通/精英） */
-        BOSS_ONLY_WAVE: true,
+        BOSS_ONLY_WAVE: BALANCE.waveDirector.bossEvent.bossOnlyWave,
         /** 若关闭 BOSS_ONLY_WAVE，可额外增加小怪数量 */
-        ADDITIONAL_ENEMY_COUNT: 0,
+        ADDITIONAL_ENEMY_COUNT: BALANCE.waveDirector.bossEvent.additionalEnemyCount,
         /** Boss 战斗强度（相对普通怪基础值） */
-        BOSS_HP_MULTIPLIER: 14,
-        BOSS_ATTACK_MULTIPLIER: 3.2,
-        BOSS_SPEED_MULTIPLIER: 1.0,
-        BOSS_SCALE_MULTIPLIER: 1.75,
-        BOSS_COIN_MULTIPLIER: 6.0,
+        BOSS_HP_MULTIPLIER: BALANCE.waveDirector.bossEvent.bossHpMultiplier,
+        BOSS_ATTACK_MULTIPLIER: BALANCE.waveDirector.bossEvent.bossAttackMultiplier,
+        BOSS_SPEED_MULTIPLIER: BALANCE.waveDirector.bossEvent.bossSpeedMultiplier,
+        BOSS_SCALE_MULTIPLIER: BALANCE.waveDirector.bossEvent.bossScaleMultiplier,
+        BOSS_COIN_MULTIPLIER: BALANCE.waveDirector.bossEvent.bossCoinMultiplier,
         /** Boss 进入小怪池后的体型比例（60%） */
-        MINION_SCALE_RATIO: 0.6,
+        MINION_SCALE_RATIO: BALANCE.waveDirector.bossEvent.minionScaleRatio,
         /** Boss 出场后的“小怪回声权重” */
         ECHO: {
             /** +2 波后开始进入提升权重阶段 */
-            START_DELAY_WAVES: 2,
+            START_DELAY_WAVES: BALANCE.waveDirector.bossEvent.echo.startDelayWaves,
             /** 提升权重区间（5%~10%） */
-            BONUS_WEIGHT_MIN: 0.05,
-            BONUS_WEIGHT_MAX: 0.1,
+            BONUS_WEIGHT_MIN: BALANCE.waveDirector.bossEvent.echo.bonusWeightMin,
+            BONUS_WEIGHT_MAX: BALANCE.waveDirector.bossEvent.echo.bonusWeightMax,
             /** 提升阶段持续波数（3~5） */
-            BONUS_DURATION_MIN: 3,
-            BONUS_DURATION_MAX: 5,
+            BONUS_DURATION_MIN: BALANCE.waveDirector.bossEvent.echo.bonusDurationMin,
+            BONUS_DURATION_MAX: BALANCE.waveDirector.bossEvent.echo.bonusDurationMax,
             /** 回落常驻权重区间（2%~4%） */
-            BASE_WEIGHT_MIN: 0.02,
-            BASE_WEIGHT_MAX: 0.04,
+            BASE_WEIGHT_MIN: BALANCE.waveDirector.bossEvent.echo.baseWeightMin,
+            BASE_WEIGHT_MAX: BALANCE.waveDirector.bossEvent.echo.baseWeightMax,
             /** 回落常驻持续波数 */
-            BASE_DURATION_WAVES: 12,
+            BASE_DURATION_WAVES: BALANCE.waveDirector.bossEvent.echo.baseDurationWaves,
         },
         BOSS_ARCHETYPES: [
             {

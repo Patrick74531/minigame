@@ -43,6 +43,10 @@ export interface BuildingTypeConfig {
         maxUnits?: number;
         incomePerTick?: number;
         incomeInterval?: number;
+        healPercentPerSecond?: number;
+        healRate?: number;
+        healRadius?: number;
+        healInterval?: number;
         // Bullet Visuals
         bulletColorHex?: string;
         bulletExplosionRadius?: number;

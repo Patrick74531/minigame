@@ -1,21 +1,23 @@
+import { BALANCE } from './balance';
+
 /**
  * 英雄系统配置
  */
 export const HERO_CONFIG = {
     /** 基础血量 */
-    BASE_HP: 60,
+    BASE_HP: BALANCE.hero.baseHp,
     /** 基础攻击力 */
-    BASE_ATTACK: 12,
+    BASE_ATTACK: BALANCE.hero.baseAttack,
     /** 攻击间隔（秒） */
-    ATTACK_INTERVAL: 0.9,
+    ATTACK_INTERVAL: BALANCE.hero.attackInterval,
     /** 攻击范围 */
-    ATTACK_RANGE: 2.5,
+    ATTACK_RANGE: BALANCE.hero.attackRange,
     /** 移动速度 */
-    MOVE_SPEED: 5.5,
+    MOVE_SPEED: BALANCE.hero.moveSpeed,
     /** 暴击率 (0~1) */
-    CRIT_RATE: 0.05,
+    CRIT_RATE: BALANCE.hero.critRate,
     /** 暴击伤害倍率 (1.5 = 150%) */
-    CRIT_DAMAGE: 1.5,
+    CRIT_DAMAGE: BALANCE.hero.critDamage,
     /**
      * 模型资源配置
      * 说明：

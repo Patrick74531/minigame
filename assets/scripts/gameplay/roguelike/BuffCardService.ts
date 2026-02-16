@@ -105,7 +105,7 @@ export class BuffCardService extends Singleton<BuffCardService>() {
             return false;
         }
 
-        hero.applyBuffCard(card.effects);
+        hero.applyBuffCard(this.scaleCardEffects(card.effects, card.rarity));
         this._pickedHistory.push(card);
 
         console.log(`[BuffCardService] Applied card: ${card.id}`);
@@ -141,6 +141,45 @@ export class BuffCardService extends Singleton<BuffCardService>() {
     public findCardById(cardId: string): BuffCardDef | null {
         const pool = this.getCardPool();
         return pool.find(c => c.id === cardId) ?? null;
+    }
+
+    private scaleCardEffects(effects: BuffCardEffect, rarity: CardRarity): BuffCardEffect {
+        const balance = GameConfig.BALANCE.HERO_SKILL;
+        const rarityScale =
+            rarity === 'gold'
+                ? balance.BUFF_RARITY_SCALE.GOLD
+                : rarity === 'purple'
+                  ? balance.BUFF_RARITY_SCALE.PURPLE
+                  : balance.BUFF_RARITY_SCALE.BLUE;
+        const multiplyScale = balance.BUFF_MULTIPLY_SCALE * rarityScale;
+        const addScale = balance.BUFF_ADD_SCALE * rarityScale;
+
+        return {
+            attack: this.scaleStatModifier(effects.attack, multiplyScale, addScale),
+            attackInterval: this.scaleStatModifier(effects.attackInterval, multiplyScale, addScale),
+            moveSpeed: this.scaleStatModifier(effects.moveSpeed, multiplyScale, addScale),
+            attackRange: this.scaleStatModifier(effects.attackRange, multiplyScale, addScale),
+            critRate: this.scaleStatModifier(effects.critRate, multiplyScale, addScale),
+            critDamage: this.scaleStatModifier(effects.critDamage, multiplyScale, addScale),
+        };
+    }
+
+    private scaleStatModifier(
+        mod: { multiply?: number; add?: number } | undefined,
+        multiplyScale: number,
+        addScale: number
+    ): { multiply?: number; add?: number } | undefined {
+        if (!mod) return undefined;
+
+        const scaled: { multiply?: number; add?: number } = {};
+        if (mod.multiply !== undefined) {
+            scaled.multiply = 1 + (mod.multiply - 1) * multiplyScale;
+        }
+        if (mod.add !== undefined) {
+            scaled.add = mod.add * addScale;
+        }
+
+        return scaled;
     }
 
     private shuffle<T>(arr: T[]): T[] {

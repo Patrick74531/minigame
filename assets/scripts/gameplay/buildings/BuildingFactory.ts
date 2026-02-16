@@ -273,11 +273,20 @@ export class BuildingFactory {
 
             if (buildingId === 'spa') {
                 const spaFeatures = config.features as
-                    | { healRadius?: number; healInterval?: number }
+                    | {
+                          healRadius?: number;
+                          healInterval?: number;
+                          healPercentPerSecond?: number;
+                          healRate?: number;
+                      }
                     | undefined;
+                const healPercentPerSecond = Math.max(
+                    0,
+                    spaFeatures?.healPercentPerSecond ?? spaFeatures?.healRate ?? 0.1
+                );
                 (building as Spa).setHealConfig({
                     radius: spaFeatures?.healRadius ?? 5,
-                    healPercentPerSecond: 0.1,
+                    healPercentPerSecond,
                     tickInterval: spaFeatures?.healInterval ?? 1,
                 });
             }

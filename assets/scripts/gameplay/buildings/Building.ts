@@ -61,14 +61,11 @@ export interface BuildingUpgradeConfig {
 @ccclass('Building')
 export class Building extends BaseComponent implements IAttackable {
     private static _latestBaseLevel: number = 1;
-    private static readonly FARM_STACK_BASE_POS: ReadonlyArray<{ x: number; z: number }> = [
-        { x: 2.65, z: -0.48 },
-        { x: 3.55, z: -0.48 },
-        { x: 2.65, z: 0.48 },
-        { x: 3.55, z: 0.48 },
-    ];
-    private static readonly FARM_STACK_BASE_Y = 0.09;
-    private static readonly FARM_STACK_MAX_HEIGHT = 12;
+    private static readonly FARM_STACK_BASE_POS: ReadonlyArray<{ x: number; z: number }> =
+        GameConfig.BUILDING.FARM_STACK.BASE_POS;
+    private static readonly FARM_STACK_BASE_Y = GameConfig.BUILDING.FARM_STACK.BASE_Y;
+    private static readonly FARM_STACK_MAX_HEIGHT = GameConfig.BUILDING.FARM_STACK.MAX_HEIGHT;
+    private static readonly FARM_COIN_VALUE = GameConfig.BUILDING.FARM_STACK.COIN_VALUE;
 
     @property
     public buildingType: BuildingType = BuildingType.BARRACKS;
@@ -505,7 +502,12 @@ export class Building extends BaseComponent implements IAttackable {
         const stack = this._farmStackCoins[stackIndex];
         const y = Building.FARM_STACK_BASE_Y + stack.length * this._farmCoinStackHeight;
         const base = Building.FARM_STACK_BASE_POS[stackIndex];
-        const coinNode = CoinFactory.createCoin(this.node, base.x, base.z, 1);
+        const coinNode = CoinFactory.createCoin(
+            this.node,
+            base.x,
+            base.z,
+            Building.FARM_COIN_VALUE
+        );
         coinNode.setPosition(base.x, y, base.z);
         coinNode.setRotationFromEuler(90, Math.random() * 360, 0);
 
@@ -517,7 +519,7 @@ export class Building extends BaseComponent implements IAttackable {
 
         const coinComp = coinNode.getComponent(Coin);
         if (coinComp) {
-            coinComp.value = 1;
+            coinComp.value = Building.FARM_COIN_VALUE;
             coinComp.enableLifetime = false;
             coinComp.floatAmplitude = Math.max(GameConfig.ECONOMY.COIN_FLOAT_AMPLITUDE, 0.12);
             coinComp.floatPhase = Math.random() * Math.PI * 2;

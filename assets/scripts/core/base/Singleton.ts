@@ -10,7 +10,7 @@
  */
 export function Singleton<T>() {
     class SingletonClass {
-        private static _instance: T | null = null;
+        static _instance: T | null = null;
 
         public static get instance(): T {
             if (!this._instance) {
