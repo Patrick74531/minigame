@@ -427,10 +427,10 @@ const BASE = {
         aggroRange: 3.0,
         baseReachDamage: 10,
         elite: {
-            hpMultiplier: 3.2,
+            hpMultiplier: 4.8,
             attackMultiplier: 1.4,
             speedMultiplier: 1.1,
-            scaleMultiplier: 1.35,
+            scaleMultiplier: 1.5,
             coinDropMultiplier: 3.0,
         },
         flyingRanged: {

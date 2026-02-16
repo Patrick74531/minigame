@@ -501,6 +501,12 @@ export class WaveManager {
         const powerAttackMultiplier = 0.72 + power * 0.78;
         const powerSpeedMultiplier = 0.85 + power * 0.2;
         const visualScale = this.resolveSpawnVisualScale(archetype, entry.spawnType);
+        const defaultHpMultiplier =
+            waveConfig.hpMultiplier * spawnCombat.hpMultiplier * powerHpMultiplier;
+        const finalHpMultiplier =
+            entry.spawnType === 'boss'
+                ? this.resolveBossHpMultiplierFloor(waveConfig.waveNumber, defaultHpMultiplier)
+                : defaultHpMultiplier;
 
         const enemy = UnitFactory.createEnemy(
             this._enemyContainer,
@@ -508,8 +514,7 @@ export class WaveManager {
             pos.y,
             this._baseNode ? this._baseNode.position : new Vec3(0, 0, 0), // Base Position
             {
-                hpMultiplier:
-                    waveConfig.hpMultiplier * spawnCombat.hpMultiplier * powerHpMultiplier,
+                hpMultiplier: finalHpMultiplier,
                 speedMultiplier:
                     waveConfig.speedMultiplier * spawnCombat.speedMultiplier * powerSpeedMultiplier,
                 attackMultiplier:
@@ -730,11 +735,22 @@ export class WaveManager {
             };
         }
         if (spawnType === 'elite') {
+            const bossScaleUpper = clamp(
+                toFinite(this._bossEventConfig?.COMBAT.BOSS_SCALE_MULTIPLIER, 1.75),
+                1.3,
+                8
+            );
+            const eliteScaleUpper = Math.max(1.1, bossScaleUpper - 0.08);
+            const eliteScale = clamp(
+                toFinite(elite.SCALE_MULTIPLIER, 1.45),
+                Math.min(1.15, eliteScaleUpper),
+                eliteScaleUpper
+            );
             return {
                 hpMultiplier: elite.HP_MULTIPLIER,
                 attackMultiplier: elite.ATTACK_MULTIPLIER,
                 speedMultiplier: elite.SPEED_MULTIPLIER,
-                scaleMultiplier: elite.SCALE_MULTIPLIER,
+                scaleMultiplier: eliteScale,
                 coinDropMultiplier: elite.COIN_DROP_MULTIPLIER,
                 isElite: true,
             };
@@ -983,9 +999,12 @@ export class WaveManager {
             };
         }
 
+        this.assignDistinctEliteArchetypes(entries, waveNumber);
+        const waveArchetypeIds = Array.from(new Set(entries.map(entry => entry.archetypeId)));
+
         applyRhythm(entries, rhythmTemplate.pattern);
         updateWaveMemory({
-            selectedIds: selectedArchetypeIds,
+            selectedIds: waveArchetypeIds,
             comboKey,
             recentWaveTypes: this._recentWaveTypes,
             recentCombos: this._recentCombos,
@@ -995,7 +1014,7 @@ export class WaveManager {
             archetypeById: this._archetypeById,
         });
         applyArchetypeSelectionState({
-            selectedIds: selectedArchetypeIds,
+            selectedIds: waveArchetypeIds,
             waveNumber,
             archetypes: this._archetypes,
             archetypeState: this._archetypeState,
@@ -1013,11 +1032,91 @@ export class WaveManager {
 
         return {
             entries,
-            selectedArchetypeIds,
+            selectedArchetypeIds: waveArchetypeIds,
             compositionTemplateId: compositionTemplate.id,
             rhythmTemplateId: rhythmTemplate.id,
             comboKey,
         };
+    }
+
+    private assignDistinctEliteArchetypes(entries: PlannedSpawnEntry[], waveNumber: number): void {
+        if (entries.length <= 0) return;
+
+        const regularArchetypeIds = new Set<string>();
+        const eliteEntries: PlannedSpawnEntry[] = [];
+        for (const entry of entries) {
+            if (entry.spawnType === 'elite') {
+                eliteEntries.push(entry);
+            } else {
+                regularArchetypeIds.add(entry.archetypeId);
+            }
+        }
+
+        if (eliteEntries.length <= 0 || regularArchetypeIds.size <= 0) return;
+
+        const candidates = this.getRegularPoolArchetypes()
+            .filter(archetype => !regularArchetypeIds.has(archetype.id))
+            .sort(
+                (a, b) =>
+                    this.computeArchetypeScore(b, waveNumber) -
+                    this.computeArchetypeScore(a, waveNumber)
+            );
+        if (candidates.length <= 0) return;
+
+        const pickCount = Math.min(3, candidates.length);
+        const pickedIds = candidates.slice(0, pickCount).map(archetype => archetype.id);
+        for (let i = 0; i < eliteEntries.length; i++) {
+            eliteEntries[i].archetypeId = pickedIds[i % pickCount];
+        }
+    }
+
+    private resolveBossHpMultiplierFloor(waveNumber: number, fallbackHpMultiplier: number): number {
+        const baseHp = Math.max(1, GameConfig.ENEMY.BASE_HP);
+        const adjacentWaveHpSum = this.estimateAdjacentWaveTotalHpSum(waveNumber);
+        if (!Number.isFinite(adjacentWaveHpSum) || adjacentWaveHpSum <= 0) {
+            return fallbackHpMultiplier;
+        }
+        const floorMultiplier = adjacentWaveHpSum / baseHp;
+        return Math.max(fallbackHpMultiplier, floorMultiplier);
+    }
+
+    private estimateAdjacentWaveTotalHpSum(waveNumber: number): number {
+        const wave = Math.max(1, Math.floor(waveNumber));
+        const prevHp = this.estimateRegularWaveTotalHp(wave - 1);
+        const nextHp = this.estimateRegularWaveTotalHp(wave + 1);
+        return Math.max(0, prevHp) + Math.max(0, nextHp);
+    }
+
+    private estimateRegularWaveTotalHp(waveNumber: number): number {
+        const wave = Math.max(1, Math.floor(waveNumber));
+        const infinite = GameConfig.WAVE.INFINITE;
+        const waveIndex = wave - 1;
+        const countStepBonus =
+            Math.floor(waveIndex / infinite.COUNT_GROWTH_STEP_WAVES) *
+            infinite.COUNT_GROWTH_STEP_BONUS;
+        const regularCount = Math.max(
+            1,
+            Math.round(infinite.BASE_COUNT + waveIndex * infinite.COUNT_PER_WAVE + countStepBonus)
+        );
+        const eliteCount = this.getEliteCountForWave(wave);
+        const hpMult = infinite.BASE_HP_MULT + waveIndex * infinite.HP_MULT_PER_WAVE;
+        const avgPowerHpMultiplier = this.resolveAverageRegularPowerHpMultiplier();
+        const regularUnitHp = GameConfig.ENEMY.BASE_HP * hpMult * avgPowerHpMultiplier;
+        const eliteUnitHp = regularUnitHp * Math.max(1, GameConfig.ENEMY.ELITE.HP_MULTIPLIER);
+        return regularCount * regularUnitHp + eliteCount * eliteUnitHp;
+    }
+
+    private resolveAverageRegularPowerHpMultiplier(): number {
+        const pool = this.getRegularPoolArchetypes();
+        if (pool.length <= 0) {
+            return 0.65 + 1 * 0.85;
+        }
+        let sum = 0;
+        for (const archetype of pool) {
+            const power = clamp(archetype.power, 0.5, 3.0);
+            sum += 0.65 + power * 0.85;
+        }
+        return sum / pool.length;
     }
 
     private buildBossOnlyWaveSpawnPlan(waveNumber: number): WaveSpawnPlan {
