@@ -129,9 +129,9 @@ export const GameConfig = {
         /** 每级经验增长倍率 */
         XP_GROWTH: BALANCE.heroLevel.xpGrowth,
         /** 击杀普通敌人获得的经验 */
-        XP_PER_KILL: BALANCE.heroLevel.xpPerKill,
+        XP_PER_KILL: BALANCE.heroLevel.xpPerKill / 3,
         /** 击杀精英敌人获得的经验 */
-        XP_PER_ELITE_KILL: BALANCE.heroLevel.xpPerEliteKill,
+        XP_PER_ELITE_KILL: BALANCE.heroLevel.xpPerEliteKill / 3,
         /**
          * 每级属性增长（复合倍率 / 加算）
          * multiply: 每级乘算倍率（如 1.08 = +8%/级）

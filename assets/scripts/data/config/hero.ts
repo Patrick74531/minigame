@@ -5,7 +5,7 @@ import { BALANCE } from './balance';
  */
 export const HERO_CONFIG = {
     /** 基础血量 */
-    BASE_HP: BALANCE.hero.baseHp,
+    BASE_HP: BALANCE.hero.baseHp * 3,
     /** 基础攻击力 */
     BASE_ATTACK: BALANCE.hero.baseAttack,
     /** 攻击间隔（秒） */
