@@ -305,6 +305,11 @@ export interface BalanceProfile {
         wave10EnemyAttack: number;
         wave10CoinBudget: number;
         suggestedHeroDps: number;
+        wave10KillDistanceToBaseNormalized: number;
+        wave10BreachRate: number;
+        firstBreachWave: number;
+        firstBaseCollapseWave: number;
+        wave10RiskScore: number;
     };
 }
 
@@ -318,6 +323,24 @@ export interface WaveBalanceSnapshot {
     enemyUnitAttack: number;
     predictedCoinIncome: number;
     suggestedHeroDps: number;
+}
+
+export interface RouteBalanceSnapshot {
+    wave: number;
+    regularEnemyCount: number;
+    eliteEnemyCount: number;
+    totalEnemyCount: number;
+    lanePathLength: number;
+    enemyTravelSeconds: number;
+    avgEnemyHp: number;
+    avgEnemyAttack: number;
+    effectiveLaneDps: number;
+    focusDpsPerEnemy: number;
+    damagePerEnemyOnRoute: number;
+    killDistanceToBaseNormalized: number;
+    breachRate: number;
+    predictedBaseHpLoss: number;
+    riskScore: number;
 }
 
 const BASE = {
@@ -585,6 +608,45 @@ const BASE = {
             attackIntervalMultiply: 0.985,
         },
     },
+    routeModel: {
+        mapLimits: {
+            x: 25,
+            z: 25,
+        },
+        lanePolylinesNormalized: {
+            top: [
+                { x: 0.05, z: 0.95 },
+                { x: 0.06, z: 0.92 },
+                { x: 0.95, z: 0.92 },
+            ],
+            mid: [
+                { x: 0.05, z: 0.95 },
+                { x: 0.35, z: 0.65 },
+                { x: 0.5, z: 0.5 },
+                { x: 0.65, z: 0.35 },
+                { x: 0.95, z: 0.05 },
+            ],
+            bottom: [
+                { x: 0.05, z: 0.95 },
+                { x: 0.08, z: 0.94 },
+                { x: 0.08, z: 0.05 },
+            ],
+        },
+        defenseAssumptions: {
+            // 该模型用于平衡脚本的“路线结果评估”，不是运行时战斗代码。
+            towerSlots: 12,
+            frostTowerSlots: 4,
+            lightningTowerSlots: 4,
+            barracksCount: 1,
+            towerFireUptime: 0.72,
+            heroDpsUptime: 0.68,
+            laneCoverageRatio: 0.62,
+            controlSlowBonus: 0.22,
+            pressureDivisorBase: 36,
+            waveGrowthSoftCap: 45,
+            baseHp: 100,
+        },
+    },
 } as const;
 
 const BALANCE_ASSUMPTIONS: Record<BalancePresetId, BalanceAssumptions> = {
@@ -640,6 +702,154 @@ function clamp(value: number, min: number, max: number): number {
 
 function scaleMultiply(base: number, assumptionScale: number, center = 1): number {
     return round2(center + (base - center) * assumptionScale);
+}
+
+type LanePoint = { x: number; z: number };
+
+function laneNormalizedToWorld(point: LanePoint, limits: { x: number; z: number }): LanePoint {
+    return {
+        x: point.x * (limits.x * 2) - limits.x,
+        z: (1 - point.z) * (limits.z * 2) - limits.z,
+    };
+}
+
+function polylineLength(points: LanePoint[]): number {
+    if (points.length <= 1) return 0;
+    let length = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+        const dx = points[i + 1].x - points[i].x;
+        const dz = points[i + 1].z - points[i].z;
+        length += Math.hypot(dx, dz);
+    }
+    return length;
+}
+
+function average(values: number[]): number {
+    if (values.length <= 0) return 0;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function resolveAverageLanePathLength(): number {
+    const limits = BASE.routeModel.mapLimits;
+    const normalized = BASE.routeModel.lanePolylinesNormalized;
+    const lengths = [normalized.top, normalized.mid, normalized.bottom].map(line =>
+        polylineLength(line.map(point => laneNormalizedToWorld(point, limits)))
+    );
+    return average(lengths);
+}
+
+function getEliteCountForWave(profile: BalanceProfile, waveNumber: number): number {
+    const wave = Math.max(1, Math.floor(waveNumber));
+    const elite = profile.waveDirector.elite;
+    if (wave < elite.startWave) return 0;
+    if ((wave - elite.startWave) % elite.interval !== 0) return 0;
+    const growthSteps = Math.floor((wave - elite.startWave) / elite.countGrowthStepWaves);
+    return Math.min(elite.maxCount, elite.baseCount + growthSteps);
+}
+
+function estimateRouteSnapshot(
+    profile: BalanceProfile,
+    waveNumber: number,
+    pathLength: number
+): RouteBalanceSnapshot {
+    const wave = Math.max(1, Math.floor(waveNumber));
+    const waveSnapshot = calculateWaveSnapshot(profile, wave);
+    const regularEnemyCount = waveSnapshot.enemyCount;
+    const eliteEnemyCount = getEliteCountForWave(profile, wave);
+    const totalEnemyCount = regularEnemyCount + eliteEnemyCount;
+    const eliteShare = totalEnemyCount > 0 ? eliteEnemyCount / totalEnemyCount : 0;
+    const avgEnemyHp = Math.max(
+        1,
+        waveSnapshot.enemyUnitHp * (1 + eliteShare * (profile.enemy.elite.hpMultiplier - 1))
+    );
+    const avgEnemyAttack = Math.max(
+        1,
+        waveSnapshot.enemyUnitAttack * (1 + eliteShare * (profile.enemy.elite.attackMultiplier - 1))
+    );
+
+    const enemySpeed = Math.max(0.25, profile.enemy.moveSpeed * waveSnapshot.enemySpeedMultiplier);
+    const enemyTravelSeconds = Math.max(0.5, pathLength / enemySpeed);
+
+    const defense = BASE.routeModel.defenseAssumptions;
+    const buildUp = clamp(0.35 + wave / 20, 0.35, 1.0);
+    const towerSlots = defense.towerSlots * buildUp;
+    const frostSlots = defense.frostTowerSlots * buildUp;
+    const lightningSlots = defense.lightningTowerSlots * buildUp;
+    const laneCoverage = clamp(
+        defense.laneCoverageRatio * (0.94 + profile.assumptions.playerPowerScale * 0.06),
+        0.35,
+        0.95
+    );
+    const towerUptime = clamp(defense.towerFireUptime * laneCoverage, 0.2, 0.95);
+
+    const towerDps =
+        (profile.building.tower.attackDamage / profile.building.tower.attackInterval) * towerSlots;
+    const frostDps =
+        (profile.building.frostTower.attackDamage / profile.building.frostTower.attackInterval) *
+        frostSlots;
+    const lightningDps =
+        (profile.building.lightningTower.attackDamage /
+            profile.building.lightningTower.attackInterval) *
+        lightningSlots;
+
+    const soldierCount = Math.max(1, profile.building.barracks.maxUnits * defense.barracksCount);
+    const soldierDps =
+        (profile.soldier.baseAttack / Math.max(0.25, profile.soldier.attackInterval)) *
+        soldierCount *
+        0.55;
+    const heroDps =
+        (profile.hero.baseAttack / Math.max(0.2, profile.hero.attackInterval)) *
+        defense.heroDpsUptime;
+
+    const controlBonus =
+        1 + defense.controlSlowBonus * profile.building.frostTower.bulletSlowPercent;
+    const effectiveLaneDps =
+        (towerDps + frostDps + lightningDps + soldierDps + heroDps) * towerUptime * controlBonus;
+
+    const pressureIndex =
+        totalEnemyCount / defense.pressureDivisorBase +
+        avgEnemyAttack / 85 +
+        wave / defense.waveGrowthSoftCap;
+    const focusDpsPerEnemy = effectiveLaneDps / (1 + pressureIndex);
+    const damagePerEnemyOnRoute = focusDpsPerEnemy * enemyTravelSeconds;
+    const killProgress = damagePerEnemyOnRoute / avgEnemyHp;
+    const killDistanceToBaseNormalized = clamp(1 - 1 / Math.max(0.001, killProgress), 0, 1);
+
+    const rawBreach = clamp(1 - killProgress, 0, 1);
+    const saturationPenalty = clamp((totalEnemyCount - 40) / 120, 0, 0.35);
+    let breachRate = clamp(
+        rawBreach + saturationPenalty * (1 - killDistanceToBaseNormalized),
+        0,
+        1
+    );
+    if (killProgress > 1.25) {
+        breachRate *= 0.35;
+    }
+
+    const predictedBaseHpLoss = round2(
+        totalEnemyCount * breachRate * profile.enemy.baseReachDamage
+    );
+    const riskScore = round2(
+        clamp(breachRate * 70 + (1 - killDistanceToBaseNormalized) * 30, 0, 100)
+    );
+
+    return {
+        wave,
+        regularEnemyCount,
+        eliteEnemyCount,
+        totalEnemyCount,
+        lanePathLength: round2(pathLength),
+        enemyTravelSeconds: round2(enemyTravelSeconds),
+        avgEnemyHp: roundInt(avgEnemyHp),
+        avgEnemyAttack: roundInt(avgEnemyAttack),
+        effectiveLaneDps: round2(effectiveLaneDps),
+        focusDpsPerEnemy: round2(focusDpsPerEnemy),
+        damagePerEnemyOnRoute: round2(damagePerEnemyOnRoute),
+        killDistanceToBaseNormalized: round2(killDistanceToBaseNormalized),
+        breachRate: round2(breachRate),
+        predictedBaseHpLoss,
+        riskScore,
+    };
 }
 
 function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): BalanceProfile {
@@ -1166,6 +1376,11 @@ function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): Bal
             wave10EnemyAttack: 0,
             wave10CoinBudget: 0,
             suggestedHeroDps: 0,
+            wave10KillDistanceToBaseNormalized: 0,
+            wave10BreachRate: 0,
+            firstBreachWave: 0,
+            firstBaseCollapseWave: 0,
+            wave10RiskScore: 0,
         },
     };
 
@@ -1189,6 +1404,29 @@ function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): Bal
     profile.analytics.wave10EnemyAttack = wave10EnemyAttack;
     profile.analytics.wave10CoinBudget = wave10CoinBudget;
     profile.analytics.suggestedHeroDps = roundInt((wave10EnemyHp * wave10Count) / 65);
+
+    const lanePathLength = resolveAverageLanePathLength();
+    const wave10Route = estimateRouteSnapshot(profile, 10, lanePathLength);
+    profile.analytics.wave10KillDistanceToBaseNormalized = wave10Route.killDistanceToBaseNormalized;
+    profile.analytics.wave10BreachRate = wave10Route.breachRate;
+    profile.analytics.wave10RiskScore = wave10Route.riskScore;
+
+    let firstBreachWave = 0;
+    let firstBaseCollapseWave = 0;
+    let predictedBaseHp = BASE.routeModel.defenseAssumptions.baseHp;
+    for (let wave = 1; wave <= 60; wave++) {
+        const route = estimateRouteSnapshot(profile, wave, lanePathLength);
+        if (firstBreachWave === 0 && route.breachRate >= 0.05) {
+            firstBreachWave = wave;
+        }
+        predictedBaseHp -= route.predictedBaseHpLoss;
+        if (firstBaseCollapseWave === 0 && predictedBaseHp <= 0) {
+            firstBaseCollapseWave = wave;
+            break;
+        }
+    }
+    profile.analytics.firstBreachWave = firstBreachWave;
+    profile.analytics.firstBaseCollapseWave = firstBaseCollapseWave;
 
     return profile;
 }
@@ -1234,12 +1472,35 @@ export function calculateWaveSnapshot(
     };
 }
 
+export function calculateRouteBalanceSnapshot(
+    profile: BalanceProfile,
+    waveNumber: number
+): RouteBalanceSnapshot {
+    return estimateRouteSnapshot(profile, waveNumber, resolveAverageLanePathLength());
+}
+
+export function buildRouteRiskTimeline(
+    profile: BalanceProfile,
+    startWave: number = 1,
+    endWave: number = 30
+): RouteBalanceSnapshot[] {
+    const from = Math.max(1, Math.floor(startWave));
+    const to = Math.max(from, Math.floor(endWave));
+    const pathLength = resolveAverageLanePathLength();
+    const timeline: RouteBalanceSnapshot[] = [];
+    for (let wave = from; wave <= to; wave++) {
+        timeline.push(estimateRouteSnapshot(profile, wave, pathLength));
+    }
+    return timeline;
+}
+
 export function buildBalanceSchemeSummary(waveNumber: number = 10) {
     return BALANCE_SCHEMES.map(profile => ({
         id: profile.id,
         label: profile.label,
         assumptions: profile.assumptions,
         snapshot: calculateWaveSnapshot(profile, waveNumber),
+        routeSnapshot: calculateRouteBalanceSnapshot(profile, waveNumber),
     }));
 }
 

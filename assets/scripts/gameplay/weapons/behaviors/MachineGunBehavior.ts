@@ -54,15 +54,9 @@ export class MachineGunBehavior extends WeaponBehavior {
     // 每几发弹壳抛一次（0 = 不抛）
     private static readonly CASING_INTERVAL = [0, 3, 2, 2, 1];
 
-    // 击退参数 [knockbackSpeed, stunDuration]
-    // 目标：Lv1 仅轻微僵直，Lv5 连续命中可形成适度压制
-    private static readonly KNOCKBACK_PARAMS: [number, number][] = [
-        [2, 0.06], // Lv1: 微微僵直
-        [3, 0.08], // Lv2: 轻微后退
-        [5, 0.1], // Lv3: 可感知击退
-        [7, 0.12], // Lv4: 明显击退
-        [10, 0.15], // Lv5: 适度压制
-    ];
+    // 固定弱击退参数：不随等级增长
+    private static readonly KNOCKBACK_FORCE = 2.0;
+    private static readonly KNOCKBACK_STUN = 0.06;
 
     // 连射计数器（用于弹壳节奏、交替偏移等）
     private _shotCount: number = 0;
@@ -148,9 +142,8 @@ export class MachineGunBehavior extends WeaponBehavior {
         bullet.useManualHitDetection = true; // 手动碰撞检测（防隧穿 + 降物理开销）
         bullet.maxLifetime = 1.5; // 机枪子弹短寿命，减少同屏数量
         bullet.disablePhysics(); // 禁用 RigidBody/BoxCollider
-        const [kbForce, kbStun] = MachineGunBehavior.KNOCKBACK_PARAMS[idx];
-        bullet.knockbackForce = kbForce;
-        bullet.knockbackStun = kbStun;
+        bullet.knockbackForce = MachineGunBehavior.KNOCKBACK_FORCE;
+        bullet.knockbackStun = MachineGunBehavior.KNOCKBACK_STUN;
         bullet.knockbackDirX = dirX;
         bullet.knockbackDirZ = dirZ;
         bullet.damage = stats.damage;
