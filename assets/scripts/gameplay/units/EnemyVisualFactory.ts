@@ -5,6 +5,7 @@ import { EnemyFlyingAnimator } from '../visuals/EnemyFlyingAnimator';
 import { EnemyPaperDollAnimator } from '../visuals/EnemyPaperDollAnimator';
 import { EnemyRoboVacuumAnimator } from '../visuals/EnemyRoboVacuumAnimator';
 import { Enemy } from './Enemy';
+import { EnemyProjectile, EnemyProjectileVisualStyle } from '../combat/EnemyProjectile';
 import type {
     EnemyAttackType,
     EnemyVisualSelectionOptions,
@@ -67,6 +68,9 @@ function attachEnemyFlyingVisual(root: Node, options?: EnemyVisualSelectionOptio
             const resolvedAttackType =
                 options?.attackType ?? resolveEnemyAttackTypeByModelPath(selected);
             enemy.attackType = resolvedAttackType;
+            const resolvedProjectileStyle = resolveEnemyProjectileStyleByModelPath(selected);
+            enemy.setRangedProjectileStyle(resolvedProjectileStyle);
+            EnemyProjectile.preloadStyle(resolvedProjectileStyle);
             if (resolvedAttackType === 'ranged') {
                 enemy.setCombatProfile({
                     aggroRange: GameConfig.ENEMY.FLYING_RANGED.AGGRO_RANGE,
@@ -88,6 +92,19 @@ export function resolveEnemyAttackTypeByModelPath(modelPath: string): EnemyAttac
     if (modelPath.indexOf('vehicle/') === 0) return 'ram';
     if (modelPath.indexOf('flying/') === 0) return 'ranged';
     return 'standard';
+}
+
+export function resolveEnemyProjectileStyleByModelPath(
+    modelPath: string
+): EnemyProjectileVisualStyle {
+    if (modelPath.indexOf('vehicle/Tank') === 0) return 'tank_shell_round';
+    if (modelPath.indexOf('vehicle/Enemy_Turret') === 0) return 'turret_cannon_round';
+    if (modelPath.indexOf('boss/Robot_Legs_Gun') === 0) return 'legs_gun_plasma_round';
+    if (modelPath.indexOf('flying/Spaceship_03') === 0) return 'flying_ship_heavy_bolt';
+    if (modelPath.indexOf('flying/Spaceship_02') === 0) return 'flying_ship_raider_bolt';
+    if (modelPath.indexOf('flying/Spaceship') === 0) return 'flying_ship_interceptor_bolt';
+    if (modelPath.indexOf('boss/Robot_Flying') === 0) return 'boss_flying_apex_core';
+    return 'default';
 }
 
 export function resolveEnemyVisualScaleByModelPath(modelPath: string): number {

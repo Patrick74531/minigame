@@ -4,23 +4,42 @@ import {
     CapsuleCollider,
     Color,
     Component,
-    Material,
+    ImageAsset,
     MeshRenderer,
     Node,
+    Texture2D,
     Vec3,
-    primitives,
-    utils,
+    resources,
 } from 'cc';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameManager } from '../../core/managers/GameManager';
 import { Building } from '../buildings/Building';
 import { Enemy } from '../units/Enemy';
 import { Unit, UnitType } from '../units/Unit';
+import { WeaponVFX } from '../weapons/WeaponVFX';
 
 const { ccclass, property } = _decorator;
 
+export type EnemyProjectileVisualStyle =
+    | 'default'
+    | 'tank_shell_round'
+    | 'turret_cannon_round'
+    | 'legs_gun_plasma_round'
+    | 'flying_ship_interceptor_bolt'
+    | 'flying_ship_raider_bolt'
+    | 'flying_ship_heavy_bolt'
+    | 'boss_flying_apex_core';
+
+interface EnemyProjectileVisualProfile {
+    texturePath?: string;
+    width: number;
+    length: number;
+    tint: Color;
+}
+
 @ccclass('EnemyProjectile')
 export class EnemyProjectile extends Component {
+    private static readonly PROJECTILE_SIZE_SCALE = 1.5;
     @property
     public speed: number = 10;
 
@@ -37,11 +56,78 @@ export class EnemyProjectile extends Component {
     private _lifetime: number = 0;
     private _owner: Enemy | null = null;
     private _gameManagerRef: GameManager | null = null;
+    private _visualStyle: EnemyProjectileVisualStyle = 'default';
 
-    private static _sharedMaterial: Material | null = null;
     private static readonly _tmpStart = new Vec3();
     private static readonly _tmpEnd = new Vec3();
     private static readonly _tmpLookAt = new Vec3();
+    private static readonly _textureCache = new Map<EnemyProjectileVisualStyle, Texture2D | null>();
+    private static readonly _textureLoading = new Set<EnemyProjectileVisualStyle>();
+    private static readonly _textureWaiters = new Map<
+        EnemyProjectileVisualStyle,
+        Array<(texture: Texture2D | null) => void>
+    >();
+    private static readonly VISUAL_PROFILES: Record<
+        EnemyProjectileVisualStyle,
+        EnemyProjectileVisualProfile
+    > = {
+        default: {
+            width: 0.2 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            length: 0.2 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            tint: new Color(255, 120, 90, 255),
+        },
+        tank_shell_round: {
+            texturePath: 'enemies/bullet/tank_shell_round',
+            width: 0.22 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            length: 0.56 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            tint: Color.WHITE.clone(),
+        },
+        turret_cannon_round: {
+            texturePath: 'enemies/bullet/turret_cannon_round',
+            width: 0.2 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            length: 0.52 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            tint: Color.WHITE.clone(),
+        },
+        legs_gun_plasma_round: {
+            texturePath: 'enemies/bullet/legs_gun_plasma_round',
+            width: 0.24 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            length: 0.6 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            tint: Color.WHITE.clone(),
+        },
+        flying_ship_interceptor_bolt: {
+            texturePath: 'enemies/bullet/flying_ship_interceptor_bolt',
+            width: 0.18 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            length: 0.48 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            tint: Color.WHITE.clone(),
+        },
+        flying_ship_raider_bolt: {
+            texturePath: 'enemies/bullet/flying_ship_raider_bolt',
+            width: 0.18 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            length: 0.5 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            tint: Color.WHITE.clone(),
+        },
+        flying_ship_heavy_bolt: {
+            texturePath: 'enemies/bullet/flying_ship_heavy_bolt',
+            width: 0.2 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            length: 0.54 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            tint: Color.WHITE.clone(),
+        },
+        boss_flying_apex_core: {
+            texturePath: 'enemies/bullet/boss_flying_apex_core',
+            width: 0.3 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            length: 0.72 * EnemyProjectile.PROJECTILE_SIZE_SCALE,
+            tint: Color.WHITE.clone(),
+        },
+    };
+
+    public static preloadStyle(style: EnemyProjectileVisualStyle): void {
+        this.ensureStyleTexture(style);
+    }
+
+    public setVisualStyle(style: EnemyProjectileVisualStyle): void {
+        this._visualStyle = style;
+        this.ensureVisual();
+    }
 
     public launch(direction: Vec3, owner: Enemy | null): void {
         this._owner = owner;
@@ -182,26 +268,90 @@ export class EnemyProjectile extends Component {
     }
 
     private ensureVisual(): void {
-        if (this.node.getComponent(MeshRenderer)) return;
+        const profile = EnemyProjectile.VISUAL_PROFILES[this._visualStyle];
+        const meshRenderer =
+            this.node.getComponent(MeshRenderer) ?? this.node.addComponent(MeshRenderer);
+        if (!meshRenderer.mesh) {
+            meshRenderer.mesh = WeaponVFX.getFlatQuadMesh(1, 1);
+        }
 
-        const meshRenderer = this.node.addComponent(MeshRenderer);
-        meshRenderer.mesh = utils.MeshUtils.createMesh(primitives.sphere(0.14));
-        meshRenderer.material = EnemyProjectile.sharedMaterial;
+        const cachedTexture = EnemyProjectile._textureCache.get(this._visualStyle);
+        if (cachedTexture) {
+            meshRenderer.setMaterial(WeaponVFX.getSpriteMat(profile.tint, cachedTexture), 0);
+        } else {
+            meshRenderer.setMaterial(WeaponVFX.getUnlitMat(profile.tint), 0);
+            EnemyProjectile.ensureStyleTexture(this._visualStyle, texture => {
+                if (!texture || !this.node || !this.node.isValid) return;
+                const current = EnemyProjectile.VISUAL_PROFILES[this._visualStyle];
+                meshRenderer.setMaterial(WeaponVFX.getSpriteMat(current.tint, texture), 0);
+            });
+        }
+
+        // Keep projectile axis along +Z so node.lookAt() aligns the texture direction.
+        this.node.setScale(profile.width, 1, profile.length);
+    }
+
+    private static ensureStyleTexture(
+        style: EnemyProjectileVisualStyle,
+        onReady?: (texture: Texture2D | null) => void
+    ): void {
+        if (this._textureCache.has(style)) {
+            onReady?.(this._textureCache.get(style) ?? null);
+            return;
+        }
+        if (this._textureLoading.has(style)) {
+            if (onReady) {
+                const waiters = this._textureWaiters.get(style) ?? [];
+                waiters.push(onReady);
+                this._textureWaiters.set(style, waiters);
+            }
+            return;
+        }
+
+        const path = this.VISUAL_PROFILES[style]?.texturePath;
+        if (!path) {
+            this._textureCache.set(style, null);
+            onReady?.(null);
+            return;
+        }
+
+        const waiters = onReady ? [onReady] : [];
+        this._textureWaiters.set(style, waiters);
+        this._textureLoading.add(style);
+        const finish = (texture: Texture2D | null): void => {
+            this._textureLoading.delete(style);
+            this._textureCache.set(style, texture);
+            const callbacks = this._textureWaiters.get(style) ?? [];
+            this._textureWaiters.delete(style);
+            for (const cb of callbacks) cb(texture);
+        };
+
+        resources.load(`${path}/texture`, Texture2D, (err, texture) => {
+            if (!err && texture) {
+                finish(texture);
+                return;
+            }
+            resources.load(path, Texture2D, (err2, texture2) => {
+                if (!err2 && texture2) {
+                    finish(texture2);
+                    return;
+                }
+                resources.load(path, ImageAsset, (err3, imageAsset) => {
+                    if (err3 || !imageAsset) {
+                        finish(null);
+                        return;
+                    }
+                    const textureFromImage = new Texture2D();
+                    textureFromImage.image = imageAsset;
+                    finish(textureFromImage);
+                });
+            });
+        });
     }
 
     private destroySelf(): void {
         if (!this.node || !this.node.isValid) return;
         this.node.destroy();
-    }
-
-    private static get sharedMaterial(): Material {
-        if (!this._sharedMaterial) {
-            const mat = new Material();
-            mat.initialize({ effectName: 'builtin-unlit' });
-            mat.setProperty('mainColor', new Color(255, 120, 90, 255));
-            this._sharedMaterial = mat;
-        }
-        return this._sharedMaterial;
     }
 
     private get gameManager(): GameManager {

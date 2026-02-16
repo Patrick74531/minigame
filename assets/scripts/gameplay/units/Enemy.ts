@@ -10,7 +10,7 @@ import { CombatService } from '../../core/managers/CombatService';
 import { Soldier } from './Soldier';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { EnemyVisualEvents } from '../visuals/EnemyVisualEvents';
-import { EnemyProjectile } from '../combat/EnemyProjectile';
+import { EnemyProjectile, EnemyProjectileVisualStyle } from '../combat/EnemyProjectile';
 
 const { ccclass } = _decorator;
 
@@ -54,6 +54,7 @@ export class Enemy extends Unit {
 
     /** Attack Type: 'standard' (melee), 'ram' (move & collide) or 'ranged' (projectile) */
     public attackType: 'standard' | 'ram' | 'ranged' = 'standard';
+    public rangedProjectileStyle: EnemyProjectileVisualStyle = 'default';
     private _ramAttackTimer: number = 0;
 
     protected initialize(): void {
@@ -82,6 +83,7 @@ export class Enemy extends Unit {
         this._scanTimer = 0;
         this._logicAccum = Math.random() * Enemy.NEAR_LOGIC_STEP;
         this._ramAttackTimer = 0;
+        this.rangedProjectileStyle = 'default';
         this.resetAttackVisualState();
     }
 
@@ -110,11 +112,16 @@ export class Enemy extends Unit {
         parent.addChild(projectileNode);
 
         const projectile = projectileNode.addComponent(EnemyProjectile);
+        projectile.setVisualStyle(this.rangedProjectileStyle);
         projectile.speed = Enemy.RANGED_PROJECTILE_SPEED;
         projectile.damage = this._stats.attack;
         projectile.maxLifetime = Enemy.RANGED_PROJECTILE_LIFETIME;
         projectile.hitRadius = Enemy.RANGED_PROJECTILE_HIT_RADIUS;
         projectile.launch(direction, this);
+    }
+
+    public setRangedProjectileStyle(style: EnemyProjectileVisualStyle): void {
+        this.rangedProjectileStyle = style;
     }
 
     public setTargetPosition(target: Vec3): void {

@@ -101,7 +101,7 @@ export const WAVE_INFINITE_CONFIG = {
             power: 1.25,
             tags: ['ground', 'ranged', 'heavy'],
             cooldownBase: 4,
-            attackType: 'standard',
+            attackType: 'ranged',
             visualScale: 4.5,
         },
         {
@@ -121,7 +121,7 @@ export const WAVE_INFINITE_CONFIG = {
             power: 1.15,
             tags: ['ground', 'tank', 'rush'],
             cooldownBase: 3,
-            attackType: 'ram',
+            attackType: 'ranged',
             visualScale: 0.9,
         },
         {
@@ -131,7 +131,7 @@ export const WAVE_INFINITE_CONFIG = {
             power: 1.08,
             tags: ['ground', 'ranged'],
             cooldownBase: 3,
-            attackType: 'ram',
+            attackType: 'ranged',
             visualScale: 0.9,
         },
         {
