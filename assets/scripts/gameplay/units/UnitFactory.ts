@@ -136,8 +136,8 @@ export class UnitFactory {
 
         // Physics Setup
         const rb = node.addComponent(RigidBody);
-        // Enemy uses script-driven movement; KINEMATIC avoids heavy dynamic solver cost in crowds.
-        rb.type = RigidBody.Type.KINEMATIC;
+        // Enable dynamic body so enemy-enemy collision can physically separate crowds.
+        rb.type = RigidBody.Type.DYNAMIC;
         rb.useGravity = false;
         rb.linearDamping = GameConfig.PHYSICS.UNIT_LINEAR_DAMPING; // Low damping
         rb.angularFactor = new Vec3(0, 0, 0); // Lock rotation
@@ -148,9 +148,8 @@ export class UnitFactory {
         col.size = new Vec3(1, 1, 1);
         col.isTrigger = false; // Solid for collision
         col.setGroup(1 << 3); // ENEMY
-        // Collide only with DEFAULT (buildings/hero/soldier) and BULLET.
-        // Excluding ENEMY-ENEMY collisions greatly reduces physics cost and crowd jitter.
-        col.setMask((1 << 0) | (1 << 4));
+        // Collide with DEFAULT (buildings/hero/soldier), ENEMY and BULLET.
+        col.setMask((1 << 0) | (1 << 3) | (1 << 4));
 
         const hpMultiplier = options.hpMultiplier ?? 1;
         const attackMultiplier = options.attackMultiplier ?? 1;
@@ -169,6 +168,10 @@ export class UnitFactory {
         });
         enemy.setCombatProfile({
             aggroRange: options.aggroRange ?? GameConfig.ENEMY.AGGRO_RANGE,
+        });
+        enemy.setCrowdSeparationProfile({
+            radius: this.resolveEnemyCrowdSeparationRadius(options),
+            weight: 1.08,
         });
 
         // Set Target
@@ -193,6 +196,27 @@ export class UnitFactory {
         hb.damagedShowDuration = 3.0;
 
         return node;
+    }
+
+    private static resolveEnemyCrowdSeparationRadius(options: EnemySpawnOptions): number {
+        const modelPath = options.modelPath ?? '';
+        const scaleMultiplier = Math.max(0.5, options.scaleMultiplier ?? 1);
+
+        let baseRadius = 1.0;
+        if (modelPath.indexOf('vehicle/Tank') === 0) {
+            baseRadius = 1.45;
+        } else if (modelPath.indexOf('vehicle/Enemy_Turret') === 0) {
+            baseRadius = 1.35;
+        } else if (modelPath.indexOf('boss/Robot_Legs_Gun') === 0) {
+            baseRadius = 1.6;
+        } else if (modelPath.indexOf('boss/') === 0) {
+            baseRadius = 1.85;
+        } else if (modelPath.indexOf('flying/') === 0) {
+            baseRadius = 1.05;
+        }
+
+        const radius = baseRadius * Math.sqrt(scaleMultiplier);
+        return Math.max(0.9, Math.min(2.6, radius));
     }
 
     /**

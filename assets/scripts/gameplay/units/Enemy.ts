@@ -11,6 +11,7 @@ import { Soldier } from './Soldier';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { EnemyVisualEvents } from '../visuals/EnemyVisualEvents';
 import { EnemyProjectile, EnemyProjectileVisualStyle } from '../combat/EnemyProjectile';
+import { EnemyQuery } from '../../core/managers/EnemyQuery';
 
 const { ccclass } = _decorator;
 
@@ -23,6 +24,8 @@ export class Enemy extends Unit {
     /** Distance to Base to trigger "Reached Base" logic */
     private readonly ARRIVAL_DISTANCE = 0.6;
     private static readonly _tmpLookAt = new Vec3();
+    private static readonly _tmpMoveVelocity = new Vec3();
+    private static readonly _tmpSeparation = new Vec3();
     private static readonly NEAR_LOGIC_STEP = 1 / 24;
     private static readonly FAR_LOGIC_STEP = 1 / 12;
     private static readonly FAR_LOGIC_DIST_SQ = 18 * 18;
@@ -55,6 +58,8 @@ export class Enemy extends Unit {
     /** Attack Type: 'standard' (melee), 'ram' (move & collide) or 'ranged' (projectile) */
     public attackType: 'standard' | 'ram' | 'ranged' = 'standard';
     public rangedProjectileStyle: EnemyProjectileVisualStyle = 'default';
+    private _crowdSeparationRadius: number = 1.0;
+    private _crowdSeparationWeight: number = 1.05;
     private _ramAttackTimer: number = 0;
 
     protected initialize(): void {
@@ -124,6 +129,15 @@ export class Enemy extends Unit {
         this.rangedProjectileStyle = style;
     }
 
+    public setCrowdSeparationProfile(config: { radius?: number; weight?: number }): void {
+        if (config.radius !== undefined) {
+            this._crowdSeparationRadius = Math.max(0, config.radius);
+        }
+        if (config.weight !== undefined) {
+            this._crowdSeparationWeight = Math.max(0, config.weight);
+        }
+    }
+
     public setTargetPosition(target: Vec3): void {
         this._targetPos.set(target);
     }
@@ -153,22 +167,20 @@ export class Enemy extends Unit {
     protected updateMovement(dt: number): void {
         if (!this.isAlive) return;
 
-        // 清除 RigidBody 残余速度，避免物理引擎干扰 setPosition 移动
         if (!this._rbEnemyLookedUp) {
             this._rbCachedEnemy = this.node.getComponent(RigidBody);
             this._rbEnemyLookedUp = true;
         }
-        if (this._rbCachedEnemy && this._rbCachedEnemy.type === RigidBody.Type.DYNAMIC) {
-            this._rbCachedEnemy.setLinearVelocity(Vec3.ZERO);
-        }
 
         // If Attacking, Don't move (unless it's a 'ram' type enemy)
         if (this._state === UnitState.ATTACKING && this.attackType !== 'ram') {
+            this.stopMovement();
             return;
         }
 
         // For Standard enemies: if target is in range, stop moving (handled by state transition usually, but double check here)
         if (this.attackType !== 'ram' && this._target && this.isTargetInRange(this._target)) {
+            this.stopMovement();
             return;
         }
 
@@ -185,10 +197,12 @@ export class Enemy extends Unit {
 
         // Check if reached Base
         if (movingToBase && distToTarget < this.ARRIVAL_DISTANCE) {
+            this.stopMovement();
             this.onReachBase();
             return;
         }
         if (distToTarget <= 0.0001) {
+            this.stopMovement();
             return;
         }
 
@@ -196,13 +210,34 @@ export class Enemy extends Unit {
         const speed = this.moveSpeed;
         const dirX = dx / distToTarget;
         const dirZ = dz / distToTarget;
+        let desiredX = dirX;
+        let desiredZ = dirZ;
+        this.computeCrowdSeparation(pos, Enemy._tmpSeparation);
+        if (Enemy._tmpSeparation.lengthSqr() > 0.0001 && this._crowdSeparationWeight > 0.001) {
+            desiredX += Enemy._tmpSeparation.x * this._crowdSeparationWeight;
+            desiredZ += Enemy._tmpSeparation.z * this._crowdSeparationWeight;
+            const desiredLenSq = desiredX * desiredX + desiredZ * desiredZ;
+            if (desiredLenSq > 0.0001) {
+                const inv = 1 / Math.sqrt(desiredLenSq);
+                desiredX *= inv;
+                desiredZ *= inv;
+            } else {
+                desiredX = dirX;
+                desiredZ = dirZ;
+            }
+        }
 
-        // Simple movement (Kinematic or manual)
-        this.node.setPosition(
-            pos.x + dirX * speed * dt,
-            GameConfig.PHYSICS.ENEMY_Y,
-            pos.z + dirZ * speed * dt
-        );
+        // Use physics velocity so enemy-enemy collision separation can work.
+        if (this._rbCachedEnemy && this._rbCachedEnemy.type === RigidBody.Type.DYNAMIC) {
+            Enemy._tmpMoveVelocity.set(desiredX * speed, 0, desiredZ * speed);
+            this._rbCachedEnemy.setLinearVelocity(Enemy._tmpMoveVelocity);
+        } else {
+            this.node.setPosition(
+                pos.x + desiredX * speed * dt,
+                GameConfig.PHYSICS.ENEMY_Y,
+                pos.z + desiredZ * speed * dt
+            );
+        }
 
         // Face target (paper-doll enemy uses billboard visuals, so root rotation is unnecessary).
         if (!this.isPaperDoll()) {
@@ -258,6 +293,7 @@ export class Enemy extends Unit {
      * Arrived at Base
      */
     private onReachBase(): void {
+        this.stopMovement();
         this.resetAttackVisualState();
         this.eventManager.emit(GameEvents.ENEMY_REACHED_BASE, {
             enemy: this.node,
@@ -491,6 +527,7 @@ export class Enemy extends Unit {
     // public setTarget(...): void { super.setTarget(...); ... }
 
     protected onDeath(): void {
+        this.stopMovement();
         this.resetAttackVisualState();
         // 延迟销毁节点，让金币掉落/视觉事件有时间处理
         // 避免死亡敌人节点及其 HealthBarRoot 永久残留在场景中
@@ -549,6 +586,41 @@ export class Enemy extends Unit {
             !!this.node.getChildByName('EnemyVacuumRoot');
         this._usesPaperDoll = hasPaperVisual;
         return this._usesPaperDoll;
+    }
+
+    private stopMovement(): void {
+        if (this._rbCachedEnemy && this._rbCachedEnemy.type === RigidBody.Type.DYNAMIC) {
+            this._rbCachedEnemy.setLinearVelocity(Vec3.ZERO);
+        }
+    }
+
+    private computeCrowdSeparation(myPos: Vec3, out: Vec3): void {
+        out.set(0, 0, 0);
+        const radius = this._crowdSeparationRadius;
+        if (radius <= 0.0001) return;
+
+        const radiusSq = radius * radius;
+        const enemies = EnemyQuery.getEnemies();
+        for (const enemy of enemies) {
+            if (!enemy || !enemy.isValid || enemy === this.node) continue;
+
+            const dx = myPos.x - enemy.position.x;
+            const dz = myPos.z - enemy.position.z;
+            const distSq = dx * dx + dz * dz;
+            if (distSq <= 0.0001 || distSq >= radiusSq) continue;
+
+            const dist = Math.sqrt(distSq);
+            const push = (radius - dist) / radius;
+            out.x += (dx / dist) * push;
+            out.z += (dz / dist) * push;
+        }
+
+        const lenSq = out.x * out.x + out.z * out.z;
+        if (lenSq > 0.0001) {
+            const inv = 1 / Math.sqrt(lenSq);
+            out.x *= inv;
+            out.z *= inv;
+        }
     }
 
     protected get eventManager(): EventManager {

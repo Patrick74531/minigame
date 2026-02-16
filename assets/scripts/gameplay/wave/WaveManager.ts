@@ -85,6 +85,8 @@ export class WaveManager {
     private static _instance: WaveManager | null = null;
     private static readonly LANE_UNLOCK_WARNING_SECONDS: number = 2.4;
     private static readonly LANE_UNLOCK_FOCUS_INWARD: number = 8.5;
+    private static readonly SPAWN_MIN_ENEMY_DISTANCE: number = 0.9;
+    private static readonly SPAWN_POSITION_TRIES: number = 10;
     private static readonly LOCKED_LANE_PAD_TYPES: ReadonlySet<string> = new Set([
         'tower',
         'frost_tower',
@@ -492,14 +494,7 @@ export class WaveManager {
 
         const visualVariant = this.resolveEnemyVisualVariant(this.totalSpawned);
         const spawnLane = this.resolveSpawnLane(entry.spawnType);
-        const pos = resolveSpawnPositionByLane({
-            lane: spawnLane,
-            portalIndexByLane: this._portalIndexByLane,
-            spawnPortals: this._spawnPortals,
-            jitterRadius: GameConfig.WAVE.INFINITE.SPAWN_PORTALS?.JITTER_RADIUS ?? 0,
-            limits: GameConfig.MAP.LIMITS,
-            baseNode: this._baseNode,
-        });
+        const pos = this.resolveSeparatedSpawnPosition(spawnLane);
         const spawnCombat = this.resolveSpawnCombatProfile(entry.spawnType);
         const power = clamp(archetype.power, 0.5, 3.0);
         const powerHpMultiplier = 0.65 + power * 0.85;
@@ -548,6 +543,56 @@ export class WaveManager {
             unitType: 'enemy',
             node: enemy,
         });
+    }
+
+    private resolveSeparatedSpawnPosition(lane: RouteLane): SpawnPortalPoint {
+        const minDistSq =
+            WaveManager.SPAWN_MIN_ENEMY_DISTANCE * WaveManager.SPAWN_MIN_ENEMY_DISTANCE;
+        const tries = Math.max(1, WaveManager.SPAWN_POSITION_TRIES);
+        let best = this.sampleSpawnPosition(lane);
+        let bestNearestSq = this.getNearestEnemyDistanceSq(best.x, best.y);
+        if (!Number.isFinite(bestNearestSq)) {
+            return best;
+        }
+
+        for (let i = 1; i < tries; i++) {
+            const candidate = this.sampleSpawnPosition(lane);
+            const nearestSq = this.getNearestEnemyDistanceSq(candidate.x, candidate.y);
+            if (!Number.isFinite(nearestSq) || nearestSq >= minDistSq) {
+                return candidate;
+            }
+            if (nearestSq > bestNearestSq) {
+                bestNearestSq = nearestSq;
+                best = candidate;
+            }
+        }
+
+        return best;
+    }
+
+    private sampleSpawnPosition(lane: RouteLane): SpawnPortalPoint {
+        return resolveSpawnPositionByLane({
+            lane,
+            portalIndexByLane: this._portalIndexByLane,
+            spawnPortals: this._spawnPortals,
+            jitterRadius: GameConfig.WAVE.INFINITE.SPAWN_PORTALS?.JITTER_RADIUS ?? 0,
+            limits: GameConfig.MAP.LIMITS,
+            baseNode: this._baseNode,
+        });
+    }
+
+    private getNearestEnemyDistanceSq(x: number, z: number): number {
+        let nearestSq = Number.POSITIVE_INFINITY;
+        for (const enemy of this._enemies) {
+            if (!enemy || !enemy.isValid) continue;
+            const dx = enemy.position.x - x;
+            const dz = enemy.position.z - z;
+            const distSq = dx * dx + dz * dz;
+            if (distSq < nearestSq) {
+                nearestSq = distSq;
+            }
+        }
+        return nearestSq;
     }
 
     private resolveEnemyVisualVariant(spawnIndex: number): EnemyVisualVariant {
