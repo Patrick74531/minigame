@@ -14,9 +14,9 @@ import {
     normalizeEnemyArchetypes,
     normalizeRhythmTemplates,
 } from './WaveConfigParsers';
-import { clamp, indexOfMax, randomInt, randomRange, toFinite, toPositiveInt } from './WaveMath';
+import { clamp, randomInt, toFinite, toPositiveInt } from './WaveMath';
 import { pickForecastEntry } from './WaveForecast';
-import { getEdgePosition, resolveSpawnPortals, type SpawnPortalPoint } from './WaveSpawnPortals';
+import { resolveSpawnPortals, type SpawnPortalPoint } from './WaveSpawnPortals';
 import {
     laneToForecastLane,
     resolveLanePortalRouting,
@@ -25,16 +25,46 @@ import {
     type RouteLane,
 } from './WaveLaneRouting';
 import { LaneFogController } from './LaneFogController';
+import {
+    resolveLaneUnlockFocusPosition,
+    resolveLaneUnlockPadFocusPosition,
+    resolveSpawnPositionByLane,
+} from './WaveLaneCoordinator';
+import {
+    advanceBossLaneState,
+    applyBossEchoForWave,
+    pruneBossEchoes,
+    resolveBossEchoWeight,
+    rollNextBossWave,
+    selectBossArchetype,
+    shouldTriggerBossWave,
+} from './WaveBossDirector';
+import {
+    allocateTypeCounts,
+    applyRhythm,
+    buildElitePositionSet,
+    enumerateValidCombos,
+    pickWeightedCombo,
+    selectTemplateWithCooldown,
+    shuffleInPlace,
+    toComboKey,
+    weightedPickWithoutReplacement,
+} from './WaveSpawnPlanner';
+import {
+    applyArchetypeSelectionState,
+    markTemplateCooldown,
+    tickArchetypeCooldowns,
+    tickTemplateCooldowns,
+    updateWaveMemory,
+} from './WaveRuntimeState';
 import type {
     ArchetypeRuntimeState,
-    BossArchetypeConfig,
     BossEchoRuntimeState,
     BossEventConfig,
     CompositionTemplate,
     EnemyArchetypeConfig,
     InfiniteRandomizerConfig,
     PlannedSpawnEntry,
-    RhythmPattern,
     RhythmTemplate,
     SpawnCombatProfile,
     SpawnType,
@@ -285,7 +315,13 @@ export class WaveManager {
             Math.round(infinite.BASE_COUNT + waveIndex * infinite.COUNT_PER_WAVE + countStepBonus)
         );
         const eliteCountBase = this.getEliteCountForWave(waveNumber);
-        const bossCount = this.shouldTriggerBossWave(waveNumber) ? 1 : 0;
+        const bossCount = shouldTriggerBossWave(
+            waveNumber,
+            this._bossEventConfig,
+            this._nextBossWave
+        )
+            ? 1
+            : 0;
         const isBossWave = bossCount > 0;
         const adjustedRegularCount = isBossWave ? 0 : regularCountBase;
         const adjustedEliteCount = isBossWave ? 0 : eliteCountBase;
@@ -456,7 +492,14 @@ export class WaveManager {
 
         const visualVariant = this.resolveEnemyVisualVariant(this.totalSpawned);
         const spawnLane = this.resolveSpawnLane(entry.spawnType);
-        const pos = this.resolveSpawnPositionByLane(spawnLane);
+        const pos = resolveSpawnPositionByLane({
+            lane: spawnLane,
+            portalIndexByLane: this._portalIndexByLane,
+            spawnPortals: this._spawnPortals,
+            jitterRadius: GameConfig.WAVE.INFINITE.SPAWN_PORTALS?.JITTER_RADIUS ?? 0,
+            limits: GameConfig.MAP.LIMITS,
+            baseNode: this._baseNode,
+        });
         const spawnCombat = this.resolveSpawnCombatProfile(entry.spawnType);
         const power = clamp(archetype.power, 0.5, 3.0);
         const powerHpMultiplier = 0.65 + power * 0.85;
@@ -557,64 +600,17 @@ export class WaveManager {
         return lanes[idx] ?? 'mid';
     }
 
-    private resolveSpawnPositionByLane(lane: RouteLane): SpawnPortalPoint {
-        const portalIndex = this._portalIndexByLane[lane];
-        const portal = this._spawnPortals[portalIndex] ?? getEdgePosition();
-        return this.samplePortalPosition(portal);
-    }
-
-    private samplePortalPosition(portal: SpawnPortalPoint): SpawnPortalPoint {
-        const jitterRadius = GameConfig.WAVE.INFINITE.SPAWN_PORTALS?.JITTER_RADIUS ?? 0;
-        if (jitterRadius <= 0) {
-            return { x: portal.x, y: portal.y };
-        }
-
-        const angle = Math.random() * Math.PI * 2;
-        const radius = Math.sqrt(Math.random()) * jitterRadius;
-        let x = portal.x + Math.cos(angle) * radius;
-        let y = portal.y + Math.sin(angle) * radius;
-
-        const base = this._baseNode;
-        if (base && base.isValid) {
-            const baseX = base.position.x;
-            const baseY = base.position.z;
-            const portalDx = portal.x - baseX;
-            const portalDy = portal.y - baseY;
-            const portalDist = Math.hypot(portalDx, portalDy);
-            if (portalDist > 0.0001) {
-                const nx = portalDx / portalDist;
-                const ny = portalDy / portalDist;
-                const candidateDx = x - baseX;
-                const candidateDy = y - baseY;
-                const candidateDist = Math.hypot(candidateDx, candidateDy);
-                const minDist = Math.max(0, portalDist - jitterRadius * 0.2);
-                if (candidateDist < minDist) {
-                    x = baseX + nx * minDist;
-                    y = baseY + ny * minDist;
-                }
-            }
-        }
-
-        const limits = GameConfig.MAP.LIMITS;
-        return {
-            x: Math.max(-limits.x, Math.min(limits.x, x)),
-            y: Math.max(-limits.z, Math.min(limits.z, y)),
-        };
-    }
-
     private onBossKilled(_lane: RouteLane): void {
-        if (this._nextUnlockLaneCursor < ROUTE_LANE_SEQUENCE.length) {
-            const laneToUnlock = ROUTE_LANE_SEQUENCE[this._nextUnlockLaneCursor];
-            if (laneToUnlock) {
-                this.scheduleLaneUnlock(laneToUnlock);
-                this._nextBossLaneCursor = this._nextUnlockLaneCursor;
-                this._nextUnlockLaneCursor++;
-            }
-            return;
+        const nextState = advanceBossLaneState({
+            nextUnlockLaneCursor: this._nextUnlockLaneCursor,
+            nextBossLaneCursor: this._nextBossLaneCursor,
+            routeLaneSequence: ROUTE_LANE_SEQUENCE,
+        });
+        this._nextUnlockLaneCursor = nextState.nextUnlockLaneCursor;
+        this._nextBossLaneCursor = nextState.nextBossLaneCursor;
+        if (nextState.laneToUnlock) {
+            this.scheduleLaneUnlock(nextState.laneToUnlock);
         }
-
-        this._nextBossLaneCursor =
-            (this._nextBossLaneCursor + 1) % Math.max(1, ROUTE_LANE_SEQUENCE.length);
     }
 
     private unlockLane(lane: RouteLane): void {
@@ -628,10 +624,35 @@ export class WaveManager {
         if (this._unlockedLanes.has(lane)) return;
         const remainSeconds = WaveManager.LANE_UNLOCK_WARNING_SECONDS;
         this._pendingLaneUnlock = { lane, remainSeconds };
+        const pads =
+            (GameConfig.BUILDING.PADS as ReadonlyArray<{
+                type: string;
+                x: number;
+                z: number;
+            }>) ?? [];
+        const basePosition = {
+            x: this._baseNode?.position.x ?? GameConfig.MAP.BASE_SPAWN.x,
+            z: this._baseNode?.position.z ?? GameConfig.MAP.BASE_SPAWN.z,
+        };
         this.eventManager.emit(GameEvents.LANE_UNLOCK_IMMINENT, {
             lane,
-            focusPosition: this.resolveLaneUnlockFocusPosition(lane),
-            padFocusPosition: this.resolveLaneUnlockPadFocusPosition(lane),
+            focusPosition: resolveLaneUnlockFocusPosition({
+                lane,
+                portalIndexByLane: this._portalIndexByLane,
+                spawnPortals: this._spawnPortals,
+                laneDirectionByLane: this._laneDirectionByLane,
+                limits: GameConfig.MAP.LIMITS,
+                inward: WaveManager.LANE_UNLOCK_FOCUS_INWARD,
+                heroY: GameConfig.PHYSICS.HERO_Y,
+            }),
+            padFocusPosition: resolveLaneUnlockPadFocusPosition({
+                lane,
+                pads,
+                lockedLanePadTypes: WaveManager.LOCKED_LANE_PAD_TYPES,
+                limits: GameConfig.MAP.LIMITS,
+                basePosition,
+                heroY: GameConfig.PHYSICS.HERO_Y,
+            }),
             remainSeconds,
         });
     }
@@ -644,136 +665,6 @@ export class WaveManager {
         const laneToUnlock = this._pendingLaneUnlock.lane;
         this._pendingLaneUnlock = null;
         this.unlockLane(laneToUnlock);
-    }
-
-    private resolveLaneUnlockFocusPosition(lane: RouteLane): Vec3 {
-        const portalIndex = this._portalIndexByLane[lane];
-        const portal = this._spawnPortals[portalIndex] ?? getEdgePosition();
-        const direction = this._laneDirectionByLane[lane] ?? this._laneDirectionByLane.mid;
-        const limits = GameConfig.MAP.LIMITS;
-        const inward = WaveManager.LANE_UNLOCK_FOCUS_INWARD;
-        const x = clamp(portal.x - direction.x * inward, -limits.x, limits.x);
-        const z = clamp(portal.y - direction.y * inward, -limits.z, limits.z);
-        const y = Math.max(1.2, GameConfig.PHYSICS.HERO_Y);
-        return new Vec3(x, y, z);
-    }
-
-    private resolveLaneUnlockPadFocusPosition(lane: RouteLane): Vec3 | undefined {
-        const pads =
-            (GameConfig.BUILDING.PADS as ReadonlyArray<{
-                type: string;
-                x: number;
-                z: number;
-            }>) ?? [];
-        if (pads.length <= 0) return undefined;
-
-        const polylines = this.getLanePolylinesWorld();
-        const baseX = this._baseNode?.position.x ?? GameConfig.MAP.BASE_SPAWN.x;
-        const baseZ = this._baseNode?.position.z ?? GameConfig.MAP.BASE_SPAWN.z;
-        let bestPad: { x: number; z: number } | null = null;
-        let bestDist = Number.POSITIVE_INFINITY;
-
-        for (const pad of pads) {
-            if (!WaveManager.LOCKED_LANE_PAD_TYPES.has(pad.type)) continue;
-            const padLane = this.resolveLaneByNearestPath(pad.x, pad.z, polylines);
-            if (padLane !== lane) continue;
-
-            const distToBase = Math.hypot(pad.x - baseX, pad.z - baseZ);
-            if (distToBase < bestDist) {
-                bestDist = distToBase;
-                bestPad = { x: pad.x, z: pad.z };
-            }
-        }
-
-        if (!bestPad) return undefined;
-        return new Vec3(bestPad.x, Math.max(1.2, GameConfig.PHYSICS.HERO_Y), bestPad.z);
-    }
-
-    private getLanePolylinesWorld(): Record<RouteLane, Array<{ x: number; z: number }>> {
-        const halfW = Math.max(1, GameConfig.MAP.LIMITS.x);
-        const halfH = Math.max(1, GameConfig.MAP.LIMITS.z);
-        const laneNormalizedToWorld = (nx: number, nz: number): { x: number; z: number } => ({
-            x: nx * (halfW * 2) - halfW,
-            z: (1 - nz) * (halfH * 2) - halfH,
-        });
-
-        return {
-            top: [
-                laneNormalizedToWorld(0.05, 0.95),
-                laneNormalizedToWorld(0.06, 0.92),
-                laneNormalizedToWorld(0.95, 0.92),
-            ],
-            mid: [
-                laneNormalizedToWorld(0.05, 0.95),
-                laneNormalizedToWorld(0.35, 0.65),
-                laneNormalizedToWorld(0.5, 0.5),
-                laneNormalizedToWorld(0.65, 0.35),
-                laneNormalizedToWorld(0.95, 0.05),
-            ],
-            bottom: [
-                laneNormalizedToWorld(0.05, 0.95),
-                laneNormalizedToWorld(0.08, 0.94),
-                laneNormalizedToWorld(0.08, 0.05),
-            ],
-        };
-    }
-
-    private resolveLaneByNearestPath(
-        x: number,
-        z: number,
-        polylines: Record<RouteLane, Array<{ x: number; z: number }>>
-    ): RouteLane {
-        let bestLane: RouteLane = 'mid';
-        let bestDistance = Number.POSITIVE_INFINITY;
-        for (const lane of ['mid', 'top', 'bottom'] as const) {
-            const distance = this.pointToPolylineDistance(x, z, polylines[lane]);
-            if (distance < bestDistance) {
-                bestDistance = distance;
-                bestLane = lane;
-            }
-        }
-        return bestLane;
-    }
-
-    private pointToPolylineDistance(
-        x: number,
-        z: number,
-        polyline: Array<{ x: number; z: number }>
-    ): number {
-        if (polyline.length <= 0) return Number.POSITIVE_INFINITY;
-        if (polyline.length === 1) {
-            return Math.hypot(x - polyline[0].x, z - polyline[0].z);
-        }
-
-        let best = Number.POSITIVE_INFINITY;
-        for (let i = 0; i < polyline.length - 1; i++) {
-            const distance = this.pointToSegmentDistance(x, z, polyline[i], polyline[i + 1]);
-            if (distance < best) {
-                best = distance;
-            }
-        }
-        return best;
-    }
-
-    private pointToSegmentDistance(
-        px: number,
-        pz: number,
-        a: { x: number; z: number },
-        b: { x: number; z: number }
-    ): number {
-        const abx = b.x - a.x;
-        const abz = b.z - a.z;
-        const abLenSq = abx * abx + abz * abz;
-        if (abLenSq <= 0.0001) {
-            return Math.hypot(px - a.x, pz - a.z);
-        }
-
-        const apx = px - a.x;
-        const apz = pz - a.z;
-        const t = Math.max(0, Math.min(1, (apx * abx + apz * abz) / abLenSq));
-        const cx = a.x + abx * t;
-        const cz = a.z + abz * t;
-        return Math.hypot(px - cx, pz - cz);
     }
 
     private resolveSpawnCombatProfile(spawnType: SpawnType): SpawnCombatProfile {
@@ -964,7 +855,7 @@ export class WaveManager {
                     });
                 }
             }
-            this._nextBossWave = this.rollNextBossWave(1);
+            this._nextBossWave = rollNextBossWave(1, this._bossEventConfig);
         } else {
             this._nextBossWave = Number.MAX_SAFE_INTEGER;
         }
@@ -990,8 +881,11 @@ export class WaveManager {
         eliteCount: number,
         bossCount: number
     ): WaveSpawnPlan {
-        this.tickRuntimeCooldowns();
-        this.pruneBossEchoes(waveNumber);
+        tickArchetypeCooldowns(this._archetypeState);
+        tickTemplateCooldowns(this._compositionTemplateState);
+        tickTemplateCooldowns(this._rhythmTemplateState);
+        tickTemplateCooldowns(this._bossState);
+        this._bossEchoes = pruneBossEchoes(this._bossEchoes, waveNumber);
 
         if (bossCount > 0 && this._bossEventConfig?.BOSS_ONLY_WAVE !== false) {
             return this.buildBossOnlyWaveSpawnPlan(waveNumber);
@@ -1014,12 +908,12 @@ export class WaveManager {
             Math.min(this._randomizerConfig.PICK_TYPES_PER_WAVE, poolSize)
         );
         const selectedArchetypeIds = this.selectArchetypesForWave(waveNumber, pickCount);
-        const comboKey = this.toComboKey(selectedArchetypeIds);
+        const comboKey = toComboKey(selectedArchetypeIds);
 
         const compositionTemplate = this.selectCompositionTemplate();
         const rhythmTemplate = this.selectRhythmTemplate();
 
-        const typeCounts = this.allocateTypeCounts(
+        const typeCounts = allocateTypeCounts(
             totalPool,
             compositionTemplate.shares,
             selectedArchetypeIds.length
@@ -1032,9 +926,9 @@ export class WaveManager {
                 archetypeSequence.push(selectedArchetypeIds[i]);
             }
         }
-        this.shuffleInPlace(archetypeSequence);
+        shuffleInPlace(archetypeSequence);
 
-        const elitePositions = this.buildElitePositionSet(totalPool, eliteCount);
+        const elitePositions = buildElitePositionSet(totalPool, eliteCount);
         const entries: PlannedSpawnEntry[] = new Array(archetypeSequence.length);
         for (let i = 0; i < archetypeSequence.length; i++) {
             entries[i] = {
@@ -1044,15 +938,29 @@ export class WaveManager {
             };
         }
 
-        this.applyRhythm(entries, rhythmTemplate.pattern);
-        this.updateWaveMemory(selectedArchetypeIds, comboKey);
-        this.applyArchetypeSelectionState(selectedArchetypeIds, waveNumber);
-        this.markTemplateCooldown(
+        applyRhythm(entries, rhythmTemplate.pattern);
+        updateWaveMemory({
+            selectedIds: selectedArchetypeIds,
+            comboKey,
+            recentWaveTypes: this._recentWaveTypes,
+            recentCombos: this._recentCombos,
+            recentTagRatios: this._recentTagRatios,
+            recentWindowWaves: this._randomizerConfig.RECENT_WINDOW_WAVES,
+            comboMemoryWaves: this._randomizerConfig.COMBO_MEMORY_WAVES,
+            archetypeById: this._archetypeById,
+        });
+        applyArchetypeSelectionState({
+            selectedIds: selectedArchetypeIds,
+            waveNumber,
+            archetypes: this._archetypes,
+            archetypeState: this._archetypeState,
+        });
+        markTemplateCooldown(
             this._compositionTemplateState,
             compositionTemplate.id,
             compositionTemplate.cooldownWaves
         );
-        this.markTemplateCooldown(
+        markTemplateCooldown(
             this._rhythmTemplateState,
             rhythmTemplate.id,
             rhythmTemplate.cooldownWaves
@@ -1069,16 +977,25 @@ export class WaveManager {
 
     private buildBossOnlyWaveSpawnPlan(waveNumber: number): WaveSpawnPlan {
         const entries: PlannedSpawnEntry[] = [];
-        const boss = this.selectBossArchetype(waveNumber);
+        const boss = selectBossArchetype({
+            bossEventConfig: this._bossEventConfig,
+            bossState: this._bossState,
+        });
         if (boss) {
             entries.push({
                 archetypeId: boss.id,
                 spawnType: 'boss',
                 intervalMultiplier: 1,
             });
-            this.applyBossEchoForWave(boss, waveNumber);
+            applyBossEchoForWave({
+                boss,
+                waveNumber,
+                bossEventConfig: this._bossEventConfig,
+                archetypeById: this._archetypeById,
+                bossEchoes: this._bossEchoes,
+            });
         }
-        this._nextBossWave = this.rollNextBossWave(waveNumber + 1);
+        this._nextBossWave = rollNextBossWave(waveNumber + 1, this._bossEventConfig);
 
         return {
             entries,
@@ -1107,17 +1024,26 @@ export class WaveManager {
             scores.set(archetype.id, this.computeArchetypeScore(archetype, waveNumber));
         }
 
-        let selected = this.weightedPickWithoutReplacement(pool, scores, pickCount);
+        let selected = weightedPickWithoutReplacement(
+            pool,
+            scores,
+            pickCount,
+            this._randomizerConfig.MIN_WEIGHT_FLOOR
+        );
         if (selected.length === 0) {
             selected = pool.slice(0, Math.min(pickCount, pool.length));
         }
 
         if (selected.length >= pickCount) {
-            const comboKey = this.toComboKey(selected.map(item => item.id));
+            const comboKey = toComboKey(selected.map(item => item.id));
             if (forbiddenCombos.has(comboKey)) {
-                const validCombos = this.enumerateValidCombos(pool, pickCount, forbiddenCombos);
+                const validCombos = enumerateValidCombos(pool, pickCount, forbiddenCombos);
                 if (validCombos.length > 0) {
-                    const picked = this.pickWeightedCombo(validCombos, scores);
+                    const picked = pickWeightedCombo(
+                        validCombos,
+                        scores,
+                        this._randomizerConfig.MIN_WEIGHT_FLOOR
+                    );
                     if (picked.length > 0) {
                         selected = picked;
                     }
@@ -1231,7 +1157,7 @@ export class WaveManager {
             }
         }
 
-        const bossEchoWeight = this.resolveBossEchoWeight(archetype.id, waveNumber);
+        const bossEchoWeight = resolveBossEchoWeight(archetype.id, waveNumber, this._bossEchoes);
         const raw =
             (baseWeight + bossEchoWeight) *
             freshFactor *
@@ -1241,389 +1167,21 @@ export class WaveManager {
         return Math.max(this._randomizerConfig.MIN_WEIGHT_FLOOR, raw);
     }
 
-    private weightedPickWithoutReplacement(
-        source: EnemyArchetypeConfig[],
-        scores: Map<string, number>,
-        pickCount: number
-    ): EnemyArchetypeConfig[] {
-        const pool = source.slice();
-        const result: EnemyArchetypeConfig[] = [];
-        const targetCount = Math.min(pickCount, pool.length);
-        for (let i = 0; i < targetCount; i++) {
-            const picked = this.pickOneWeighted(pool, scores);
-            if (!picked) break;
-            result.push(picked);
-            const idx = pool.indexOf(picked);
-            if (idx >= 0) pool.splice(idx, 1);
-        }
-        return result;
-    }
-
-    private pickOneWeighted(
-        pool: EnemyArchetypeConfig[],
-        scores: Map<string, number>
-    ): EnemyArchetypeConfig | null {
-        if (pool.length === 0) return null;
-        let total = 0;
-        for (const item of pool) {
-            total += Math.max(this._randomizerConfig.MIN_WEIGHT_FLOOR, scores.get(item.id) ?? 0);
-        }
-        if (!Number.isFinite(total) || total <= 0) {
-            return pool[Math.floor(Math.random() * pool.length)] ?? null;
-        }
-
-        let cursor = Math.random() * total;
-        for (const item of pool) {
-            cursor -= Math.max(this._randomizerConfig.MIN_WEIGHT_FLOOR, scores.get(item.id) ?? 0);
-            if (cursor <= 0) return item;
-        }
-        return pool[pool.length - 1] ?? null;
-    }
-
-    private enumerateValidCombos(
-        pool: EnemyArchetypeConfig[],
-        pickCount: number,
-        forbidden: Set<string>
-    ): EnemyArchetypeConfig[][] {
-        if (pickCount <= 0 || pool.length < pickCount) return [];
-        const results: EnemyArchetypeConfig[][] = [];
-        const stack: EnemyArchetypeConfig[] = [];
-
-        const dfs = (start: number): void => {
-            if (stack.length === pickCount) {
-                const comboKey = this.toComboKey(stack.map(item => item.id));
-                if (!forbidden.has(comboKey)) {
-                    results.push(stack.slice());
-                }
-                return;
-            }
-            for (let i = start; i < pool.length; i++) {
-                stack.push(pool[i]);
-                dfs(i + 1);
-                stack.pop();
-            }
-        };
-
-        dfs(0);
-        return results;
-    }
-
-    private pickWeightedCombo(
-        combos: EnemyArchetypeConfig[][],
-        scores: Map<string, number>
-    ): EnemyArchetypeConfig[] {
-        if (combos.length === 0) return [];
-        let total = 0;
-        const comboWeights: number[] = new Array(combos.length);
-        for (let i = 0; i < combos.length; i++) {
-            let weight = 0;
-            for (const item of combos[i]) {
-                weight += scores.get(item.id) ?? this._randomizerConfig.MIN_WEIGHT_FLOOR;
-            }
-            weight = Math.max(this._randomizerConfig.MIN_WEIGHT_FLOOR, weight);
-            comboWeights[i] = weight;
-            total += weight;
-        }
-        if (!Number.isFinite(total) || total <= 0) {
-            return combos[Math.floor(Math.random() * combos.length)] ?? [];
-        }
-        let cursor = Math.random() * total;
-        for (let i = 0; i < combos.length; i++) {
-            cursor -= comboWeights[i];
-            if (cursor <= 0) return combos[i];
-        }
-        return combos[combos.length - 1] ?? [];
-    }
-
     private selectCompositionTemplate(): CompositionTemplate {
-        return this.selectTemplateWithCooldown(
+        return selectTemplateWithCooldown(
             this._compositionTemplates,
             this._compositionTemplateState
         );
     }
 
     private selectRhythmTemplate(): RhythmTemplate {
-        return this.selectTemplateWithCooldown(this._rhythmTemplates, this._rhythmTemplateState);
-    }
-
-    private selectTemplateWithCooldown<T extends { id: string; cooldownWaves: number }>(
-        templates: T[],
-        stateMap: Map<string, TemplateRuntimeState>
-    ): T {
-        const unlocked = templates.filter(tpl => (stateMap.get(tpl.id)?.cooldownRemain ?? 0) <= 0);
-        if (unlocked.length > 0) {
-            return unlocked[Math.floor(Math.random() * unlocked.length)] ?? templates[0];
-        }
-
-        return (
-            templates
-                .slice()
-                .sort(
-                    (a, b) =>
-                        (stateMap.get(a.id)?.cooldownRemain ?? 0) -
-                        (stateMap.get(b.id)?.cooldownRemain ?? 0)
-                )[0] ?? templates[0]
-        );
-    }
-
-    private allocateTypeCounts(total: number, shares: number[], typeCount: number): number[] {
-        const resolvedTypeCount = Math.max(1, typeCount);
-        if (total <= 0) return new Array(resolvedTypeCount).fill(0);
-        const normalizedShares = this.normalizeShares(shares, resolvedTypeCount);
-
-        const raw = normalizedShares.map(share => (total * share) / 100);
-        const counts = raw.map(value => Math.floor(value));
-        let assigned = counts.reduce((sum, value) => sum + value, 0);
-
-        const fracOrder = raw
-            .map((value, idx) => ({ idx, frac: value - Math.floor(value) }))
-            .sort((a, b) => b.frac - a.frac);
-        let cursor = 0;
-        while (assigned < total && fracOrder.length > 0) {
-            const idx = fracOrder[cursor % fracOrder.length].idx;
-            counts[idx]++;
-            assigned++;
-            cursor++;
-        }
-
-        if (total >= resolvedTypeCount) {
-            for (let i = 0; i < resolvedTypeCount; i++) {
-                if (counts[i] <= 0) {
-                    const donorIdx = indexOfMax(counts);
-                    if (counts[donorIdx] > 1) {
-                        counts[donorIdx]--;
-                        counts[i]++;
-                    }
-                }
-            }
-        }
-
-        return counts;
-    }
-
-    private normalizeShares(shares: number[], typeCount: number): number[] {
-        if (typeCount <= 0) return [];
-        const candidate = shares
-            .slice(0, typeCount)
-            .map(value => clamp(toFinite(value, 0), 0, 1000));
-        while (candidate.length < typeCount) {
-            candidate.push(100 / typeCount);
-        }
-
-        const sum = candidate.reduce((acc, value) => acc + value, 0);
-        if (!Number.isFinite(sum) || sum <= 0) {
-            const even = 100 / typeCount;
-            return new Array(typeCount).fill(even);
-        }
-        return candidate.map(value => (value / sum) * 100);
-    }
-
-    private buildElitePositionSet(total: number, eliteCount: number): Set<number> {
-        const result = new Set<number>();
-        const safeTotal = Math.max(0, total);
-        const safeElite = Math.max(0, Math.min(eliteCount, safeTotal));
-        if (safeElite <= 0 || safeTotal <= 0) return result;
-
-        for (let i = 0; i < safeElite; i++) {
-            const pos = Math.floor(((i + 1) * safeTotal) / (safeElite + 1));
-            result.add(clamp(pos, 0, Math.max(0, safeTotal - 1)));
-        }
-        return result;
-    }
-
-    private applyRhythm(entries: PlannedSpawnEntry[], pattern: RhythmPattern): void {
-        if (entries.length <= 0) return;
-        const last = Math.max(1, entries.length - 1);
-        for (let i = 0; i < entries.length; i++) {
-            const t = i / last;
-            let m = 1;
-            if (pattern === 'frontload') {
-                m = 0.72 + 0.58 * t;
-            } else if (pattern === 'backload') {
-                m = 1.3 - 0.58 * t;
-            } else if (pattern === 'pulse') {
-                m = i % 4 === 0 || i % 4 === 1 ? 0.74 : 1.3;
-            }
-            entries[i].intervalMultiplier = clamp(m, 0.35, 2.4);
-        }
-    }
-
-    private shouldTriggerBossWave(waveNumber: number): boolean {
-        if (!this._bossEventConfig?.ENABLED) return false;
-        return waveNumber >= this._nextBossWave;
-    }
-
-    private selectBossArchetype(waveNumber: number): BossArchetypeConfig | null {
-        const bossCfg = this._bossEventConfig;
-        if (!bossCfg || bossCfg.BOSS_ARCHETYPES.length === 0) return null;
-
-        const unlocked = bossCfg.BOSS_ARCHETYPES.filter(item => {
-            const state = this._bossState.get(item.id);
-            return !state || state.cooldownRemain <= 0;
-        });
-        const pool = unlocked.length > 0 ? unlocked : bossCfg.BOSS_ARCHETYPES;
-        if (pool.length === 0) return null;
-
-        const idx = randomInt(0, Math.max(0, pool.length - 1));
-        const picked = pool[idx] ?? pool[0];
-        const bossState = this._bossState.get(picked.id);
-        if (bossState) {
-            bossState.cooldownRemain = Math.max(
-                bossState.cooldownRemain,
-                bossCfg.BOSS_COOLDOWN_WAVES
-            );
-        }
-        void waveNumber;
-        return picked;
-    }
-
-    private applyBossEchoForWave(boss: BossArchetypeConfig, waveNumber: number): void {
-        const cfg = this._bossEventConfig;
-        if (!cfg) return;
-        const targetId = boss.echoTargetId;
-        if (!targetId || !this._archetypeById.has(targetId)) return;
-
-        const echoCfg = cfg.ECHO;
-        const bonusDuration = randomInt(
-            echoCfg.BONUS_DURATION_MIN,
-            Math.max(echoCfg.BONUS_DURATION_MIN, echoCfg.BONUS_DURATION_MAX)
-        );
-        const bonusStart = waveNumber + Math.max(0, echoCfg.START_DELAY_WAVES);
-        const bonusEnd = bonusStart + Math.max(0, bonusDuration - 1);
-        const baseStart = bonusEnd + 1;
-        const baseEnd = baseStart + Math.max(0, echoCfg.BASE_DURATION_WAVES - 1);
-
-        this._bossEchoes.push({
-            targetId,
-            bonusStartWave: bonusStart,
-            bonusEndWave: bonusEnd,
-            bonusWeight: randomRange(echoCfg.BONUS_WEIGHT_MIN, echoCfg.BONUS_WEIGHT_MAX),
-            baseStartWave: baseStart,
-            baseEndWave: baseEnd,
-            baseWeight: randomRange(echoCfg.BASE_WEIGHT_MIN, echoCfg.BASE_WEIGHT_MAX),
-        });
-    }
-
-    private resolveBossEchoWeight(archetypeId: string, waveNumber: number): number {
-        let bonus = 0;
-        for (const echo of this._bossEchoes) {
-            if (echo.targetId !== archetypeId) continue;
-            if (waveNumber >= echo.bonusStartWave && waveNumber <= echo.bonusEndWave) {
-                bonus += echo.bonusWeight;
-                continue;
-            }
-            if (waveNumber >= echo.baseStartWave && waveNumber <= echo.baseEndWave) {
-                bonus += echo.baseWeight;
-            }
-        }
-        return bonus;
-    }
-
-    private pruneBossEchoes(waveNumber: number): void {
-        this._bossEchoes = this._bossEchoes.filter(echo => waveNumber <= echo.baseEndWave);
-    }
-
-    private rollNextBossWave(fromWave: number): number {
-        const cfg = this._bossEventConfig;
-        if (!cfg) return Number.MAX_SAFE_INTEGER;
-        const min = Math.max(1, cfg.INTERVAL_MIN_WAVES);
-        const max = Math.max(min, cfg.INTERVAL_MAX_WAVES);
-        return fromWave + randomInt(min, max);
-    }
-
-    private updateWaveMemory(selectedIds: string[], comboKey: string): void {
-        this._recentWaveTypes.push(selectedIds.slice());
-        if (this._recentWaveTypes.length > this._randomizerConfig.RECENT_WINDOW_WAVES) {
-            this._recentWaveTypes.splice(
-                0,
-                this._recentWaveTypes.length - this._randomizerConfig.RECENT_WINDOW_WAVES
-            );
-        }
-
-        this._recentCombos.push(comboKey);
-        if (this._recentCombos.length > this._randomizerConfig.COMBO_MEMORY_WAVES) {
-            this._recentCombos.splice(
-                0,
-                this._recentCombos.length - this._randomizerConfig.COMBO_MEMORY_WAVES
-            );
-        }
-
-        const tagCounts: Record<string, number> = {};
-        for (const id of selectedIds) {
-            const archetype = this._archetypeById.get(id);
-            if (!archetype) continue;
-            for (const tag of archetype.tags) {
-                tagCounts[tag] = (tagCounts[tag] ?? 0) + 1;
-            }
-        }
-        const denom = Math.max(1, selectedIds.length);
-        const tagRatios: Record<string, number> = {};
-        for (const tag of Object.keys(tagCounts)) {
-            tagRatios[tag] = tagCounts[tag] / denom;
-        }
-        this._recentTagRatios.push(tagRatios);
-        if (this._recentTagRatios.length > this._randomizerConfig.RECENT_WINDOW_WAVES) {
-            this._recentTagRatios.splice(
-                0,
-                this._recentTagRatios.length - this._randomizerConfig.RECENT_WINDOW_WAVES
-            );
-        }
-    }
-
-    private applyArchetypeSelectionState(selectedIds: string[], waveNumber: number): void {
-        const picked = new Set(selectedIds);
-        for (const archetype of this._archetypes) {
-            const state = this._archetypeState.get(archetype.id);
-            if (!state) continue;
-            if (picked.has(archetype.id)) {
-                state.cooldownRemain = Math.max(1, archetype.cooldownBase);
-                state.lastSeenWave = waveNumber;
-            }
-        }
-    }
-
-    private tickRuntimeCooldowns(): void {
-        for (const state of this._archetypeState.values()) {
-            state.cooldownRemain = Math.max(0, state.cooldownRemain - 1);
-        }
-        for (const state of this._compositionTemplateState.values()) {
-            state.cooldownRemain = Math.max(0, state.cooldownRemain - 1);
-        }
-        for (const state of this._rhythmTemplateState.values()) {
-            state.cooldownRemain = Math.max(0, state.cooldownRemain - 1);
-        }
-        for (const state of this._bossState.values()) {
-            state.cooldownRemain = Math.max(0, state.cooldownRemain - 1);
-        }
-    }
-
-    private markTemplateCooldown(
-        stateMap: Map<string, TemplateRuntimeState>,
-        id: string,
-        cooldown: number
-    ): void {
-        const state = stateMap.get(id);
-        if (!state) return;
-        state.cooldownRemain = Math.max(0, cooldown);
+        return selectTemplateWithCooldown(this._rhythmTemplates, this._rhythmTemplateState);
     }
 
     private resolveArchetypeById(id: string): EnemyArchetypeConfig | null {
         const found = this._archetypeById.get(id);
         if (found) return found;
         return this._archetypes[0] ?? null;
-    }
-
-    private toComboKey(ids: string[]): string {
-        return ids.slice().sort().join('|');
-    }
-
-    private shuffleInPlace<T>(arr: T[]): void {
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            const tmp = arr[i];
-            arr[i] = arr[j];
-            arr[j] = tmp;
-        }
     }
 
     /**
