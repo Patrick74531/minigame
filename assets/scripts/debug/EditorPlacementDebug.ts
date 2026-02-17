@@ -35,6 +35,9 @@ export class PadPlacementEntry {
 
     @property({ tooltip: 'Y 轴旋转角度（度），对应 GameConfig.BUILDING.PADS[*].angle' })
     public angle: number = 0;
+
+    @property({ tooltip: '是否开局预建（对应 GameConfig.BUILDING.PADS[*].prebuild）' })
+    public prebuild: boolean = false;
 }
 
 @ccclass('BuildingScaleEntry')
@@ -227,6 +230,7 @@ export class EditorPlacementDebug extends Component {
             z: number;
             type: string;
             angle?: number;
+            prebuild?: boolean;
         }>;
         this.padPlacements = pads.map(pad => {
             const entry = new PadPlacementEntry();
@@ -234,6 +238,7 @@ export class EditorPlacementDebug extends Component {
             entry.x = pad.x;
             entry.z = pad.z;
             entry.angle = typeof pad.angle === 'number' ? pad.angle : 0;
+            entry.prebuild = pad.prebuild === true;
             return entry;
         });
         this.refreshPadPlacementIds();
@@ -259,18 +264,28 @@ export class EditorPlacementDebug extends Component {
             z: number;
             type: string;
             angle?: number;
+            prebuild?: boolean;
         }>;
         pads.length = 0;
         for (const entry of this.padPlacements) {
             const type = (entry.type || '').trim();
             if (!type) continue;
-            const pad: { x: number; z: number; type: string; angle?: number } = {
+            const pad: {
+                x: number;
+                z: number;
+                type: string;
+                angle?: number;
+                prebuild?: boolean;
+            } = {
                 type,
                 x: entry.x,
                 z: entry.z,
             };
             if (Math.abs(entry.angle) > 0.001) {
                 pad.angle = entry.angle;
+            }
+            if (entry.prebuild) {
+                pad.prebuild = true;
             }
             pads.push(pad);
         }

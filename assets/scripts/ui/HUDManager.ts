@@ -36,6 +36,8 @@ const BOSS_PREVIEW_STAGE_Z = -460;
 const LANE_UNLOCK_DIALOG_WIDTH = 920;
 const LANE_UNLOCK_DIALOG_HEIGHT = 84;
 const LANE_UNLOCK_DEFAULT_SECONDS = 2.4;
+const HERO_RESPAWN_DIALOG_WIDTH = 920;
+const HERO_RESPAWN_DIALOG_HEIGHT = 260;
 
 type BossIntroPayload = {
     bossNode: Node;
@@ -93,6 +95,11 @@ export class HUDManager {
     private _laneUnlockDialogBg: Graphics | null = null;
     private _laneUnlockDialogOpacity: UIOpacity | null = null;
     private _laneUnlockDialogToken: number = 0;
+    private _heroRespawnRoot: Node | null = null;
+    private _heroRespawnCountdownLabel: Label | null = null;
+    private _heroRespawnMessageLabel: Label | null = null;
+    private _heroRespawnOpacity: UIOpacity | null = null;
+    private _heroRespawnToken: number = 0;
 
     // === Boss 出场 UI / 演出 ===
     private _bossIntroRoot: Node | null = null;
@@ -172,6 +179,7 @@ export class HUDManager {
         this.createWaveForecastBanner(uiCanvas);
         this.createLaneUnlockDialog(uiCanvas);
         this.createBossIntroPanel(uiCanvas);
+        this.createHeroRespawnDialog(uiCanvas);
 
         // 监听事件
         this.setupEventListeners();
@@ -275,6 +283,106 @@ export class HUDManager {
         if (this._buildingInfoLabel) {
             this._buildingInfoLabel.node.active = false;
         }
+    }
+
+    public showHeroRespawnCountdown(seconds: number): void {
+        if (
+            !this._heroRespawnRoot ||
+            !this._heroRespawnCountdownLabel ||
+            !this._heroRespawnMessageLabel ||
+            !this._heroRespawnOpacity
+        ) {
+            return;
+        }
+
+        this._heroRespawnToken += 1;
+        this._heroRespawnRoot.active = true;
+        this._heroRespawnOpacity.opacity = 255;
+        this._heroRespawnRoot.setScale(1, 1, 1);
+
+        this._heroRespawnCountdownLabel.string = Localization.instance.t(
+            'ui.hero.respawn.countdown.value',
+            { seconds }
+        );
+        this._heroRespawnMessageLabel.string = Localization.instance.t(
+            'ui.hero.respawn.countdown.message',
+            { seconds }
+        );
+
+        Tween.stopAllByTarget(this._heroRespawnRoot);
+        Tween.stopAllByTarget(this._heroRespawnOpacity);
+    }
+
+    public updateHeroRespawnCountdown(seconds: number): void {
+        if (
+            !this._heroRespawnRoot ||
+            !this._heroRespawnRoot.active ||
+            !this._heroRespawnCountdownLabel ||
+            !this._heroRespawnMessageLabel
+        ) {
+            return;
+        }
+
+        this._heroRespawnCountdownLabel.string = Localization.instance.t(
+            'ui.hero.respawn.countdown.value',
+            { seconds }
+        );
+        this._heroRespawnMessageLabel.string = Localization.instance.t(
+            'ui.hero.respawn.countdown.message',
+            { seconds }
+        );
+    }
+
+    public showHeroRespawnReadyPrompt(): void {
+        if (
+            !this._heroRespawnRoot ||
+            !this._heroRespawnCountdownLabel ||
+            !this._heroRespawnMessageLabel ||
+            !this._heroRespawnOpacity
+        ) {
+            return;
+        }
+
+        this._heroRespawnToken += 1;
+        const token = this._heroRespawnToken;
+
+        this._heroRespawnRoot.active = true;
+        this._heroRespawnOpacity.opacity = 255;
+        this._heroRespawnRoot.setScale(1, 1, 1);
+        this._heroRespawnCountdownLabel.string = Localization.instance.t(
+            'ui.hero.respawn.ready.tag'
+        );
+        this._heroRespawnMessageLabel.string = Localization.instance.t(
+            'ui.hero.respawn.ready.message'
+        );
+
+        Tween.stopAllByTarget(this._heroRespawnRoot);
+        Tween.stopAllByTarget(this._heroRespawnOpacity);
+
+        tween(this._heroRespawnRoot)
+            .to(0.12, { scale: new Vec3(1.06, 1.06, 1) })
+            .to(0.18, { scale: new Vec3(1, 1, 1) })
+            .start();
+
+        tween(this._heroRespawnOpacity)
+            .delay(2.2)
+            .to(0.24, { opacity: 0 })
+            .call(() => {
+                if (token !== this._heroRespawnToken) return;
+                if (this._heroRespawnRoot) {
+                    this._heroRespawnRoot.active = false;
+                }
+            })
+            .start();
+    }
+
+    public hideHeroRespawnCountdown(): void {
+        if (!this._heroRespawnRoot || !this._heroRespawnOpacity) return;
+        this._heroRespawnToken += 1;
+        Tween.stopAllByTarget(this._heroRespawnRoot);
+        Tween.stopAllByTarget(this._heroRespawnOpacity);
+        this._heroRespawnOpacity.opacity = 0;
+        this._heroRespawnRoot.active = false;
     }
 
     // === 事件处理 ===
@@ -562,6 +670,83 @@ export class HUDManager {
         this._laneUnlockDialogLabel.color = new Color(255, 225, 176, 255);
 
         this._laneUnlockDialogRoot = root;
+        root.active = false;
+    }
+
+    private createHeroRespawnDialog(parent: Node): void {
+        const root = new Node('HeroRespawnDialog');
+        root.layer = UI_LAYER;
+        parent.addChild(root);
+
+        root.addComponent(UITransform).setContentSize(
+            HERO_RESPAWN_DIALOG_WIDTH,
+            HERO_RESPAWN_DIALOG_HEIGHT
+        );
+        const widget = root.addComponent(Widget);
+        widget.isAlignHorizontalCenter = true;
+        widget.isAlignVerticalCenter = true;
+
+        this._heroRespawnOpacity = root.addComponent(UIOpacity);
+        this._heroRespawnOpacity.opacity = 0;
+
+        const bgNode = new Node('HeroRespawnDialogBg');
+        bgNode.layer = UI_LAYER;
+        root.addChild(bgNode);
+        bgNode.addComponent(UITransform);
+        const bg = bgNode.addComponent(Graphics);
+        bg.fillColor = new Color(18, 12, 8, 232);
+        bg.roundRect(
+            -HERO_RESPAWN_DIALOG_WIDTH / 2,
+            -HERO_RESPAWN_DIALOG_HEIGHT / 2,
+            HERO_RESPAWN_DIALOG_WIDTH,
+            HERO_RESPAWN_DIALOG_HEIGHT,
+            16
+        );
+        bg.fill();
+        bg.strokeColor = new Color(255, 136, 56, 255);
+        bg.lineWidth = 4;
+        bg.roundRect(
+            -HERO_RESPAWN_DIALOG_WIDTH / 2,
+            -HERO_RESPAWN_DIALOG_HEIGHT / 2,
+            HERO_RESPAWN_DIALOG_WIDTH,
+            HERO_RESPAWN_DIALOG_HEIGHT,
+            16
+        );
+        bg.stroke();
+
+        const countNode = new Node('HeroRespawnCount');
+        countNode.layer = UI_LAYER;
+        root.addChild(countNode);
+        countNode
+            .addComponent(UITransform)
+            .setContentSize(HERO_RESPAWN_DIALOG_WIDTH - 60, HERO_RESPAWN_DIALOG_HEIGHT * 0.58);
+        countNode.setPosition(0, 34, 0);
+        this._heroRespawnCountdownLabel = countNode.addComponent(Label);
+        this._heroRespawnCountdownLabel.string = '10';
+        this._heroRespawnCountdownLabel.fontSize = 124;
+        this._heroRespawnCountdownLabel.lineHeight = 132;
+        this._heroRespawnCountdownLabel.isBold = true;
+        this._heroRespawnCountdownLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this._heroRespawnCountdownLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._heroRespawnCountdownLabel.color = new Color(255, 222, 130, 255);
+
+        const msgNode = new Node('HeroRespawnText');
+        msgNode.layer = UI_LAYER;
+        root.addChild(msgNode);
+        msgNode
+            .addComponent(UITransform)
+            .setContentSize(HERO_RESPAWN_DIALOG_WIDTH - 80, HERO_RESPAWN_DIALOG_HEIGHT * 0.44);
+        msgNode.setPosition(0, -76, 0);
+        this._heroRespawnMessageLabel = msgNode.addComponent(Label);
+        this._heroRespawnMessageLabel.string = '';
+        this._heroRespawnMessageLabel.fontSize = 34;
+        this._heroRespawnMessageLabel.lineHeight = 42;
+        this._heroRespawnMessageLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this._heroRespawnMessageLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._heroRespawnMessageLabel.enableWrapText = true;
+        this._heroRespawnMessageLabel.color = new Color(255, 241, 210, 255);
+
+        this._heroRespawnRoot = root;
         root.active = false;
     }
 
@@ -1195,6 +1380,12 @@ export class HUDManager {
         if (this._laneUnlockDialogOpacity) {
             Tween.stopAllByTarget(this._laneUnlockDialogOpacity);
         }
+        if (this._heroRespawnRoot) {
+            Tween.stopAllByTarget(this._heroRespawnRoot);
+        }
+        if (this._heroRespawnOpacity) {
+            Tween.stopAllByTarget(this._heroRespawnOpacity);
+        }
         this._coinLabel = null;
         this._waveLabel = null;
         this._buildingInfoLabel = null;
@@ -1210,6 +1401,10 @@ export class HUDManager {
         this._laneUnlockDialogLabel = null;
         this._laneUnlockDialogBg = null;
         this._laneUnlockDialogOpacity = null;
+        this._heroRespawnRoot = null;
+        this._heroRespawnCountdownLabel = null;
+        this._heroRespawnMessageLabel = null;
+        this._heroRespawnOpacity = null;
         this._bossIntroRoot = null;
         this._bossIntroTitleLabel = null;
         this._bossIntroQuoteLabel = null;

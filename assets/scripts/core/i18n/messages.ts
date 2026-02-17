@@ -101,6 +101,10 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.buff.stat.critRate': '暴击率',
         'ui.buff.stat.critDamage': '暴击伤害',
         'ui.levelup.banner': '升级! Lv.{level}',
+        'ui.hero.respawn.countdown.value': '{seconds}',
+        'ui.hero.respawn.countdown.message': '奶奶正在纳米修复，{seconds}s 后重返战场！',
+        'ui.hero.respawn.ready.tag': '出战！',
+        'ui.hero.respawn.ready.message': '倒计时结束，奶奶回归战场，继续战斗！',
 
         'enemy.archetype.boss_robot_flying': '飞行机甲',
         'enemy.archetype.boss_robot_large': '巨型机甲',
@@ -220,6 +224,12 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.buff.stat.critRate': 'Crit Rate',
         'ui.buff.stat.critDamage': 'Crit Damage',
         'ui.levelup.banner': 'LEVEL UP! Lv.{level}',
+        'ui.hero.respawn.countdown.value': '{seconds}',
+        'ui.hero.respawn.countdown.message':
+            'Grandma is in nano-recovery. Rejoining the fight in {seconds}s!',
+        'ui.hero.respawn.ready.tag': 'READY!',
+        'ui.hero.respawn.ready.message':
+            'Countdown complete. Grandma is back in action. Keep pushing!',
 
         'enemy.archetype.boss_robot_flying': 'Flying Warbot',
         'enemy.archetype.boss_robot_large': 'Titan Warbot',

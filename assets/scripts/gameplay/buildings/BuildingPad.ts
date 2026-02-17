@@ -48,6 +48,37 @@ export class BuildingPad extends BaseComponent {
     private static readonly BUILD_CONFIRM_DELAY = 0.25;
     private static readonly BUILD_MAX_RETRY = 3;
     private static readonly BUILD_AUTO_RETRY_ROUNDS = 2;
+    private static readonly EARLY_TOWER_BUILD_COSTS: ReadonlyArray<number> = [10, 20, 40];
+    private static _earlyTowerBuildCostCursor: number = 0;
+    private static readonly _activePads: Set<BuildingPad> = new Set();
+
+    private static peekEarlyTowerBuildCost(): number | null {
+        const idx = BuildingPad._earlyTowerBuildCostCursor;
+        if (idx < 0 || idx >= BuildingPad.EARLY_TOWER_BUILD_COSTS.length) {
+            return null;
+        }
+        return BuildingPad.EARLY_TOWER_BUILD_COSTS[idx];
+    }
+
+    private static consumeEarlyTowerBuildCost(): number | null {
+        const cost = BuildingPad.peekEarlyTowerBuildCost();
+        if (cost === null) {
+            return null;
+        }
+        BuildingPad._earlyTowerBuildCostCursor += 1;
+        return cost;
+    }
+
+    private static resetEarlyTowerBuildCostState(): void {
+        BuildingPad._earlyTowerBuildCostCursor = 0;
+    }
+
+    private static refreshEarlyTowerBuildCostDisplays(): void {
+        for (const pad of BuildingPad._activePads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            pad.refreshEarlyTowerBuildDiscountDisplay();
+        }
+    }
 
     /** 建筑类型 ID */
     @property
@@ -127,11 +158,14 @@ export class BuildingPad extends BaseComponent {
     private _isAnimating: boolean = false; // New flag to block input during animation
     private _buildEmitAttempts: number = 0;
     private _buildAutoRetryRounds: number = 0;
+    private _reservedEarlyTowerBuildCost: number | null = null;
 
     // Store original spawn position to place the building there.
     private _originalPosition: Vec3 = new Vec3();
 
     protected start(): void {
+        BuildingPad._activePads.add(this);
+
         // 1. Store Original Position (Where the building should be)
         this._originalPosition.set(this.node.worldPosition);
 
@@ -169,12 +203,34 @@ export class BuildingPad extends BaseComponent {
 
         // Listen for tower selection
         this.eventManager.on(GameEvents.TOWER_SELECTED, this.onTowerSelected, this);
+        this.eventManager.on(GameEvents.GAME_START, this.onGameStart, this);
 
-        console.log(`[BuildingPad] 初始化: ${this.buildingName}, 需要 ${this._config.cost} 金币`);
+        console.log(`[BuildingPad] 初始化: ${this.buildingName}, 需要 ${this.requiredCoins} 金币`);
     }
 
     protected onDestroy(): void {
+        BuildingPad._activePads.delete(this);
         this.eventManager.off(GameEvents.TOWER_SELECTED, this.onTowerSelected, this);
+        this.eventManager.off(GameEvents.GAME_START, this.onGameStart, this);
+    }
+
+    private onGameStart(): void {
+        BuildingPad.resetEarlyTowerBuildCostState();
+        this._reservedEarlyTowerBuildCost = null;
+        BuildingPad.refreshEarlyTowerBuildCostDisplays();
+    }
+
+    private refreshEarlyTowerBuildDiscountDisplay(): void {
+        if (this._state !== BuildingPadState.WAITING) return;
+        if (this._associatedBuilding) return;
+        if (!this._isTowerSlot) return;
+        if (this._reservedEarlyTowerBuildCost !== null) return;
+
+        this.updateDisplay();
+        if (this._heroInArea && this.hudManager) {
+            const title = this.getHudTitle();
+            this.hudManager.showBuildingInfo(title, this.requiredCoins, this.collectedCoins);
+        }
     }
 
     private setupPhysics(): void {
@@ -358,6 +414,7 @@ export class BuildingPad extends BaseComponent {
         this._associatedBuilding = building;
         this._buildEmitAttempts = 0;
         this._buildAutoRetryRounds = 0;
+        this._reservedEarlyTowerBuildCost = null;
 
         // 若 start() 还未执行，提前加载配置
         if (!this._config) {
@@ -427,7 +484,43 @@ export class BuildingPad extends BaseComponent {
         if (this._state === BuildingPadState.UPGRADING) {
             return this._nextUpgradeCost;
         }
+
+        if (this.shouldApplyEarlyTowerBuildDiscount()) {
+            if (this._reservedEarlyTowerBuildCost !== null) {
+                return this._reservedEarlyTowerBuildCost;
+            }
+
+            const previewDiscount = BuildingPad.peekEarlyTowerBuildCost();
+            if (previewDiscount !== null) {
+                return previewDiscount;
+            }
+        }
+
         return this._config?.cost ?? 0;
+    }
+
+    private shouldApplyEarlyTowerBuildDiscount(): boolean {
+        return (
+            this._state === BuildingPadState.WAITING &&
+            !this._associatedBuilding &&
+            this._isTowerSlot &&
+            BuildingPadPlacement.isTowerType(this.buildingTypeId)
+        );
+    }
+
+    private ensureEarlyTowerBuildDiscountReserved(): void {
+        if (!this.shouldApplyEarlyTowerBuildDiscount()) return;
+        if (this._reservedEarlyTowerBuildCost !== null) return;
+
+        const reservedDiscount = BuildingPad.consumeEarlyTowerBuildCost();
+        if (reservedDiscount === null) return;
+
+        this._reservedEarlyTowerBuildCost = reservedDiscount;
+        console.log(
+            `[BuildingPad] 早期防御塔折扣生效: ${this.buildingTypeId} 造价=${reservedDiscount}`
+        );
+
+        BuildingPad.refreshEarlyTowerBuildCostDisplays();
     }
 
     /**
@@ -453,6 +546,10 @@ export class BuildingPad extends BaseComponent {
         }
 
         if (heroCoins <= 0) return 0;
+
+        if (this._state === BuildingPadState.WAITING) {
+            this.ensureEarlyTowerBuildDiscountReserved();
+        }
 
         const needed = this.requiredCoins - this._collectedCoins;
         const toCollect = Math.min(this.collectRate, heroCoins, needed);
@@ -658,6 +755,7 @@ export class BuildingPad extends BaseComponent {
         this._isAnimating = false;
         this._buildEmitAttempts = 0;
         this._buildAutoRetryRounds = 0;
+        this._reservedEarlyTowerBuildCost = null;
 
         // Restore initial type if this was a tower slot
         if (this._isTowerSlot) {

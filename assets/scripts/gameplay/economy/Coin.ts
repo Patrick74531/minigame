@@ -23,7 +23,7 @@ export class Coin extends BaseComponent implements IPoolable {
     @property
     public floatAmplitude: number = GameConfig.ECONOMY.COIN_FLOAT_AMPLITUDE;
     @property
-    public enableLifetime: boolean = true;
+    public enableLifetime: boolean = false;
     @property
     public lifetimeLimit: number = GameConfig.ECONOMY.COIN_LIFETIME;
     @property

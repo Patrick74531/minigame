@@ -43,9 +43,18 @@ export class BuildingPadSpawner {
                 x: number;
                 z: number;
                 angle?: number;
+                prebuild?: boolean;
             }>) ?? [];
+        const fallbackPrebuildTowerIndex = this.resolveFallbackPrebuildTowerIndex(padPositions);
+        if (fallbackPrebuildTowerIndex >= 0) {
+            const fallback = padPositions[fallbackPrebuildTowerIndex];
+            console.log(
+                `[BuildingPadSpawner] Fallback prebuild tower selected at (${fallback.x}, 0, ${fallback.z})`
+            );
+        }
 
-        for (const pos of padPositions) {
+        for (let index = 0; index < padPositions.length; index++) {
+            const pos = padPositions[index];
             const angle = typeof pos.angle === 'number' ? pos.angle : 0;
 
             // Special handling for Spa: Pre-spawned, invalid interaction (no pad/upgrade)
@@ -82,7 +91,11 @@ export class BuildingPadSpawner {
             buildingManager.registerPad(pad);
             this.applyLockedLanePadVisibility(padNode, pos.type, pos.x, pos.z);
 
-            if (!this.PREBUILT_LEVEL1_TYPES.has(pos.type)) {
+            const shouldPrebuild =
+                pos.prebuild === true ||
+                this.PREBUILT_LEVEL1_TYPES.has(pos.type) ||
+                index === fallbackPrebuildTowerIndex;
+            if (!shouldPrebuild) {
                 continue;
             }
 
@@ -176,6 +189,54 @@ export class BuildingPadSpawner {
         }
 
         return bestLane;
+    }
+
+    private static resolveFallbackPrebuildTowerIndex(
+        pads: ReadonlyArray<{
+            type: string;
+            x: number;
+            z: number;
+            prebuild?: boolean;
+        }>
+    ): number {
+        const hasExplicitTowerPrebuild = pads.some(
+            pad => pad.type === 'tower' && pad.prebuild === true
+        );
+        if (hasExplicitTowerPrebuild) {
+            return -1;
+        }
+
+        const polylines = this.getLanePolylinesWorld();
+        const baseX = GameConfig.MAP.BASE_SPAWN.x;
+        const baseZ = GameConfig.MAP.BASE_SPAWN.z;
+
+        const candidates: Array<{ index: number; distanceToBase: number }> = [];
+
+        for (let index = 0; index < pads.length; index++) {
+            const pad = pads[index];
+            if (pad.type !== 'tower') continue;
+
+            const lane = this.resolveLaneByNearestPath(pad.x, pad.z);
+            if (lane !== 'mid') continue;
+
+            // "靠近上路侧"：到上路中心线距离更近。
+            const topDistance = this.pointToPolylineDistance(pad.x, pad.z, polylines.top);
+            const bottomDistance = this.pointToPolylineDistance(pad.x, pad.z, polylines.bottom);
+            if (topDistance >= bottomDistance) continue;
+
+            // 先收集该侧中路机枪塔，再按离基地距离排序选第 3 个。
+            const distanceToBase = Math.hypot(pad.x - baseX, pad.z - baseZ);
+            candidates.push({ index, distanceToBase });
+        }
+
+        if (candidates.length <= 0) {
+            return -1;
+        }
+
+        candidates.sort((a, b) => a.distanceToBase - b.distanceToBase);
+        // Fallback default: mid-lane upper-side third tower (index 2 after sorting from base).
+        const targetSlot = Math.min(2, candidates.length - 1);
+        return candidates[targetSlot].index;
     }
 
     private static getLanePolylinesWorld(): Record<RouteLane, Array<{ x: number; z: number }>> {

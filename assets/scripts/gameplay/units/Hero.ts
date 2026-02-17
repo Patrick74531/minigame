@@ -29,6 +29,7 @@ import { getWeaponLevelStats, type WeaponLevelStats } from '../weapons/WeaponTyp
 import { HeroLevelSystem } from './HeroLevelSystem';
 import { GameEvents } from '../../data/GameEvents';
 import { EventManager } from '../../core/managers/EventManager';
+import { Building } from '../buildings/Building';
 
 const { ccclass, property } = _decorator;
 const PHYSICS_GROUP_WALL = 1 << 5;
@@ -39,10 +40,14 @@ const PHYSICS_GROUP_WALL = 1 << 5;
  */
 @ccclass('Hero')
 export class Hero extends Unit {
+    private static readonly RESPAWN_DELAY_SECONDS = 10;
+
     // 移动输入向量 (x, y) -1 ~ 1
     private _inputVector: Vec2 = new Vec2(0, 0);
     private _facingDir: Vec3 = new Vec3();
     private _hasFacingDir: boolean = false;
+    private _respawning: boolean = false;
+    private _respawnRemainingSeconds: number = 0;
 
     private _weapon: RangedWeapon | null = null;
     private _mover: CharacterMover | null = null;
@@ -69,6 +74,11 @@ export class Hero extends Unit {
     private static readonly _tmpLookAt = new Vec3();
 
     public onDespawn(): void {
+        this.unschedule(this.tickRespawnCountdown);
+        this.unschedule(this.finishRespawn);
+        this._respawning = false;
+        this._respawnRemainingSeconds = 0;
+        this.hudManager.hideHeroRespawnCountdown();
         if (this.gameManager.hero === this.node) {
             this.gameManager.hero = null;
         }
@@ -155,6 +165,9 @@ export class Hero extends Unit {
     protected onDestroy(): void {
         this._eventMgr.off(GameEvents.HERO_LEVEL_UP, this.onLevelUp, this);
         this._eventMgr.off(GameEvents.BASE_UPGRADE_READY, this.onBaseUpgradeReady, this);
+        this.unschedule(this.tickRespawnCountdown);
+        this.unschedule(this.finishRespawn);
+        this.hudManager.hideHeroRespawnCountdown();
     }
 
     private get _eventMgr(): EventManager {
@@ -574,6 +587,100 @@ export class Hero extends Unit {
         }
         if (this._mover) {
             this._mover.moveSpeed = this._stats.moveSpeed;
+        }
+    }
+
+    protected onDeath(): void {
+        this.startRespawnCountdown();
+    }
+
+    private startRespawnCountdown(): void {
+        if (this._respawning) return;
+
+        this._respawning = true;
+        this._respawnRemainingSeconds = Hero.RESPAWN_DELAY_SECONDS;
+        this._inputVector.set(0, 0);
+        this._hasFacingDir = false;
+        this._target = null;
+        this._stopCurrentWeapon();
+        this.setHeroCollisionEnabled(false);
+
+        this.hudManager.showHeroRespawnCountdown(this._respawnRemainingSeconds);
+
+        this.unschedule(this.tickRespawnCountdown);
+        this.unschedule(this.finishRespawn);
+        this.schedule(this.tickRespawnCountdown, 1, Hero.RESPAWN_DELAY_SECONDS - 1, 1);
+        this.scheduleOnce(this.finishRespawn, Hero.RESPAWN_DELAY_SECONDS);
+    }
+
+    private tickRespawnCountdown(): void {
+        if (!this._respawning) return;
+        this._respawnRemainingSeconds = Math.max(0, this._respawnRemainingSeconds - 1);
+        if (this._respawnRemainingSeconds > 0) {
+            this.hudManager.updateHeroRespawnCountdown(this._respawnRemainingSeconds);
+        }
+    }
+
+    private finishRespawn(): void {
+        if (!this.node || !this.node.isValid) return;
+
+        this._respawning = false;
+        this._respawnRemainingSeconds = 0;
+
+        const respawnPos = this.resolveRespawnPosition();
+        this.node.setWorldPosition(respawnPos.x, GameConfig.PHYSICS.HERO_Y, respawnPos.z);
+
+        this.resetUnit();
+        this._state = UnitState.IDLE;
+        this._target = null;
+        this._inputVector.set(0, 0);
+        this._hasFacingDir = false;
+        this.setHeroCollisionEnabled(true);
+
+        this.hudManager.showHeroRespawnReadyPrompt();
+    }
+
+    private resolveRespawnPosition(): Vec3 {
+        const basePos = this.findBuildingWorldPosition('base');
+        const spaPos = this.findBuildingWorldPosition('spa');
+
+        if (basePos && spaPos) {
+            return new Vec3(
+                (basePos.x + spaPos.x) * 0.5,
+                GameConfig.PHYSICS.HERO_Y,
+                (basePos.z + spaPos.z) * 0.5
+            );
+        }
+
+        if (basePos) {
+            return new Vec3(
+                basePos.x + GameConfig.MAP.HERO_SPAWN_OFFSET.x,
+                GameConfig.PHYSICS.HERO_Y,
+                basePos.z + GameConfig.MAP.HERO_SPAWN_OFFSET.z
+            );
+        }
+
+        return new Vec3(
+            GameConfig.MAP.BASE_SPAWN.x + GameConfig.MAP.HERO_SPAWN_OFFSET.x,
+            GameConfig.PHYSICS.HERO_Y,
+            GameConfig.MAP.BASE_SPAWN.z + GameConfig.MAP.HERO_SPAWN_OFFSET.z
+        );
+    }
+
+    private findBuildingWorldPosition(typeId: string): Vec3 | null {
+        for (const node of this.gameManager.activeBuildings) {
+            if (!node || !node.isValid) continue;
+            const building = node.getComponent(Building);
+            if (!building || building.buildingTypeId !== typeId) continue;
+            return node.getWorldPosition(new Vec3());
+        }
+        return null;
+    }
+
+    private setHeroCollisionEnabled(enabled: boolean): void {
+        const collider = this.node.getComponent(CapsuleCollider);
+        if (collider && collider.isValid) {
+            collider.enabled = enabled;
         }
     }
 

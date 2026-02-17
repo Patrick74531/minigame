@@ -314,7 +314,8 @@ export const BUILDING_CONFIG = {
         { x: -7.9, z: -3.4, type: 'tower', angle: -45 },
         { x: -3.4, z: -7.9, type: 'tower', angle: 135 },
         { x: -5.4, z: -0.9, type: 'tower', angle: -45 },
-        { x: -0.9, z: -5.4, type: 'tower', angle: 135 },
+        // Mid lane upper-side third tower starts as prebuilt machine-gun tower
+        { x: -0.9, z: -5.4, type: 'tower', angle: 135, prebuild: true },
         { x: -2.9, z: 1.7, type: 'tower', angle: -45 },
         { x: 1.7, z: -2.9, type: 'tower', angle: 135 },
     ],
