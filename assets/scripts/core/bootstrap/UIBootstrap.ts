@@ -8,7 +8,6 @@ import { WeaponBarUI } from '../../ui/WeaponBarUI';
 import { TowerSelectUI } from '../../ui/TowerSelectUI';
 import { UIResponsive } from '../../ui/UIResponsive';
 import { ServiceRegistry } from '../managers/ServiceRegistry';
-import { GlitchWaveBehavior } from '../../gameplay/weapons/behaviors/GlitchWaveBehavior';
 
 export type UIRefs = {
     canvas: Node;
@@ -34,9 +33,6 @@ export class UIBootstrap {
         UIBootstrap.weaponSelectUI.initialize(canvas);
         UIBootstrap.weaponBarUI.initialize(canvas);
         UIBootstrap.towerSelectUI.initialize(canvas);
-
-        // 绑定 UI 画布供 GlitchWave 故障闪屏使用
-        GlitchWaveBehavior.bindUICanvas(canvas);
 
         return { canvas, joystick };
     }

@@ -47,7 +47,8 @@ export class EffectManager {
         if (!this._container) return;
 
         if (data.effectType === 'glitch_interference') {
-            EffectFactory.createGlitchInterference(this._container, data.center, data.radius);
+            // GlitchWave now keeps only hero-foot halo (handled in weapon behavior).
+            // Skip world-space interference slices/rays here.
             return;
         }
 

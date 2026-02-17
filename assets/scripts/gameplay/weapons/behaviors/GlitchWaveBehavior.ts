@@ -2,36 +2,18 @@ import { Node, Color, Vec3 } from 'cc';
 import { WeaponBehavior } from '../WeaponBehavior';
 import { WeaponType, WeaponLevelStats } from '../WeaponTypes';
 import { WeaponVFX } from '../WeaponVFX';
-import { CombatService } from '../../../core/managers/CombatService';
-import { CombatSystem } from '../../combat/CombatSystem';
-import { GlitchDistortion } from '../../visuals/GlitchDistortion';
-import { Enemy } from '../../units/Enemy';
-import { GlitchOverlay } from '../vfx/GlitchOverlay';
-import { ScreenShake } from '../vfx/ScreenShake';
 import { EventManager } from '../../../core/managers/EventManager';
 import { ServiceRegistry } from '../../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../../data/GameEvents';
+import { GameConfig } from '../../../data/GameConfig';
 
 /**
- * 模拟回音 — 信号干扰波 (性能优化版)
- *
- * 核心优化：
- * - 用 UI 层干扰扫描覆盖代替大面积纯色块
- * - 3D 层使用短促干扰束替代大方块冲击波
- * - 保留低开销震屏与中心闪光
- * - 屏幕震动 + UI 故障闪屏 = 视觉冲击力更强，性能更低
- *
+ * 模拟回音 — 信号干扰波
+ * 视觉表现：仅保留脚下旋转光环（随等级放大）
  * 机制定位：低伤害范围控场（主打减速）
  */
 export class GlitchWaveBehavior extends WeaponBehavior {
     public readonly type = WeaponType.GLITCH_WAVE;
-
-    private static _uiCanvas: Node | null = null;
-
-    /** 绑定 UI 画布（在 UIBootstrap 中调用一次） */
-    public static bindUICanvas(uiCanvas: Node): void {
-        this._uiCanvas = uiCanvas;
-    }
 
     private static readonly COLORS: Color[] = [
         new Color(70, 210, 255, 255),
@@ -46,13 +28,12 @@ export class GlitchWaveBehavior extends WeaponBehavior {
         _target: Node,
         stats: WeaponLevelStats,
         level: number,
-        parent: Node
+        _parent: Node
     ): void {
         const center = owner.position.clone();
         center.y += 0.5;
 
         const waveRadius = (stats['waveRadius'] ?? 4) as number;
-        const waveSpeed = (stats['waveSpeed'] ?? 8) as number;
         const slowPercent = Math.max(0, Math.min(0.85, (stats['slowPercent'] ?? 0.3) as number));
         const slowDuration = Math.max(0.2, (stats['slowDuration'] ?? 1.8) as number);
         const idx = Math.min(level - 1, 4);
@@ -70,115 +51,17 @@ export class GlitchWaveBehavior extends WeaponBehavior {
             effectType: 'glitch_interference',
         });
 
-
-        // === 3D 层：模拟回音主特效 ===
-        // 核心旋转粒子效果 (Lv.1+)
-        // 改为挂载在 owner (英雄) 下，跟随移动
-        // y=0.1 贴近脚底
-        // 视觉大小随等级提升 (Lv1=1.0, Lv5=1.6)
-        const levelScale = 1.0 + (level - 1) * 0.15;
-        WeaponVFX.createEchoWave(owner, new Vec3(0, 0.1, 0), {
-            scale: waveRadius * 0.8 * levelScale, 
+        // 仅保留旋转光环：挂在英雄脚下并显著增大等级成长
+        // Lv1 基础更大，Lv5 增幅更明显
+        const levelScale = 1.0 + (level - 1) * 0.28;
+        // 英雄根节点默认在离地约 HERO_Y 位置；按世界缩放换算到局部偏移，避免光环浮到腰部。
+        const ownerWorldScaleY = Math.max(0.001, Math.abs(owner.worldScale.y));
+        const haloGroundLiftWorld = 0.05;
+        const haloLocalYOffset =
+            (-GameConfig.PHYSICS.HERO_Y + haloGroundLiftWorld) / ownerWorldScaleY;
+        WeaponVFX.createEchoWave(owner, new Vec3(0, haloLocalYOffset, 0), {
+            scale: waveRadius * 1.4 * levelScale,
             color: color,
         });
-
-        // === 敌人扭曲特效 ===
-        this.applyDistortionToEnemies(owner.worldPosition, waveRadius * levelScale, level);
-
-        // === 3D 层：干扰束脉冲（次级细节） ===
-        this.spawnInterferenceBurst(parent, center, waveRadius, waveSpeed, color, level);
-
-        // 中心闪光 (Lv.2+)
-        if (level >= 2) {
-            WeaponVFX.createMuzzleFlash(parent, center, color, 0.22 + level * 0.06);
-        }
-
-        // === UI 层：故障扫描线覆盖 ===
-        if (GlitchWaveBehavior._uiCanvas) {
-            const intensity = Math.min(1, 0.36 + level * 0.11); // Lv.1=0.47, Lv.5=0.91
-            const duration = 0.18 + level * 0.05;
-            GlitchOverlay.flash(GlitchWaveBehavior._uiCanvas, duration, intensity, color);
-        }
-
-        // === 屏幕震动 (Lv.3+) ===
-        if (level >= 3) {
-            ScreenShake.shake(0.08 + level * 0.045, 0.1 + level * 0.025);
-        }
-    }
-
-    /** 生成短促多束干扰线，做出“信号撕裂”感 */
-    private spawnInterferenceBurst(
-        parent: Node,
-        center: Vec3,
-        radius: number,
-        waveSpeed: number,
-        color: Color,
-        level: number
-    ): void {
-        const beamCount = 3 + level;
-        const duration = Math.max(0.06, 0.22 - waveSpeed * 0.01);
-        const widthBase = 0.1 + level * 0.018;
-
-        for (let i = 0; i < beamCount; i++) {
-            const angle = (Math.PI * 2 * i) / beamCount + (Math.random() - 0.5) * 0.65;
-            const innerR = Math.random() * radius * 0.25;
-            const outerR = radius * (0.72 + Math.random() * 0.35);
-
-            const start = new Vec3(
-                center.x + Math.cos(angle) * innerR,
-                center.y,
-                center.z + Math.sin(angle) * innerR
-            );
-            const end = new Vec3(
-                center.x + Math.cos(angle) * outerR,
-                center.y,
-                center.z + Math.sin(angle) * outerR
-            );
-
-            const beamColor = new Color(
-                Math.min(255, color.r + 25),
-                Math.min(255, color.g + 20),
-                Math.max(0, color.b - 10),
-                220
-            );
-            const coreColor = new Color(235, 255, 255, 235);
-
-            WeaponVFX.createCodeBeam(parent, start, end, {
-                width: widthBase + Math.random() * 0.04,
-                duration: duration + Math.random() * 0.06,
-                beamColor,
-                coreColor,
-                intensity: 1.8 + level * 0.35,
-            });
-        }
-    }
-
-    private applyDistortionToEnemies(center: Vec3, radius: number, level: number): void {
-        const combatSys = CombatService.provider as unknown as CombatSystem;
-        if (!combatSys || !combatSys.activeEnemies) return;
-
-        const enemies = combatSys.activeEnemies;
-        const radiusSq = radius * radius;
-        
-        // 扭曲强度随等级增加
-        const duration = 0.5 + level * 0.1; 
-        const strength = 1.0 + level * 0.5;
-
-        for (const enemy of enemies) {
-            if (!enemy.isAlive || !enemy.node || !enemy.node.isValid) continue;
-
-            const dx = enemy.node.worldPosition.x - center.x;
-            const dz = enemy.node.worldPosition.z - center.z;
-            const distSq = dx * dx + dz * dz;
-
-            if (distSq <= radiusSq) {
-                // Add distortion component
-                let distortion = enemy.node.getComponent(GlitchDistortion);
-                if (!distortion) {
-                    distortion = enemy.node.addComponent(GlitchDistortion);
-                }
-                distortion.init(duration, strength);
-            }
-        }
     }
 }
