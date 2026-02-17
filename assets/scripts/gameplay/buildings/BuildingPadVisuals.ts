@@ -1,4 +1,13 @@
-import { Color, Graphics, Label, LabelOutline, Node, RenderRoot2D, UITransform } from 'cc';
+import {
+    Color,
+    Graphics,
+    Label,
+    LabelOutline,
+    LabelShadow,
+    Node,
+    RenderRoot2D,
+    UITransform,
+} from 'cc';
 import { BuildingText } from './BuildingText';
 import { BuildingPadIconFactory, type BuildingPadIconKind } from './BuildingPadIconFactory';
 
@@ -36,8 +45,8 @@ export class BuildingPadVisuals {
         flatRoot.setScale(0.009, 0.009, 0.009);
 
         const ctx = flatRoot.addComponent(Graphics);
-        ctx.lineWidth = 4;
-        ctx.strokeColor = Color.WHITE;
+        ctx.lineWidth = 5;
+        ctx.strokeColor = new Color(220, 242, 255, 255);
         ctx.lineJoin = Graphics.LineJoin.ROUND;
         ctx.lineCap = Graphics.LineCap.ROUND;
 
@@ -62,16 +71,21 @@ export class BuildingPadVisuals {
 
         const label = labelNode.addComponent(Label);
         label.string = `${requiredCoins}`;
-        label.fontSize = 50;
-        label.lineHeight = 54;
-        label.color = new Color(255, 235, 160, 255);
+        label.fontSize = 56;
+        label.lineHeight = 60;
+        label.color = new Color(255, 236, 154, 255);
         label.isBold = true;
         label.horizontalAlign = Label.HorizontalAlign.RIGHT;
         label.verticalAlign = Label.VerticalAlign.CENTER;
 
         const outline = labelNode.addComponent(LabelOutline);
-        outline.color = Color.BLACK;
-        outline.width = 4;
+        outline.color = new Color(18, 12, 6, 255);
+        outline.width = 5;
+
+        const shadow = labelNode.addComponent(LabelShadow);
+        shadow.color = new Color(0, 0, 0, 210);
+        shadow.offset.set(3, -2);
+        shadow.blur = 2;
 
         const coinNode = new Node('CoinInline');
         contentNode.addChild(coinNode);
@@ -79,15 +93,15 @@ export class BuildingPadVisuals {
 
         coinNode.addComponent(UITransform).setContentSize(40, 40);
         const coinG = coinNode.addComponent(Graphics);
-        coinG.fillColor = new Color(240, 190, 60, 255);
-        coinG.circle(0, 0, 16);
+        coinG.fillColor = new Color(246, 198, 72, 255);
+        coinG.circle(0, 0, 17);
         coinG.fill();
-        coinG.strokeColor = new Color(120, 80, 20, 255);
-        coinG.lineWidth = 2.5;
-        coinG.circle(0, 0, 16);
+        coinG.strokeColor = new Color(124, 70, 18, 255);
+        coinG.lineWidth = 3;
+        coinG.circle(0, 0, 17);
         coinG.stroke();
-        coinG.fillColor = new Color(255, 225, 120, 255);
-        coinG.circle(-3, 3, 5);
+        coinG.fillColor = new Color(255, 240, 156, 255);
+        coinG.circle(-3, 4, 5.4);
         coinG.fill();
 
         const functionIconNode = this.createFunctionIcon(contentNode, iconKind);
@@ -120,16 +134,16 @@ export class BuildingPadVisuals {
 
         if (remaining <= 0) {
             label.string = BuildingText.constructingLabel();
-            label.fontSize = 24;
-            label.lineHeight = 30;
+            label.fontSize = 30;
+            label.lineHeight = 36;
             label.horizontalAlign = Label.HorizontalAlign.CENTER;
             if (costLabelNode) costLabelNode.setPosition(0, completeCostY, 0);
             if (coinIconNode) coinIconNode.active = false;
             if (functionIconNode) functionIconNode.active = false;
         } else {
             label.string = `${remaining}`;
-            label.fontSize = 50;
-            label.lineHeight = 54;
+            label.fontSize = 56;
+            label.lineHeight = 60;
             label.horizontalAlign = Label.HorizontalAlign.RIGHT;
             if (costLabelNode) costLabelNode.setPosition(-18, activeCostY, 0);
             if (coinIconNode) coinIconNode.active = true;
@@ -137,11 +151,11 @@ export class BuildingPadVisuals {
         }
 
         if (progress >= 1) {
-            label.color = new Color(0, 255, 0, 255);
+            label.color = new Color(118, 255, 136, 255);
         } else if (progress >= 0.5) {
-            label.color = new Color(255, 255, 0, 255);
+            label.color = new Color(255, 236, 120, 255);
         } else {
-            label.color = new Color(255, 215, 0, 255);
+            label.color = new Color(255, 216, 82, 255);
         }
     }
 

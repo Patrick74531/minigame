@@ -9,17 +9,20 @@ import { WeaponType } from '../weapons/WeaponTypes';
 
 /**
  * AirdropService
- * 每波开始时生成空投，抽取武器供玩家选择。
+ * 开局立即生成一次空投，随后按波次间隔生成空投，抽取武器供玩家选择。
  * 空投宝箱打开后暂停游戏，展示 3 把武器供选择。
  *
  * NOTE: 与 BuffCardService 类似的事件驱动模式。
  */
 export class AirdropService extends Singleton<AirdropService>() {
-    private static readonly OFFER_INTERVAL_WAVES = 3;
+    /** 两次空投之间要经过的波次数（例：开局后第 3 波再触发） */
+    private static readonly WAVES_BETWEEN_OFFERS = 2;
 
     /** 当前待选武器 */
     private _pendingWeapons: WeaponType[] = [];
     private _waveCounter: number = 0;
+    /** 下一次按波次触发空投的目标波次 */
+    private _nextOfferWave: number = 1 + AirdropService.WAVES_BETWEEN_OFFERS;
 
     public get pendingWeapons(): WeaponType[] {
         return this._pendingWeapons;
@@ -29,33 +32,47 @@ export class AirdropService extends Singleton<AirdropService>() {
 
     public initialize(): void {
         this._waveCounter = 0;
+        this._nextOfferWave = 1 + AirdropService.WAVES_BETWEEN_OFFERS;
+        this.eventManager.on(GameEvents.GAME_START, this.onGameStart, this);
         this.eventManager.on(GameEvents.WAVE_START, this.onWaveStart, this);
         this.eventManager.on(GameEvents.WEAPON_PICKED, this.onWeaponPicked, this);
         console.log('[AirdropService] 初始化完成');
     }
 
     public cleanup(): void {
+        this.eventManager.off(GameEvents.GAME_START, this.onGameStart, this);
         this.eventManager.off(GameEvents.WAVE_START, this.onWaveStart, this);
         this.eventManager.off(GameEvents.WEAPON_PICKED, this.onWeaponPicked, this);
         this._pendingWeapons = [];
         this._waveCounter = 0;
+        this._nextOfferWave = 1 + AirdropService.WAVES_BETWEEN_OFFERS;
     }
 
     // === 事件处理 ===
+
+    private onGameStart(): void {
+        // 开局立即给一次武器选择
+        this.spawnAirdrop();
+    }
 
     private onWaveStart(data: { wave?: number }): void {
         const wave = Math.max(1, Math.floor(data.wave ?? this._waveCounter + 1));
         this._waveCounter = wave;
 
-        if (wave % AirdropService.OFFER_INTERVAL_WAVES !== 0) {
+        if (wave < this._nextOfferWave) {
             return;
         }
 
-        // 每 3 波开始时触发一次空投
+        // 开局后每经过两波，在目标波次触发一次空投（3,5,7,...）
         this.spawnAirdrop();
+        this._nextOfferWave = wave + AirdropService.WAVES_BETWEEN_OFFERS;
     }
 
     private spawnAirdrop(): void {
+        if (this._pendingWeapons.length > 0) {
+            return;
+        }
+
         const count = GameConfig.WEAPON_SYSTEM.PICK_COUNT;
         const manager = HeroWeaponManager.instance;
         this._pendingWeapons = manager.drawWeapons(count);

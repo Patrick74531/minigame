@@ -1,4 +1,4 @@
-import { Node, UITransform, Color, Widget, Graphics, Label, UIOpacity, tween, Vec3 } from 'cc';
+import { Node, UITransform, Color, Widget, Graphics, Label } from 'cc';
 import { Singleton } from '../core/base/Singleton';
 import { EventManager } from '../core/managers/EventManager';
 import { ServiceRegistry } from '../core/managers/ServiceRegistry';
@@ -6,13 +6,13 @@ import { GameEvents } from '../data/GameEvents';
 import { Localization } from '../core/i18n/Localization';
 import { GameConfig } from '../data/GameConfig';
 import { GameManager } from '../core/managers/GameManager';
+import { SelectionCardTheme } from './SelectionCardTheme';
 
 const UI_LAYER = 33554432;
 
-const CARD_WIDTH = 240;
-const CARD_HEIGHT = 320;
-const CARD_GAP = 40;
-const CARD_CORNER_RADIUS = 16;
+const CARD_WIDTH = 258;
+const CARD_HEIGHT = 360;
+const CARD_GAP = 34;
 
 /**
  * TowerSelectUI
@@ -69,12 +69,14 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
         const maskTransform = maskNode.addComponent(UITransform);
         maskTransform.setContentSize(1280, 720);
         const maskWidget = maskNode.addComponent(Widget);
-        maskWidget.isAlignTop = maskWidget.isAlignBottom = maskWidget.isAlignLeft = maskWidget.isAlignRight = true;
+        maskWidget.isAlignTop =
+            maskWidget.isAlignBottom =
+            maskWidget.isAlignLeft =
+            maskWidget.isAlignRight =
+                true;
         maskWidget.top = maskWidget.bottom = maskWidget.left = maskWidget.right = 0;
         const maskG = maskNode.addComponent(Graphics);
-        maskG.fillColor = new Color(0, 0, 0, 160);
-        maskG.rect(-640, -360, 1280, 720);
-        maskG.fill();
+        SelectionCardTheme.drawOverlayMask(maskG, 1280, 720);
 
         // 点击遮罩关闭（可选，但通常强制选择）
         // maskNode.on(Node.EventType.TOUCH_END, () => this.hideCards());
@@ -86,9 +88,10 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
         const container = new Node('CardContainer');
         container.layer = UI_LAYER;
         this._rootNode.addChild(container);
-        
+
         // 动态缩放适配
-        const totalWidth = this.TOWER_TYPES.length * CARD_WIDTH + (this.TOWER_TYPES.length - 1) * CARD_GAP;
+        const totalWidth =
+            this.TOWER_TYPES.length * CARD_WIDTH + (this.TOWER_TYPES.length - 1) * CARD_GAP;
         const size = rootTransform.contentSize;
         if (totalWidth > size.width - 100) {
             const scale = (size.width - 100) / totalWidth;
@@ -101,26 +104,14 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
             const card = this.createCardNode(type);
             container.addChild(card);
             card.setPosition(startX + i * (CARD_WIDTH + CARD_GAP), -20, 0);
-
-            // 入场动画
-            const opacity = card.addComponent(UIOpacity);
-            opacity.opacity = 0;
-            card.setScale(0.8, 0.8, 1);
-            tween(card)
-                .delay(i * 0.1)
-                .to(0.25, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
-                .start();
-            tween(opacity)
-                .delay(i * 0.1)
-                .to(0.2, { opacity: 255 })
-                .start();
+            SelectionCardTheme.playCardReveal(card, i);
         });
     }
 
     private hideCards(): void {
         // 恢复游戏
         if (this._isShowing) {
-             this.gameManager.resumeGame();
+            this.gameManager.resumeGame();
         }
 
         if (this._rootNode) {
@@ -134,7 +125,7 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
     private createTitle(root: Node): void {
         const titleNode = new Node('Title');
         titleNode.layer = UI_LAYER;
-        titleNode.addComponent(UITransform).setContentSize(600, 60);
+        titleNode.addComponent(UITransform).setContentSize(760, 72);
         root.addChild(titleNode);
 
         const widget = titleNode.addComponent(Widget);
@@ -144,15 +135,35 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.tower.select.title') || 'Select Tower';
-        label.fontSize = 36;
-        label.lineHeight = 40;
-        label.color = new Color(255, 215, 0, 255);
-        label.horizontalAlign = Label.HorizontalAlign.CENTER;
-        titleNode.setPosition(0, 220, 0);
+        SelectionCardTheme.applyLabelTheme(label, {
+            fontSize: 48,
+            lineHeight: 54,
+            color: new Color(255, 214, 92, 255),
+            bold: true,
+            hAlign: Label.HorizontalAlign.CENTER,
+            vAlign: Label.VerticalAlign.CENTER,
+            outlineColor: new Color(52, 26, 6, 255),
+            outlineWidth: 5,
+        });
+        titleNode.setPosition(0, 214, 0);
+
+        const decoNode = new Node('TitleDeco');
+        decoNode.layer = UI_LAYER;
+        titleNode.addChild(decoNode);
+        const deco = decoNode.addComponent(Graphics);
+        deco.strokeColor = new Color(255, 219, 120, 210);
+        deco.lineWidth = 2;
+        deco.moveTo(-230, -20);
+        deco.lineTo(-95, -20);
+        deco.stroke();
+        deco.moveTo(95, -20);
+        deco.lineTo(230, -20);
+        deco.stroke();
     }
 
     private createCardNode(buildingType: string): Node {
-        const config = GameConfig.BUILDING.TYPES[buildingType as keyof typeof GameConfig.BUILDING.TYPES];
+        const config =
+            GameConfig.BUILDING.TYPES[buildingType as keyof typeof GameConfig.BUILDING.TYPES];
         if (!config) return new Node();
 
         const cardNode = new Node(`TowerCard_${buildingType}`);
@@ -169,83 +180,95 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
         cardNode.addChild(bg);
 
         const g = bg.addComponent(Graphics);
-        g.fillColor = new Color(30, 30, 40, 240);
-        g.roundRect(-CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, CARD_CORNER_RADIUS);
-        g.fill();
-        g.strokeColor = themeColor;
-        g.lineWidth = 3;
-        g.roundRect(-CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, CARD_CORNER_RADIUS);
-        g.stroke();
+        SelectionCardTheme.drawCardBackground(g, CARD_WIDTH, CARD_HEIGHT, themeColor, 78);
 
-        // 顶部色条
-        g.fillColor = themeColor;
-        g.roundRect(-CARD_WIDTH / 2, CARD_HEIGHT / 2 - 60, CARD_WIDTH, 60, CARD_CORNER_RADIUS);
-        g.fill();
-        g.rect(-CARD_WIDTH / 2, CARD_HEIGHT / 2 - 60, CARD_WIDTH, 30); // Fill bottom corners of top bar
-        g.fill(); // Re-fill to ensure sharp cutoff if needed, but roundRect top is fine. 
-        // Actually to make top rounded and bottom flat for the header bar:
-        // Easier to just draw header.
-        
         // 名称
         const nameNode = new Node('Name');
         nameNode.layer = UI_LAYER;
-        nameNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 20, 50);
+        nameNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 30, 56);
         cardNode.addChild(nameNode);
         const nameLabel = nameNode.addComponent(Label);
         nameLabel.string = Localization.instance.t(config.nameKey) || buildingType;
-        nameLabel.fontSize = 24;
-        nameLabel.lineHeight = 30;
-        nameLabel.color = Color.WHITE;
-        nameLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
-        nameNode.setPosition(0, CARD_HEIGHT / 2 - 30, 0);
+        SelectionCardTheme.applyLabelTheme(nameLabel, {
+            fontSize: 30,
+            lineHeight: 34,
+            color: Color.WHITE,
+            bold: true,
+            hAlign: Label.HorizontalAlign.CENTER,
+            vAlign: Label.VerticalAlign.CENTER,
+            outlineColor: new Color(18, 20, 34, 255),
+            outlineWidth: 3,
+        });
+        nameLabel.overflow = Label.Overflow.SHRINK;
+        nameNode.setPosition(0, CARD_HEIGHT / 2 - 42, 0);
+
+        SelectionCardTheme.createBadge(
+            cardNode,
+            this.getTowerTag(buildingType),
+            SelectionCardTheme.blendColor(themeColor, new Color(255, 224, 146, 255), 0.3),
+            { w: 108, h: 30 },
+            { x: 0, y: CARD_HEIGHT / 2 - 88 },
+            new Color(176, 255, 206, 255)
+        );
 
         // 描述
         const descNode = new Node('Desc');
         descNode.layer = UI_LAYER;
-        descNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 30, 100);
+        descNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 30, 108);
         cardNode.addChild(descNode);
         const descLabel = descNode.addComponent(Label);
         descLabel.string = Localization.instance.t(config.descriptionKey) || '';
-        descLabel.fontSize = 16;
-        descLabel.lineHeight = 20;
-        descLabel.color = new Color(200, 200, 200, 255);
-        descLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
-        descLabel.verticalAlign = Label.VerticalAlign.TOP;
+        SelectionCardTheme.applyLabelTheme(descLabel, {
+            fontSize: 18,
+            lineHeight: 24,
+            color: new Color(194, 208, 232, 255),
+            hAlign: Label.HorizontalAlign.CENTER,
+            vAlign: Label.VerticalAlign.TOP,
+            outlineColor: new Color(8, 20, 32, 255),
+            outlineWidth: 2,
+            shadowBlur: 1,
+        });
         descLabel.overflow = Label.Overflow.SHRINK;
         descLabel.enableWrapText = true;
-        descNode.setPosition(0, 40, 0);
+        descNode.setPosition(0, 32, 0);
 
         // 属性预览 (简略)
         const statsNode = new Node('Stats');
         statsNode.layer = UI_LAYER;
-        statsNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 20, 80);
+        statsNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 24, 118);
         cardNode.addChild(statsNode);
         const statsLabel = statsNode.addComponent(Label);
-        
+
         const statsConfig = config as any;
         let statsText = '';
         if (statsConfig.stats) {
             statsText += `HP: ${statsConfig.stats.hp}\n`;
-            if (statsConfig.stats.attackDamage) statsText += `DMG: ${statsConfig.stats.attackDamage}\n`;
+            if (statsConfig.stats.attackDamage)
+                statsText += `DMG: ${statsConfig.stats.attackDamage}\n`;
             // if (statsConfig.stats.attackInterval) statsText += `SPD: ${statsConfig.stats.attackInterval}s\n`;
         }
-        
+
         statsLabel.string = statsText;
-        statsLabel.fontSize = 16;
-        statsLabel.lineHeight = 22;
-        statsLabel.color = new Color(240, 240, 240, 255);
-        statsLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
-        statsNode.setPosition(0, -60, 0);
+        SelectionCardTheme.applyLabelTheme(statsLabel, {
+            fontSize: 19,
+            lineHeight: 26,
+            color: new Color(236, 244, 255, 255),
+            hAlign: Label.HorizontalAlign.CENTER,
+            vAlign: Label.VerticalAlign.CENTER,
+            outlineColor: new Color(10, 22, 38, 255),
+            outlineWidth: 2,
+        });
+        statsNode.setPosition(0, -88, 0);
 
         // 点击事件
-        cardNode.on(Node.EventType.TOUCH_END, () => {
+        SelectionCardTheme.bindCardClick(cardNode, () => {
             if (!this._isShowing || !this._currentPadNode) return;
-            
+
             this.eventManager.emit(GameEvents.TOWER_SELECTED, {
                 padNode: this._currentPadNode,
-                buildingTypeId: buildingType
+                buildingTypeId: buildingType,
             });
-            
+
             this.hideCards();
         });
 
@@ -261,6 +284,12 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
             return new Color(r, g, b, 255);
         }
         return Color.WHITE;
+    }
+
+    private getTowerTag(typeId: string): string {
+        if (typeId === 'frost_tower') return '冰霜';
+        if (typeId === 'lightning_tower') return '闪电';
+        return '机枪';
     }
 
     private get eventManager(): EventManager {

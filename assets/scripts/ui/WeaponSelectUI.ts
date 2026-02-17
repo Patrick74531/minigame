@@ -1,19 +1,18 @@
-import { Node, UITransform, Color, Widget, Graphics, Label, UIOpacity, tween, Vec3 } from 'cc';
+import { Node, UITransform, Color, Widget, Graphics, Label } from 'cc';
 import { Singleton } from '../core/base/Singleton';
 import { EventManager } from '../core/managers/EventManager';
-import { GameManager } from '../core/managers/GameManager';
 import { ServiceRegistry } from '../core/managers/ServiceRegistry';
 import { GameEvents } from '../data/GameEvents';
 import { HeroWeaponManager } from '../gameplay/weapons/HeroWeaponManager';
 import { WeaponType, WeaponDef, getWeaponLevelStats } from '../gameplay/weapons/WeaponTypes';
 import { Localization } from '../core/i18n/Localization';
+import { SelectionCardTheme } from './SelectionCardTheme';
 
 const UI_LAYER = 33554432;
 
-const CARD_WIDTH = 240;
-const CARD_HEIGHT = 360;
-const CARD_GAP = 30;
-const CARD_CORNER_RADIUS = 16;
+const CARD_WIDTH = 258;
+const CARD_HEIGHT = 378;
+const CARD_GAP = 34;
 
 /**
  * WeaponSelectUI
@@ -84,9 +83,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
                 true;
         maskWidget.top = maskWidget.bottom = maskWidget.left = maskWidget.right = 0;
         const maskG = maskNode.addComponent(Graphics);
-        maskG.fillColor = new Color(0, 0, 0, 160);
-        maskG.rect(-640, -360, 1280, 720);
-        maskG.fill();
+        SelectionCardTheme.drawOverlayMask(maskG, 1280, 720);
 
         // 标题
         this.createTitle(this._rootNode);
@@ -112,19 +109,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
             const card = this.createCardNode(w, i);
             cardContainer.addChild(card);
             card.setPosition(startX + i * (CARD_WIDTH + CARD_GAP), -20, 0);
-
-            // 入场动画
-            const opacity = card.addComponent(UIOpacity);
-            opacity.opacity = 0;
-            card.setScale(0.8, 0.8, 1);
-            tween(card)
-                .delay(i * 0.1)
-                .to(0.25, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
-                .start();
-            tween(opacity)
-                .delay(i * 0.1)
-                .to(0.2, { opacity: 255 })
-                .start();
+            SelectionCardTheme.playCardReveal(card, i);
         });
     }
 
@@ -141,7 +126,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
     private createTitle(root: Node): void {
         const titleNode = new Node('Title');
         titleNode.layer = UI_LAYER;
-        titleNode.addComponent(UITransform).setContentSize(600, 60);
+        titleNode.addComponent(UITransform).setContentSize(760, 72);
         root.addChild(titleNode);
 
         // Responsive Title using Widget
@@ -152,11 +137,31 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.weapon.select.title');
-        label.fontSize = 36;
-        label.lineHeight = 40;
-        label.color = new Color(255, 215, 0, 255);
-        label.horizontalAlign = Label.HorizontalAlign.CENTER;
-        titleNode.setPosition(0, 220, 0);
+        SelectionCardTheme.applyLabelTheme(label, {
+            fontSize: 48,
+            lineHeight: 54,
+            color: new Color(255, 214, 92, 255),
+            bold: true,
+            hAlign: Label.HorizontalAlign.CENTER,
+            vAlign: Label.VerticalAlign.CENTER,
+            outlineColor: new Color(52, 26, 6, 255),
+            outlineWidth: 5,
+            shadowColor: new Color(0, 0, 0, 210),
+        });
+        titleNode.setPosition(0, 214, 0);
+
+        const decoNode = new Node('TitleDeco');
+        decoNode.layer = UI_LAYER;
+        titleNode.addChild(decoNode);
+        const deco = decoNode.addComponent(Graphics);
+        deco.strokeColor = new Color(255, 219, 120, 210);
+        deco.lineWidth = 2;
+        deco.moveTo(-230, -20);
+        deco.lineTo(-95, -20);
+        deco.stroke();
+        deco.moveTo(95, -20);
+        deco.lineTo(230, -20);
+        deco.stroke();
     }
 
     private createCardNode(weapon: { type: WeaponType; def: WeaponDef }, _index: number): Node {
@@ -180,87 +185,87 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         cardNode.addChild(bg);
 
         const g = bg.addComponent(Graphics);
-        g.fillColor = new Color(25, 25, 35, 230);
-        g.roundRect(-CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, CARD_CORNER_RADIUS);
-        g.fill();
-        g.strokeColor = themeColor;
-        g.lineWidth = 3;
-        g.roundRect(-CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, CARD_CORNER_RADIUS);
-        g.stroke();
-        // 顶部色条
-        g.fillColor = themeColor;
-        g.roundRect(-CARD_WIDTH / 2, CARD_HEIGHT / 2 - 70, CARD_WIDTH, 70, CARD_CORNER_RADIUS);
-        g.fill();
-        g.fillColor = themeColor;
-        g.rect(-CARD_WIDTH / 2, CARD_HEIGHT / 2 - 70, CARD_WIDTH, CARD_CORNER_RADIUS);
-        g.fill();
+        SelectionCardTheme.drawCardBackground(g, CARD_WIDTH, CARD_HEIGHT, themeColor, 78);
 
         // 武器名称
         const nameNode = new Node('Name');
         nameNode.layer = UI_LAYER;
-        nameNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 20, 50);
+        nameNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 30, 56);
         cardNode.addChild(nameNode);
         const nameLabel = nameNode.addComponent(Label);
         nameLabel.string = Localization.instance.t(def.nameKey);
-        nameLabel.fontSize = 26;
-        nameLabel.lineHeight = 30;
-        nameLabel.color = Color.WHITE;
-        nameLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        SelectionCardTheme.applyLabelTheme(nameLabel, {
+            fontSize: 30,
+            lineHeight: 34,
+            color: Color.WHITE,
+            bold: true,
+            hAlign: Label.HorizontalAlign.CENTER,
+            vAlign: Label.VerticalAlign.CENTER,
+            outlineColor: new Color(18, 20, 34, 255),
+            outlineWidth: 3,
+        });
         nameLabel.overflow = Label.Overflow.SHRINK;
-        nameNode.setPosition(0, CARD_HEIGHT / 2 - 40, 0);
+        nameNode.setPosition(0, CARD_HEIGHT / 2 - 42, 0);
 
         // 等级标签
-        const levelNode = new Node('Level');
-        levelNode.layer = UI_LAYER;
-        levelNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 20, 30);
-        cardNode.addChild(levelNode);
-        const levelLabel = levelNode.addComponent(Label);
-        levelLabel.string = isUpgrade
+        const levelText = isUpgrade
             ? Localization.instance.t('ui.weapon.level.upgrade', {
                   from: currentLevel,
                   to: currentLevel + 1,
               })
             : Localization.instance.t('ui.weapon.level.new');
-        levelLabel.fontSize = 18;
-        levelLabel.lineHeight = 22;
-        levelLabel.color = isUpgrade ? new Color(255, 215, 0, 255) : new Color(100, 255, 100, 255);
-        levelLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
-        levelNode.setPosition(0, CARD_HEIGHT / 2 - 80, 0);
+        SelectionCardTheme.createBadge(
+            cardNode,
+            levelText,
+            SelectionCardTheme.blendColor(themeColor, new Color(255, 224, 146, 255), 0.3),
+            { w: 146, h: 30 },
+            { x: 0, y: CARD_HEIGHT / 2 - 88 },
+            isUpgrade ? new Color(255, 226, 126, 255) : new Color(158, 252, 186, 255)
+        );
 
         // 武器描述
         const descNode = new Node('Desc');
         descNode.layer = UI_LAYER;
-        descNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 24, 60);
+        descNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 26, 82);
         cardNode.addChild(descNode);
         const descLabel = descNode.addComponent(Label);
         descLabel.string = Localization.instance.t(def.descriptionKey);
-        descLabel.fontSize = 16;
-        descLabel.lineHeight = 20;
-        descLabel.color = new Color(190, 190, 190, 255);
-        descLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
-        descLabel.verticalAlign = Label.VerticalAlign.TOP;
+        SelectionCardTheme.applyLabelTheme(descLabel, {
+            fontSize: 18,
+            lineHeight: 24,
+            color: new Color(194, 208, 232, 255),
+            hAlign: Label.HorizontalAlign.CENTER,
+            vAlign: Label.VerticalAlign.TOP,
+            outlineColor: new Color(8, 20, 32, 255),
+            outlineWidth: 2,
+            shadowBlur: 1,
+        });
         descLabel.overflow = Label.Overflow.SHRINK;
-        descNode.setPosition(0, 20, 0);
+        descNode.setPosition(0, 34, 0);
 
         // 属性预览
         const nextLevel = currentLevel + 1;
         const statsText = this.formatStats(def, nextLevel);
         const statsNode = new Node('Stats');
         statsNode.layer = UI_LAYER;
-        statsNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 24, 120);
+        statsNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 28, 164);
         cardNode.addChild(statsNode);
         const statsLabel = statsNode.addComponent(Label);
         statsLabel.string = statsText;
-        statsLabel.fontSize = 17;
-        statsLabel.lineHeight = 22;
-        statsLabel.color = new Color(240, 240, 240, 255);
-        statsLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
-        statsLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        SelectionCardTheme.applyLabelTheme(statsLabel, {
+            fontSize: 18,
+            lineHeight: 24,
+            color: new Color(236, 244, 255, 255),
+            hAlign: Label.HorizontalAlign.CENTER,
+            vAlign: Label.VerticalAlign.CENTER,
+            outlineColor: new Color(10, 22, 38, 255),
+            outlineWidth: 2,
+        });
         statsLabel.overflow = Label.Overflow.CLAMP;
-        statsNode.setPosition(0, -70, 0);
+        statsNode.setPosition(0, -86, 0);
 
         // 点击
-        cardNode.on(Node.EventType.TOUCH_END, () => {
+        SelectionCardTheme.bindCardClick(cardNode, () => {
             if (!this._isShowing) return;
             this.eventManager.emit(GameEvents.WEAPON_PICKED, { weaponId: type });
             this.hideCards();
@@ -324,9 +329,5 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
 
     private get eventManager(): EventManager {
         return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
-    }
-
-    private get gameManager(): GameManager {
-        return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
     }
 }

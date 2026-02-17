@@ -9,6 +9,8 @@ import {
     Widget,
     Graphics,
     Label,
+    LabelOutline,
+    LabelShadow,
 } from 'cc';
 import { Joystick } from './Joystick';
 import { Localization } from '../core/i18n/Localization';
@@ -119,19 +121,29 @@ export class UIFactory {
 
         const transform = node.addComponent(UITransform);
         transform.setAnchorPoint(1, 1); // 锚点设为右上角
+        transform.setContentSize(330, 62);
 
         const widget = node.addComponent(Widget);
         widget.isAlignTop = true;
         widget.isAlignRight = true;
-        widget.top = 50;
-        widget.right = 150;
+        widget.top = 16;
+        widget.right = 186;
 
         const label = node.addComponent(Label);
         label.string = Localization.instance.t('ui.hud.coins', { count: 0 });
-        label.fontSize = 40;
-        label.lineHeight = 50;
-        label.color = new Color(255, 215, 0, 255); // 金色
+        label.fontSize = 44;
+        label.lineHeight = 52;
+        label.color = new Color(255, 216, 95, 255);
         label.horizontalAlign = Label.HorizontalAlign.RIGHT; // 右对齐
+        label.verticalAlign = Label.VerticalAlign.CENTER;
+
+        const outline = node.addComponent(LabelOutline);
+        outline.color = new Color(34, 16, 4, 255);
+        outline.width = 4;
+        const shadow = node.addComponent(LabelShadow);
+        shadow.color = new Color(0, 0, 0, 190);
+        shadow.offset.set(2, -2);
+        shadow.blur = 2;
 
         return label;
     }
@@ -149,9 +161,18 @@ export class UIFactory {
 
         const label = node.addComponent(Label);
         label.string = text;
-        label.fontSize = 30;
-        label.lineHeight = 35;
+        label.fontSize = 34;
+        label.lineHeight = 40;
         label.color = Color.WHITE;
+
+        const outline = node.addComponent(LabelOutline);
+        outline.color = new Color(10, 16, 26, 255);
+        outline.width = 3;
+
+        const shadow = node.addComponent(LabelShadow);
+        shadow.color = new Color(0, 0, 0, 175);
+        shadow.offset.set(2, -1);
+        shadow.blur = 2;
 
         return label;
     }
@@ -173,10 +194,18 @@ export class UIFactory {
 
         const label = node.addComponent(Label);
         label.string = Localization.instance.t('ui.hud.desktopMoveHint');
-        label.fontSize = 24;
-        label.lineHeight = 30;
-        label.color = new Color(235, 235, 235, 255);
+        label.fontSize = 28;
+        label.lineHeight = 34;
+        label.color = new Color(232, 240, 252, 255);
         label.horizontalAlign = Label.HorizontalAlign.LEFT;
+
+        const outline = node.addComponent(LabelOutline);
+        outline.color = new Color(10, 20, 32, 255);
+        outline.width = 3;
+        const shadow = node.addComponent(LabelShadow);
+        shadow.color = new Color(0, 0, 0, 168);
+        shadow.offset.set(2, -1);
+        shadow.blur = 2;
 
         return label;
     }

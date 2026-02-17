@@ -15,7 +15,6 @@ import {
     Label,
     LabelOutline,
     LabelShadow,
-    Font,
 } from 'cc';
 import { Localization } from '../core/i18n/Localization';
 
@@ -257,16 +256,33 @@ export class HealthBar extends Component {
         const bgNode = new Node('Background');
         root.addChild(bgNode);
         this._bgGraphics = bgNode.addComponent(Graphics);
-        this._bgGraphics.fillColor = new Color(50, 0, 0, 255);
-        this._bgGraphics.rect(-this.width / 2, -this.height / 2, this.width, this.height);
+        const barRadius = Math.max(2, this.height * 0.5);
+        this._bgGraphics.fillColor = new Color(18, 16, 22, 245);
+        this._bgGraphics.roundRect(
+            -this.width / 2,
+            -this.height / 2,
+            this.width,
+            this.height,
+            barRadius
+        );
         this._bgGraphics.fill();
+        this._bgGraphics.strokeColor = new Color(60, 82, 104, 210);
+        this._bgGraphics.lineWidth = 1.6;
+        this._bgGraphics.roundRect(
+            -this.width / 2,
+            -this.height / 2,
+            this.width,
+            this.height,
+            barRadius
+        );
+        this._bgGraphics.stroke();
 
         // Foreground (Green)
         const fgNode = new Node('Foreground');
         root.addChild(fgNode);
         this._fgGraphics = fgNode.addComponent(Graphics);
         this._fgGraphics.fillColor = new Color(0, 255, 0, 255);
-        this._fgGraphics.rect(0, 0, this.width, this.height); // Draw 0 to width, handle offset in node
+        this._fgGraphics.roundRect(0, 0, this.width, this.height, barRadius);
         this._fgGraphics.fill();
 
         fgNode.setPosition(-this.width / 2, -this.height / 2, 0);
@@ -275,29 +291,30 @@ export class HealthBar extends Component {
         const labelNode = new Node('NameLabel');
         root.addChild(labelNode);
         // Position above the bar
-        labelNode.setPosition(0, this.height + 4, 0);
+        labelNode.setPosition(0, this.height + 8, 0);
         this._nameLabel = labelNode.addComponent(Label);
-        this._nameLabel.fontSize = 28;
-        this._nameLabel.lineHeight = 32;
+        this._nameLabel.fontSize = 30;
+        this._nameLabel.lineHeight = 34;
         this._nameLabel.isBold = true;
         this._nameLabel.string = '';
+        this._nameLabel.color = new Color(255, 238, 198, 255);
 
         // Outline
         const outline = labelNode.addComponent(LabelOutline);
-        outline.color = new Color(0, 0, 0, 255);
-        outline.width = 2;
+        outline.color = new Color(18, 10, 4, 255);
+        outline.width = 3;
 
         // Shadow
         const shadow = labelNode.addComponent(LabelShadow);
         shadow.color = new Color(0, 0, 0, 200);
-        shadow.offset.set(2, -2);
+        shadow.offset.set(2, -1);
         shadow.blur = 2;
     }
 
     public setName(name: string, level: number): void {
         if (!this._nameLabel) return;
         const levelText = Localization.instance.t('ui.common.level.short', { level });
-        this._nameLabel.string = `${name} ${levelText}`;
+        this._nameLabel.string = `${name}  ${levelText}`;
     }
 
     public updateHealth(current: number, max: number): void {
@@ -343,7 +360,13 @@ export class HealthBar extends Component {
         ) {
             this._fgGraphics.fillColor = targetColor;
             this._fgGraphics.clear();
-            this._fgGraphics.rect(0, 0, this.width, this.height);
+            this._fgGraphics.roundRect(
+                0,
+                0,
+                this.width,
+                this.height,
+                Math.max(2, this.height * 0.5)
+            );
             this._fgGraphics.fill();
         }
     }

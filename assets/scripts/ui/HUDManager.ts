@@ -20,6 +20,8 @@ import {
     director,
     game,
     EventTouch,
+    LabelOutline,
+    LabelShadow,
 } from 'cc';
 import { EventManager } from '../core/managers/EventManager';
 import { GameEvents } from '../data/GameEvents';
@@ -55,9 +57,12 @@ const GAME_OVER_RESTART_BTN_MAX_WIDTH = 280;
 const GAME_OVER_RESTART_BTN_MAX_HEIGHT = 86;
 const GAME_OVER_RESTART_BTN_MIN_WIDTH = 190;
 const GAME_OVER_RESTART_BTN_MIN_HEIGHT = 64;
-const SETTINGS_PANEL_WIDTH = 460;
-const SETTINGS_PANEL_HEIGHT = 270;
-const SETTINGS_SLIDER_WIDTH = 236;
+const SETTINGS_PANEL_WIDTH = 500;
+const SETTINGS_PANEL_HEIGHT = 304;
+const SETTINGS_SLIDER_WIDTH = 262;
+const SETTINGS_BUTTON_WIDTH = 156;
+const SETTINGS_BUTTON_HEIGHT = 58;
+const SETTINGS_CLOSE_SIZE = 48;
 
 type AudioSliderKey = 'bgm' | 'sfx';
 
@@ -115,8 +120,8 @@ export class HUDManager {
     private _xpBarBg: Graphics | null = null;
     private _xpBarFg: Graphics | null = null;
     private _levelLabel: Label | null = null;
-    private _xpBarWidth: number = 260;
-    private _xpBarHeight: number = 14;
+    private _xpBarWidth: number = 320;
+    private _xpBarHeight: number = 16;
 
     // === 波前预告 UI ===
     private _waveForecastRoot: Node | null = null;
@@ -208,9 +213,15 @@ export class HUDManager {
         const hpWidget = this._baseHpLabel.node.addComponent(Widget);
         hpWidget.isAlignTop = true;
         hpWidget.isAlignHorizontalCenter = true;
-        hpWidget.top = 20;
+        hpWidget.top = 48;
 
-        this._baseHpLabel.fontSize = 24;
+        this._baseHpLabel.fontSize = 30;
+        this._baseHpLabel.lineHeight = 36;
+        this._baseHpLabel.color = new Color(244, 245, 255, 255);
+        this.applyGameLabelStyle(this._baseHpLabel, {
+            outlineColor: new Color(8, 16, 28, 255),
+            outlineWidth: 4,
+        });
 
         // 创建建造点信息显示
         this.createBuildingInfoLabel(uiCanvas);
@@ -226,11 +237,17 @@ export class HUDManager {
         const waveWidget = this._waveLabel.node.addComponent(Widget);
         waveWidget.isAlignTop = true;
         waveWidget.isAlignLeft = true;
-        waveWidget.top = 20;
-        waveWidget.left = 20;
+        waveWidget.top = 18;
+        waveWidget.left = 24;
 
-        this._waveLabel.fontSize = 30;
-        this._waveLabel.color = new Color(255, 215, 0, 255); // Gold color
+        this._waveLabel.fontSize = 40;
+        this._waveLabel.lineHeight = 44;
+        this._waveLabel.color = new Color(255, 215, 80, 255);
+        this.applyGameLabelStyle(this._waveLabel, {
+            outlineColor: new Color(40, 20, 0, 255),
+            outlineWidth: 5,
+            shadowColor: new Color(0, 0, 0, 205),
+        });
 
         // 创建经验条 (Top Center)
         this.createXpBar(uiCanvas);
@@ -259,14 +276,18 @@ export class HUDManager {
         const widget = node.addComponent(Widget);
         widget.isAlignBottom = true;
         widget.isAlignHorizontalCenter = true;
-        widget.bottom = 150;
+        widget.bottom = 174;
 
         this._buildingInfoLabel = node.addComponent(Label);
         this._buildingInfoLabel.string = '';
-        this._buildingInfoLabel.fontSize = 36;
-        this._buildingInfoLabel.lineHeight = 40;
-        this._buildingInfoLabel.color = new Color(255, 255, 255, 255); // 白色
+        this._buildingInfoLabel.fontSize = 40;
+        this._buildingInfoLabel.lineHeight = 46;
+        this._buildingInfoLabel.color = new Color(255, 244, 212, 255);
         this._buildingInfoLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this.applyGameLabelStyle(this._buildingInfoLabel, {
+            outlineColor: new Color(24, 16, 8, 255),
+            outlineWidth: 4,
+        });
 
         // 默认隐藏
         node.active = false;
@@ -276,11 +297,13 @@ export class HUDManager {
         const buttonNode = new Node('SettingsButton');
         buttonNode.layer = UI_LAYER;
         parent.addChild(buttonNode);
-        buttonNode.addComponent(UITransform).setContentSize(112, 46);
+        buttonNode
+            .addComponent(UITransform)
+            .setContentSize(SETTINGS_BUTTON_WIDTH, SETTINGS_BUTTON_HEIGHT);
         const buttonWidget = buttonNode.addComponent(Widget);
         buttonWidget.isAlignTop = true;
         buttonWidget.isAlignRight = true;
-        buttonWidget.top = 14;
+        buttonWidget.top = 12;
         buttonWidget.right = 16;
 
         const button = buttonNode.addComponent(Button);
@@ -292,15 +315,34 @@ export class HUDManager {
         const buttonLabelNode = new Node('SettingsButtonLabel');
         buttonLabelNode.layer = UI_LAYER;
         buttonNode.addChild(buttonLabelNode);
-        buttonLabelNode.addComponent(UITransform).setContentSize(104, 40);
+        buttonLabelNode
+            .addComponent(UITransform)
+            .setContentSize(SETTINGS_BUTTON_WIDTH - 52, SETTINGS_BUTTON_HEIGHT - 8);
+        buttonLabelNode.setPosition(14, 0, 0);
         const buttonLabel = buttonLabelNode.addComponent(Label);
         buttonLabel.string = Localization.instance.t('ui.settings.button');
-        buttonLabel.fontSize = 24;
-        buttonLabel.lineHeight = 30;
+        buttonLabel.fontSize = 28;
+        buttonLabel.lineHeight = 32;
         buttonLabel.isBold = true;
         buttonLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         buttonLabel.verticalAlign = Label.VerticalAlign.CENTER;
-        buttonLabel.color = new Color(28, 18, 10, 255);
+        buttonLabel.color = new Color(34, 19, 8, 255);
+        this.applyGameLabelStyle(buttonLabel, {
+            outlineColor: new Color(255, 238, 182, 228),
+            outlineWidth: 1,
+            shadowColor: new Color(0, 0, 0, 88),
+            shadowOffsetX: 1,
+            shadowOffsetY: -1,
+            shadowBlur: 1,
+        });
+
+        const buttonIconNode = new Node('SettingsButtonIcon');
+        buttonIconNode.layer = UI_LAYER;
+        buttonNode.addChild(buttonIconNode);
+        buttonIconNode.addComponent(UITransform).setContentSize(28, 28);
+        buttonIconNode.setPosition(-SETTINGS_BUTTON_WIDTH * 0.3, 0, 0);
+        const buttonIcon = buttonIconNode.addComponent(Graphics);
+        this.drawSettingsGearIcon(buttonIcon);
 
         buttonNode.on(
             Button.EventType.CLICK,
@@ -356,33 +398,39 @@ export class HUDManager {
         const titleNode = new Node('SettingsTitle');
         titleNode.layer = UI_LAYER;
         panel.addChild(titleNode);
-        titleNode.addComponent(UITransform).setContentSize(SETTINGS_PANEL_WIDTH - 110, 42);
-        titleNode.setPosition(-40, 98, 0);
+        titleNode.addComponent(UITransform).setContentSize(SETTINGS_PANEL_WIDTH - 132, 46);
+        titleNode.setPosition(-56, 108, 0);
         const titleLabel = titleNode.addComponent(Label);
         titleLabel.string = Localization.instance.t('ui.settings.title');
-        titleLabel.fontSize = 30;
-        titleLabel.lineHeight = 36;
+        titleLabel.fontSize = 32;
+        titleLabel.lineHeight = 38;
         titleLabel.isBold = true;
         titleLabel.horizontalAlign = Label.HorizontalAlign.LEFT;
         titleLabel.verticalAlign = Label.VerticalAlign.CENTER;
         titleLabel.color = new Color(255, 228, 186, 255);
+        this.applyGameLabelStyle(titleLabel, {
+            outlineColor: new Color(54, 26, 8, 255),
+            outlineWidth: 3,
+        });
 
         const closeBtnNode = new Node('SettingsCloseButton');
         closeBtnNode.layer = UI_LAYER;
         panel.addChild(closeBtnNode);
-        closeBtnNode.addComponent(UITransform).setContentSize(42, 34);
-        closeBtnNode.setPosition(SETTINGS_PANEL_WIDTH / 2 - 34, SETTINGS_PANEL_HEIGHT / 2 - 30, 0);
+        closeBtnNode
+            .addComponent(UITransform)
+            .setContentSize(SETTINGS_CLOSE_SIZE, SETTINGS_CLOSE_SIZE);
+        closeBtnNode.setPosition(SETTINGS_PANEL_WIDTH / 2 - 40, SETTINGS_PANEL_HEIGHT / 2 - 36, 0);
         const closeButton = closeBtnNode.addComponent(Button);
         closeButton.transition = Button.Transition.NONE;
         const closeBg = closeBtnNode.addComponent(Graphics);
         this.drawSettingsCloseButton(closeBg);
-        const closeLabel = closeBtnNode.addComponent(Label);
-        closeLabel.string = 'X';
-        closeLabel.fontSize = 24;
-        closeLabel.lineHeight = 28;
-        closeLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
-        closeLabel.verticalAlign = Label.VerticalAlign.CENTER;
-        closeLabel.color = new Color(255, 245, 226, 255);
+
+        const closeIconNode = new Node('SettingsCloseIcon');
+        closeIconNode.layer = UI_LAYER;
+        closeBtnNode.addChild(closeIconNode);
+        closeIconNode.addComponent(UITransform).setContentSize(24, 24);
+        const closeIcon = closeIconNode.addComponent(Graphics);
+        this.drawSettingsCloseIcon(closeIcon);
         closeBtnNode.on(
             Button.EventType.CLICK,
             () => {
@@ -395,14 +443,14 @@ export class HUDManager {
             panel,
             'SettingsBgmRow',
             'ui.settings.bgm',
-            26,
+            38,
             'bgm'
         );
         this._settingsSfxSlider = this.createVolumeSlider(
             panel,
             'SettingsSfxRow',
             'ui.settings.sfx',
-            -62,
+            -58,
             'sfx'
         );
 
@@ -422,32 +470,36 @@ export class HUDManager {
         const row = new Node(rowName);
         row.layer = UI_LAYER;
         parent.addChild(row);
-        row.addComponent(UITransform).setContentSize(SETTINGS_PANEL_WIDTH - 44, 70);
+        row.addComponent(UITransform).setContentSize(SETTINGS_PANEL_WIDTH - 44, 80);
         row.setPosition(0, posY, 0);
 
         const titleNode = new Node(`${rowName}_Title`);
         titleNode.layer = UI_LAYER;
         row.addChild(titleNode);
-        titleNode.addComponent(UITransform).setContentSize(120, 34);
-        titleNode.setPosition(-152, 16, 0);
+        titleNode.addComponent(UITransform).setContentSize(128, 36);
+        titleNode.setPosition(-162, 18, 0);
         const titleLabel = titleNode.addComponent(Label);
         titleLabel.string = Localization.instance.t(titleKey);
-        titleLabel.fontSize = 24;
-        titleLabel.lineHeight = 30;
+        titleLabel.fontSize = 26;
+        titleLabel.lineHeight = 32;
         titleLabel.horizontalAlign = Label.HorizontalAlign.LEFT;
         titleLabel.verticalAlign = Label.VerticalAlign.CENTER;
-        titleLabel.color = new Color(232, 236, 246, 255);
+        titleLabel.color = new Color(238, 242, 252, 255);
+        this.applyGameLabelStyle(titleLabel, {
+            outlineColor: new Color(8, 20, 34, 255),
+            outlineWidth: 3,
+        });
 
         const trackNode = new Node(`${rowName}_Track`);
         trackNode.layer = UI_LAYER;
         row.addChild(trackNode);
         trackNode.addComponent(UITransform).setContentSize(SETTINGS_SLIDER_WIDTH, 18);
-        trackNode.setPosition(-12, -12, 0);
+        trackNode.setPosition(-16, -10, 0);
         const trackBg = trackNode.addComponent(Graphics);
-        trackBg.fillColor = new Color(45, 52, 66, 238);
+        trackBg.fillColor = new Color(28, 42, 58, 238);
         trackBg.roundRect(-SETTINGS_SLIDER_WIDTH / 2, -9, SETTINGS_SLIDER_WIDTH, 18, 9);
         trackBg.fill();
-        trackBg.strokeColor = new Color(126, 144, 168, 220);
+        trackBg.strokeColor = new Color(116, 194, 236, 220);
         trackBg.lineWidth = 2;
         trackBg.roundRect(-SETTINGS_SLIDER_WIDTH / 2, -9, SETTINGS_SLIDER_WIDTH, 18, 9);
         trackBg.stroke();
@@ -461,21 +513,21 @@ export class HUDManager {
         const knobNode = new Node(`${rowName}_Knob`);
         knobNode.layer = UI_LAYER;
         trackNode.addChild(knobNode);
-        knobNode.addComponent(UITransform).setContentSize(26, 26);
+        knobNode.addComponent(UITransform).setContentSize(28, 28);
         const knobGraphics = knobNode.addComponent(Graphics);
-        knobGraphics.fillColor = new Color(248, 240, 214, 255);
-        knobGraphics.circle(0, 0, 10);
+        knobGraphics.fillColor = new Color(255, 246, 220, 255);
+        knobGraphics.circle(0, 0, 11);
         knobGraphics.fill();
-        knobGraphics.strokeColor = new Color(255, 172, 84, 255);
+        knobGraphics.strokeColor = new Color(255, 186, 82, 255);
         knobGraphics.lineWidth = 2;
-        knobGraphics.circle(0, 0, 10);
+        knobGraphics.circle(0, 0, 11);
         knobGraphics.stroke();
 
         const hitNode = new Node(`${rowName}_Hit`);
         hitNode.layer = UI_LAYER;
         row.addChild(hitNode);
         hitNode.addComponent(UITransform).setContentSize(SETTINGS_SLIDER_WIDTH + 18, 34);
-        hitNode.setPosition(-12, -12, 0);
+        hitNode.setPosition(-16, -10, 0);
         hitNode.on(
             Node.EventType.TOUCH_START,
             (event: EventTouch) => {
@@ -494,15 +546,19 @@ export class HUDManager {
         const valueNode = new Node(`${rowName}_Value`);
         valueNode.layer = UI_LAYER;
         row.addChild(valueNode);
-        valueNode.addComponent(UITransform).setContentSize(72, 34);
-        valueNode.setPosition(166, 16, 0);
+        valueNode.addComponent(UITransform).setContentSize(80, 36);
+        valueNode.setPosition(168, 18, 0);
         const valueLabel = valueNode.addComponent(Label);
         valueLabel.string = '100%';
-        valueLabel.fontSize = 22;
-        valueLabel.lineHeight = 28;
+        valueLabel.fontSize = 24;
+        valueLabel.lineHeight = 30;
         valueLabel.horizontalAlign = Label.HorizontalAlign.RIGHT;
         valueLabel.verticalAlign = Label.VerticalAlign.CENTER;
-        valueLabel.color = new Color(154, 224, 255, 255);
+        valueLabel.color = new Color(156, 228, 255, 255);
+        this.applyGameLabelStyle(valueLabel, {
+            outlineColor: new Color(10, 24, 34, 255),
+            outlineWidth: 3,
+        });
 
         return {
             key,
@@ -512,6 +568,28 @@ export class HUDManager {
             valueLabel,
             width: SETTINGS_SLIDER_WIDTH,
         };
+    }
+
+    private applyGameLabelStyle(
+        label: Label,
+        options?: {
+            outlineColor?: Color;
+            outlineWidth?: number;
+            shadowColor?: Color;
+            shadowOffsetX?: number;
+            shadowOffsetY?: number;
+            shadowBlur?: number;
+        }
+    ): void {
+        const outline =
+            label.node.getComponent(LabelOutline) ?? label.node.addComponent(LabelOutline);
+        outline.color = options?.outlineColor ?? new Color(10, 16, 28, 255);
+        outline.width = options?.outlineWidth ?? 3;
+
+        const shadow = label.node.getComponent(LabelShadow) ?? label.node.addComponent(LabelShadow);
+        shadow.color = options?.shadowColor ?? new Color(0, 0, 0, 180);
+        shadow.offset.set(options?.shadowOffsetX ?? 2, options?.shadowOffsetY ?? -2);
+        shadow.blur = options?.shadowBlur ?? 2;
     }
 
     private onVolumeSliderTouch(key: AudioSliderKey, event: EventTouch): void {
@@ -556,7 +634,7 @@ export class HUDManager {
 
         slider.fillGraphics.clear();
         if (fillWidth > 0) {
-            slider.fillGraphics.fillColor = new Color(88, 221, 255, 255);
+            slider.fillGraphics.fillColor = new Color(82, 214, 255, 255);
             slider.fillGraphics.roundRect(left, -7, fillWidth, 14, 7);
             slider.fillGraphics.fill();
         }
@@ -565,47 +643,110 @@ export class HUDManager {
     }
 
     private drawSettingsButton(bg: Graphics): void {
+        const tf = bg.node.getComponent(UITransform);
+        const w = Math.round(tf?.contentSize.width ?? SETTINGS_BUTTON_WIDTH);
+        const h = Math.round(tf?.contentSize.height ?? SETTINGS_BUTTON_HEIGHT);
+        const radius = Math.max(12, Math.round(h * 0.3));
         bg.clear();
-        bg.fillColor = new Color(255, 205, 98, 245);
-        bg.roundRect(-56, -23, 112, 46, 12);
+        bg.fillColor = new Color(255, 198, 88, 250);
+        bg.roundRect(-w / 2, -h / 2, w, h, radius);
         bg.fill();
-        bg.strokeColor = new Color(255, 238, 182, 255);
-        bg.lineWidth = 2;
-        bg.roundRect(-56, -23, 112, 46, 12);
+        bg.fillColor = new Color(255, 236, 172, 120);
+        bg.roundRect(-w / 2 + 4, h * 0.04, w - 8, h * 0.34, Math.max(8, radius - 5));
+        bg.fill();
+        bg.strokeColor = new Color(255, 246, 210, 255);
+        bg.lineWidth = 3;
+        bg.roundRect(-w / 2, -h / 2, w, h, radius);
         bg.stroke();
     }
 
     private drawSettingsCloseButton(bg: Graphics): void {
+        const tf = bg.node.getComponent(UITransform);
+        const s = Math.round(tf?.contentSize.width ?? SETTINGS_CLOSE_SIZE);
+        const r = Math.max(8, Math.round(s * 0.25));
         bg.clear();
-        bg.fillColor = new Color(156, 84, 64, 255);
-        bg.roundRect(-21, -17, 42, 34, 8);
+        bg.fillColor = new Color(122, 42, 34, 255);
+        bg.roundRect(-s / 2, -s / 2, s, s, r);
         bg.fill();
-        bg.strokeColor = new Color(255, 204, 182, 255);
-        bg.lineWidth = 2;
-        bg.roundRect(-21, -17, 42, 34, 8);
+        bg.strokeColor = new Color(255, 182, 160, 255);
+        bg.lineWidth = 2.5;
+        bg.roundRect(-s / 2, -s / 2, s, s, r);
         bg.stroke();
     }
 
     private drawSettingsPanelBackground(bg: Graphics): void {
         bg.clear();
-        bg.fillColor = new Color(16, 24, 36, 236);
+        bg.fillColor = new Color(10, 20, 34, 238);
         bg.roundRect(
             -SETTINGS_PANEL_WIDTH / 2,
             -SETTINGS_PANEL_HEIGHT / 2,
             SETTINGS_PANEL_WIDTH,
             SETTINGS_PANEL_HEIGHT,
-            16
+            18
         );
         bg.fill();
-        bg.strokeColor = new Color(255, 162, 76, 246);
-        bg.lineWidth = 3;
+        bg.fillColor = new Color(32, 46, 68, 155);
+        bg.roundRect(
+            -SETTINGS_PANEL_WIDTH / 2 + 10,
+            SETTINGS_PANEL_HEIGHT * 0.14,
+            SETTINGS_PANEL_WIDTH - 20,
+            SETTINGS_PANEL_HEIGHT * 0.3,
+            12
+        );
+        bg.fill();
+        bg.strokeColor = new Color(255, 172, 88, 246);
+        bg.lineWidth = 3.5;
         bg.roundRect(
             -SETTINGS_PANEL_WIDTH / 2,
             -SETTINGS_PANEL_HEIGHT / 2,
             SETTINGS_PANEL_WIDTH,
             SETTINGS_PANEL_HEIGHT,
-            16
+            18
         );
+        bg.stroke();
+        bg.strokeColor = new Color(96, 204, 248, 140);
+        bg.lineWidth = 1.5;
+        bg.roundRect(
+            -SETTINGS_PANEL_WIDTH / 2 + 10,
+            -SETTINGS_PANEL_HEIGHT / 2 + 10,
+            SETTINGS_PANEL_WIDTH - 20,
+            SETTINGS_PANEL_HEIGHT - 20,
+            14
+        );
+        bg.stroke();
+    }
+
+    private drawSettingsGearIcon(bg: Graphics): void {
+        bg.clear();
+        bg.strokeColor = new Color(62, 34, 8, 255);
+        bg.lineWidth = 2;
+        for (let i = 0; i < 8; i++) {
+            const angle = (Math.PI / 4) * i;
+            const outerX = Math.cos(angle) * 11;
+            const outerY = Math.sin(angle) * 11;
+            const innerX = Math.cos(angle) * 7;
+            const innerY = Math.sin(angle) * 7;
+            bg.moveTo(innerX, innerY);
+            bg.lineTo(outerX, outerY);
+            bg.stroke();
+        }
+        bg.fillColor = new Color(110, 62, 20, 255);
+        bg.circle(0, 0, 7);
+        bg.fill();
+        bg.fillColor = new Color(255, 230, 168, 255);
+        bg.circle(0, 0, 3.2);
+        bg.fill();
+    }
+
+    private drawSettingsCloseIcon(bg: Graphics): void {
+        bg.clear();
+        bg.strokeColor = new Color(255, 236, 222, 255);
+        bg.lineWidth = 3.5;
+        bg.moveTo(-7, -7);
+        bg.lineTo(7, 7);
+        bg.stroke();
+        bg.moveTo(-7, 7);
+        bg.lineTo(7, -7);
         bg.stroke();
     }
 
@@ -679,9 +820,9 @@ export class HUDManager {
             });
             // 简单的变色逻辑
             if (current < max * 0.3) {
-                this._baseHpLabel.color = new Color(255, 50, 50, 255);
+                this._baseHpLabel.color = new Color(255, 112, 112, 255);
             } else {
-                this._baseHpLabel.color = new Color(255, 255, 255, 255);
+                this._baseHpLabel.color = new Color(244, 245, 255, 255);
             }
         }
     }
@@ -1257,9 +1398,10 @@ export class HUDManager {
                   };
               }
             | undefined;
-        const reload = maybeWindow?.location?.reload;
+        const locationObj = maybeWindow?.location;
+        const reload = locationObj?.reload;
         if (typeof reload !== 'function') return false;
-        reload.call(maybeWindow.location);
+        reload.call(locationObj);
         return true;
     }
 
@@ -1382,12 +1524,12 @@ export class HUDManager {
         parent.addChild(root);
 
         const transform = root.addComponent(UITransform);
-        transform.setContentSize(this._xpBarWidth + 80, this._xpBarHeight + 30);
+        transform.setContentSize(this._xpBarWidth + 90, this._xpBarHeight + 34);
 
         const widget = root.addComponent(Widget);
         widget.isAlignTop = true;
         widget.isAlignHorizontalCenter = true;
-        widget.top = 20;
+        widget.top = 16;
 
         // 等级标签
         const lvNode = new Node('LevelLabel');
@@ -1396,11 +1538,15 @@ export class HUDManager {
         lvNode.addComponent(UITransform);
         this._levelLabel = lvNode.addComponent(Label);
         this._levelLabel.string = Localization.instance.t('ui.common.level.short', { level: 1 });
-        this._levelLabel.fontSize = 22;
-        this._levelLabel.lineHeight = 26;
-        this._levelLabel.color = new Color(255, 230, 140, 255);
+        this._levelLabel.fontSize = 26;
+        this._levelLabel.lineHeight = 30;
+        this._levelLabel.color = new Color(255, 231, 132, 255);
         this._levelLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
-        lvNode.setPosition(0, 12, 0);
+        this.applyGameLabelStyle(this._levelLabel, {
+            outlineColor: new Color(40, 24, 8, 255),
+            outlineWidth: 4,
+        });
+        lvNode.setPosition(0, 14, 0);
 
         // 背景条
         const bgNode = new Node('XpBg');
@@ -1408,24 +1554,24 @@ export class HUDManager {
         root.addChild(bgNode);
         bgNode.addComponent(UITransform);
         this._xpBarBg = bgNode.addComponent(Graphics);
-        this._xpBarBg.fillColor = new Color(40, 40, 40, 200);
+        this._xpBarBg.fillColor = new Color(12, 22, 34, 210);
         this._xpBarBg.roundRect(
             -this._xpBarWidth / 2,
             -this._xpBarHeight / 2,
             this._xpBarWidth,
             this._xpBarHeight,
-            4
+            7
         );
         this._xpBarBg.fill();
         // 边框
-        this._xpBarBg.strokeColor = new Color(120, 120, 120, 180);
-        this._xpBarBg.lineWidth = 1;
+        this._xpBarBg.strokeColor = new Color(82, 180, 236, 215);
+        this._xpBarBg.lineWidth = 2;
         this._xpBarBg.roundRect(
             -this._xpBarWidth / 2,
             -this._xpBarHeight / 2,
             this._xpBarWidth,
             this._xpBarHeight,
-            4
+            7
         );
         this._xpBarBg.stroke();
         bgNode.setPosition(0, -6, 0);
@@ -1445,13 +1591,13 @@ export class HUDManager {
         this._xpBarFg.clear();
         const w = this._xpBarWidth * Math.max(0, Math.min(1, ratio));
         if (w < 1) return;
-        this._xpBarFg.fillColor = new Color(80, 200, 255, 255);
+        this._xpBarFg.fillColor = new Color(92, 220, 255, 255);
         this._xpBarFg.roundRect(
             -this._xpBarWidth / 2,
             -this._xpBarHeight / 2,
             w,
             this._xpBarHeight,
-            4
+            7
         );
         this._xpBarFg.fill();
     }
@@ -1475,7 +1621,7 @@ export class HUDManager {
         const widget = root.addComponent(Widget);
         widget.isAlignTop = true;
         widget.isAlignHorizontalCenter = true;
-        widget.top = 66;
+        widget.top = 74;
 
         this._waveForecastOpacity = root.addComponent(UIOpacity);
         this._waveForecastOpacity.opacity = 0;
@@ -1492,11 +1638,15 @@ export class HUDManager {
         labelNode.addComponent(UITransform);
         this._waveForecastLabel = labelNode.addComponent(Label);
         this._waveForecastLabel.string = '';
-        this._waveForecastLabel.fontSize = 28;
-        this._waveForecastLabel.lineHeight = 34;
+        this._waveForecastLabel.fontSize = 30;
+        this._waveForecastLabel.lineHeight = 36;
         this._waveForecastLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._waveForecastLabel.verticalAlign = Label.VerticalAlign.CENTER;
         this._waveForecastLabel.color = new Color(120, 235, 255, 255);
+        this.applyGameLabelStyle(this._waveForecastLabel, {
+            outlineColor: new Color(8, 24, 40, 255),
+            outlineWidth: 4,
+        });
 
         this._waveForecastRoot = root;
         this.drawWaveForecastBackground(false);
@@ -1519,12 +1669,16 @@ export class HUDManager {
         const height = this._waveForecastHeight;
 
         bg.clear();
-        bg.fillColor = isBoss ? new Color(76, 18, 18, 235) : new Color(14, 34, 54, 225);
-        bg.roundRect(-width / 2, -height / 2, width, height, 10);
+        bg.fillColor = isBoss ? new Color(78, 20, 18, 236) : new Color(10, 30, 52, 232);
+        bg.roundRect(-width / 2, -height / 2, width, height, 14);
         bg.fill();
-        bg.strokeColor = isBoss ? new Color(255, 110, 110, 255) : new Color(80, 210, 255, 255);
-        bg.lineWidth = 3;
-        bg.roundRect(-width / 2, -height / 2, width, height, 10);
+        bg.strokeColor = isBoss ? new Color(255, 124, 124, 255) : new Color(96, 220, 255, 255);
+        bg.lineWidth = 3.5;
+        bg.roundRect(-width / 2, -height / 2, width, height, 14);
+        bg.stroke();
+        bg.strokeColor = isBoss ? new Color(255, 186, 162, 112) : new Color(164, 236, 255, 96);
+        bg.lineWidth = 1.2;
+        bg.roundRect(-width / 2 + 7, -height / 2 + 7, width - 14, height - 14, 10);
         bg.stroke();
     }
 
@@ -1595,11 +1749,15 @@ export class HUDManager {
             .setContentSize(LANE_UNLOCK_DIALOG_WIDTH - 56, LANE_UNLOCK_DIALOG_HEIGHT - 18);
         this._laneUnlockDialogLabel = textNode.addComponent(Label);
         this._laneUnlockDialogLabel.string = '';
-        this._laneUnlockDialogLabel.fontSize = 27;
-        this._laneUnlockDialogLabel.lineHeight = 34;
+        this._laneUnlockDialogLabel.fontSize = 30;
+        this._laneUnlockDialogLabel.lineHeight = 36;
         this._laneUnlockDialogLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._laneUnlockDialogLabel.verticalAlign = Label.VerticalAlign.CENTER;
         this._laneUnlockDialogLabel.color = new Color(255, 225, 176, 255);
+        this.applyGameLabelStyle(this._laneUnlockDialogLabel, {
+            outlineColor: new Color(34, 18, 8, 255),
+            outlineWidth: 4,
+        });
 
         this._laneUnlockDialogRoot = root;
         root.active = false;
@@ -1686,23 +1844,33 @@ export class HUDManager {
         if (!this._laneUnlockDialogBg) return;
         const bg = this._laneUnlockDialogBg;
         bg.clear();
-        bg.fillColor = new Color(42, 26, 14, 232);
+        bg.fillColor = new Color(34, 20, 10, 236);
         bg.roundRect(
             -LANE_UNLOCK_DIALOG_WIDTH / 2,
             -LANE_UNLOCK_DIALOG_HEIGHT / 2,
             LANE_UNLOCK_DIALOG_WIDTH,
             LANE_UNLOCK_DIALOG_HEIGHT,
-            12
+            14
         );
         bg.fill();
-        bg.strokeColor = new Color(255, 176, 82, 255);
-        bg.lineWidth = 3;
+        bg.strokeColor = new Color(255, 186, 92, 255);
+        bg.lineWidth = 3.5;
         bg.roundRect(
             -LANE_UNLOCK_DIALOG_WIDTH / 2,
             -LANE_UNLOCK_DIALOG_HEIGHT / 2,
             LANE_UNLOCK_DIALOG_WIDTH,
             LANE_UNLOCK_DIALOG_HEIGHT,
-            12
+            14
+        );
+        bg.stroke();
+        bg.strokeColor = new Color(255, 228, 182, 120);
+        bg.lineWidth = 1.5;
+        bg.roundRect(
+            -LANE_UNLOCK_DIALOG_WIDTH / 2 + 8,
+            -LANE_UNLOCK_DIALOG_HEIGHT / 2 + 8,
+            LANE_UNLOCK_DIALOG_WIDTH - 16,
+            LANE_UNLOCK_DIALOG_HEIGHT - 16,
+            10
         );
         bg.stroke();
     }

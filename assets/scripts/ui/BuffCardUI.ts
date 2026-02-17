@@ -1,4 +1,4 @@
-import { Node, UITransform, Color, Widget, Graphics, Label, UIOpacity, tween, Vec3 } from 'cc';
+import { Node, UITransform, Color, Widget, Graphics, Label } from 'cc';
 import { EventManager } from '../core/managers/EventManager';
 import { GameManager } from '../core/managers/GameManager';
 import { ServiceRegistry } from '../core/managers/ServiceRegistry';
@@ -10,15 +10,15 @@ import {
 } from '../gameplay/roguelike/BuffCardService';
 import { GameConfig } from '../data/GameConfig';
 import { Localization } from '../core/i18n/Localization';
+import { SelectionCardTheme } from './SelectionCardTheme';
 
 // UI_2D Layer
 const UI_LAYER = 33554432;
 
 /** 单张卡牌视觉尺寸 */
-const CARD_WIDTH = 220;
-const CARD_HEIGHT = 340;
-const CARD_GAP = 30;
-const CARD_CORNER_RADIUS = 16;
+const CARD_WIDTH = 258;
+const CARD_HEIGHT = 378;
+const CARD_GAP = 34;
 
 /**
  * BuffCardUI
@@ -93,12 +93,12 @@ export class BuffCardUI {
 
         // 居中排列卡牌
         const totalWidth = cards.length * CARD_WIDTH + (cards.length - 1) * CARD_GAP;
-        
+
         // Dynamic scaling if total width exceeds screen width
         const size = this._root.getComponent(UITransform)?.contentSize;
         if (size && totalWidth > size.width - 100) {
-             const scale = (size.width - 100) / totalWidth;
-             cardContainer.setScale(scale, scale, 1);
+            const scale = (size.width - 100) / totalWidth;
+            cardContainer.setScale(scale, scale, 1);
         }
 
         const startX = -totalWidth / 2 + CARD_WIDTH / 2;
@@ -108,27 +108,7 @@ export class BuffCardUI {
             const cardNode = this.createCardNode(card, i);
             cardNode.setPosition(startX + i * (CARD_WIDTH + CARD_GAP), -20, 0);
             cardContainer.addChild(cardNode);
-
-            // 入场动画：从下方弹入
-            const targetY = cardNode.position.y;
-            cardNode.setPosition(cardNode.position.x, targetY - 200, 0);
-
-            const opacity = cardNode.addComponent(UIOpacity);
-            opacity.opacity = 0;
-
-            tween(cardNode)
-                .delay(i * 0.12)
-                .to(
-                    0.3,
-                    { position: new Vec3(cardNode.position.x, targetY, 0) },
-                    { easing: 'backOut' }
-                )
-                .start();
-
-            tween(opacity)
-                .delay(i * 0.12)
-                .to(0.2, { opacity: 255 })
-                .start();
+            SelectionCardTheme.playCardReveal(cardNode, i);
         }
     }
 
@@ -167,9 +147,7 @@ export class BuffCardUI {
         overlay.addChild(bg);
 
         const g = bg.addComponent(Graphics);
-        g.fillColor = new Color(0, 0, 0, 160);
-        g.rect(-640, -360, 1280, 720);
-        g.fill();
+        SelectionCardTheme.drawOverlayMask(g, 1280, 720);
 
         return overlay;
     }
@@ -179,20 +157,39 @@ export class BuffCardUI {
         titleNode.layer = UI_LAYER;
         parent.addChild(titleNode);
 
-        titleNode.addComponent(UITransform);
+        titleNode.addComponent(UITransform).setContentSize(760, 72);
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.buff.select.title');
-        label.fontSize = 38;
-        label.lineHeight = 44;
-        label.color = new Color(255, 215, 0, 255);
-        label.horizontalAlign = Label.HorizontalAlign.CENTER;
+        SelectionCardTheme.applyLabelTheme(label, {
+            fontSize: 48,
+            lineHeight: 54,
+            color: new Color(255, 214, 92, 255),
+            bold: true,
+            hAlign: Label.HorizontalAlign.CENTER,
+            vAlign: Label.VerticalAlign.CENTER,
+            outlineColor: new Color(52, 26, 6, 255),
+            outlineWidth: 5,
+        });
 
         // Responsive Title using Widget
         const widget = titleNode.addComponent(Widget);
         widget.isAlignTop = true;
         widget.isAlignHorizontalCenter = true;
         widget.top = 100;
+
+        const decoNode = new Node('TitleDeco');
+        decoNode.layer = UI_LAYER;
+        titleNode.addChild(decoNode);
+        const deco = decoNode.addComponent(Graphics);
+        deco.strokeColor = new Color(255, 219, 120, 210);
+        deco.lineWidth = 2;
+        deco.moveTo(-230, -20);
+        deco.lineTo(-95, -20);
+        deco.stroke();
+        deco.moveTo(95, -20);
+        deco.lineTo(230, -20);
+        deco.stroke();
     }
 
     private createCardNode(card: BuffCardDef, _index: number): Node {
@@ -213,54 +210,57 @@ export class BuffCardUI {
         cardNode.addChild(bg);
 
         const g = bg.addComponent(Graphics);
-        // 卡牌底色（深色）
-        g.fillColor = new Color(30, 30, 40, 230);
-        g.roundRect(-CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, CARD_CORNER_RADIUS);
-        g.fill();
-        // 卡牌边框（稀有度色）
-        g.strokeColor = rarityColor;
-        g.lineWidth = 3;
-        g.roundRect(-CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, CARD_CORNER_RADIUS);
-        g.stroke();
-        // 顶部色条（稀有度色）
-        g.fillColor = rarityColor;
-        g.roundRect(-CARD_WIDTH / 2, CARD_HEIGHT / 2 - 60, CARD_WIDTH, 60, CARD_CORNER_RADIUS);
-        g.fill();
-        // 覆盖底部圆角（使色条下缘为直角）
-        g.fillColor = rarityColor;
-        g.rect(-CARD_WIDTH / 2, CARD_HEIGHT / 2 - 60, CARD_WIDTH, CARD_CORNER_RADIUS);
-        g.fill();
+        SelectionCardTheme.drawCardBackground(g, CARD_WIDTH, CARD_HEIGHT, rarityColor, 78);
 
         // 卡牌名称
         const nameNode = new Node('CardName');
         nameNode.layer = UI_LAYER;
-        nameNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 20, 50);
+        nameNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 30, 56);
         cardNode.addChild(nameNode);
 
         const nameLabel = nameNode.addComponent(Label);
         nameLabel.string = Localization.instance.t(card.nameKey);
-        nameLabel.fontSize = 26;
-        nameLabel.lineHeight = 30;
-        nameLabel.color = Color.WHITE;
-        nameLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        SelectionCardTheme.applyLabelTheme(nameLabel, {
+            fontSize: 30,
+            lineHeight: 34,
+            color: Color.WHITE,
+            bold: true,
+            hAlign: Label.HorizontalAlign.CENTER,
+            vAlign: Label.VerticalAlign.CENTER,
+            outlineColor: new Color(18, 20, 34, 255),
+            outlineWidth: 3,
+        });
         nameLabel.overflow = Label.Overflow.SHRINK;
-        nameNode.setPosition(0, CARD_HEIGHT / 2 - 35, 0);
+        nameNode.setPosition(0, CARD_HEIGHT / 2 - 42, 0);
+
+        SelectionCardTheme.createBadge(
+            cardNode,
+            this.getRarityTag(card.rarity),
+            rarityColor,
+            { w: 104, h: 30 },
+            { x: 0, y: CARD_HEIGHT / 2 - 88 },
+            new Color(176, 255, 206, 255)
+        );
 
         // 属性提升详情（动态生成，唯一文字区域）
         const detailNode = new Node('CardDetail');
         detailNode.layer = UI_LAYER;
-        detailNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 24, 200);
+        detailNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 30, 230);
         cardNode.addChild(detailNode);
 
         const detailLabel = detailNode.addComponent(Label);
         detailLabel.string = this.formatEffects(card.effects);
-        detailLabel.fontSize = 20;
-        detailLabel.lineHeight = 28;
-        detailLabel.color = new Color(240, 240, 240, 255);
-        detailLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
-        detailLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        SelectionCardTheme.applyLabelTheme(detailLabel, {
+            fontSize: 21,
+            lineHeight: 29,
+            color: new Color(236, 244, 255, 255),
+            hAlign: Label.HorizontalAlign.CENTER,
+            vAlign: Label.VerticalAlign.CENTER,
+            outlineColor: new Color(10, 22, 38, 255),
+            outlineWidth: 2,
+        });
         detailLabel.overflow = Label.Overflow.CLAMP;
-        detailNode.setPosition(0, -30, 0);
+        detailNode.setPosition(0, -52, 0);
 
         // 点击区域（覆盖整张卡牌）
         this.addClickHandler(cardNode, card);
@@ -269,17 +269,9 @@ export class BuffCardUI {
     }
 
     private addClickHandler(cardNode: Node, card: BuffCardDef): void {
-        cardNode.on(Node.EventType.TOUCH_END, () => {
+        SelectionCardTheme.bindCardClick(cardNode, () => {
             if (!this._isShowing) return;
-
-            // 选中动画
-            tween(cardNode)
-                .to(0.15, { scale: new Vec3(1.1, 1.1, 1) })
-                .to(0.1, { scale: new Vec3(1, 1, 1) })
-                .call(() => {
-                    this.onCardSelected(card);
-                })
-                .start();
+            this.onCardSelected(card);
         });
     }
 
@@ -360,6 +352,13 @@ export class BuffCardUI {
         }
 
         return lines.join('\n');
+    }
+
+    private getRarityTag(rarity: string): string {
+        if (rarity === 'legendary') return '传说';
+        if (rarity === 'epic') return '史诗';
+        if (rarity === 'rare') return '稀有';
+        return '普通';
     }
 
     // === 工具 ===
