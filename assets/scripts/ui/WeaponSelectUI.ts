@@ -1,10 +1,22 @@
-import { Node, UITransform, Color, Widget, Graphics, Label } from 'cc';
+import {
+    Node,
+    UITransform,
+    Color,
+    Widget,
+    Graphics,
+    Label,
+    Sprite,
+    resources,
+    SpriteFrame,
+    Texture2D,
+    ImageAsset,
+} from 'cc';
 import { Singleton } from '../core/base/Singleton';
 import { EventManager } from '../core/managers/EventManager';
 import { ServiceRegistry } from '../core/managers/ServiceRegistry';
 import { GameEvents } from '../data/GameEvents';
 import { HeroWeaponManager } from '../gameplay/weapons/HeroWeaponManager';
-import { WeaponType, WeaponDef, getWeaponLevelStats } from '../gameplay/weapons/WeaponTypes';
+import { WeaponType, WeaponDef } from '../gameplay/weapons/WeaponTypes';
 import { Localization } from '../core/i18n/Localization';
 import { SelectionCardTheme } from './SelectionCardTheme';
 
@@ -23,6 +35,11 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
     private _uiCanvas: Node | null = null;
     private _rootNode: Node | null = null;
     private _isShowing: boolean = false;
+    
+    // Icon loading cache
+    private _iconFrameCache: Map<string, SpriteFrame> = new Map();
+    private _iconLoading: Set<string> = new Set();
+    private _iconWaiting: Map<string, Set<Sprite>> = new Map();
 
     public initialize(uiCanvas: Node): void {
         this._uiCanvas = uiCanvas;
@@ -33,6 +50,9 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
     public cleanup(): void {
         this.eventManager.off(GameEvents.WEAPONS_OFFERED, this.onWeaponsOffered, this);
         this.hideCards();
+        this._iconFrameCache.clear();
+        this._iconLoading.clear();
+        this._iconWaiting.clear();
     }
 
     // === 事件处理 ===
@@ -119,6 +139,9 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
             this._rootNode = null;
         }
         this._isShowing = false;
+        // Clear waiting sets to avoid memory leaks if sprites are destroyed
+        this._iconWaiting.clear();
+        this._iconLoading.clear();
     }
 
     // === UI 构建 ===
@@ -243,26 +266,27 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         descLabel.overflow = Label.Overflow.SHRINK;
         descNode.setPosition(0, 34, 0);
 
-        // 属性预览
-        const nextLevel = currentLevel + 1;
-        const statsText = this.formatStats(def, nextLevel);
-        const statsNode = new Node('Stats');
-        statsNode.layer = UI_LAYER;
-        statsNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 28, 164);
-        cardNode.addChild(statsNode);
-        const statsLabel = statsNode.addComponent(Label);
-        statsLabel.string = statsText;
-        SelectionCardTheme.applyLabelTheme(statsLabel, {
-            fontSize: 18,
-            lineHeight: 24,
-            color: new Color(236, 244, 255, 255),
-            hAlign: Label.HorizontalAlign.CENTER,
-            vAlign: Label.VerticalAlign.CENTER,
-            outlineColor: new Color(10, 22, 38, 255),
-            outlineWidth: 2,
-        });
-        statsLabel.overflow = Label.Overflow.CLAMP;
-        statsNode.setPosition(0, -86, 0);
+        // 武器图标 (替代原有的 Stats)
+        const iconContainer = new Node('WeaponIcon');
+        iconContainer.layer = UI_LAYER;
+        cardNode.addChild(iconContainer);
+        const containerSize = 100;
+        iconContainer.addComponent(UITransform).setContentSize(containerSize, containerSize);
+        iconContainer.setPosition(0, -60, 0); // Center of the bottom area
+
+        // Icon Sprite
+        const spriteNode = new Node('Sprite');
+        spriteNode.layer = UI_LAYER;
+        iconContainer.addChild(spriteNode);
+        const spriteSize = 80;
+        spriteNode.addComponent(UITransform).setContentSize(spriteSize, spriteSize);
+        
+        const sprite = spriteNode.addComponent(Sprite);
+        sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+        
+        if (def.iconPath) {
+            this.loadWeaponIcon(sprite, def.iconPath);
+        }
 
         // 点击
         SelectionCardTheme.bindCardClick(cardNode, () => {
@@ -274,48 +298,108 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         return cardNode;
     }
 
-    // === 属性格式化 ===
+    // === Icon Loading Logic (Copied from WeaponBarUI) ===
 
-    private static readonly STAT_LABEL_KEYS: Record<string, string> = {
-        damage: 'ui.weapon.stat.damage',
-        attackInterval: 'ui.weapon.stat.attackInterval',
-        range: 'ui.weapon.stat.range',
-        projectileSpeed: 'ui.weapon.stat.projectileSpeed',
-        spread: 'ui.weapon.stat.spread',
-        gravity: 'ui.weapon.stat.gravity',
-        burnDuration: 'ui.weapon.stat.burnDuration',
-        explosionRadius: 'ui.weapon.stat.explosionRadius',
-        spinSpeed: 'ui.weapon.stat.spinSpeed',
-        waveSpeed: 'ui.weapon.stat.waveSpeed',
-        waveRadius: 'ui.weapon.stat.waveRadius',
-        slowPercent: 'ui.weapon.stat.slowPercent',
-        slowDuration: 'ui.weapon.stat.slowDuration',
-    };
-
-    private formatStats(def: WeaponDef, level: number): string {
-        const stats = getWeaponLevelStats(def, level);
-        const lines: string[] = [];
-
-        const keys = Object.keys(stats);
-        for (let i = 0; i < keys.length; i++) {
-            const key = keys[i];
-            const value = (stats as any)[key];
-            const labelKey = WeaponSelectUI.STAT_LABEL_KEYS[key];
-            if (!labelKey) continue;
-            const label = Localization.instance.t(labelKey);
-            if (typeof value === 'number') {
-                if (key === 'slowPercent') {
-                    lines.push(`${label}: ${Math.round(value * 100)}%`);
-                } else if (key === 'slowDuration') {
-                    lines.push(
-                        `${label}: ${Localization.instance.t('ui.common.seconds', { value })}`
-                    );
-                } else {
-                    lines.push(`${label}: ${value}`);
-                }
-            }
+    private loadWeaponIcon(sprite: Sprite, path: string): void {
+        const normalizedPath = path.trim();
+        const cached = this._iconFrameCache.get(normalizedPath);
+        if (cached) {
+            sprite.spriteFrame = cached;
+            return;
         }
-        return lines.join('\n');
+
+        const waitingSet = this.getIconWaitingSet(normalizedPath);
+        waitingSet.add(sprite);
+        if (this._iconLoading.has(normalizedPath)) {
+            return;
+        }
+        this._iconLoading.add(normalizedPath);
+
+        const candidates = this.getIconLoadCandidates(normalizedPath);
+        this.loadWeaponIconByCandidate(candidates, 0, frame => {
+            this._iconLoading.delete(normalizedPath);
+            const waiting = this.getIconWaitingSet(normalizedPath);
+            if (!frame) {
+                console.error(`[WeaponSelectUI] Failed to load weapon icon from paths:`, candidates);
+                waiting.clear();
+                return;
+            }
+
+            this._iconFrameCache.set(normalizedPath, frame);
+            for (const waitingSprite of waiting) {
+                if (!waitingSprite?.isValid) continue;
+                waitingSprite.spriteFrame = frame;
+            }
+            waiting.clear();
+        });
+    }
+
+    private getIconLoadCandidates(path: string): string[] {
+        const rawCandidates = [
+            path,
+            `${path}/spriteFrame`,
+            `${path}/texture`,
+            path.endsWith('.webp') ? path : `${path}.webp`,
+            path.endsWith('.webp') ? `${path}/spriteFrame` : `${path}.webp/spriteFrame`,
+            path.endsWith('.webp') ? `${path}/texture` : `${path}.webp/texture`,
+        ];
+
+        const candidates: string[] = [];
+        for (const candidate of rawCandidates) {
+            if (!candidate || candidates.includes(candidate)) continue;
+            candidates.push(candidate);
+        }
+        return candidates;
+    }
+
+    private loadWeaponIconByCandidate(
+        candidates: string[],
+        index: number,
+        done: (frame: SpriteFrame | null) => void
+    ): void {
+        if (index >= candidates.length) {
+            done(null);
+            return;
+        }
+
+        const candidate = candidates[index];
+        resources.load(candidate, SpriteFrame, (sfErr, spriteFrame) => {
+            if (!sfErr && spriteFrame) {
+                done(spriteFrame);
+                return;
+            }
+
+            resources.load(candidate, Texture2D, (texErr, texture) => {
+                if (!texErr && texture) {
+                    const frame = new SpriteFrame();
+                    frame.texture = texture;
+                    done(frame);
+                    return;
+                }
+
+                resources.load(candidate, ImageAsset, (imgErr, imageAsset) => {
+                    if (!imgErr && imageAsset) {
+                        const textureFromImage = new Texture2D();
+                        textureFromImage.image = imageAsset;
+                        const frameFromImage = new SpriteFrame();
+                        frameFromImage.texture = textureFromImage;
+                        done(frameFromImage);
+                        return;
+                    }
+
+                    this.loadWeaponIconByCandidate(candidates, index + 1, done);
+                });
+            });
+        });
+    }
+
+    private getIconWaitingSet(path: string): Set<Sprite> {
+        let waitingSet = this._iconWaiting.get(path);
+        if (!waitingSet) {
+            waitingSet = new Set<Sprite>();
+            this._iconWaiting.set(path, waitingSet);
+        }
+        return waitingSet;
     }
 
     // === 工具 ===
