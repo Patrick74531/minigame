@@ -25,7 +25,7 @@ import { HeroLevelSystem } from '../../gameplay/units/HeroLevelSystem';
 export class SystemReset {
     /**
      * 销毁所有单例实例
-     * 
+     *
      * NOTE: 调用此方法后，所有 Manager.instance 将变为 null。
      * 必须保证之后立即进行场景重载或重新初始化，否则会报错。
      */
@@ -37,7 +37,7 @@ export class SystemReset {
         EventManager.destroyInstance();
         EffectManager.destroyInstance();
         PoolManager.destroyInstance();
-        
+
         // 游戏玩法
         WaveService.destroyInstance();
         WaveManager.destroyInstance();

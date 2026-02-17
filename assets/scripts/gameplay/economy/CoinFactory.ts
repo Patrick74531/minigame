@@ -30,21 +30,25 @@ export class CoinFactory {
         // Try loading 'effects/star_coin'
         resources.load('effects/star_coin', Prefab, (err, prefab) => {
             if (!err && prefab) {
-                console.log('[CoinFactory] Successfully loaded star_coin prefab (path: effects/star_coin)');
+                console.log(
+                    '[CoinFactory] Successfully loaded star_coin prefab (path: effects/star_coin)'
+                );
                 this._starCoinPrefab = prefab;
                 this._isLoading = false;
                 return;
             }
-            
+
             console.warn('[CoinFactory] Failed to load effects/star_coin:', err);
 
             // Try loading 'effects/star_coin/star_coin' (common GLTF import issue)
             resources.load('effects/star_coin/star_coin', Prefab, (err2, prefab2) => {
                 if (!err2 && prefab2) {
-                     console.log('[CoinFactory] Successfully loaded star_coin prefab (path: effects/star_coin/star_coin)');
-                     this._starCoinPrefab = prefab2;
+                    console.log(
+                        '[CoinFactory] Successfully loaded star_coin prefab (path: effects/star_coin/star_coin)'
+                    );
+                    this._starCoinPrefab = prefab2;
                 } else {
-                     console.error('[CoinFactory] Failed to load star_coin from both paths.', err2);
+                    console.error('[CoinFactory] Failed to load star_coin from both paths.', err2);
                 }
                 this._isLoading = false;
             });
@@ -58,7 +62,7 @@ export class CoinFactory {
         let node: Node;
         if (this._starCoinPrefab) {
             node = instantiate(this._starCoinPrefab);
-            node.setScale(0.35, 0.35, 0.35); 
+            node.setScale(0.35, 0.35, 0.35);
             // Default rotation (0,0,0) makes it upright/vertical on ground (if model is Y-up / Standing)
             node.setRotationFromEuler(0, 0, 0);
 
@@ -66,7 +70,7 @@ export class CoinFactory {
             // Use builtin-unlit to GUARANTEE the color appears exactly as defined (no lighting interference)
             // const goldMaterial = new Material();
             // goldMaterial.initialize({ effectName: 'builtin-unlit' });
-            
+
             // const goldColor = new Color(255, 190, 0, 255); // Rich Gold
             // goldMaterial.setProperty('mainColor', goldColor);
             // // Unlit doesn't use metallic/roughness/emission, just mainColor

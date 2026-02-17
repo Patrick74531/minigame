@@ -15,7 +15,7 @@ const { ccclass } = _decorator;
 export class PlayerInputAdapter extends Component {
     private _hero: Node | null = null;
     private _joystick: Joystick | null = null;
-    
+
     // Keyboard input state
     private _keyboardInput: Vec2 = new Vec2(0, 0);
     private _keysPressed: Set<KeyCode> = new Set();
@@ -63,22 +63,30 @@ export class PlayerInputAdapter extends Component {
 
     private checkWeaponSwitch(keyCode: KeyCode): void {
         const manager = HeroWeaponManager.instance;
-        const allIds = manager.getAllWeaponIds(); // Note: This gets ALL definitions, not inventory. 
+        const allIds = manager.getAllWeaponIds(); // Note: This gets ALL definitions, not inventory.
         // Better to iterate inventory slots or just map to known types if slots are fixed?
         // Requirement: H J K L -> Weapon Slot 1 2 3 4
-        
+
         // Let's map to inventory indices for now involving a predictable order
         // OR just simple mapping if easy.
-        
+
         // Actually, let's just get the inventory as an array to map indices
         const inventory = Array.from(manager.inventory.keys());
-        
+
         let slotIndex = -1;
         switch (keyCode) {
-            case KeyCode.KEY_H: slotIndex = 0; break;
-            case KeyCode.KEY_J: slotIndex = 1; break;
-            case KeyCode.KEY_K: slotIndex = 2; break;
-            case KeyCode.KEY_L: slotIndex = 3; break;
+            case KeyCode.KEY_H:
+                slotIndex = 0;
+                break;
+            case KeyCode.KEY_J:
+                slotIndex = 1;
+                break;
+            case KeyCode.KEY_K:
+                slotIndex = 2;
+                break;
+            case KeyCode.KEY_L:
+                slotIndex = 3;
+                break;
         }
 
         if (slotIndex >= 0 && slotIndex < inventory.length) {

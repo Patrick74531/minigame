@@ -35,7 +35,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
     private _uiCanvas: Node | null = null;
     private _rootNode: Node | null = null;
     private _isShowing: boolean = false;
-    
+
     // Icon loading cache
     private _iconFrameCache: Map<string, SpriteFrame> = new Map();
     private _iconLoading: Set<string> = new Set();
@@ -280,10 +280,10 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         iconContainer.addChild(spriteNode);
         const spriteSize = 80;
         spriteNode.addComponent(UITransform).setContentSize(spriteSize, spriteSize);
-        
+
         const sprite = spriteNode.addComponent(Sprite);
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
-        
+
         if (def.iconPath) {
             this.loadWeaponIcon(sprite, def.iconPath);
         }
@@ -320,7 +320,10 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
             this._iconLoading.delete(normalizedPath);
             const waiting = this.getIconWaitingSet(normalizedPath);
             if (!frame) {
-                console.error(`[WeaponSelectUI] Failed to load weapon icon from paths:`, candidates);
+                console.error(
+                    `[WeaponSelectUI] Failed to load weapon icon from paths:`,
+                    candidates
+                );
                 waiting.clear();
                 return;
             }

@@ -1,11 +1,4 @@
-import {
-    Color,
-    MeshRenderer,
-    Node,
-    Tween,
-    Vec3,
-    tween,
-} from 'cc';
+import { Color, MeshRenderer, Node, Tween, Vec3, tween } from 'cc';
 import { VisualEffect } from '../VisualEffect';
 import { WeaponVFX } from '../../weapons/WeaponVFX';
 
@@ -15,10 +8,15 @@ import { WeaponVFX } from '../../weapons/WeaponVFX';
  */
 export class LightningBoltEffect {
     // 颜色配置
-    private static readonly CORE_COLOR = new Color(150, 220, 255, 255);  // 亮白蓝核心
-    private static readonly GLOW_COLOR = new Color(40, 120, 255, 120);   // 半透蓝光晕
+    private static readonly CORE_COLOR = new Color(150, 220, 255, 255); // 亮白蓝核心
+    private static readonly GLOW_COLOR = new Color(40, 120, 255, 120); // 半透蓝光晕
 
-    public static play(payload: { parent: Node; startPos: Vec3; endPos: Vec3; width: number }): void {
+    public static play(payload: {
+        parent: Node;
+        startPos: Vec3;
+        endPos: Vec3;
+        width: number;
+    }): void {
         const node = new Node('LightningBolt');
         payload.parent.addChild(node);
         node.setWorldPosition(payload.startPos);
@@ -61,7 +59,12 @@ export class LightningBoltEffect {
      * - 光晕层: 宽+矮，半透明蓝
      * - 核心层: 窄+矮，亮白蓝
      */
-    private static _createRibbonSegment(parent: Node, start: Vec3, end: Vec3, widthScale: number = 1): void {
+    private static _createRibbonSegment(
+        parent: Node,
+        start: Vec3,
+        end: Vec3,
+        widthScale: number = 1
+    ): void {
         const dx = end.x - start.x;
         const dz = end.z - start.z;
         const len = Math.sqrt(dx * dx + dz * dz);

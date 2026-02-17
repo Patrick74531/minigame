@@ -46,9 +46,10 @@ export class GlitchDistortion extends Component {
 
         // 强度曲线：快起慢落
         const t = this._elapsed / this._duration;
-        const envelope = t < 0.2
-            ? t / 0.2                           // ramp up
-            : 1.0 - (t - 0.2) / 0.8;           // ramp down
+        const envelope =
+            t < 0.2
+                ? t / 0.2 // ramp up
+                : 1.0 - (t - 0.2) / 0.8; // ramp down
         const strength = envelope * this._maxStrength;
 
         // === 色彩闪变 ===

@@ -16,7 +16,8 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'building.base.description': '核心目标',
         'building.tower.description': '超远射程，可同时覆盖两条路径，高频单体输出',
         'building.frost_tower.description': '大范围减速立场，只能攻击本路敌人，负责控场',
-        'building.lightning_tower.description': '发射闪电链在敌人间弹射，造成范围伤害，只能攻击本路敌人',
+        'building.lightning_tower.description':
+            '发射闪电链在敌人间弹射，造成范围伤害，只能攻击本路敌人',
         'building.farm.description': '将残骸转化为额外资源',
         'building.wall.description': '具有嘲讽属性的防线，敌人会优先攻击',
         'building.spa.description': '提供治疗和增益效果',
@@ -156,7 +157,8 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'building.base.description': 'Core objective.',
         'building.tower.description': 'Long-range rapid fire. Covers two lanes.',
         'building.frost_tower.description': 'Area slow field. Attacks current lane only.',
-        'building.lightning_tower.description': 'Chain lightning that bounces between enemies. Attacks current lane only.',
+        'building.lightning_tower.description':
+            'Chain lightning that bounces between enemies. Attacks current lane only.',
         'building.farm.description': 'Converts scrap into extra resources.',
         'building.wall.description': 'Taunting frontline that draws enemy attacks.',
         'building.spa.description': 'Provides healing and buffs.',
@@ -168,13 +170,16 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.tower.tag.lightning': 'Tesla',
 
         'weapon.machine_gun.name': 'Widowmaker',
-        'weapon.machine_gun.description': 'High-rate tracer machine gun with massive single-target damage and knockback.',
+        'weapon.machine_gun.description':
+            'High-rate tracer machine gun with massive single-target damage and knockback.',
         'weapon.flamethrower.name': 'Compost Flamethrower',
-        'weapon.flamethrower.description': 'Spews flames over a wide cone, dealing continuous area damage.',
+        'weapon.flamethrower.description':
+            'Spews flames over a wide cone, dealing continuous area damage.',
         'weapon.cannon.name': 'Laser Cannon',
         'weapon.cannon.description': 'Fires a high-energy beam that obliterates enemies in a line.',
         'weapon.glitch_wave.name': 'Signal Jammer',
-        'weapon.glitch_wave.description': 'Emits a powerful jamming wave that significantly slows nearby enemies.',
+        'weapon.glitch_wave.description':
+            'Emits a powerful jamming wave that significantly slows nearby enemies.',
 
         'buff.card.blue_attack.name': 'Edge Honing',
         'buff.card.blue_speed.name': 'Swift Wind',

@@ -10,13 +10,7 @@
 export { Singleton, BaseComponent } from './base';
 
 // 管理器
-export {
-    EventManager,
-    PoolManager,
-    GameManager,
-    GameState,
-    EffectManager,
-} from './managers';
+export { EventManager, PoolManager, GameManager, GameState, EffectManager } from './managers';
 export type { IPoolable } from './managers';
 
 // 工具

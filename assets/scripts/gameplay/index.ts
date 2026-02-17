@@ -21,18 +21,11 @@ export { Coin } from './economy';
 export { CombatSystem } from './combat/CombatSystem';
 
 // 肉鸽卡牌系统
-export {
-    BuffCardService,
-} from './roguelike/BuffCardService';
+export { BuffCardService } from './roguelike/BuffCardService';
 export type { BuffCardDef, BuffCardEffect, CardRarity } from './roguelike/BuffCardService';
 
 // 武器系统
-export {
-    WeaponType,
-    WeaponBehavior,
-    WeaponBehaviorFactory,
-    HeroWeaponManager,
-} from './weapons';
+export { WeaponType, WeaponBehavior, WeaponBehaviorFactory, HeroWeaponManager } from './weapons';
 export type { WeaponDef, WeaponInstance } from './weapons';
 
 // 空投系统

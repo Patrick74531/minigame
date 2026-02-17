@@ -43,8 +43,6 @@ export class FlamethrowerBehavior extends WeaponBehavior {
     /** 伤害 tick 间隔（秒） */
     private static readonly DMG_TICK_INTERVAL = 0.15;
 
-
-
     /** 标记为持续型武器 */
     public override get isContinuous(): boolean {
         return true;
@@ -115,9 +113,6 @@ export class FlamethrowerBehavior extends WeaponBehavior {
             );
         }
 
-
-
-
         // === 地面灼烧（低频随机） ===
         if (Math.random() < 0.006) {
             WeaponVFX.createGroundBurn(
@@ -147,7 +142,8 @@ export class FlamethrowerBehavior extends WeaponBehavior {
         const hitCount = Math.min(targetCap, hits.length);
 
         // DPS 按 tick 间隔分摊：每 tick 伤害 = damage * (tickInterval / attackInterval)
-        const dpsRatio = FlamethrowerBehavior.DMG_TICK_INTERVAL / Math.max(0.1, stats.attackInterval);
+        const dpsRatio =
+            FlamethrowerBehavior.DMG_TICK_INTERVAL / Math.max(0.1, stats.attackInterval);
 
         for (let i = 0; i < hitCount; i++) {
             const hit = hits[i];

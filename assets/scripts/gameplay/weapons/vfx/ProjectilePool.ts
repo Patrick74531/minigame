@@ -61,7 +61,7 @@ export class ProjectilePool {
     /** 回收节点到池（不销毁，仅隐藏） */
     public static put(key: string, node: Node): void {
         if (!node.isValid) return;
-        
+
         // Execute recycle callback if exists
         const cb = this._recycleCbs.get(key);
         if (cb) {

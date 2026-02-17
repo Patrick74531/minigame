@@ -1,7 +1,4 @@
-export {
-    WeaponType,
-    getWeaponLevelStats,
-} from './WeaponTypes';
+export { WeaponType, getWeaponLevelStats } from './WeaponTypes';
 export type { WeaponDef, WeaponInstance, WeaponLevelStats } from './WeaponTypes';
 export { WeaponBehavior } from './WeaponBehavior';
 export { WeaponBehaviorFactory } from './WeaponBehaviorFactory';
