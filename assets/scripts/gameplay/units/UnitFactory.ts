@@ -126,7 +126,16 @@ export class UnitFactory {
             isElite ? 'Enemy_Elite' : 'Enemy',
             isElite ? new Color(235, 245, 160, 255) : new Color(220, 60, 60, 255)
         );
-        const scaleMultiplier = options.scaleMultiplier ?? 1;
+        let scaleMultiplier = options.scaleMultiplier ?? 1;
+
+        // Apply 0.7 scale to normal enemies (not elite, not boss, not turret)
+        const modelPath = options.modelPath ?? '';
+        const isBoss = modelPath.includes('boss/');
+        const isTurret = modelPath.includes('vehicle/Enemy_Turret');
+        if (!isElite && !isBoss && !isTurret) {
+            scaleMultiplier *= 0.7;
+        }
+
         const baseScale = 0.38;
         node.setPosition(x, GameConfig.PHYSICS.ENEMY_Y, z); // Raised
         node.setScale(
