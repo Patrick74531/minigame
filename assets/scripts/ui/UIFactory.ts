@@ -14,7 +14,6 @@ import {
 } from 'cc';
 import { Joystick } from './Joystick';
 import { Localization } from '../core/i18n/Localization';
-import { UIResponsive } from './UIResponsive';
 
 /**
  * UI 工厂
@@ -183,29 +182,29 @@ export class UIFactory {
         parent.addChild(node);
 
         const transform = node.addComponent(UITransform);
-        transform.setAnchorPoint(0, 0);
+        transform.setAnchorPoint(0.5, 0);
+        transform.setContentSize(300, 34);
 
         const widget = node.addComponent(Widget);
-        widget.isAlignLeft = true;
+        widget.isAlignHorizontalCenter = true;
         widget.isAlignBottom = true;
-        const padding = UIResponsive.getControlPadding();
-        widget.left = padding.left;
-        widget.bottom = padding.bottom;
+        widget.bottom = 8;
 
         const label = node.addComponent(Label);
         label.string = Localization.instance.t('ui.hud.desktopMoveHint');
-        label.fontSize = 28;
-        label.lineHeight = 34;
-        label.color = new Color(232, 240, 252, 255);
-        label.horizontalAlign = Label.HorizontalAlign.LEFT;
+        label.fontSize = 22;
+        label.lineHeight = 26;
+        label.color = new Color(224, 236, 252, 255);
+        label.horizontalAlign = Label.HorizontalAlign.CENTER;
+        label.verticalAlign = Label.VerticalAlign.CENTER;
 
         const outline = node.addComponent(LabelOutline);
         outline.color = new Color(10, 20, 32, 255);
-        outline.width = 3;
+        outline.width = 2;
         const shadow = node.addComponent(LabelShadow);
-        shadow.color = new Color(0, 0, 0, 168);
+        shadow.color = new Color(0, 0, 0, 156);
         shadow.offset.set(2, -1);
-        shadow.blur = 2;
+        shadow.blur = 1;
 
         return label;
     }

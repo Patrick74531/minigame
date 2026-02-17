@@ -1,4 +1,4 @@
-import { Node } from 'cc';
+import { Node, sys } from 'cc';
 import { UIFactory } from '../../ui/UIFactory';
 import { Joystick } from '../../ui/Joystick';
 import { HUDManager } from '../../ui/HUDManager';
@@ -24,7 +24,7 @@ export class UIBootstrap {
         root.addChild(canvas);
 
         const joystick = UIFactory.createJoystick(canvas);
-        if (!UIResponsive.shouldUseTouchControls()) {
+        if (sys.isBrowser && !UIResponsive.shouldUseTouchControls()) {
             UIFactory.createDesktopMoveHint(canvas);
         }
 

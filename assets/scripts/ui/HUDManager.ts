@@ -20,6 +20,7 @@ import {
     director,
     game,
     EventTouch,
+    view,
     LabelOutline,
     LabelShadow,
 } from 'cc';
@@ -35,6 +36,7 @@ import { resolveBossDialogueProfile } from './BossIntroDialogue';
 import { Joystick } from './Joystick';
 import { AudioSettingsManager } from '../core/managers/AudioSettingsManager';
 import { WeaponSFXManager } from '../gameplay/weapons/WeaponSFXManager';
+import { UIResponsive } from './UIResponsive';
 
 // UI_2D Layer
 const UI_LAYER = 33554432;
@@ -112,6 +114,8 @@ export class HUDManager {
     // === UI 元素 ===
     private _coinLabel: Label | null = null;
     private _waveLabel: Label | null = null;
+    private _waveWidget: Widget | null = null;
+    private _desktopMoveHintWidget: Widget | null = null;
     private _buildingInfoLabel: Label | null = null;
     private _baseHpLabel: Label | null = null;
     private _uiCanvas: Node | null = null;
@@ -120,6 +124,7 @@ export class HUDManager {
     private _xpBarBg: Graphics | null = null;
     private _xpBarFg: Graphics | null = null;
     private _levelLabel: Label | null = null;
+    private _xpRootWidget: Widget | null = null;
     private _xpBarWidth: number = 320;
     private _xpBarHeight: number = 16;
 
@@ -199,6 +204,7 @@ export class HUDManager {
 
         // 创建金币显示
         this._coinLabel = UIFactory.createCoinDisplay(uiCanvas);
+        this._coinLabel.node.active = false;
 
         // 创建基地 HP 显示
         this._baseHpLabel = UIFactory.createLabel(
@@ -222,11 +228,12 @@ export class HUDManager {
             outlineColor: new Color(8, 16, 28, 255),
             outlineWidth: 4,
         });
+        this._baseHpLabel.node.active = false;
 
         // 创建建造点信息显示
         this.createBuildingInfoLabel(uiCanvas);
 
-        // 创建波次显示 (Top Left)
+        // 创建波次显示（屏幕中间）
         this._waveLabel = UIFactory.createLabel(
             uiCanvas,
             Localization.instance.t('ui.hud.wave', { wave: 1 }),
@@ -234,11 +241,7 @@ export class HUDManager {
         );
 
         // Position using Widget
-        const waveWidget = this._waveLabel.node.addComponent(Widget);
-        waveWidget.isAlignTop = true;
-        waveWidget.isAlignLeft = true;
-        waveWidget.top = 18;
-        waveWidget.left = 24;
+        this._waveWidget = this._waveLabel.node.addComponent(Widget);
 
         this._waveLabel.fontSize = 40;
         this._waveLabel.lineHeight = 44;
@@ -249,7 +252,7 @@ export class HUDManager {
             shadowColor: new Color(0, 0, 0, 205),
         });
 
-        // 创建经验条 (Top Center)
+        // 创建经验条 (Top Left)
         this.createXpBar(uiCanvas);
         this.createWaveForecastBanner(uiCanvas);
         this.createLaneUnlockDialog(uiCanvas);
@@ -257,6 +260,10 @@ export class HUDManager {
         this.createHeroRespawnDialog(uiCanvas);
         this.createGameOverDialog(uiCanvas);
         this.createSettingsUI(uiCanvas);
+        this._desktopMoveHintWidget =
+            uiCanvas.getChildByName('DesktopMoveHint')?.getComponent(Widget) ?? null;
+        view.on('canvas-resize', this.onCanvasResize, this);
+        this.applyHudEdgeLayout();
 
         // 监听事件
         this.setupEventListeners();
@@ -1526,10 +1533,7 @@ export class HUDManager {
         const transform = root.addComponent(UITransform);
         transform.setContentSize(this._xpBarWidth + 90, this._xpBarHeight + 34);
 
-        const widget = root.addComponent(Widget);
-        widget.isAlignTop = true;
-        widget.isAlignHorizontalCenter = true;
-        widget.top = 16;
+        this._xpRootWidget = root.addComponent(Widget);
 
         // 等级标签
         const lvNode = new Node('LevelLabel');
@@ -2460,6 +2464,7 @@ export class HUDManager {
      */
     public cleanup(): void {
         this.eventManager.offAllByTarget(this);
+        view.off('canvas-resize', this.onCanvasResize, this);
         this.stopBossCinematic(true);
         this.stopBossPreviewMotion();
         if (this._waveForecastRoot) {
@@ -2503,8 +2508,11 @@ export class HUDManager {
         }
         this._coinLabel = null;
         this._waveLabel = null;
+        this._waveWidget = null;
+        this._desktopMoveHintWidget = null;
         this._buildingInfoLabel = null;
         this._baseHpLabel = null;
+        this._xpRootWidget = null;
         this._xpBarBg = null;
         this._xpBarFg = null;
         this._levelLabel = null;
@@ -2546,6 +2554,51 @@ export class HUDManager {
         this._bossPreviewMotionTarget = null;
         this._bossCinematicClock = null;
         this._uiCanvas = null;
+    }
+
+    private onCanvasResize(): void {
+        this.applyHudEdgeLayout();
+    }
+
+    private applyHudEdgeLayout(): void {
+        const padding = UIResponsive.getControlPadding();
+        const topInset = Math.max(14, Math.round(padding.top * 0.86));
+        const bottomInset = Math.max(20, Math.round(padding.bottom * 0.82));
+
+        if (this._waveWidget) {
+            this._waveWidget.isAlignTop = true;
+            this._waveWidget.isAlignHorizontalCenter = true;
+            this._waveWidget.isAlignLeft = false;
+            this._waveWidget.isAlignRight = false;
+            this._waveWidget.isAlignBottom = false;
+            this._waveWidget.isAlignVerticalCenter = false;
+            this._waveWidget.top = topInset;
+            this._waveWidget.horizontalCenter = 0;
+            this._waveWidget.updateAlignment();
+        }
+
+        if (this._xpRootWidget) {
+            this._xpRootWidget.isAlignBottom = true;
+            this._xpRootWidget.isAlignHorizontalCenter = true;
+            this._xpRootWidget.isAlignTop = false;
+            this._xpRootWidget.isAlignLeft = false;
+            this._xpRootWidget.isAlignRight = false;
+            this._xpRootWidget.isAlignVerticalCenter = false;
+            this._xpRootWidget.bottom = bottomInset;
+            this._xpRootWidget.horizontalCenter = 0;
+            this._xpRootWidget.updateAlignment();
+        }
+
+        if (this._desktopMoveHintWidget) {
+            this._desktopMoveHintWidget.isAlignBottom = true;
+            this._desktopMoveHintWidget.isAlignHorizontalCenter = true;
+            this._desktopMoveHintWidget.isAlignTop = false;
+            this._desktopMoveHintWidget.isAlignLeft = false;
+            this._desktopMoveHintWidget.isAlignRight = false;
+            this._desktopMoveHintWidget.bottom = Math.max(2, bottomInset - 34);
+            this._desktopMoveHintWidget.horizontalCenter = 0;
+            this._desktopMoveHintWidget.updateAlignment();
+        }
     }
 
     private get eventManager(): EventManager {

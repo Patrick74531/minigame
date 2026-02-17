@@ -27,7 +27,6 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
     private _uiCanvas: Node | null = null;
     private _barNode: Node | null = null;
     private _barWidget: Widget | null = null;
-    private _barBackground: Graphics | null = null;
     private _iconNodes: Map<WeaponType, Node> = new Map();
     private _showKeyboardHints: boolean = false;
     private _iconSize: number = DESKTOP_ICON_SIZE;
@@ -53,7 +52,6 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
             this._barNode = null;
         }
         this._barWidget = null;
-        this._barBackground = null;
         this._iconNodes.clear();
     }
 
@@ -94,7 +92,6 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         });
 
         this.updateContainerSize(index);
-        this.drawBarBackground();
     }
 
     // === UI 构建 ===
@@ -113,9 +110,6 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         this._barWidget = this._barNode.addComponent(Widget);
         this._barWidget.isAlignBottom = true;
         this._barWidget.isAlignRight = true;
-
-        this._barBackground = this._barNode.addComponent(Graphics);
-        this.drawBarBackground();
     }
 
     private onResize(): void {
@@ -206,27 +200,6 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         const width = Math.max(BAR_MIN_WIDTH, iconAreaWidth + BAR_PADDING_X * 2);
         const height = Math.max(BAR_MIN_HEIGHT, this._iconSize + BAR_PADDING_Y * 2 + 12);
         this._barNode.getComponent(UITransform)?.setContentSize(width, height);
-    }
-
-    private drawBarBackground(): void {
-        if (!this._barBackground || !this._barNode) return;
-        const tf = this._barNode.getComponent(UITransform);
-        if (!tf) return;
-
-        const w = tf.contentSize.width;
-        const h = tf.contentSize.height;
-        const g = this._barBackground;
-        const radius = Math.max(14, Math.round(h * 0.22));
-
-        g.clear();
-        g.fillColor = new Color(12, 18, 30, 192);
-        g.roundRect(-w, 0, w, h, radius);
-        g.fill();
-
-        g.strokeColor = new Color(65, 170, 225, 210);
-        g.lineWidth = 2;
-        g.roundRect(-w, 0, w, h, radius);
-        g.stroke();
     }
 
     private createLevelBadge(

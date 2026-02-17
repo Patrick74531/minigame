@@ -99,6 +99,7 @@ export class Joystick extends Component {
             if (this._desktopMode) {
                 this.hideVisuals();
             } else {
+                this.showVisuals();
                 this.resetPosition();
             }
         }
