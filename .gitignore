@@ -7,6 +7,11 @@ profiles/
 
 # Dependencies
 node_modules/
+devvit/node_modules/
+devvit/webroot/assets/
+devvit/webroot/cocos-js/
+devvit/webroot/src/
+devvit/webroot/index.js
 
 # IDE
 .idea/

@@ -124,6 +124,15 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.settings.sfx': '音效',
         'ui.settings.lang.zh': '中文',
         'ui.settings.lang.en': 'English',
+        'ui.home.start': '开始游戏',
+        'ui.home.leaderboard': '排行榜',
+        'ui.home.subscribe': '关注我们',
+        'ui.home.subscribed': '已关注 ✓',
+        'ui.leaderboard.title': '🏆 排行榜',
+        'ui.leaderboard.loading': '加载中...',
+        'ui.leaderboard.empty': '暂无记录，快来创造第一条！',
+        'ui.leaderboard.wave_short': '第{wave}波',
+        'ui.leaderboard.close': '关闭',
 
         'enemy.archetype.boss_robot_flying': '飞行机甲',
         'enemy.archetype.boss_robot_large': '巨型机甲',
@@ -271,9 +280,16 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.settings.sfx': 'SFX',
         'ui.settings.lang.zh': '中文',
         'ui.settings.lang.en': 'English',
-        'ui.home.start': '开始游戏',
-        'ui.home.leaderboard': '排行榜',
-        'ui.home.subscribe': '关注我们',
+        'ui.home.start': 'Start Game',
+        'ui.home.leaderboard': 'Leaderboard',
+        'ui.home.subscribe': 'Follow Us',
+        'ui.home.subscribed': 'Following ✓',
+
+        'ui.leaderboard.title': '🏆 Leaderboard',
+        'ui.leaderboard.loading': 'Loading...',
+        'ui.leaderboard.empty': 'No records yet. Be the first!',
+        'ui.leaderboard.wave_short': 'Wave {wave}',
+        'ui.leaderboard.close': 'Close',
 
         'enemy.archetype.boss_robot_flying': 'Flying Warbot',
         'enemy.archetype.boss_robot_large': 'Titan Warbot',
@@ -293,6 +309,5 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'enemy.archetype.fallback_ground': 'Ground Assault Unit',
         'enemy.archetype.fallback_air': 'Air Assault Unit',
         'enemy.archetype.fallback_heavy': 'Heavy Breaker Unit',
-
     },
 };

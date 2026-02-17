@@ -22,6 +22,8 @@ import { HUDSettingsModule } from '../hud/HUDSettingsModule';
 import { applyGameLabelStyle } from '../hud/HUDCommon';
 import { LocalizationComp } from '../LocalizationComp';
 import { UIResponsive } from '../UIResponsive';
+import { RedditBridge, type RedditBridgeCallback } from '../../core/reddit/RedditBridge';
+import { LeaderboardPanel } from './LeaderboardPanel';
 
 const { ccclass } = _decorator;
 
@@ -36,6 +38,8 @@ export class HomePage extends Component {
     private _startBtn: Node | null = null;
     private _leaderboardBtn: Node | null = null;
     private _subscribeBtn: Node | null = null;
+    private _leaderboardPanel: LeaderboardPanel | null = null;
+    private _bridgeListener: ((e: RedditBridgeCallback) => void) | null = null;
 
     public onLoad() {
         this._uiLayer = this.node.parent?.layer ?? Layers.Enum.UI_2D;
@@ -52,11 +56,16 @@ export class HomePage extends Component {
         view.on('canvas-resize', this.onCanvasResize, this);
         this.onCanvasResize();
         this.scheduleOnce(() => this.onCanvasResize(), 0);
+
+        this._initRedditBridge();
     }
 
     public onDestroy() {
         view.off('canvas-resize', this.onCanvasResize, this);
         this._settingsModule?.cleanup();
+        if (this._bridgeListener) {
+            RedditBridge.instance.removeListener(this._bridgeListener);
+        }
     }
 
     private ensureRootLayout() {
@@ -335,16 +344,74 @@ export class HomePage extends Component {
         }
     }
 
+    private _initRedditBridge(): void {
+        const bridge = RedditBridge.instance;
+        this._bridgeListener = (event: RedditBridgeCallback) => {
+            this._onBridgeEvent(event);
+        };
+        bridge.addListener(this._bridgeListener);
+        if (bridge.isRedditEnvironment) {
+            bridge.requestInit();
+        }
+    }
+
+    private _onBridgeEvent(event: RedditBridgeCallback): void {
+        switch (event.type) {
+            case 'init':
+                this._updateSubscribeButton(event.data.isSubscribed);
+                break;
+            case 'leaderboard':
+                this._leaderboardPanel?.showEntries(event.entries);
+                break;
+            case 'score_submitted':
+                break;
+            case 'subscription_result':
+                if (event.success) this._updateSubscribeButton(true);
+                break;
+        }
+    }
+
+    private _updateSubscribeButton(isSubscribed: boolean): void {
+        if (!this._subscribeBtn) return;
+        const locKey = isSubscribed ? 'ui.home.subscribed' : 'ui.home.subscribe';
+        const comp = this._subscribeBtn.getChildByName('Label')?.getComponent(LocalizationComp);
+        if (comp) {
+            comp.key = locKey;
+            comp.refresh();
+        }
+    }
+
     private onStartClick() {
         GameManager.instance.startGame();
         this.node.destroy();
     }
 
     private onLeaderboardClick() {
-        console.log('Leaderboard clicked - Not implemented');
+        if (this._leaderboardPanel) {
+            this._leaderboardPanel.destroy();
+            this._leaderboardPanel = null;
+            return;
+        }
+        this._leaderboardPanel = new LeaderboardPanel(this.node, () => {
+            this._leaderboardPanel?.destroy();
+            this._leaderboardPanel = null;
+        });
+        this._leaderboardPanel.showLoading();
+        const bridge = RedditBridge.instance;
+        if (bridge.isRedditEnvironment) {
+            bridge.requestLeaderboard();
+        } else {
+            this._leaderboardPanel.showEntries([]);
+        }
     }
 
     private onSubscribeClick() {
-        console.log('Subscribe clicked - Not implemented');
+        const bridge = RedditBridge.instance;
+        if (bridge.isRedditEnvironment) {
+            bridge.requestSubscribe();
+        } else {
+            const name = bridge.subredditName || 'your community';
+            console.warn(`[HomePage] Subscribe: r/${name}`);
+        }
     }
 }

@@ -850,7 +850,7 @@ export class HUDSettingsModule implements HUDModule {
 
         const left = -rowWidth / 2 + 8;
         const titleCenterX = left + titleW / 2;
-        const titleY = Math.round(rowHeight * 0.18);
+        const titleY = 0;
         slider.titleNode
             .getComponent(UITransform)
             ?.setContentSize(titleW, Math.round(rowHeight * 0.52));
@@ -860,7 +860,7 @@ export class HUDSettingsModule implements HUDModule {
 
         const trackLeft = left + titleW + 14;
         const trackCenterX = trackLeft + sliderW / 2;
-        const trackY = -Math.round(rowHeight * 0.16);
+        const trackY = 0;
         slider.trackNode.getComponent(UITransform)?.setContentSize(sliderW, 18);
         slider.trackNode.setPosition(trackCenterX, trackY, 0);
         this.drawSliderTrack(slider.trackGraphics, sliderW);
@@ -894,7 +894,7 @@ export class HUDSettingsModule implements HUDModule {
         const titleNode = row.getChildByName('SettingsLangTitle');
         const titleLabel = titleNode?.getComponent(Label);
         const titleW = Math.max(138, Math.min(224, Math.round(rowWidth * 0.36)));
-        const titleY = Math.round(rowHeight * 0.18);
+        const titleY = 0;
         const left = -rowWidth / 2 + 8;
         titleNode?.getComponent(UITransform)?.setContentSize(titleW, Math.round(rowHeight * 0.52));
         titleNode?.setPosition(left + titleW / 2, titleY, 0);
@@ -911,7 +911,7 @@ export class HUDSettingsModule implements HUDModule {
             .getComponent(UITransform)
             ?.setContentSize(containerW, Math.round(rowHeight * 0.62));
         const containerCenterX = left + titleW + 14 + containerW / 2;
-        container.setPosition(containerCenterX, -Math.round(rowHeight * 0.05), 0);
+        container.setPosition(containerCenterX, 0, 0);
 
         const buttonGap = 14;
         const buttonW = Math.max(92, Math.min(168, Math.round((containerW - buttonGap) * 0.5)));

@@ -17,6 +17,7 @@ import {
     type BossIntroPayload as HUDBossIntroPayload,
 } from './hud/HUDBossIntroModule';
 import { HUDCameraCinematicService } from './hud/HUDCameraCinematicService';
+import { RedditBridge } from '../core/reddit/RedditBridge';
 
 /**
  * HUD 管理器
@@ -83,7 +84,7 @@ export class HUDManager {
         this._waveNoticeModule.setVisible(visible);
         // Boss intro?
         // this._bossIntroModule.setVisible(visible); // Usually hidden anyway
-        
+
         // If other modules have built-in visibility logic, we might not need to force them.
         // But StatusModule definitely needs to be hidden.
     }
@@ -224,6 +225,9 @@ export class HUDManager {
 
     private onGameOver(data: { victory: boolean }): void {
         this._gameOverModule.showGameOver(Boolean(data?.victory));
+        const wave = WaveService.instance.currentWave;
+        const score = wave * 100;
+        RedditBridge.instance.submitScore(score, wave);
     }
 
     private onBossIntro(data: HUDBossIntroPayload): void {
