@@ -1115,13 +1115,18 @@ export class MapGenerator extends Component {
                     const px = this.lerp(p0.x, p1.x, t);
                     const pz = this.lerp(p0.z, p1.z, t);
                     const laneHalfWorld = this.getLaneHalfWidthNormalized(laneIndex) * world;
-                    const baseOffset = laneHalfWorld + (laneIndex === 1 ? 0.8 : 0.72);
+                    const roadsideEdgeOffset = laneIndex === 1 ? 3.0 : 0.72;
+                    const baseOffset = laneHalfWorld + roadsideEdgeOffset;
 
                     for (const side of [-1, 1]) {
                         if (rng() < 0.35) continue;
                         let planted = false;
                         for (let attempt = 0; attempt < 2 && !planted; attempt++) {
-                            const offset = baseOffset + this.lerp(-0.12, 0.12, rng());
+                            const offsetJitter =
+                                laneIndex === 1
+                                    ? this.lerp(0.2, 0.7, rng())
+                                    : this.lerp(-0.12, 0.12, rng());
+                            const offset = baseOffset + offsetJitter;
                             const alongJitter = this.lerp(-0.72, 0.72, rng());
                             const x = px + tx * alongJitter + nx * offset * side;
                             const z = pz + tz * alongJitter + nz * offset * side;
