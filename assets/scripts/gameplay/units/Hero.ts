@@ -25,6 +25,7 @@ import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import type { BuffCardEffect } from '../roguelike/BuffCardService';
 import { HeroWeaponManager } from '../weapons/HeroWeaponManager';
 import { WeaponBehaviorFactory } from '../weapons/WeaponBehaviorFactory';
+import { WeaponSFXManager } from '../weapons/WeaponSFXManager';
 import { getWeaponLevelStats, type WeaponLevelStats } from '../weapons/WeaponTypes';
 import { HeroLevelSystem } from './HeroLevelSystem';
 import { GameEvents } from '../../data/GameEvents';
@@ -76,6 +77,7 @@ export class Hero extends Unit {
     public onDespawn(): void {
         this.unschedule(this.tickRespawnCountdown);
         this.unschedule(this.finishRespawn);
+        WeaponSFXManager.stopAllLoops(this.node);
         this._respawning = false;
         this._respawnRemainingSeconds = 0;
         this.hudManager.hideHeroRespawnCountdown();
@@ -167,6 +169,7 @@ export class Hero extends Unit {
         this._eventMgr.off(GameEvents.BASE_UPGRADE_READY, this.onBaseUpgradeReady, this);
         this.unschedule(this.tickRespawnCountdown);
         this.unschedule(this.finishRespawn);
+        WeaponSFXManager.stopAllLoops(this.node);
         this.hudManager.hideHeroRespawnCountdown();
     }
 
@@ -271,12 +274,19 @@ export class Hero extends Unit {
             const behavior = WeaponBehaviorFactory.get(manager.activeWeapon.type);
             const shouldFire =
                 this._target && (behavior?.isContinuous || this._customWeaponTimer <= 0);
+            WeaponSFXManager.syncLoopState(
+                this.node,
+                manager.activeWeapon.type,
+                Boolean(this._target && this._target.isAlive)
+            );
             if (shouldFire) {
                 this.performAttack();
             } else if (!this._target) {
                 // 无目标时停止持续型武器
                 this._stopCurrentWeapon();
             }
+        } else {
+            WeaponSFXManager.syncLoopState(this.node, null, false);
         }
 
         super.update(dt);
@@ -472,6 +482,7 @@ export class Hero extends Unit {
                 behavior.stopFire();
             }
         }
+        WeaponSFXManager.stopAllLoops(this.node);
     }
 
     // === 升级处理 ===

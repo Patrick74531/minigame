@@ -2,6 +2,7 @@ import { Node, Color, Vec3, Mat4, PhysicsSystem } from 'cc';
 import { WeaponBehavior } from '../WeaponBehavior';
 import { WeaponType, WeaponLevelStats } from '../WeaponTypes';
 import { WeaponVFX } from '../WeaponVFX';
+import { WeaponSFXManager } from '../WeaponSFXManager';
 import { ScreenShake } from '../vfx/ScreenShake';
 import { GameConfig } from '../../../data/GameConfig';
 import { EventManager } from '../../../core/managers/EventManager';
@@ -37,6 +38,8 @@ export class CannonBehavior extends WeaponBehavior {
         _parent: Node
     ): void {
         if (!target || !target.isValid) return;
+
+        WeaponSFXManager.playAttackOneShot(this.type);
 
         const beamCfg = GameConfig.VFX?.CANNON_BEAM;
         const spawnUp =

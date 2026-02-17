@@ -2,6 +2,7 @@ import { Node, Color, Vec3 } from 'cc';
 import { WeaponBehavior } from '../WeaponBehavior';
 import { WeaponType, WeaponLevelStats } from '../WeaponTypes';
 import { WeaponVFX } from '../WeaponVFX';
+import { WeaponSFXManager } from '../WeaponSFXManager';
 import { EventManager } from '../../../core/managers/EventManager';
 import { ServiceRegistry } from '../../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../../data/GameEvents';
@@ -30,6 +31,8 @@ export class GlitchWaveBehavior extends WeaponBehavior {
         level: number,
         _parent: Node
     ): void {
+        WeaponSFXManager.playAttackOneShot(this.type);
+
         const center = owner.position.clone();
         center.y += 0.5;
 

@@ -13,6 +13,7 @@ import { ControllerServices } from './core/bootstrap/ControllerServices';
 import { PlayerInputAdapter } from './core/input/PlayerInputAdapter';
 import { WeaponBehaviorFactory } from './gameplay/weapons/WeaponBehaviorFactory';
 import { WeaponVFX } from './gameplay/weapons/WeaponVFX';
+import { WeaponSFXManager } from './gameplay/weapons/WeaponSFXManager';
 import { ScreenShake } from './gameplay/weapons/vfx/ScreenShake';
 import { HeroLevelSystem } from './gameplay/units/HeroLevelSystem';
 import { LevelUpVFX } from './gameplay/effects/LevelUpVFX';
@@ -106,6 +107,7 @@ export class GameController extends Component {
 
         // Initialize weapon system
         WeaponVFX.initialize();
+        WeaponSFXManager.initialize(this.node);
         WeaponBehaviorFactory.initialize();
         this._services.heroWeaponManager.initialize();
         this._services.airdropService.initialize();
@@ -129,6 +131,7 @@ export class GameController extends Component {
         this._services.weaponBarUI.cleanup();
         HeroLevelSystem.instance.cleanup();
         this.evtMgr.off(GameEvents.HERO_LEVEL_UP, this.onHeroLevelUp, this);
+        WeaponSFXManager.cleanup();
         WeaponVFX.cleanup();
         ServiceRegistry.clear();
     }
