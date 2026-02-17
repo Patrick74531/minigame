@@ -37,6 +37,10 @@ export class BuffCardUI {
         return this._instance;
     }
 
+    public static destroyInstance(): void {
+        this._instance = null;
+    }
+
     private _root: Node | null = null;
     private _uiCanvas: Node | null = null;
     private _isShowing: boolean = false;

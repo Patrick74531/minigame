@@ -22,6 +22,10 @@ export class EffectManager {
         return this._instance;
     }
 
+    public static destroyInstance(): void {
+        this._instance = null;
+    }
+
     public initialize(container: Node): void {
         this._container = container;
         this.setupListeners();

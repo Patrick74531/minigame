@@ -182,7 +182,8 @@ export class EditorPlacementDebug extends Component {
 
     protected onDestroy(): void {
         this.unschedule(this.syncPadDebugLabels);
-        this.clearPadDebugLabels();
+        // 场景卸载过程中节点树可能处于半销毁状态，避免在这里遍历全场景。
+        // 标签节点会随着场景销毁自动清理。
     }
 
     /**
@@ -946,7 +947,12 @@ export class EditorPlacementDebug extends Component {
     private clearPadDebugLabels(): void {
         const scene = this.node.scene;
         if (!scene) return;
-        const pads = scene.getComponentsInChildren(BuildingPad);
+        let pads: BuildingPad[] = [];
+        try {
+            pads = scene.getComponentsInChildren(BuildingPad);
+        } catch {
+            return;
+        }
         for (const pad of pads) {
             const node = pad.node?.getChildByName(EditorPlacementDebug.PAD_DEBUG_LABEL_NODE);
             if (node && node.isValid) {

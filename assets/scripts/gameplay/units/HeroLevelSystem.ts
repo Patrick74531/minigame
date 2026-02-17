@@ -28,6 +28,10 @@ export class HeroLevelSystem {
         return this._instance;
     }
 
+    public static destroyInstance(): void {
+        this._instance = null;
+    }
+
     private _level: number = 1;
     private _currentXp: number = 0;
     private _heroNode: Node | null = null;

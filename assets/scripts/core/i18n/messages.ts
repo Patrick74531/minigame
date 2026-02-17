@@ -105,6 +105,12 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.hero.respawn.countdown.message': '奶奶正在纳米修复，{seconds}s 后重返战场！',
         'ui.hero.respawn.ready.tag': '出战！',
         'ui.hero.respawn.ready.message': '倒计时结束，奶奶回归战场，继续战斗！',
+        'ui.gameOver.title.victory': '防线守住了',
+        'ui.gameOver.title.defeat': '防线崩溃',
+        'ui.gameOver.message.victory': '这波打得漂亮，准备下一场硬仗。',
+        'ui.gameOver.message.defeat': '基地已失守，立刻重整战场再来一局。',
+        'ui.gameOver.button.restart': '重新开始',
+        'ui.gameOver.button.restarting': '重启中...',
 
         'enemy.archetype.boss_robot_flying': '飞行机甲',
         'enemy.archetype.boss_robot_large': '巨型机甲',
@@ -230,6 +236,12 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.hero.respawn.ready.tag': 'READY!',
         'ui.hero.respawn.ready.message':
             'Countdown complete. Grandma is back in action. Keep pushing!',
+        'ui.gameOver.title.victory': 'Defense Held',
+        'ui.gameOver.title.defeat': 'Defense Collapsed',
+        'ui.gameOver.message.victory': 'Clean hold. Get ready for the next hot zone.',
+        'ui.gameOver.message.defeat': 'Base lost. Regroup and launch another run now.',
+        'ui.gameOver.button.restart': 'Restart',
+        'ui.gameOver.button.restarting': 'Restarting...',
 
         'enemy.archetype.boss_robot_flying': 'Flying Warbot',
         'enemy.archetype.boss_robot_large': 'Titan Warbot',

@@ -102,6 +102,10 @@ export class WaveManager {
         return this._instance;
     }
 
+    public static destroyInstance(): void {
+        this._instance = null;
+    }
+
     // === 状态 ===
     private _enemyContainer: Node | null = null;
     private _enemies: Node[] = [];

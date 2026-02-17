@@ -28,6 +28,10 @@ export class BuildingManager {
         return this._instance;
     }
 
+    public static destroyInstance(): void {
+        this._instance = null;
+    }
+
     private _unitContainer: Node | null = null;
 
     /**

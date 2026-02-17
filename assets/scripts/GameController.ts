@@ -21,6 +21,8 @@ import { GameEvents } from './data/GameEvents';
 import { EventManager } from './core/managers/EventManager';
 import { ResourcePreloader } from './core/bootstrap/ResourcePreloader';
 import { CoinFactory } from './gameplay/economy/CoinFactory';
+import { SystemReset } from './core/bootstrap/SystemReset';
+import { applyCanvasOnDisableSafetyPatch } from './core/engine/CanvasSafetyPatch';
 
 const { ccclass, property } = _decorator;
 
@@ -59,6 +61,8 @@ export class GameController extends Component {
     private _waveLoop: WaveLoop | null = null;
 
     protected onLoad(): void {
+        applyCanvasOnDisableSafetyPatch();
+
         // 预加载关键资源（贴图/Prefab/动画），避免首波帧率抖动
         ResourcePreloader.preloadAll();
         CoinFactory.loadResources();
@@ -117,6 +121,7 @@ export class GameController extends Component {
     }
 
     protected onDestroy(): void {
+        // 1. Cleanup all services (unregister events, stop timers, etc.)
         this._services.gameManager.cleanup();
         this._services.waveManager.cleanup();
         this._services.hudManager.cleanup();
@@ -134,6 +139,9 @@ export class GameController extends Component {
         WeaponSFXManager.cleanup();
         WeaponVFX.cleanup();
         ServiceRegistry.clear();
+
+        // 2. Destroy ALL singleton instances so scene reload creates fresh ones.
+        SystemReset.shutdown();
     }
 
     protected start(): void {

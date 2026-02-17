@@ -43,9 +43,20 @@ export class Joystick extends Component {
     private _effectiveRadius: number = 80;
     private _desktopMode: boolean = false;
     private _mouseActive: boolean = false;
+    private _inputEnabled: boolean = true;
 
     public get inputVector(): Vec2 {
         return this._inputVector;
+    }
+
+    public setInputEnabled(enabled: boolean): void {
+        if (this._inputEnabled === enabled) return;
+        this._inputEnabled = enabled;
+        if (!enabled) {
+            this._touchId = null;
+            this._mouseActive = false;
+            this.endInput();
+        }
     }
 
     protected onLoad(): void {
@@ -154,17 +165,20 @@ export class Joystick extends Component {
     }
 
     private onTouchStart(event: EventTouch): void {
+        if (!this._inputEnabled) return;
         if (this._mouseActive) return;
         if (!this.tryBeginInput(event.getUILocation().x, event.getUILocation().y)) return;
         this._touchId = event.touch!.getID();
     }
 
     private onTouchMove(event: EventTouch): void {
+        if (!this._inputEnabled) return;
         if (event.touch!.getID() !== this._touchId) return;
         this.applyInputMove(event.getUILocation().x, event.getUILocation().y);
     }
 
     private onTouchEnd(event: EventTouch): void {
+        if (!this._inputEnabled) return;
         if (event.touch!.getID() !== this._touchId) return;
 
         this._touchId = null;
@@ -172,6 +186,7 @@ export class Joystick extends Component {
     }
 
     private onMouseDown(event: EventMouse): void {
+        if (!this._inputEnabled) return;
         if (event.getButton() !== EventMouse.BUTTON_LEFT) return;
         if (this._touchId !== null || this._mouseActive) return;
         const loc = event.getLocation();
@@ -180,12 +195,14 @@ export class Joystick extends Component {
     }
 
     private onMouseMove(event: EventMouse): void {
+        if (!this._inputEnabled) return;
         if (!this._mouseActive) return;
         const loc = event.getLocation();
         this.applyInputMove(loc.x, loc.y);
     }
 
     private onMouseUp(event: EventMouse): void {
+        if (!this._inputEnabled) return;
         if (event.getButton() !== EventMouse.BUTTON_LEFT) return;
         if (!this._mouseActive) return;
         this._mouseActive = false;
@@ -198,6 +215,7 @@ export class Joystick extends Component {
     }
 
     private tryBeginInput(screenX: number, screenY: number): boolean {
+        if (!this._inputEnabled) return false;
         if (!this.isInJoystickZone(screenX, screenY)) return false;
 
         const localPos = this.clampToMovementBounds(this.screenToLocal(screenX, screenY));

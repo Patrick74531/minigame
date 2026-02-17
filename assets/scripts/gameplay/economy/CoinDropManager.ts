@@ -22,6 +22,10 @@ export class CoinDropManager {
         return this._instance;
     }
 
+    public static destroyInstance(): void {
+        this._instance = null;
+    }
+
     public initialize(coinContainer: Node): void {
         this._coinContainer = coinContainer;
         this.eventManager.on(GameEvents.UNIT_DIED, this.onUnitDied, this);

@@ -28,6 +28,10 @@ export class WaveService {
         return this._instance;
     }
 
+    public static destroyInstance(): void {
+        this._instance = null;
+    }
+
     public registerProvider(provider: WaveProvider): void {
         this._providers.set(provider.id, provider);
     }

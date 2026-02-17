@@ -98,6 +98,10 @@ export class BuildingRegistry {
         return this._instance;
     }
 
+    public static destroyInstance(): void {
+        this._instance = null;
+    }
+
     /**
      * 注册默认建筑类型
      */
