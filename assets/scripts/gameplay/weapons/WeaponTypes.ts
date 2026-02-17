@@ -38,6 +38,44 @@ export interface WeaponInstance {
 
 /** 获取武器当前等级的属性 */
 export function getWeaponLevelStats(def: WeaponDef, level: number): WeaponLevelStats {
-    const idx = Math.max(0, Math.min(level - 1, def.levels.length - 1));
-    return def.levels[idx];
+    const safeLevel = Math.max(1, Math.floor(level));
+    const levels = def.levels;
+    if (levels.length <= 0) {
+        return {
+            damage: 0,
+            attackInterval: 1,
+            range: 0,
+            projectileSpeed: 0,
+        };
+    }
+
+    if (safeLevel <= levels.length) {
+        return levels[safeLevel - 1];
+    }
+
+    const lastIndex = levels.length - 1;
+    const last = levels[lastIndex];
+    const prev = levels[Math.max(0, lastIndex - 1)];
+    const extraLevels = safeLevel - levels.length;
+    const extrapolated: WeaponLevelStats = { ...last };
+
+    const keys = new Set<string>([...Object.keys(prev), ...Object.keys(last)]);
+    for (const key of keys) {
+        const lastValue = (last as Record<string, number>)[key];
+        if (typeof lastValue !== 'number') continue;
+
+        const prevValue = (prev as Record<string, number>)[key];
+        const step = typeof prevValue === 'number' ? lastValue - prevValue : 0;
+        let value = lastValue + step * extraLevels;
+
+        if (key === 'attackInterval') {
+            value = Math.max(0.02, value);
+        } else {
+            value = Math.max(0, value);
+        }
+
+        extrapolated[key] = value;
+    }
+
+    return extrapolated;
 }

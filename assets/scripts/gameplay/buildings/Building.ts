@@ -327,7 +327,7 @@ export class Building extends BaseComponent implements IAttackable {
      * 升级建筑
      */
     public upgrade(): boolean {
-        if (!this.isAlive || this.level >= this.maxLevel) {
+        if (!this.isAlive) {
             return false;
         }
 
@@ -338,13 +338,13 @@ export class Building extends BaseComponent implements IAttackable {
         this.maxHp = Math.floor(this.maxHp * this.statMultiplier);
         // 兵营升级：缩短产兵间隔（同时间隔始终只产 1 只）。
         if (this.spawnInterval > 0 && this.buildingType === BuildingType.BARRACKS) {
-            this.spawnInterval = Math.max(0.5, this.spawnInterval * this.spawnIntervalMultiplier);
+            this.spawnInterval = this.spawnInterval * this.spawnIntervalMultiplier;
         }
         if (this.maxUnitsPerLevel > 0) {
             this.maxUnits += this.maxUnitsPerLevel;
         }
         if (this.buildingType === BuildingType.FARM && this.incomeInterval > 0) {
-            this.incomeInterval = Math.max(0.35, this.incomeInterval / this.incomeMultiplier);
+            this.incomeInterval = this.incomeInterval / this.incomeMultiplier;
         }
 
         // Heal to full (bonus)

@@ -1,5 +1,6 @@
 import { AudioClip, AudioSource, Node, director, resources } from 'cc';
 import { WeaponType } from './WeaponTypes';
+import { AudioSettingsManager } from '../../core/managers/AudioSettingsManager';
 
 type WeaponSfxKey = 'fire' | 'gun' | 'laser' | 'disturb';
 type LoopSfxKey = 'fire' | 'gun';
@@ -64,7 +65,17 @@ export class WeaponSFXManager {
     public static initialize(parent?: Node): void {
         this._ensureRoot(parent);
         this._ensureAllSources();
+        this.refreshVolumes();
         this._preloadAllClips();
+    }
+
+    public static refreshVolumes(): void {
+        const keys: WeaponSfxKey[] = ['fire', 'gun', 'laser', 'disturb'];
+        for (const key of keys) {
+            const source = this._sources[key];
+            if (!source || !source.isValid) continue;
+            source.volume = this.resolveEffectiveVolume(key);
+        }
     }
 
     public static cleanup(): void {
@@ -158,6 +169,7 @@ export class WeaponSFXManager {
         const clip = this._clips[key];
 
         if (source && clip) {
+            source.volume = this.resolveEffectiveVolume(key);
             source.playOneShot(clip, 1);
             return;
         }
@@ -197,7 +209,7 @@ export class WeaponSFXManager {
         const source = sourceNode.addComponent(AudioSource);
         source.playOnAwake = false;
         source.loop = false;
-        source.volume = this.VOLUMES[key];
+        source.volume = this.resolveEffectiveVolume(key);
 
         this._sources[key] = source;
         return source;
@@ -273,6 +285,7 @@ export class WeaponSFXManager {
         if (!source) return;
 
         source.loop = true;
+        source.volume = this.resolveEffectiveVolume(key);
 
         if (!clip) {
             this._ensureClipLoaded(key);
@@ -281,5 +294,10 @@ export class WeaponSFXManager {
 
         source.clip = clip;
         source.play();
+    }
+
+    private static resolveEffectiveVolume(key: WeaponSfxKey): number {
+        const globalSfx = AudioSettingsManager.instance.sfxVolume;
+        return Math.max(0, Math.min(1, this.VOLUMES[key] * globalSfx));
     }
 }

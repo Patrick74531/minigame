@@ -19,6 +19,7 @@ import {
     Vec3,
     director,
     game,
+    EventTouch,
 } from 'cc';
 import { EventManager } from '../core/managers/EventManager';
 import { GameEvents } from '../data/GameEvents';
@@ -30,6 +31,8 @@ import { Localization } from '../core/i18n/Localization';
 import { CameraFollow } from '../core/camera/CameraFollow';
 import { resolveBossDialogueProfile } from './BossIntroDialogue';
 import { Joystick } from './Joystick';
+import { AudioSettingsManager } from '../core/managers/AudioSettingsManager';
+import { WeaponSFXManager } from '../gameplay/weapons/WeaponSFXManager';
 
 // UI_2D Layer
 const UI_LAYER = 33554432;
@@ -52,6 +55,20 @@ const GAME_OVER_RESTART_BTN_MAX_WIDTH = 280;
 const GAME_OVER_RESTART_BTN_MAX_HEIGHT = 86;
 const GAME_OVER_RESTART_BTN_MIN_WIDTH = 190;
 const GAME_OVER_RESTART_BTN_MIN_HEIGHT = 64;
+const SETTINGS_PANEL_WIDTH = 460;
+const SETTINGS_PANEL_HEIGHT = 270;
+const SETTINGS_SLIDER_WIDTH = 236;
+
+type AudioSliderKey = 'bgm' | 'sfx';
+
+type VolumeSliderView = {
+    key: AudioSliderKey;
+    hitNode: Node;
+    fillGraphics: Graphics;
+    knobNode: Node;
+    valueLabel: Label;
+    width: number;
+};
 
 type BossIntroPayload = {
     bossNode: Node;
@@ -133,6 +150,11 @@ export class HUDManager {
     private _gameOverButtonWidth: number = GAME_OVER_RESTART_BTN_MAX_WIDTH;
     private _gameOverButtonHeight: number = GAME_OVER_RESTART_BTN_MAX_HEIGHT;
     private _joystickRef: Joystick | null = null;
+    private _settingsButtonNode: Node | null = null;
+    private _settingsPanelRoot: Node | null = null;
+    private _settingsPanelOpacity: UIOpacity | null = null;
+    private _settingsBgmSlider: VolumeSliderView | null = null;
+    private _settingsSfxSlider: VolumeSliderView | null = null;
 
     // === Boss 出场 UI / 演出 ===
     private _bossIntroRoot: Node | null = null;
@@ -166,6 +188,8 @@ export class HUDManager {
         uiCanvas.getChildByName('LaneUnlockDialog')?.destroy();
         uiCanvas.getChildByName('BossIntroPanel')?.destroy();
         uiCanvas.getChildByName('GameOverDialog')?.destroy();
+        uiCanvas.getChildByName('SettingsButton')?.destroy();
+        uiCanvas.getChildByName('SettingsPanelRoot')?.destroy();
         uiCanvas.getChildByName('UICamera')?.getChildByName('BossIntroModelStage')?.destroy();
 
         // 创建金币显示
@@ -215,6 +239,7 @@ export class HUDManager {
         this.createBossIntroPanel(uiCanvas);
         this.createHeroRespawnDialog(uiCanvas);
         this.createGameOverDialog(uiCanvas);
+        this.createSettingsUI(uiCanvas);
 
         // 监听事件
         this.setupEventListeners();
@@ -245,6 +270,378 @@ export class HUDManager {
 
         // 默认隐藏
         node.active = false;
+    }
+
+    private createSettingsUI(parent: Node): void {
+        const buttonNode = new Node('SettingsButton');
+        buttonNode.layer = UI_LAYER;
+        parent.addChild(buttonNode);
+        buttonNode.addComponent(UITransform).setContentSize(112, 46);
+        const buttonWidget = buttonNode.addComponent(Widget);
+        buttonWidget.isAlignTop = true;
+        buttonWidget.isAlignRight = true;
+        buttonWidget.top = 14;
+        buttonWidget.right = 16;
+
+        const button = buttonNode.addComponent(Button);
+        button.transition = Button.Transition.NONE;
+
+        const buttonBg = buttonNode.addComponent(Graphics);
+        this.drawSettingsButton(buttonBg);
+
+        const buttonLabelNode = new Node('SettingsButtonLabel');
+        buttonLabelNode.layer = UI_LAYER;
+        buttonNode.addChild(buttonLabelNode);
+        buttonLabelNode.addComponent(UITransform).setContentSize(104, 40);
+        const buttonLabel = buttonLabelNode.addComponent(Label);
+        buttonLabel.string = Localization.instance.t('ui.settings.button');
+        buttonLabel.fontSize = 24;
+        buttonLabel.lineHeight = 30;
+        buttonLabel.isBold = true;
+        buttonLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        buttonLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        buttonLabel.color = new Color(28, 18, 10, 255);
+
+        buttonNode.on(
+            Button.EventType.CLICK,
+            () => {
+                this.toggleSettingsPanel();
+            },
+            this
+        );
+
+        const panelRoot = new Node('SettingsPanelRoot');
+        panelRoot.layer = UI_LAYER;
+        parent.addChild(panelRoot);
+        panelRoot.addComponent(UITransform).setContentSize(1280, 720);
+        const rootWidget = panelRoot.addComponent(Widget);
+        rootWidget.isAlignTop = true;
+        rootWidget.isAlignBottom = true;
+        rootWidget.isAlignLeft = true;
+        rootWidget.isAlignRight = true;
+        this._settingsPanelOpacity = panelRoot.addComponent(UIOpacity);
+        this._settingsPanelOpacity.opacity = 0;
+
+        const blocker = new Node('SettingsPanelBlocker');
+        blocker.layer = UI_LAYER;
+        panelRoot.addChild(blocker);
+        blocker.addComponent(UITransform).setContentSize(1280, 720);
+        const blockerWidget = blocker.addComponent(Widget);
+        blockerWidget.isAlignTop = true;
+        blockerWidget.isAlignBottom = true;
+        blockerWidget.isAlignLeft = true;
+        blockerWidget.isAlignRight = true;
+        blocker.addComponent(BlockInputEvents);
+        blocker.on(
+            Node.EventType.TOUCH_END,
+            () => {
+                this.hideSettingsPanel();
+            },
+            this
+        );
+
+        const panel = new Node('SettingsPanel');
+        panel.layer = UI_LAYER;
+        panelRoot.addChild(panel);
+        panel.addComponent(UITransform).setContentSize(SETTINGS_PANEL_WIDTH, SETTINGS_PANEL_HEIGHT);
+        const panelWidget = panel.addComponent(Widget);
+        panelWidget.isAlignTop = true;
+        panelWidget.isAlignRight = true;
+        panelWidget.top = 70;
+        panelWidget.right = 16;
+
+        const panelBg = panel.addComponent(Graphics);
+        this.drawSettingsPanelBackground(panelBg);
+
+        const titleNode = new Node('SettingsTitle');
+        titleNode.layer = UI_LAYER;
+        panel.addChild(titleNode);
+        titleNode.addComponent(UITransform).setContentSize(SETTINGS_PANEL_WIDTH - 110, 42);
+        titleNode.setPosition(-40, 98, 0);
+        const titleLabel = titleNode.addComponent(Label);
+        titleLabel.string = Localization.instance.t('ui.settings.title');
+        titleLabel.fontSize = 30;
+        titleLabel.lineHeight = 36;
+        titleLabel.isBold = true;
+        titleLabel.horizontalAlign = Label.HorizontalAlign.LEFT;
+        titleLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        titleLabel.color = new Color(255, 228, 186, 255);
+
+        const closeBtnNode = new Node('SettingsCloseButton');
+        closeBtnNode.layer = UI_LAYER;
+        panel.addChild(closeBtnNode);
+        closeBtnNode.addComponent(UITransform).setContentSize(42, 34);
+        closeBtnNode.setPosition(SETTINGS_PANEL_WIDTH / 2 - 34, SETTINGS_PANEL_HEIGHT / 2 - 30, 0);
+        const closeButton = closeBtnNode.addComponent(Button);
+        closeButton.transition = Button.Transition.NONE;
+        const closeBg = closeBtnNode.addComponent(Graphics);
+        this.drawSettingsCloseButton(closeBg);
+        const closeLabel = closeBtnNode.addComponent(Label);
+        closeLabel.string = 'X';
+        closeLabel.fontSize = 24;
+        closeLabel.lineHeight = 28;
+        closeLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        closeLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        closeLabel.color = new Color(255, 245, 226, 255);
+        closeBtnNode.on(
+            Button.EventType.CLICK,
+            () => {
+                this.hideSettingsPanel();
+            },
+            this
+        );
+
+        this._settingsBgmSlider = this.createVolumeSlider(
+            panel,
+            'SettingsBgmRow',
+            'ui.settings.bgm',
+            26,
+            'bgm'
+        );
+        this._settingsSfxSlider = this.createVolumeSlider(
+            panel,
+            'SettingsSfxRow',
+            'ui.settings.sfx',
+            -62,
+            'sfx'
+        );
+
+        this._settingsButtonNode = buttonNode;
+        this._settingsPanelRoot = panelRoot;
+        this.refreshSettingsPanelUI();
+        panelRoot.active = false;
+    }
+
+    private createVolumeSlider(
+        parent: Node,
+        rowName: string,
+        titleKey: string,
+        posY: number,
+        key: AudioSliderKey
+    ): VolumeSliderView {
+        const row = new Node(rowName);
+        row.layer = UI_LAYER;
+        parent.addChild(row);
+        row.addComponent(UITransform).setContentSize(SETTINGS_PANEL_WIDTH - 44, 70);
+        row.setPosition(0, posY, 0);
+
+        const titleNode = new Node(`${rowName}_Title`);
+        titleNode.layer = UI_LAYER;
+        row.addChild(titleNode);
+        titleNode.addComponent(UITransform).setContentSize(120, 34);
+        titleNode.setPosition(-152, 16, 0);
+        const titleLabel = titleNode.addComponent(Label);
+        titleLabel.string = Localization.instance.t(titleKey);
+        titleLabel.fontSize = 24;
+        titleLabel.lineHeight = 30;
+        titleLabel.horizontalAlign = Label.HorizontalAlign.LEFT;
+        titleLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        titleLabel.color = new Color(232, 236, 246, 255);
+
+        const trackNode = new Node(`${rowName}_Track`);
+        trackNode.layer = UI_LAYER;
+        row.addChild(trackNode);
+        trackNode.addComponent(UITransform).setContentSize(SETTINGS_SLIDER_WIDTH, 18);
+        trackNode.setPosition(-12, -12, 0);
+        const trackBg = trackNode.addComponent(Graphics);
+        trackBg.fillColor = new Color(45, 52, 66, 238);
+        trackBg.roundRect(-SETTINGS_SLIDER_WIDTH / 2, -9, SETTINGS_SLIDER_WIDTH, 18, 9);
+        trackBg.fill();
+        trackBg.strokeColor = new Color(126, 144, 168, 220);
+        trackBg.lineWidth = 2;
+        trackBg.roundRect(-SETTINGS_SLIDER_WIDTH / 2, -9, SETTINGS_SLIDER_WIDTH, 18, 9);
+        trackBg.stroke();
+
+        const fillNode = new Node(`${rowName}_Fill`);
+        fillNode.layer = UI_LAYER;
+        trackNode.addChild(fillNode);
+        fillNode.addComponent(UITransform).setContentSize(SETTINGS_SLIDER_WIDTH, 18);
+        const fillGraphics = fillNode.addComponent(Graphics);
+
+        const knobNode = new Node(`${rowName}_Knob`);
+        knobNode.layer = UI_LAYER;
+        trackNode.addChild(knobNode);
+        knobNode.addComponent(UITransform).setContentSize(26, 26);
+        const knobGraphics = knobNode.addComponent(Graphics);
+        knobGraphics.fillColor = new Color(248, 240, 214, 255);
+        knobGraphics.circle(0, 0, 10);
+        knobGraphics.fill();
+        knobGraphics.strokeColor = new Color(255, 172, 84, 255);
+        knobGraphics.lineWidth = 2;
+        knobGraphics.circle(0, 0, 10);
+        knobGraphics.stroke();
+
+        const hitNode = new Node(`${rowName}_Hit`);
+        hitNode.layer = UI_LAYER;
+        row.addChild(hitNode);
+        hitNode.addComponent(UITransform).setContentSize(SETTINGS_SLIDER_WIDTH + 18, 34);
+        hitNode.setPosition(-12, -12, 0);
+        hitNode.on(
+            Node.EventType.TOUCH_START,
+            (event: EventTouch) => {
+                this.onVolumeSliderTouch(key, event);
+            },
+            this
+        );
+        hitNode.on(
+            Node.EventType.TOUCH_MOVE,
+            (event: EventTouch) => {
+                this.onVolumeSliderTouch(key, event);
+            },
+            this
+        );
+
+        const valueNode = new Node(`${rowName}_Value`);
+        valueNode.layer = UI_LAYER;
+        row.addChild(valueNode);
+        valueNode.addComponent(UITransform).setContentSize(72, 34);
+        valueNode.setPosition(166, 16, 0);
+        const valueLabel = valueNode.addComponent(Label);
+        valueLabel.string = '100%';
+        valueLabel.fontSize = 22;
+        valueLabel.lineHeight = 28;
+        valueLabel.horizontalAlign = Label.HorizontalAlign.RIGHT;
+        valueLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        valueLabel.color = new Color(154, 224, 255, 255);
+
+        return {
+            key,
+            hitNode,
+            fillGraphics,
+            knobNode,
+            valueLabel,
+            width: SETTINGS_SLIDER_WIDTH,
+        };
+    }
+
+    private onVolumeSliderTouch(key: AudioSliderKey, event: EventTouch): void {
+        const slider = key === 'bgm' ? this._settingsBgmSlider : this._settingsSfxSlider;
+        if (!slider) return;
+
+        const transform = slider.hitNode.getComponent(UITransform);
+        if (!transform) return;
+        const uiLocation = event.getUILocation();
+        const local = transform.convertToNodeSpaceAR(new Vec3(uiLocation.x, uiLocation.y, 0));
+        const ratio = Math.max(0, Math.min(1, (local.x + slider.width * 0.5) / slider.width));
+
+        if (key === 'bgm') {
+            AudioSettingsManager.instance.setBgmVolume(ratio);
+        } else {
+            AudioSettingsManager.instance.setSfxVolume(ratio);
+            WeaponSFXManager.refreshVolumes();
+        }
+
+        this.refreshSettingsPanelUI();
+    }
+
+    private refreshSettingsPanelUI(): void {
+        if (this._settingsBgmSlider) {
+            this.redrawVolumeSlider(
+                this._settingsBgmSlider,
+                AudioSettingsManager.instance.bgmVolume
+            );
+        }
+        if (this._settingsSfxSlider) {
+            this.redrawVolumeSlider(
+                this._settingsSfxSlider,
+                AudioSettingsManager.instance.sfxVolume
+            );
+        }
+    }
+
+    private redrawVolumeSlider(slider: VolumeSliderView, ratio: number): void {
+        const clamped = Math.max(0, Math.min(1, ratio));
+        const left = -slider.width / 2;
+        const fillWidth = Math.max(0, Math.round(slider.width * clamped));
+
+        slider.fillGraphics.clear();
+        if (fillWidth > 0) {
+            slider.fillGraphics.fillColor = new Color(88, 221, 255, 255);
+            slider.fillGraphics.roundRect(left, -7, fillWidth, 14, 7);
+            slider.fillGraphics.fill();
+        }
+        slider.knobNode.setPosition(left + slider.width * clamped, 0, 0);
+        slider.valueLabel.string = `${Math.round(clamped * 100)}%`;
+    }
+
+    private drawSettingsButton(bg: Graphics): void {
+        bg.clear();
+        bg.fillColor = new Color(255, 205, 98, 245);
+        bg.roundRect(-56, -23, 112, 46, 12);
+        bg.fill();
+        bg.strokeColor = new Color(255, 238, 182, 255);
+        bg.lineWidth = 2;
+        bg.roundRect(-56, -23, 112, 46, 12);
+        bg.stroke();
+    }
+
+    private drawSettingsCloseButton(bg: Graphics): void {
+        bg.clear();
+        bg.fillColor = new Color(156, 84, 64, 255);
+        bg.roundRect(-21, -17, 42, 34, 8);
+        bg.fill();
+        bg.strokeColor = new Color(255, 204, 182, 255);
+        bg.lineWidth = 2;
+        bg.roundRect(-21, -17, 42, 34, 8);
+        bg.stroke();
+    }
+
+    private drawSettingsPanelBackground(bg: Graphics): void {
+        bg.clear();
+        bg.fillColor = new Color(16, 24, 36, 236);
+        bg.roundRect(
+            -SETTINGS_PANEL_WIDTH / 2,
+            -SETTINGS_PANEL_HEIGHT / 2,
+            SETTINGS_PANEL_WIDTH,
+            SETTINGS_PANEL_HEIGHT,
+            16
+        );
+        bg.fill();
+        bg.strokeColor = new Color(255, 162, 76, 246);
+        bg.lineWidth = 3;
+        bg.roundRect(
+            -SETTINGS_PANEL_WIDTH / 2,
+            -SETTINGS_PANEL_HEIGHT / 2,
+            SETTINGS_PANEL_WIDTH,
+            SETTINGS_PANEL_HEIGHT,
+            16
+        );
+        bg.stroke();
+    }
+
+    private toggleSettingsPanel(): void {
+        if (this._settingsPanelRoot?.active) {
+            this.hideSettingsPanel();
+            return;
+        }
+        this.showSettingsPanel();
+    }
+
+    private showSettingsPanel(): void {
+        if (!this._settingsPanelRoot || !this._settingsPanelOpacity) return;
+        this.refreshSettingsPanelUI();
+
+        this._settingsPanelRoot.active = true;
+        const rootParent = this._settingsPanelRoot.parent;
+        if (rootParent) {
+            this._settingsPanelRoot.setSiblingIndex(rootParent.children.length - 1);
+        }
+        this._settingsPanelOpacity.opacity = 0;
+        Tween.stopAllByTarget(this._settingsPanelOpacity);
+        tween(this._settingsPanelOpacity).to(0.14, { opacity: 255 }).start();
+    }
+
+    private hideSettingsPanel(): void {
+        if (!this._settingsPanelRoot || !this._settingsPanelOpacity) return;
+        Tween.stopAllByTarget(this._settingsPanelOpacity);
+        tween(this._settingsPanelOpacity)
+            .to(0.12, { opacity: 0 })
+            .call(() => {
+                if (this._settingsPanelRoot) {
+                    this._settingsPanelRoot.active = false;
+                }
+            })
+            .start();
     }
 
     private setupEventListeners(): void {
@@ -1921,6 +2318,12 @@ export class HUDManager {
         if (this._heroRespawnOpacity) {
             Tween.stopAllByTarget(this._heroRespawnOpacity);
         }
+        if (this._settingsPanelOpacity) {
+            Tween.stopAllByTarget(this._settingsPanelOpacity);
+        }
+        if (this._settingsPanelRoot) {
+            Tween.stopAllByTarget(this._settingsPanelRoot);
+        }
         if (this._gameOverRoot) {
             Tween.stopAllByTarget(this._gameOverRoot);
         }
@@ -1949,6 +2352,11 @@ export class HUDManager {
         this._heroRespawnCountdownLabel = null;
         this._heroRespawnMessageLabel = null;
         this._heroRespawnOpacity = null;
+        this._settingsButtonNode = null;
+        this._settingsPanelRoot = null;
+        this._settingsPanelOpacity = null;
+        this._settingsBgmSlider = null;
+        this._settingsSfxSlider = null;
         this._gameOverRoot = null;
         this._gameOverTitleLabel = null;
         this._gameOverMessageLabel = null;

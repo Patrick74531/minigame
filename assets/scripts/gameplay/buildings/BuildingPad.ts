@@ -1,7 +1,6 @@
 import {
     _decorator,
     Node,
-    Color,
     Material,
     Label,
     BoxCollider,
@@ -534,17 +533,6 @@ export class BuildingPad extends BaseComponent {
         if (this._state !== BuildingPadState.WAITING && this._state !== BuildingPadState.UPGRADING)
             return 0;
 
-        // If Max Level, stop collecting
-        if (this._state === BuildingPadState.UPGRADING && this._associatedBuilding) {
-            const maxLvl = this._associatedBuilding.maxLevel;
-            if (this._associatedBuilding.level >= maxLvl) {
-                // Max Level Reached
-                if (this._label) this._label.string = BuildingText.maxLabel();
-                if (this._coinIconNode) this._coinIconNode.active = false;
-                return 0;
-            }
-        }
-
         if (heroCoins <= 0) return 0;
 
         if (this._state === BuildingPadState.WAITING) {
@@ -728,17 +716,6 @@ export class BuildingPad extends BaseComponent {
             // Reset
             this._collectedCoins = 0;
             this.updateDisplay();
-
-            // Check Max Level
-            const maxLvl = this._associatedBuilding.maxLevel;
-            if (this._associatedBuilding.level >= maxLvl) {
-                console.log('[BuildingPad] Max Level Reached.');
-                if (this._label) {
-                    this._label.string = BuildingText.maxLabel();
-                    this._label.color = Color.RED;
-                }
-                if (this._coinIconNode) this._coinIconNode.active = false;
-            }
 
             this._isAnimating = false;
         });

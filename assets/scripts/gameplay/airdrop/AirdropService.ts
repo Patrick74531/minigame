@@ -15,8 +15,11 @@ import { WeaponType } from '../weapons/WeaponTypes';
  * NOTE: 与 BuffCardService 类似的事件驱动模式。
  */
 export class AirdropService extends Singleton<AirdropService>() {
+    private static readonly OFFER_INTERVAL_WAVES = 3;
+
     /** 当前待选武器 */
     private _pendingWeapons: WeaponType[] = [];
+    private _waveCounter: number = 0;
 
     public get pendingWeapons(): WeaponType[] {
         return this._pendingWeapons;
@@ -25,6 +28,7 @@ export class AirdropService extends Singleton<AirdropService>() {
     // === 生命周期 ===
 
     public initialize(): void {
+        this._waveCounter = 0;
         this.eventManager.on(GameEvents.WAVE_START, this.onWaveStart, this);
         this.eventManager.on(GameEvents.WEAPON_PICKED, this.onWeaponPicked, this);
         console.log('[AirdropService] 初始化完成');
@@ -34,12 +38,20 @@ export class AirdropService extends Singleton<AirdropService>() {
         this.eventManager.off(GameEvents.WAVE_START, this.onWaveStart, this);
         this.eventManager.off(GameEvents.WEAPON_PICKED, this.onWeaponPicked, this);
         this._pendingWeapons = [];
+        this._waveCounter = 0;
     }
 
     // === 事件处理 ===
 
-    private onWaveStart(_data: { wave?: number }): void {
-        // 每波开始时触发空投
+    private onWaveStart(data: { wave?: number }): void {
+        const wave = Math.max(1, Math.floor(data.wave ?? this._waveCounter + 1));
+        this._waveCounter = wave;
+
+        if (wave % AirdropService.OFFER_INTERVAL_WAVES !== 0) {
+            return;
+        }
+
+        // 每 3 波开始时触发一次空投
         this.spawnAirdrop();
     }
 

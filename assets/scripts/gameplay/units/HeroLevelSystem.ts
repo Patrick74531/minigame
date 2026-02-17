@@ -49,7 +49,7 @@ export class HeroLevelSystem {
         return this.getXpForLevel(this._level);
     }
     public get isMaxLevel(): boolean {
-        return this._level >= GameConfig.HERO_LEVEL.MAX_LEVEL;
+        return false;
     }
 
     /**
@@ -78,26 +78,19 @@ export class HeroLevelSystem {
      * 手动增加经验（供外部调用，如任务奖励）
      */
     public addXp(amount: number): void {
-        if (this.isMaxLevel || amount <= 0) return;
+        if (amount <= 0) return;
 
         this._currentXp += amount;
 
         // 连续升级处理（一次杀很多怪可能连升数级）
-        let leveled = false;
-        while (!this.isMaxLevel && this._currentXp >= this.maxXp) {
+        while (this._currentXp >= this.maxXp) {
             this._currentXp -= this.maxXp;
             this._level++;
-            leveled = true;
 
             this.eventManager.emit(GameEvents.HERO_LEVEL_UP, {
                 level: this._level,
                 heroNode: this._heroNode!,
             });
-        }
-
-        // 满级时多余经验归零
-        if (this.isMaxLevel) {
-            this._currentXp = 0;
         }
 
         this.eventManager.emit(GameEvents.HERO_XP_GAINED, {
@@ -114,7 +107,15 @@ export class HeroLevelSystem {
      */
     public getXpForLevel(level: number): number {
         if (level <= 0) return 0;
-        if (level > this._xpTable.length) return this._xpTable[this._xpTable.length - 1] ?? 9999;
+        if (level > this._xpTable.length) {
+            const raw = Math.floor(
+                GameConfig.HERO_LEVEL.XP_BASE * Math.pow(GameConfig.HERO_LEVEL.XP_GROWTH, level - 1)
+            );
+            if (!Number.isFinite(raw)) {
+                return Number.MAX_SAFE_INTEGER;
+            }
+            return Math.max(1, raw);
+        }
         return this._xpTable[level - 1];
     }
 

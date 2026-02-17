@@ -56,18 +56,13 @@ export class HeroWeaponManager extends Singleton<HeroWeaponManager>() {
 
     /**
      * 添加或升级武器
-     * @returns 升级后的等级（-1 表示已满级无法升级）
+     * @returns 升级后的等级
      */
     public addWeapon(type: WeaponType): number {
-        const maxLevel = GameConfig.WEAPON_SYSTEM.MAX_WEAPON_LEVEL;
         const existing = this._inventory.get(type);
 
         if (existing) {
             // 已有此武器 → 升级
-            if (existing.level >= maxLevel) {
-                console.log(`[HeroWeaponManager] ${type} 已满级 (Lv.${maxLevel})`);
-                return -1;
-            }
             existing.level++;
             console.log(`[HeroWeaponManager] ${type} 升级到 Lv.${existing.level}`);
             this.eventManager.emit(GameEvents.WEAPON_INVENTORY_CHANGED, {

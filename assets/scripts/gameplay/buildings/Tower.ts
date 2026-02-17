@@ -207,11 +207,7 @@ export class Tower extends Building {
 
         this.attackDamage = Math.floor(this.attackDamage * this.attackMultiplier);
         this.attackRange *= this.rangeMultiplier;
-        const minAttackInterval = this.shouldUseMachineGunStyleProjectile() ? 0.12 : 0.2;
-        this.attackInterval = Math.max(
-            minAttackInterval,
-            this.attackInterval * this.intervalMultiplier
-        );
+        this.attackInterval = this.attackInterval * this.intervalMultiplier;
         if (this.chainRangePerLevel > 0) {
             this.chainRange += this.chainRangePerLevel;
         }

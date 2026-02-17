@@ -111,6 +111,10 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.gameOver.message.defeat': '基地已失守，立刻重整战场再来一局。',
         'ui.gameOver.button.restart': '重新开始',
         'ui.gameOver.button.restarting': '重启中...',
+        'ui.settings.button': '设置',
+        'ui.settings.title': '声音设置',
+        'ui.settings.bgm': '背景音乐',
+        'ui.settings.sfx': '音效',
 
         'enemy.archetype.boss_robot_flying': '飞行机甲',
         'enemy.archetype.boss_robot_large': '巨型机甲',
@@ -242,6 +246,10 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.gameOver.message.defeat': 'Base lost. Regroup and launch another run now.',
         'ui.gameOver.button.restart': 'Restart',
         'ui.gameOver.button.restarting': 'Restarting...',
+        'ui.settings.button': 'Settings',
+        'ui.settings.title': 'Audio Settings',
+        'ui.settings.bgm': 'Background Music',
+        'ui.settings.sfx': 'SFX',
 
         'enemy.archetype.boss_robot_flying': 'Flying Warbot',
         'enemy.archetype.boss_robot_large': 'Titan Warbot',

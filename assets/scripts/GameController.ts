@@ -23,6 +23,7 @@ import { ResourcePreloader } from './core/bootstrap/ResourcePreloader';
 import { CoinFactory } from './gameplay/economy/CoinFactory';
 import { SystemReset } from './core/bootstrap/SystemReset';
 import { applyCanvasOnDisableSafetyPatch } from './core/engine/CanvasSafetyPatch';
+import { AudioSettingsManager } from './core/managers/AudioSettingsManager';
 
 const { ccclass, property } = _decorator;
 
@@ -111,6 +112,7 @@ export class GameController extends Component {
 
         // Initialize weapon system
         WeaponVFX.initialize();
+        AudioSettingsManager.instance.initialize(this.node);
         WeaponSFXManager.initialize(this.node);
         WeaponBehaviorFactory.initialize();
         this._services.heroWeaponManager.initialize();
@@ -136,6 +138,7 @@ export class GameController extends Component {
         this._services.weaponBarUI.cleanup();
         HeroLevelSystem.instance.cleanup();
         this.evtMgr.off(GameEvents.HERO_LEVEL_UP, this.onHeroLevelUp, this);
+        AudioSettingsManager.instance.cleanup();
         WeaponSFXManager.cleanup();
         WeaponVFX.cleanup();
         ServiceRegistry.clear();

@@ -5,7 +5,7 @@ import { GameManager } from '../core/managers/GameManager';
 import { ServiceRegistry } from '../core/managers/ServiceRegistry';
 import { GameEvents } from '../data/GameEvents';
 import { HeroWeaponManager } from '../gameplay/weapons/HeroWeaponManager';
-import { WeaponType, WeaponDef } from '../gameplay/weapons/WeaponTypes';
+import { WeaponType, WeaponDef, getWeaponLevelStats } from '../gameplay/weapons/WeaponTypes';
 import { Localization } from '../core/i18n/Localization';
 
 const UI_LAYER = 33554432;
@@ -96,14 +96,14 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
 
         // Dynamic scaling if total width exceeds screen width
         const size = this._rootNode.getComponent(UITransform)?.contentSize;
-         // Create a container for scaling
+        // Create a container for scaling
         const cardContainer = new Node('CardContainer');
         cardContainer.layer = UI_LAYER;
         this._rootNode.addChild(cardContainer);
 
         if (size && totalWidth > size.width - 100) {
-             const scale = (size.width - 100) / totalWidth;
-             cardContainer.setScale(scale, scale, 1);
+            const scale = (size.width - 100) / totalWidth;
+            cardContainer.setScale(scale, scale, 1);
         }
 
         const startX = -totalWidth / 2 + CARD_WIDTH / 2;
@@ -288,8 +288,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
     };
 
     private formatStats(def: WeaponDef, level: number): string {
-        const idx = Math.max(0, Math.min(level - 1, def.levels.length - 1));
-        const stats = def.levels[idx];
+        const stats = getWeaponLevelStats(def, level);
         const lines: string[] = [];
 
         const keys = Object.keys(stats);

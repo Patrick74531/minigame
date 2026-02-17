@@ -543,17 +543,9 @@ export class Hero extends Unit {
 
             let value = base * growth.multiplier * buffMul + growth.additive + buffAdd;
 
-            // 上限约束
-            if (growth.cap !== undefined) {
-                value = Math.min(value, growth.cap);
-            }
             // attack 取整
             if (key === 'attack' || key === 'maxHp') {
                 value = Math.floor(value);
-            }
-            // attackInterval 下限
-            if (key === 'attackInterval') {
-                value = Math.max(0.2, value);
             }
 
             this._stats[key] = value;

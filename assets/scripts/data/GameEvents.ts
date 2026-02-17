@@ -174,6 +174,7 @@ export type GameEventPayloads = {
         slowPercent: number;
         slowDuration: number;
         effectType?: 'frost_rain' | 'glitch_interference' | 'generic';
+        laneFilter?: 'top' | 'mid' | 'bottom';
     };
 
     // === 建筑选择系统 ===
