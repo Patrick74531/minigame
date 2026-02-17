@@ -16,6 +16,14 @@ export class UIResponsive {
         return view.getVisibleSize();
     }
 
+    public static getVisibleSizeAndRatio(): { visibleSize: Size; ratio: number } {
+        const size = view.getVisibleSize();
+        return {
+            visibleSize: size,
+            ratio: size.width / size.height,
+        };
+    }
+
     public static shouldUseTouchControls(): boolean {
         const forced = this.getForcedInputMode();
         if (forced === 'touch') return true;

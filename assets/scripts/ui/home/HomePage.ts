@@ -1,0 +1,350 @@
+import {
+    _decorator,
+    Component,
+    Node,
+    Sprite,
+    SpriteFrame,
+    Label,
+    Button,
+    UITransform,
+    Widget,
+    Color,
+    Layers,
+    view,
+    resources,
+    Texture2D,
+    ImageAsset,
+    Graphics,
+} from 'cc';
+import { Localization } from '../../core/i18n/Localization';
+import { GameManager } from '../../core/managers/GameManager';
+import { HUDSettingsModule } from '../hud/HUDSettingsModule';
+import { applyGameLabelStyle } from '../hud/HUDCommon';
+import { LocalizationComp } from '../LocalizationComp';
+import { UIResponsive } from '../UIResponsive';
+
+const { ccclass } = _decorator;
+
+@ccclass('HomePage')
+export class HomePage extends Component {
+    private _backgroundNode: Node | null = null;
+    private _backgroundSprite: Sprite | null = null;
+    private _contentNode: Node | null = null;
+    private _settingsModule: HUDSettingsModule | null = null;
+    private _uiLayer: number = Layers.Enum.UI_2D;
+
+    private _startBtn: Node | null = null;
+    private _leaderboardBtn: Node | null = null;
+    private _subscribeBtn: Node | null = null;
+
+    public onLoad() {
+        this._uiLayer = this.node.parent?.layer ?? Layers.Enum.UI_2D;
+        this.node.layer = this._uiLayer;
+
+        this.ensureRootLayout();
+        this.createUI();
+
+        this._settingsModule = new HUDSettingsModule(() => {
+            this.refreshText();
+        });
+        this._settingsModule.initialize(this.node);
+
+        view.on('canvas-resize', this.onCanvasResize, this);
+        this.onCanvasResize();
+        this.scheduleOnce(() => this.onCanvasResize(), 0);
+    }
+
+    public onDestroy() {
+        view.off('canvas-resize', this.onCanvasResize, this);
+        this._settingsModule?.cleanup();
+    }
+
+    private ensureRootLayout() {
+        const rootTf = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
+        const size = this.getCanvasSize();
+        rootTf.setContentSize(size.width, size.height);
+
+        const rootWidget = this.node.getComponent(Widget) ?? this.node.addComponent(Widget);
+        rootWidget.isAlignTop = true;
+        rootWidget.isAlignBottom = true;
+        rootWidget.isAlignLeft = true;
+        rootWidget.isAlignRight = true;
+        rootWidget.top = 0;
+        rootWidget.bottom = 0;
+        rootWidget.left = 0;
+        rootWidget.right = 0;
+        rootWidget.updateAlignment();
+    }
+
+    private createUI() {
+        this.node.getChildByName('HomeBackground')?.destroy();
+        this.node.getChildByName('HomeContent')?.destroy();
+
+        this._backgroundNode = new Node('HomeBackground');
+        this._backgroundNode.layer = this._uiLayer;
+        this.node.addChild(this._backgroundNode);
+
+        this._backgroundNode.addComponent(UITransform);
+        const bgWidget = this._backgroundNode.addComponent(Widget);
+        bgWidget.isAlignHorizontalCenter = true;
+        bgWidget.isAlignVerticalCenter = true;
+        bgWidget.horizontalCenter = 0;
+        bgWidget.verticalCenter = 0;
+
+        this._backgroundSprite = this._backgroundNode.addComponent(Sprite);
+        this._backgroundSprite.type = Sprite.Type.SIMPLE;
+        this._backgroundSprite.sizeMode = Sprite.SizeMode.CUSTOM;
+
+        this.loadBackgroundTexture();
+
+        this._contentNode = new Node('HomeContent');
+        this._contentNode.layer = this._uiLayer;
+        this.node.addChild(this._contentNode);
+
+        this._contentNode.addComponent(UITransform);
+
+        const contentWidget = this._contentNode.addComponent(Widget);
+        contentWidget.isAlignVerticalCenter = true;
+        contentWidget.isAlignHorizontalCenter = true;
+        contentWidget.verticalCenter = 0;
+        contentWidget.horizontalCenter = 0;
+
+        this._startBtn = this.createGameButton('StartButton', 'ui.home.start', 0, 120, () =>
+            this.onStartClick()
+        );
+        this._leaderboardBtn = this.createGameButton(
+            'LeaderboardButton',
+            'ui.home.leaderboard',
+            0,
+            0,
+            () => this.onLeaderboardClick()
+        );
+        this._subscribeBtn = this.createGameButton(
+            'SubscribeButton',
+            'ui.home.subscribe',
+            0,
+            -120,
+            () => this.onSubscribeClick()
+        );
+
+        this._contentNode.addChild(this._startBtn);
+        this._contentNode.addChild(this._leaderboardBtn);
+        this._contentNode.addChild(this._subscribeBtn);
+        this.updateContentLayout();
+    }
+
+    private loadBackgroundTexture() {
+        resources.load('ui/homepage', Texture2D, (textureErr, texture) => {
+            if (!textureErr && texture) {
+                this.applyBackgroundTexture(texture);
+                return;
+            }
+
+            resources.load('ui/homepage', ImageAsset, (imageErr, imageAsset) => {
+                if (imageErr || !imageAsset) {
+                    console.warn('Failed to load homepage background', imageErr ?? textureErr);
+                    return;
+                }
+                const fallbackTexture = new Texture2D();
+                fallbackTexture.image = imageAsset;
+                this.applyBackgroundTexture(fallbackTexture);
+            });
+        });
+    }
+
+    private applyBackgroundTexture(texture: Texture2D) {
+        if (!this._backgroundSprite) return;
+        const spriteFrame = new SpriteFrame();
+        spriteFrame.texture = texture;
+        this._backgroundSprite.spriteFrame = spriteFrame;
+        this.updateBackgroundLayout();
+    }
+
+    private createGameButton(
+        name: string,
+        locKey: string,
+        x: number,
+        y: number,
+        onClick: () => void
+    ): Node {
+        const btnNode = new Node(name);
+        btnNode.layer = this._uiLayer;
+        const tf = btnNode.addComponent(UITransform);
+        tf.setContentSize(240, 80);
+        btnNode.setPosition(x, y, 0);
+
+        const btn = btnNode.addComponent(Button);
+        btn.transition = Button.Transition.SCALE;
+        btn.zoomScale = 0.95;
+
+        const bg = btnNode.addComponent(Graphics);
+        this.drawButton(bg);
+
+        const labelNode = new Node('Label');
+        labelNode.layer = this._uiLayer;
+        btnNode.addChild(labelNode);
+        labelNode.addComponent(UITransform);
+        const label = labelNode.addComponent(Label);
+        label.fontSize = 32;
+        label.isBold = true;
+        label.color = Color.WHITE;
+        label.horizontalAlign = Label.HorizontalAlign.CENTER;
+        label.verticalAlign = Label.VerticalAlign.CENTER;
+        label.overflow = Label.Overflow.SHRINK;
+        label.string = Localization.instance.t(locKey);
+        applyGameLabelStyle(label, { outlineWidth: 3, outlineColor: new Color(0, 0, 0, 200) });
+
+        const locComp = labelNode.addComponent(LocalizationComp);
+        locComp.key = locKey;
+
+        btnNode.on(Button.EventType.CLICK, onClick, this);
+        return btnNode;
+    }
+
+    private drawButton(g: Graphics) {
+        const tf = g.node.getComponent(UITransform);
+        const width = Math.round(tf?.contentSize.width ?? 240);
+        const height = Math.round(tf?.contentSize.height ?? 80);
+        const radius = Math.max(12, Math.round(height * 0.22));
+        g.clear();
+        g.fillColor = new Color(255, 198, 88, 255);
+        g.roundRect(-width / 2, -height / 2, width, height, radius);
+        g.fill();
+        g.strokeColor = new Color(255, 255, 255, 200);
+        g.lineWidth = Math.max(2, Math.round(height * 0.05));
+        g.roundRect(-width / 2, -height / 2, width, height, radius);
+        g.stroke();
+    }
+
+    private onCanvasResize() {
+        this.ensureRootLayout();
+        this.updateBackgroundLayout();
+        this.updateContentLayout();
+        this._settingsModule?.onCanvasResize();
+    }
+
+    private updateBackgroundLayout() {
+        if (!this._backgroundNode) return;
+
+        const bgTransform = this._backgroundNode.getComponent(UITransform);
+        if (!bgTransform) return;
+
+        const size = this.getBackgroundCoverageSize();
+        bgTransform.setContentSize(Math.max(1, size.width), Math.max(1, size.height));
+        this._backgroundNode.getComponent(Widget)?.updateAlignment();
+    }
+
+    private getCanvasSize(): { width: number; height: number } {
+        const parentTf = this.node.parent?.getComponent(UITransform);
+        if (parentTf) {
+            return {
+                width: Math.max(1, parentTf.contentSize.width),
+                height: Math.max(1, parentTf.contentSize.height),
+            };
+        }
+
+        const visible = UIResponsive.getVisibleSize();
+        if (visible.width > 1 && visible.height > 1) {
+            return { width: visible.width, height: visible.height };
+        }
+
+        return { width: 1280, height: 720 };
+    }
+
+    // Background needs to cover full visible viewport under SHOW_ALL, while other UI keeps layout size.
+    private getBackgroundCoverageSize(): { width: number; height: number } {
+        const layout = this.getCanvasSize();
+        let width = layout.width;
+        let height = layout.height;
+
+        const visible = UIResponsive.getVisibleSize();
+        width = Math.max(width, visible.width);
+        height = Math.max(height, visible.height);
+
+        const frame = view.getFrameSize();
+        const scaleXGetter = (view as unknown as { getScaleX?: () => number }).getScaleX;
+        const scaleYGetter = (view as unknown as { getScaleY?: () => number }).getScaleY;
+        const scaleX = typeof scaleXGetter === 'function' ? scaleXGetter.call(view) : 0;
+        const scaleY = typeof scaleYGetter === 'function' ? scaleYGetter.call(view) : 0;
+        if (scaleX > 0 && scaleY > 0) {
+            width = Math.max(width, frame.width / scaleX);
+            height = Math.max(height, frame.height / scaleY);
+        }
+
+        return {
+            width: Math.ceil(width + 2),
+            height: Math.ceil(height + 2),
+        };
+    }
+
+    private updateContentLayout() {
+        if (!this._contentNode) return;
+        const size = this.getCanvasSize();
+        const contentTf = this._contentNode.getComponent(UITransform);
+        contentTf?.setContentSize(size.width, size.height);
+        this._contentNode.getComponent(Widget)?.updateAlignment();
+
+        const shortSide = Math.min(size.width, size.height);
+        const buttonW = Math.round(UIResponsive.clamp(shortSide * 0.38, 220, 360));
+        const buttonH = Math.round(UIResponsive.clamp(shortSide * 0.12, 72, 108));
+        const gap = Math.round(UIResponsive.clamp(shortSide * 0.045, 24, 42));
+        const step = buttonH + gap;
+        const centerY = 0;
+
+        this.layoutButton(this._startBtn, buttonW, buttonH, centerY + step);
+        this.layoutButton(this._leaderboardBtn, buttonW, buttonH, centerY);
+        this.layoutButton(this._subscribeBtn, buttonW, buttonH, centerY - step);
+    }
+
+    private layoutButton(btnNode: Node | null, width: number, height: number, y: number) {
+        if (!btnNode) return;
+        btnNode.getComponent(UITransform)?.setContentSize(width, height);
+        btnNode.setPosition(0, y, 0);
+        btnNode.getComponent(Widget)?.updateAlignment();
+
+        const bg = btnNode.getComponent(Graphics);
+        if (bg) {
+            this.drawButton(bg);
+        }
+
+        const labelNode = btnNode.getChildByName('Label');
+        labelNode?.getComponent(UITransform)?.setContentSize(Math.max(120, width - 32), height - 8);
+        const label = labelNode?.getComponent(Label);
+        if (label) {
+            label.fontSize = Math.round(UIResponsive.clamp(height * 0.42, 28, 44));
+            label.lineHeight = label.fontSize + 6;
+        }
+    }
+
+    private refreshText() {
+        this._settingsModule?.onLanguageChanged();
+
+        if (this._startBtn) {
+            const comp = this._startBtn.getChildByName('Label')?.getComponent(LocalizationComp);
+            comp?.refresh();
+        }
+        if (this._leaderboardBtn) {
+            const comp = this._leaderboardBtn
+                .getChildByName('Label')
+                ?.getComponent(LocalizationComp);
+            comp?.refresh();
+        }
+        if (this._subscribeBtn) {
+            const comp = this._subscribeBtn.getChildByName('Label')?.getComponent(LocalizationComp);
+            comp?.refresh();
+        }
+    }
+
+    private onStartClick() {
+        GameManager.instance.startGame();
+        this.node.destroy();
+    }
+
+    private onLeaderboardClick() {
+        console.log('Leaderboard clicked - Not implemented');
+    }
+
+    private onSubscribeClick() {
+        console.log('Subscribe clicked - Not implemented');
+    }
+}

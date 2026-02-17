@@ -271,6 +271,9 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.settings.sfx': 'SFX',
         'ui.settings.lang.zh': '中文',
         'ui.settings.lang.en': 'English',
+        'ui.home.start': '开始游戏',
+        'ui.home.leaderboard': '排行榜',
+        'ui.home.subscribe': '关注我们',
 
         'enemy.archetype.boss_robot_flying': 'Flying Warbot',
         'enemy.archetype.boss_robot_large': 'Titan Warbot',
@@ -290,5 +293,6 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'enemy.archetype.fallback_ground': 'Ground Assault Unit',
         'enemy.archetype.fallback_air': 'Air Assault Unit',
         'enemy.archetype.fallback_heavy': 'Heavy Breaker Unit',
+
     },
 };

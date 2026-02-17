@@ -99,6 +99,29 @@ export class HUDStatusModule implements HUDModule {
         this.applyHudEdgeLayout();
     }
 
+    public setVisible(visible: boolean): void {
+        const nodes = [
+            this._waveLabel?.node,
+            this._xpRootWidget?.node, // The root of XP bar
+            this._desktopMoveHintWidget?.node,
+            this._buildingInfoLabel?.node,
+        ];
+
+        nodes.forEach(n => {
+            if (n && n.isValid) {
+                n.active = visible;
+            }
+        });
+
+        // Keep these two hidden in gameplay as requested.
+        if (this._coinLabel?.node?.isValid) {
+            this._coinLabel.node.active = false;
+        }
+        if (this._baseHpLabel?.node?.isValid) {
+            this._baseHpLabel.node.active = false;
+        }
+    }
+
     public onLanguageChanged(): void {
         if (this._waveLabel) {
             this._waveLabel.string = Localization.instance.t('ui.hud.wave', {
@@ -139,6 +162,7 @@ export class HUDStatusModule implements HUDModule {
     public updateCoinDisplay(count: number): void {
         if (!this._coinLabel) return;
         this._coinLabel.string = Localization.instance.t('ui.hud.coins', { count });
+        this._coinLabel.node.active = false;
     }
 
     public updateBaseHp(current: number, max: number): void {
@@ -153,6 +177,7 @@ export class HUDStatusModule implements HUDModule {
         } else {
             this._baseHpLabel.color = new Color(244, 245, 255, 255);
         }
+        this._baseHpLabel.node.active = false;
     }
 
     public updateWaveDisplay(wave: number): void {

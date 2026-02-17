@@ -129,6 +129,17 @@ export class HUDWaveNoticeModule implements HUDModule {
         this.applyResponsiveLayout();
     }
 
+    public setVisible(visible: boolean): void {
+        // These are transient dialogs, usually we just want to hide them if they are showing.
+        // Or if 'visible' is true, we don't necessarily show them (they show on event).
+        // So this might just be "force hide" if false.
+        if (!visible) {
+             if (this._waveForecastRoot) this._waveForecastRoot.active = false;
+             if (this._laneUnlockDialogRoot) this._laneUnlockDialogRoot.active = false;
+             if (this._heroRespawnRoot) this._heroRespawnRoot.active = false;
+        }
+    }
+
     public onLanguageChanged(): void {
         this.applyResponsiveLayout();
         if (this._respawnMode === 'countdown' && this._heroRespawnRoot?.active) {

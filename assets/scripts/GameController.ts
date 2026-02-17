@@ -155,6 +155,7 @@ export class GameController extends Component {
                 enemy: this._enemyContainer!,
                 soldier: this._soldierContainer!,
                 building: this._buildingContainer!,
+                ui: this._uiCanvas!,
             },
             onSpawned: (base, hero) => {
                 this._base = base;
