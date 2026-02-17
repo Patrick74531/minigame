@@ -1,4 +1,17 @@
-import { Node, UITransform, Color, Graphics, Label, Widget, view } from 'cc';
+import {
+    Node,
+    UITransform,
+    Color,
+    Graphics,
+    Label,
+    Widget,
+    view,
+    Sprite,
+    resources,
+    SpriteFrame,
+    Texture2D,
+    ImageAsset,
+} from 'cc';
 import { Singleton } from '../core/base/Singleton';
 import { EventManager } from '../core/managers/EventManager';
 import { ServiceRegistry } from '../core/managers/ServiceRegistry';
@@ -28,6 +41,9 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
     private _barNode: Node | null = null;
     private _barWidget: Widget | null = null;
     private _iconNodes: Map<WeaponType, Node> = new Map();
+    private _iconFrameCache: Map<string, SpriteFrame> = new Map();
+    private _iconLoading: Set<string> = new Set();
+    private _iconWaiting: Map<string, Set<Sprite>> = new Map();
     private _showKeyboardHints: boolean = false;
     private _iconSize: number = DESKTOP_ICON_SIZE;
 
@@ -53,6 +69,9 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         }
         this._barWidget = null;
         this._iconNodes.clear();
+        this._iconFrameCache.clear();
+        this._iconLoading.clear();
+        this._iconWaiting.clear();
     }
 
     // === 刷新 ===
@@ -147,6 +166,7 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
 
         const themeColor = this.hexToColor(def.iconColor);
 
+        // Background
         const g = node.addComponent(Graphics);
         const radius = Math.max(10, Math.round(iconSize * 0.18));
 
@@ -171,7 +191,18 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         g.roundRect(-iconSize / 2, -iconSize / 2, iconSize, iconSize, radius);
         g.stroke();
 
-        this.drawWeaponGlyph(g, type, themeColor, iconSize, isActive);
+        // Icon Sprite
+        const iconNode = new Node('IconSprite');
+        iconNode.layer = UI_LAYER;
+        node.addChild(iconNode);
+        const spriteSize = iconSize * 0.75;
+        iconNode.addComponent(UITransform).setContentSize(spriteSize, spriteSize);
+        const sprite = iconNode.addComponent(Sprite);
+        sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+
+        if (def.iconPath) {
+            this.loadWeaponIcon(sprite, def.iconPath);
+        }
 
         this.createLevelBadge(node, level, iconSize, isActive);
 
@@ -191,6 +222,108 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         });
 
         return node;
+    }
+
+    private loadWeaponIcon(sprite: Sprite, path: string): void {
+        const normalizedPath = path.trim();
+        const cached = this._iconFrameCache.get(normalizedPath);
+        if (cached) {
+            sprite.spriteFrame = cached;
+            return;
+        }
+
+        const waitingSet = this.getIconWaitingSet(normalizedPath);
+        waitingSet.add(sprite);
+        if (this._iconLoading.has(normalizedPath)) {
+            return;
+        }
+        this._iconLoading.add(normalizedPath);
+
+        const candidates = this.getIconLoadCandidates(normalizedPath);
+        this.loadWeaponIconByCandidate(candidates, 0, frame => {
+            this._iconLoading.delete(normalizedPath);
+            const waiting = this.getIconWaitingSet(normalizedPath);
+            if (!frame) {
+                console.error(`[WeaponBarUI] Failed to load weapon icon from paths:`, candidates);
+                waiting.clear();
+                return;
+            }
+
+            this._iconFrameCache.set(normalizedPath, frame);
+            for (const waitingSprite of waiting) {
+                if (!waitingSprite?.isValid) continue;
+                waitingSprite.spriteFrame = frame;
+            }
+            waiting.clear();
+        });
+    }
+
+    private getIconLoadCandidates(path: string): string[] {
+        const rawCandidates = [
+            path,
+            `${path}/spriteFrame`,
+            `${path}/texture`,
+            path.endsWith('.webp') ? path : `${path}.webp`,
+            path.endsWith('.webp') ? `${path}/spriteFrame` : `${path}.webp/spriteFrame`,
+            path.endsWith('.webp') ? `${path}/texture` : `${path}.webp/texture`,
+        ];
+
+        const candidates: string[] = [];
+        for (const candidate of rawCandidates) {
+            if (!candidate || candidates.includes(candidate)) continue;
+            candidates.push(candidate);
+        }
+        return candidates;
+    }
+
+    private loadWeaponIconByCandidate(
+        candidates: string[],
+        index: number,
+        done: (frame: SpriteFrame | null) => void
+    ): void {
+        if (index >= candidates.length) {
+            done(null);
+            return;
+        }
+
+        const candidate = candidates[index];
+        resources.load(candidate, SpriteFrame, (sfErr, spriteFrame) => {
+            if (!sfErr && spriteFrame) {
+                done(spriteFrame);
+                return;
+            }
+
+            resources.load(candidate, Texture2D, (texErr, texture) => {
+                if (!texErr && texture) {
+                    const frame = new SpriteFrame();
+                    frame.texture = texture;
+                    done(frame);
+                    return;
+                }
+
+                resources.load(candidate, ImageAsset, (imgErr, imageAsset) => {
+                    if (!imgErr && imageAsset) {
+                        const textureFromImage = new Texture2D();
+                        textureFromImage.image = imageAsset;
+                        const frameFromImage = new SpriteFrame();
+                        frameFromImage.texture = textureFromImage;
+                        done(frameFromImage);
+                        return;
+                    }
+
+                    this.loadWeaponIconByCandidate(candidates, index + 1, done);
+                });
+            });
+        });
+    }
+
+    private getIconWaitingSet(path: string): Set<Sprite> {
+        let waitingSet = this._iconWaiting.get(path);
+        if (!waitingSet) {
+            waitingSet = new Set<Sprite>();
+            this._iconWaiting.set(path, waitingSet);
+        }
+        return waitingSet;
     }
 
     private updateContainerSize(iconCount: number): void {
@@ -263,112 +396,6 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         keyLabel.color = new Color(255, 233, 156, 255);
         keyLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         keyLabel.verticalAlign = Label.VerticalAlign.CENTER;
-    }
-
-    private drawWeaponGlyph(
-        g: Graphics,
-        type: WeaponType,
-        themeColor: Color,
-        iconSize: number,
-        isActive: boolean
-    ): void {
-        const glow = isActive ? 1 : 0.86;
-        const baseColor = new Color(
-            Math.round(themeColor.r * glow),
-            Math.round(themeColor.g * glow),
-            Math.round(themeColor.b * glow),
-            255
-        );
-
-        switch (type) {
-            case WeaponType.MACHINE_GUN:
-                this.drawMachineGunGlyph(g, baseColor, iconSize);
-                return;
-            case WeaponType.FLAMETHROWER:
-                this.drawFlamethrowerGlyph(g, baseColor, iconSize);
-                return;
-            case WeaponType.CANNON:
-                this.drawCannonGlyph(g, baseColor, iconSize);
-                return;
-            case WeaponType.GLITCH_WAVE:
-                this.drawGlitchWaveGlyph(g, baseColor, iconSize);
-                return;
-            default:
-                this.drawMachineGunGlyph(g, baseColor, iconSize);
-        }
-    }
-
-    private drawMachineGunGlyph(g: Graphics, c: Color, s: number): void {
-        g.fillColor = new Color(28, 38, 50, 255);
-        g.roundRect(-s * 0.28, -s * 0.08, s * 0.34, s * 0.16, s * 0.04);
-        g.fill();
-        g.fillColor = c;
-        g.roundRect(-s * 0.32, -s * 0.1, s * 0.34, s * 0.2, s * 0.05);
-        g.fill();
-        g.roundRect(s * 0.02, -s * 0.05, s * 0.2, s * 0.1, s * 0.03);
-        g.fill();
-
-        g.fillColor = new Color(255, 220, 160, 255);
-        for (let i = 0; i < 3; i++) {
-            g.circle(s * (0.18 + i * 0.08), s * (-0.01 + i * 0.03), s * 0.03);
-            g.fill();
-        }
-    }
-
-    private drawFlamethrowerGlyph(g: Graphics, c: Color, s: number): void {
-        g.fillColor = new Color(38, 44, 56, 255);
-        g.roundRect(-s * 0.32, -s * 0.07, s * 0.22, s * 0.14, s * 0.04);
-        g.fill();
-        g.fillColor = c;
-        g.roundRect(-s * 0.3, -s * 0.08, s * 0.22, s * 0.16, s * 0.04);
-        g.fill();
-
-        g.fillColor = new Color(255, 182, 60, 255);
-        g.circle(-s * 0.02, s * 0.02, s * 0.08);
-        g.fill();
-        g.fillColor = new Color(255, 96, 34, 255);
-        g.circle(s * 0.1, s * 0.03, s * 0.09);
-        g.fill();
-        g.fillColor = new Color(255, 225, 126, 255);
-        g.circle(s * 0.02, s * 0.03, s * 0.04);
-        g.fill();
-        g.fillColor = new Color(255, 134, 58, 255);
-        g.circle(s * 0.2, s * 0.02, s * 0.06);
-        g.fill();
-    }
-
-    private drawCannonGlyph(g: Graphics, c: Color, s: number): void {
-        g.fillColor = new Color(22, 30, 44, 255);
-        g.circle(-s * 0.06, -s * 0.01, s * 0.16);
-        g.fill();
-
-        g.fillColor = c;
-        g.circle(-s * 0.06, -s * 0.01, s * 0.15);
-        g.fill();
-        g.roundRect(-s * 0.04, -s * 0.05, s * 0.28, s * 0.1, s * 0.03);
-        g.fill();
-
-        g.fillColor = new Color(255, 220, 188, 255);
-        g.circle(s * 0.28, 0, s * 0.04);
-        g.fill();
-    }
-
-    private drawGlitchWaveGlyph(g: Graphics, c: Color, s: number): void {
-        g.strokeColor = c;
-        g.lineWidth = 3;
-        g.circle(0, 0, s * 0.18);
-        g.stroke();
-        g.lineWidth = 2;
-        g.circle(0, 0, s * 0.28);
-        g.stroke();
-
-        g.strokeColor = new Color(188, 248, 255, 255);
-        g.lineWidth = 4;
-        g.moveTo(-s * 0.24, -s * 0.04);
-        g.lineTo(-s * 0.06, s * 0.08);
-        g.lineTo(s * 0.08, -s * 0.02);
-        g.lineTo(s * 0.26, s * 0.1);
-        g.stroke();
     }
 
     // === 工具 ===

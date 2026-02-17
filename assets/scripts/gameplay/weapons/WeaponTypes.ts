@@ -27,6 +27,7 @@ export interface WeaponDef {
     nameKey: string;
     descriptionKey: string;
     iconColor: string;
+    iconPath: string;
     levels: WeaponLevelStats[];
 }
 

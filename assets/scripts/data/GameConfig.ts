@@ -371,6 +371,7 @@ export const GameConfig = {
                 nameKey: 'weapon.machine_gun.name',
                 descriptionKey: 'weapon.machine_gun.description',
                 iconColor: '#FF4500',
+                iconPath: 'icon/gun',
                 levels: [
                     { damage: 6, attackInterval: 0.12, range: 4.8, projectileSpeed: 28, spread: 4 },
                     {
@@ -408,6 +409,7 @@ export const GameConfig = {
                 nameKey: 'weapon.flamethrower.name',
                 descriptionKey: 'weapon.flamethrower.description',
                 iconColor: '#8B0000',
+                iconPath: 'icon/fire',
                 levels: [
                     {
                         damage: 18,
@@ -456,6 +458,7 @@ export const GameConfig = {
                 nameKey: 'weapon.cannon.name',
                 descriptionKey: 'weapon.cannon.description',
                 iconColor: '#708090',
+                iconPath: 'icon/gannon',
                 levels: [
                     {
                         damage: 34,
@@ -504,6 +507,7 @@ export const GameConfig = {
                 nameKey: 'weapon.glitch_wave.name',
                 descriptionKey: 'weapon.glitch_wave.description',
                 iconColor: '#00FFFF',
+                iconPath: 'icon/signal',
                 levels: [
                     {
                         damage: 14,

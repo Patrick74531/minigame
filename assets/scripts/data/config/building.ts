@@ -270,7 +270,7 @@ export const BUILDING_CONFIG = {
             role: 'building',
             visual: {
                 colorHex: '#FFC0CB',
-                scale: { x: 9, y: 9, z: 9 },
+                scale: { x: 7.2, y: 7.2, z: 7.2 },
             },
             stats: {
                 hp: BALANCE.building.spa.hp,
