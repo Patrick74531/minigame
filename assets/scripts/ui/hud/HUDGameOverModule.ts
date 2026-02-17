@@ -90,6 +90,7 @@ export class HUDGameOverModule implements HUDModule {
                     : 'ui.gameOver.button.restart'
             );
         }
+        this.updateGameOverDialogLayout();
     }
 
     public showGameOver(victory: boolean): void {
@@ -204,6 +205,7 @@ export class HUDGameOverModule implements HUDModule {
         this._gameOverTitleLabel.isBold = true;
         this._gameOverTitleLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._gameOverTitleLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._gameOverTitleLabel.overflow = Label.Overflow.SHRINK;
         this._gameOverTitleLabel.color = new Color(255, 224, 140, 255);
 
         const messageNode = new Node('GameOverMessage');
@@ -216,6 +218,7 @@ export class HUDGameOverModule implements HUDModule {
         this._gameOverMessageLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._gameOverMessageLabel.verticalAlign = Label.VerticalAlign.CENTER;
         this._gameOverMessageLabel.enableWrapText = true;
+        this._gameOverMessageLabel.overflow = Label.Overflow.SHRINK;
         this._gameOverMessageLabel.color = new Color(234, 245, 255, 255);
 
         const buttonNode = new Node('GameOverRestartButton');
@@ -241,6 +244,7 @@ export class HUDGameOverModule implements HUDModule {
         this._gameOverButtonLabel.isBold = true;
         this._gameOverButtonLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._gameOverButtonLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._gameOverButtonLabel.overflow = Label.Overflow.SHRINK;
         this._gameOverButtonLabel.color = new Color(30, 18, 8, 255);
         this._gameOverButtonLabel.string = Localization.instance.t('ui.gameOver.button.restart');
 

@@ -76,6 +76,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
     public showCards(weapons: { type: WeaponType; def: WeaponDef }[]): void {
         if (!this._uiCanvas || this._isShowing) return;
         this._isShowing = true;
+        const viewport = this.getViewportSize();
 
         // 创建根节点（全屏遮罩）
         this._rootNode = new Node('WeaponSelectRoot');
@@ -83,7 +84,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         this._uiCanvas.addChild(this._rootNode);
 
         const rootTransform = this._rootNode.addComponent(UITransform);
-        rootTransform.setContentSize(1280, 720);
+        rootTransform.setContentSize(viewport.width, viewport.height);
 
         const widget = this._rootNode.addComponent(Widget);
         widget.isAlignTop = widget.isAlignBottom = widget.isAlignLeft = widget.isAlignRight = true;
@@ -94,7 +95,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         maskNode.layer = UI_LAYER;
         this._rootNode.addChild(maskNode);
         const maskTransform = maskNode.addComponent(UITransform);
-        maskTransform.setContentSize(1280, 720);
+        maskTransform.setContentSize(viewport.width, viewport.height);
         const maskWidget = maskNode.addComponent(Widget);
         maskWidget.isAlignTop =
             maskWidget.isAlignBottom =
@@ -103,10 +104,10 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
                 true;
         maskWidget.top = maskWidget.bottom = maskWidget.left = maskWidget.right = 0;
         const maskG = maskNode.addComponent(Graphics);
-        SelectionCardTheme.drawOverlayMask(maskG, 1280, 720);
+        SelectionCardTheme.drawOverlayMask(maskG, viewport.width, viewport.height);
 
         // 标题
-        this.createTitle(this._rootNode);
+        this.createTitle(this._rootNode, viewport.width, viewport.height);
 
         // 卡牌
         const totalWidth = weapons.length * CARD_WIDTH + (weapons.length - 1) * CARD_GAP;
@@ -146,20 +147,26 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
 
     // === UI 构建 ===
 
-    private createTitle(root: Node): void {
+    private createTitle(root: Node, viewportWidth: number, viewportHeight: number): void {
         const titleNode = new Node('Title');
         titleNode.layer = UI_LAYER;
-        titleNode.addComponent(UITransform).setContentSize(760, 72);
+        titleNode
+            .addComponent(UITransform)
+            .setContentSize(
+                Math.round(Math.max(420, Math.min(880, viewportWidth * 0.72))),
+                Math.round(Math.max(64, Math.min(90, viewportHeight * 0.11)))
+            );
         root.addChild(titleNode);
 
         // Responsive Title using Widget
         const widget = titleNode.addComponent(Widget);
         widget.isAlignTop = true;
         widget.isAlignHorizontalCenter = true;
-        widget.top = 100;
+        widget.top = Math.round(Math.max(30, Math.min(120, viewportHeight * 0.14)));
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.weapon.select.title');
+        label.overflow = Label.Overflow.SHRINK;
         SelectionCardTheme.applyLabelTheme(label, {
             fontSize: 48,
             lineHeight: 54,
@@ -185,6 +192,14 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         deco.moveTo(95, -20);
         deco.lineTo(230, -20);
         deco.stroke();
+    }
+
+    private getViewportSize(): { width: number; height: number } {
+        const size = this._uiCanvas?.getComponent(UITransform)?.contentSize;
+        return {
+            width: Math.max(480, Math.round(size?.width ?? 1280)),
+            height: Math.max(320, Math.round(size?.height ?? 720)),
+        };
     }
 
     private createCardNode(weapon: { type: WeaponType; def: WeaponDef }, _index: number): Node {

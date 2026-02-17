@@ -74,16 +74,17 @@ export class BuffCardUI {
     public showCards(cards: BuffCardDef[]): void {
         if (!this._uiCanvas || this._isShowing) return;
         this._isShowing = true;
+        const viewport = this.getViewportSize();
 
         // 暂停游戏
         this.gameManager.pauseGame();
 
         // 创建根节点（全屏遮罩）
-        this._root = this.createOverlay();
+        this._root = this.createOverlay(viewport.width, viewport.height);
         this._uiCanvas.addChild(this._root);
 
         // 创建标题
-        this.createTitle(this._root);
+        this.createTitle(this._root, viewport.width, viewport.height);
 
         // 创建卡牌容器
         const cardContainer = new Node('CardContainer');
@@ -122,12 +123,12 @@ export class BuffCardUI {
 
     // === 卡牌创建 ===
 
-    private createOverlay(): Node {
+    private createOverlay(viewportWidth: number, viewportHeight: number): Node {
         const overlay = new Node('BuffCardOverlay');
         overlay.layer = UI_LAYER;
 
         const transform = overlay.addComponent(UITransform);
-        transform.setContentSize(1280, 720);
+        transform.setContentSize(viewportWidth, viewportHeight);
 
         const widget = overlay.addComponent(Widget);
         widget.isAlignTop = true;
@@ -143,24 +144,30 @@ export class BuffCardUI {
         const bg = new Node('OverlayBG');
         bg.layer = UI_LAYER;
         const bgTransform = bg.addComponent(UITransform);
-        bgTransform.setContentSize(1280, 720);
+        bgTransform.setContentSize(viewportWidth, viewportHeight);
         overlay.addChild(bg);
 
         const g = bg.addComponent(Graphics);
-        SelectionCardTheme.drawOverlayMask(g, 1280, 720);
+        SelectionCardTheme.drawOverlayMask(g, viewportWidth, viewportHeight);
 
         return overlay;
     }
 
-    private createTitle(parent: Node): void {
+    private createTitle(parent: Node, viewportWidth: number, viewportHeight: number): void {
         const titleNode = new Node('CardTitle');
         titleNode.layer = UI_LAYER;
         parent.addChild(titleNode);
 
-        titleNode.addComponent(UITransform).setContentSize(760, 72);
+        titleNode
+            .addComponent(UITransform)
+            .setContentSize(
+                Math.round(Math.max(420, Math.min(880, viewportWidth * 0.72))),
+                Math.round(Math.max(64, Math.min(90, viewportHeight * 0.11)))
+            );
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.buff.select.title');
+        label.overflow = Label.Overflow.SHRINK;
         SelectionCardTheme.applyLabelTheme(label, {
             fontSize: 48,
             lineHeight: 54,
@@ -176,7 +183,7 @@ export class BuffCardUI {
         const widget = titleNode.addComponent(Widget);
         widget.isAlignTop = true;
         widget.isAlignHorizontalCenter = true;
-        widget.top = 100;
+        widget.top = Math.round(Math.max(30, Math.min(120, viewportHeight * 0.14)));
 
         const decoNode = new Node('TitleDeco');
         decoNode.layer = UI_LAYER;
@@ -190,6 +197,14 @@ export class BuffCardUI {
         deco.moveTo(95, -20);
         deco.lineTo(230, -20);
         deco.stroke();
+    }
+
+    private getViewportSize(): { width: number; height: number } {
+        const size = this._uiCanvas?.getComponent(UITransform)?.contentSize;
+        return {
+            width: Math.max(480, Math.round(size?.width ?? 1280)),
+            height: Math.max(320, Math.round(size?.height ?? 720)),
+        };
     }
 
     private createCardNode(card: BuffCardDef, _index: number): Node {

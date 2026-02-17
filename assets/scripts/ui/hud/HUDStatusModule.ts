@@ -31,6 +31,7 @@ export class HUDStatusModule implements HUDModule {
 
     public initialize(uiCanvas: Node): void {
         this._coinLabel = UIFactory.createCoinDisplay(uiCanvas);
+        this._coinLabel.overflow = Label.Overflow.SHRINK;
         this._coinLabel.node.active = false;
 
         this._baseHpLabel = UIFactory.createLabel(
@@ -48,6 +49,7 @@ export class HUDStatusModule implements HUDModule {
 
         this._baseHpLabel.fontSize = 30;
         this._baseHpLabel.lineHeight = 36;
+        this._baseHpLabel.overflow = Label.Overflow.SHRINK;
         this._baseHpLabel.color = new Color(244, 245, 255, 255);
         this.applyLabelStyle(this._baseHpLabel, {
             outlineColor: new Color(8, 16, 28, 255),
@@ -65,6 +67,7 @@ export class HUDStatusModule implements HUDModule {
         this._waveWidget = this._waveLabel.node.addComponent(Widget);
         this._waveLabel.fontSize = 40;
         this._waveLabel.lineHeight = 44;
+        this._waveLabel.overflow = Label.Overflow.SHRINK;
         this._waveLabel.color = new Color(255, 215, 80, 255);
         this.applyLabelStyle(this._waveLabel, {
             outlineColor: new Color(40, 20, 0, 255),
@@ -199,6 +202,8 @@ export class HUDStatusModule implements HUDModule {
         this._buildingInfoLabel.lineHeight = 46;
         this._buildingInfoLabel.color = new Color(255, 244, 212, 255);
         this._buildingInfoLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this._buildingInfoLabel.enableWrapText = true;
+        this._buildingInfoLabel.overflow = Label.Overflow.SHRINK;
         this.applyLabelStyle(this._buildingInfoLabel, {
             outlineColor: new Color(24, 16, 8, 255),
             outlineWidth: 4,
@@ -300,10 +305,35 @@ export class HUDStatusModule implements HUDModule {
 
     private applyHudEdgeLayout(): void {
         const padding = UIResponsive.getControlPadding();
+        const size = UIResponsive.getVisibleSize();
+        const compact = Math.min(size.width, size.height) < 700;
         const topInset = Math.max(14, Math.round(padding.top * 0.86));
         const bottomInset = Math.max(20, Math.round(padding.bottom * 0.82));
 
+        if (this._coinLabel) {
+            const coinNode = this._coinLabel.node;
+            coinNode
+                .getComponent(UITransform)
+                ?.setContentSize(
+                    Math.round(UIResponsive.clamp(size.width * 0.32, 220, 360)),
+                    Math.round(UIResponsive.clamp(size.height * 0.09, 50, 72))
+                );
+            this._coinLabel.fontSize = compact ? 36 : 44;
+            this._coinLabel.lineHeight = this._coinLabel.fontSize + 8;
+        }
+
         if (this._waveWidget) {
+            const waveNode = this._waveWidget.node;
+            waveNode
+                .getComponent(UITransform)
+                ?.setContentSize(
+                    Math.round(UIResponsive.clamp(size.width * 0.42, 220, 460)),
+                    Math.round(UIResponsive.clamp(size.height * 0.1, 46, 74))
+                );
+            if (this._waveLabel) {
+                this._waveLabel.fontSize = compact ? 34 : 40;
+                this._waveLabel.lineHeight = this._waveLabel.fontSize + 6;
+            }
             this._waveWidget.isAlignTop = true;
             this._waveWidget.isAlignHorizontalCenter = true;
             this._waveWidget.isAlignLeft = false;
@@ -328,6 +358,10 @@ export class HUDStatusModule implements HUDModule {
         }
 
         if (this._desktopMoveHintWidget) {
+            const hintLabel = this._desktopMoveHintWidget.node.getComponent(Label);
+            if (hintLabel) {
+                hintLabel.overflow = Label.Overflow.SHRINK;
+            }
             this._desktopMoveHintWidget.isAlignBottom = true;
             this._desktopMoveHintWidget.isAlignHorizontalCenter = true;
             this._desktopMoveHintWidget.isAlignTop = false;
@@ -336,6 +370,28 @@ export class HUDStatusModule implements HUDModule {
             this._desktopMoveHintWidget.bottom = Math.max(2, bottomInset - 34);
             this._desktopMoveHintWidget.horizontalCenter = 0;
             this._desktopMoveHintWidget.updateAlignment();
+        }
+
+        if (this._baseHpLabel) {
+            this._baseHpLabel.node
+                .getComponent(UITransform)
+                ?.setContentSize(
+                    Math.round(UIResponsive.clamp(size.width * 0.5, 280, 560)),
+                    Math.round(UIResponsive.clamp(size.height * 0.1, 50, 76))
+                );
+            this._baseHpLabel.fontSize = compact ? 26 : 30;
+            this._baseHpLabel.lineHeight = this._baseHpLabel.fontSize + 6;
+        }
+
+        if (this._buildingInfoLabel) {
+            this._buildingInfoLabel.node
+                .getComponent(UITransform)
+                ?.setContentSize(
+                    Math.round(UIResponsive.clamp(size.width * 0.82, 420, 1020)),
+                    Math.round(UIResponsive.clamp(size.height * 0.16, 70, 130))
+                );
+            this._buildingInfoLabel.fontSize = compact ? 32 : 40;
+            this._buildingInfoLabel.lineHeight = this._buildingInfoLabel.fontSize + 6;
         }
     }
 }

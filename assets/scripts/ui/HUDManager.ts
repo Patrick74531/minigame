@@ -110,6 +110,7 @@ export class HUDManager {
         this.eventManager.on(GameEvents.BOSS_INTRO, this.onBossIntro, this);
         this.eventManager.on(GameEvents.LANE_UNLOCK_IMMINENT, this.onLaneUnlockImminent, this);
         this.eventManager.on(GameEvents.GAME_OVER, this.onGameOver, this);
+        this.eventManager.on(GameEvents.LANGUAGE_CHANGED, this.onLanguageChanged, this);
     }
 
     // === 公共接口 ===
@@ -224,6 +225,10 @@ export class HUDManager {
         });
     }
 
+    private onLanguageChanged(): void {
+        this.refreshAllText();
+    }
+
     /**
      * 清理
      */
@@ -243,6 +248,9 @@ export class HUDManager {
 
     private onCanvasResize(): void {
         this._statusModule.onCanvasResize?.();
+        this._settingsModule.onCanvasResize?.();
+        this._waveNoticeModule.onCanvasResize?.();
+        this._bossIntroModule.onCanvasResize?.();
         this._gameOverModule.onCanvasResize?.();
     }
 

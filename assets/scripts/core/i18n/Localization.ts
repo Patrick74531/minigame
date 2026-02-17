@@ -40,14 +40,15 @@ export class Localization {
     public setLanguage(lang: LanguageCode): void {
         if (!this._messages.has(lang)) {
             console.warn(
-                `[Localization] Unsupported language "${lang}", fallback to ${DEFAULT_LANGUAGE}.`
+                `[Localization] Unsupported language "${lang}", fallback to ${DEFAULT_LANGUAGE}`
             );
-            this._currentLang = DEFAULT_LANGUAGE;
-            return;
+            lang = DEFAULT_LANGUAGE;
         }
+
         this._currentLang = lang;
         localStorage.setItem(this.STORAGE_KEY, lang);
-
+        
+        // Emit language changed event
         EventManager.instance.emit(GameEvents.LANGUAGE_CHANGED, { lang });
     }
 

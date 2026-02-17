@@ -11,14 +11,23 @@ import {
     Widget,
 } from 'cc';
 import { Localization } from '../../core/i18n/Localization';
+import { UIResponsive } from '../UIResponsive';
 import { applyGameLabelStyle, HUD_UI_LAYER } from './HUDCommon';
 import type { HUDModule } from './HUDModule';
 
-const LANE_UNLOCK_DIALOG_WIDTH = 920;
-const LANE_UNLOCK_DIALOG_HEIGHT = 84;
 const LANE_UNLOCK_DEFAULT_SECONDS = 2.4;
-const HERO_RESPAWN_DIALOG_WIDTH = 920;
-const HERO_RESPAWN_DIALOG_HEIGHT = 260;
+const WAVE_FORECAST_MIN_WIDTH = 420;
+const WAVE_FORECAST_MAX_WIDTH = 980;
+const WAVE_FORECAST_MIN_HEIGHT = 66;
+const WAVE_FORECAST_MAX_HEIGHT = 106;
+const LANE_DIALOG_MIN_WIDTH = 520;
+const LANE_DIALOG_MAX_WIDTH = 1120;
+const LANE_DIALOG_MIN_HEIGHT = 88;
+const LANE_DIALOG_MAX_HEIGHT = 156;
+const HERO_RESPAWN_MIN_WIDTH = 520;
+const HERO_RESPAWN_MAX_WIDTH = 1020;
+const HERO_RESPAWN_MIN_HEIGHT = 220;
+const HERO_RESPAWN_MAX_HEIGHT = 360;
 
 export type WaveForecastPayload = {
     wave?: number;
@@ -37,32 +46,42 @@ export type LaneUnlockImminentPayload = {
 type RespawnMode = 'none' | 'countdown' | 'ready';
 
 export class HUDWaveNoticeModule implements HUDModule {
+    private _uiCanvas: Node | null = null;
+
     private _waveForecastRoot: Node | null = null;
     private _waveForecastLabel: Label | null = null;
     private _waveForecastBg: Graphics | null = null;
     private _waveForecastOpacity: UIOpacity | null = null;
-    private readonly _waveForecastWidth = 620;
-    private readonly _waveForecastHeight = 66;
+    private _waveForecastWidth = 620;
+    private _waveForecastHeight = 66;
+    private _waveForecastIsBoss = false;
 
     private _laneUnlockDialogRoot: Node | null = null;
     private _laneUnlockDialogLabel: Label | null = null;
     private _laneUnlockDialogBg: Graphics | null = null;
     private _laneUnlockDialogOpacity: UIOpacity | null = null;
+    private _laneUnlockDialogWidth = 920;
+    private _laneUnlockDialogHeight = 96;
     private _laneUnlockDialogToken = 0;
 
     private _heroRespawnRoot: Node | null = null;
+    private _heroRespawnBg: Graphics | null = null;
     private _heroRespawnCountdownLabel: Label | null = null;
     private _heroRespawnMessageLabel: Label | null = null;
     private _heroRespawnOpacity: UIOpacity | null = null;
+    private _heroRespawnWidth = 920;
+    private _heroRespawnHeight = 260;
     private _heroRespawnToken = 0;
 
     private _respawnMode: RespawnMode = 'none';
     private _respawnSeconds = 0;
 
     public initialize(uiCanvas: Node): void {
+        this._uiCanvas = uiCanvas;
         this.createWaveForecastBanner(uiCanvas);
         this.createLaneUnlockDialog(uiCanvas);
         this.createHeroRespawnDialog(uiCanvas);
+        this.applyResponsiveLayout();
     }
 
     public cleanup(): void {
@@ -85,6 +104,7 @@ export class HUDWaveNoticeModule implements HUDModule {
             Tween.stopAllByTarget(this._heroRespawnOpacity);
         }
 
+        this._uiCanvas = null;
         this._waveForecastRoot = null;
         this._waveForecastLabel = null;
         this._waveForecastBg = null;
@@ -96,6 +116,7 @@ export class HUDWaveNoticeModule implements HUDModule {
         this._laneUnlockDialogOpacity = null;
 
         this._heroRespawnRoot = null;
+        this._heroRespawnBg = null;
         this._heroRespawnCountdownLabel = null;
         this._heroRespawnMessageLabel = null;
         this._heroRespawnOpacity = null;
@@ -104,7 +125,12 @@ export class HUDWaveNoticeModule implements HUDModule {
         this._respawnSeconds = 0;
     }
 
+    public onCanvasResize(): void {
+        this.applyResponsiveLayout();
+    }
+
     public onLanguageChanged(): void {
+        this.applyResponsiveLayout();
         if (this._respawnMode === 'countdown' && this._heroRespawnRoot?.active) {
             this.renderRespawnCountdownText(this._respawnSeconds);
         } else if (this._respawnMode === 'ready' && this._heroRespawnRoot?.active) {
@@ -250,15 +276,11 @@ export class HUDWaveNoticeModule implements HUDModule {
 
         this._heroRespawnCountdownLabel.string = Localization.instance.t(
             'ui.hero.respawn.countdown.value',
-            {
-                seconds,
-            }
+            { seconds }
         );
         this._heroRespawnMessageLabel.string = Localization.instance.t(
             'ui.hero.respawn.countdown.message',
-            {
-                seconds,
-            }
+            { seconds }
         );
     }
 
@@ -305,6 +327,7 @@ export class HUDWaveNoticeModule implements HUDModule {
         this._waveForecastLabel.lineHeight = 36;
         this._waveForecastLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._waveForecastLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._waveForecastLabel.overflow = Label.Overflow.SHRINK;
         this._waveForecastLabel.color = new Color(120, 235, 255, 255);
         applyGameLabelStyle(this._waveForecastLabel, {
             outlineColor: new Color(8, 24, 40, 255),
@@ -331,18 +354,25 @@ export class HUDWaveNoticeModule implements HUDModule {
         const bg = this._waveForecastBg;
         const width = this._waveForecastWidth;
         const height = this._waveForecastHeight;
+        const radius = Math.max(12, Math.round(height * 0.22));
 
         bg.clear();
         bg.fillColor = isBoss ? new Color(78, 20, 18, 236) : new Color(10, 30, 52, 232);
-        bg.roundRect(-width / 2, -height / 2, width, height, 14);
+        bg.roundRect(-width / 2, -height / 2, width, height, radius);
         bg.fill();
         bg.strokeColor = isBoss ? new Color(255, 124, 124, 255) : new Color(96, 220, 255, 255);
         bg.lineWidth = 3.5;
-        bg.roundRect(-width / 2, -height / 2, width, height, 14);
+        bg.roundRect(-width / 2, -height / 2, width, height, radius);
         bg.stroke();
         bg.strokeColor = isBoss ? new Color(255, 186, 162, 112) : new Color(164, 236, 255, 96);
         bg.lineWidth = 1.2;
-        bg.roundRect(-width / 2 + 7, -height / 2 + 7, width - 14, height - 14, 10);
+        bg.roundRect(
+            -width / 2 + 7,
+            -height / 2 + 7,
+            width - 14,
+            height - 14,
+            Math.max(9, radius - 4)
+        );
         bg.stroke();
     }
 
@@ -351,6 +381,8 @@ export class HUDWaveNoticeModule implements HUDModule {
             return;
         }
 
+        this.applyResponsiveLayout();
+        this._waveForecastIsBoss = isBoss;
         this._waveForecastLabel.string = text;
         this._waveForecastLabel.color = isBoss
             ? new Color(255, 130, 130, 255)
@@ -387,8 +419,8 @@ export class HUDWaveNoticeModule implements HUDModule {
         parent.addChild(root);
 
         root.addComponent(UITransform).setContentSize(
-            LANE_UNLOCK_DIALOG_WIDTH,
-            LANE_UNLOCK_DIALOG_HEIGHT
+            this._laneUnlockDialogWidth,
+            this._laneUnlockDialogHeight
         );
         const widget = root.addComponent(Widget);
         widget.isAlignBottom = true;
@@ -410,13 +442,15 @@ export class HUDWaveNoticeModule implements HUDModule {
         root.addChild(textNode);
         textNode
             .addComponent(UITransform)
-            .setContentSize(LANE_UNLOCK_DIALOG_WIDTH - 56, LANE_UNLOCK_DIALOG_HEIGHT - 18);
+            .setContentSize(this._laneUnlockDialogWidth - 56, this._laneUnlockDialogHeight - 18);
         this._laneUnlockDialogLabel = textNode.addComponent(Label);
         this._laneUnlockDialogLabel.string = '';
         this._laneUnlockDialogLabel.fontSize = 30;
         this._laneUnlockDialogLabel.lineHeight = 36;
         this._laneUnlockDialogLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._laneUnlockDialogLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._laneUnlockDialogLabel.enableWrapText = true;
+        this._laneUnlockDialogLabel.overflow = Label.Overflow.SHRINK;
         this._laneUnlockDialogLabel.color = new Color(255, 225, 176, 255);
         applyGameLabelStyle(this._laneUnlockDialogLabel, {
             outlineColor: new Color(34, 18, 8, 255),
@@ -431,34 +465,25 @@ export class HUDWaveNoticeModule implements HUDModule {
         if (!this._laneUnlockDialogBg) return;
 
         const bg = this._laneUnlockDialogBg;
+        const width = this._laneUnlockDialogWidth;
+        const height = this._laneUnlockDialogHeight;
+        const radius = Math.max(12, Math.round(height * 0.2));
         bg.clear();
         bg.fillColor = new Color(34, 20, 10, 236);
-        bg.roundRect(
-            -LANE_UNLOCK_DIALOG_WIDTH / 2,
-            -LANE_UNLOCK_DIALOG_HEIGHT / 2,
-            LANE_UNLOCK_DIALOG_WIDTH,
-            LANE_UNLOCK_DIALOG_HEIGHT,
-            14
-        );
+        bg.roundRect(-width / 2, -height / 2, width, height, radius);
         bg.fill();
         bg.strokeColor = new Color(255, 186, 92, 255);
         bg.lineWidth = 3.5;
-        bg.roundRect(
-            -LANE_UNLOCK_DIALOG_WIDTH / 2,
-            -LANE_UNLOCK_DIALOG_HEIGHT / 2,
-            LANE_UNLOCK_DIALOG_WIDTH,
-            LANE_UNLOCK_DIALOG_HEIGHT,
-            14
-        );
+        bg.roundRect(-width / 2, -height / 2, width, height, radius);
         bg.stroke();
         bg.strokeColor = new Color(255, 228, 182, 120);
         bg.lineWidth = 1.5;
         bg.roundRect(
-            -LANE_UNLOCK_DIALOG_WIDTH / 2 + 8,
-            -LANE_UNLOCK_DIALOG_HEIGHT / 2 + 8,
-            LANE_UNLOCK_DIALOG_WIDTH - 16,
-            LANE_UNLOCK_DIALOG_HEIGHT - 16,
-            10
+            -width / 2 + 8,
+            -height / 2 + 8,
+            width - 16,
+            height - 16,
+            Math.max(9, radius - 4)
         );
         bg.stroke();
     }
@@ -472,6 +497,7 @@ export class HUDWaveNoticeModule implements HUDModule {
             return;
         }
 
+        this.applyResponsiveLayout();
         this._laneUnlockDialogToken += 1;
         const token = this._laneUnlockDialogToken;
         this._laneUnlockDialogLabel.string = text;
@@ -506,8 +532,8 @@ export class HUDWaveNoticeModule implements HUDModule {
         parent.addChild(root);
 
         root.addComponent(UITransform).setContentSize(
-            HERO_RESPAWN_DIALOG_WIDTH,
-            HERO_RESPAWN_DIALOG_HEIGHT
+            this._heroRespawnWidth,
+            this._heroRespawnHeight
         );
         const widget = root.addComponent(Widget);
         widget.isAlignHorizontalCenter = true;
@@ -520,33 +546,15 @@ export class HUDWaveNoticeModule implements HUDModule {
         bgNode.layer = HUD_UI_LAYER;
         root.addChild(bgNode);
         bgNode.addComponent(UITransform);
-        const bg = bgNode.addComponent(Graphics);
-        bg.fillColor = new Color(18, 12, 8, 232);
-        bg.roundRect(
-            -HERO_RESPAWN_DIALOG_WIDTH / 2,
-            -HERO_RESPAWN_DIALOG_HEIGHT / 2,
-            HERO_RESPAWN_DIALOG_WIDTH,
-            HERO_RESPAWN_DIALOG_HEIGHT,
-            16
-        );
-        bg.fill();
-        bg.strokeColor = new Color(255, 136, 56, 255);
-        bg.lineWidth = 4;
-        bg.roundRect(
-            -HERO_RESPAWN_DIALOG_WIDTH / 2,
-            -HERO_RESPAWN_DIALOG_HEIGHT / 2,
-            HERO_RESPAWN_DIALOG_WIDTH,
-            HERO_RESPAWN_DIALOG_HEIGHT,
-            16
-        );
-        bg.stroke();
+        this._heroRespawnBg = bgNode.addComponent(Graphics);
+        this.drawHeroRespawnBackground();
 
         const countNode = new Node('HeroRespawnCount');
         countNode.layer = HUD_UI_LAYER;
         root.addChild(countNode);
         countNode
             .addComponent(UITransform)
-            .setContentSize(HERO_RESPAWN_DIALOG_WIDTH - 60, HERO_RESPAWN_DIALOG_HEIGHT * 0.58);
+            .setContentSize(this._heroRespawnWidth - 60, this._heroRespawnHeight * 0.58);
         countNode.setPosition(0, 34, 0);
         this._heroRespawnCountdownLabel = countNode.addComponent(Label);
         this._heroRespawnCountdownLabel.string = '10';
@@ -555,6 +563,7 @@ export class HUDWaveNoticeModule implements HUDModule {
         this._heroRespawnCountdownLabel.isBold = true;
         this._heroRespawnCountdownLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._heroRespawnCountdownLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._heroRespawnCountdownLabel.overflow = Label.Overflow.SHRINK;
         this._heroRespawnCountdownLabel.color = new Color(255, 222, 130, 255);
 
         const msgNode = new Node('HeroRespawnText');
@@ -562,7 +571,7 @@ export class HUDWaveNoticeModule implements HUDModule {
         root.addChild(msgNode);
         msgNode
             .addComponent(UITransform)
-            .setContentSize(HERO_RESPAWN_DIALOG_WIDTH - 80, HERO_RESPAWN_DIALOG_HEIGHT * 0.44);
+            .setContentSize(this._heroRespawnWidth - 80, this._heroRespawnHeight * 0.44);
         msgNode.setPosition(0, -76, 0);
         this._heroRespawnMessageLabel = msgNode.addComponent(Label);
         this._heroRespawnMessageLabel.string = '';
@@ -571,10 +580,155 @@ export class HUDWaveNoticeModule implements HUDModule {
         this._heroRespawnMessageLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._heroRespawnMessageLabel.verticalAlign = Label.VerticalAlign.CENTER;
         this._heroRespawnMessageLabel.enableWrapText = true;
+        this._heroRespawnMessageLabel.overflow = Label.Overflow.SHRINK;
         this._heroRespawnMessageLabel.color = new Color(255, 241, 210, 255);
 
         this._heroRespawnRoot = root;
         root.active = false;
+    }
+
+    private drawHeroRespawnBackground(): void {
+        if (!this._heroRespawnBg) return;
+        const bg = this._heroRespawnBg;
+        const width = this._heroRespawnWidth;
+        const height = this._heroRespawnHeight;
+        const radius = Math.max(14, Math.round(Math.min(width, height) * 0.06));
+
+        bg.clear();
+        bg.fillColor = new Color(18, 12, 8, 232);
+        bg.roundRect(-width / 2, -height / 2, width, height, radius);
+        bg.fill();
+        bg.strokeColor = new Color(255, 136, 56, 255);
+        bg.lineWidth = 4;
+        bg.roundRect(-width / 2, -height / 2, width, height, radius);
+        bg.stroke();
+    }
+
+    private applyResponsiveLayout(): void {
+        const canvasTransform = this._uiCanvas?.getComponent(UITransform);
+        if (!canvasTransform) return;
+
+        const viewportW = Math.max(480, Math.round(canvasTransform.contentSize.width));
+        const viewportH = Math.max(320, Math.round(canvasTransform.contentSize.height));
+        const compact = viewportW < 900 || viewportH < 620;
+        const padding = UIResponsive.getControlPadding();
+
+        this._waveForecastWidth = Math.round(
+            UIResponsive.clamp(
+                viewportW * (compact ? 0.82 : 0.6),
+                WAVE_FORECAST_MIN_WIDTH,
+                WAVE_FORECAST_MAX_WIDTH
+            )
+        );
+        this._waveForecastHeight = Math.round(
+            UIResponsive.clamp(
+                viewportH * (compact ? 0.14 : 0.1),
+                WAVE_FORECAST_MIN_HEIGHT,
+                WAVE_FORECAST_MAX_HEIGHT
+            )
+        );
+
+        this._waveForecastRoot
+            ?.getComponent(UITransform)
+            ?.setContentSize(this._waveForecastWidth, this._waveForecastHeight);
+        const waveWidget = this._waveForecastRoot?.getComponent(Widget);
+        if (waveWidget) {
+            waveWidget.top = Math.max(10, Math.round(padding.top * 0.56));
+            waveWidget.updateAlignment();
+        }
+        this._waveForecastLabel?.node
+            .getComponent(UITransform)
+            ?.setContentSize(this._waveForecastWidth - 44, this._waveForecastHeight - 12);
+        if (this._waveForecastLabel) {
+            this._waveForecastLabel.fontSize = Math.max(
+                22,
+                Math.min(34, Math.round(this._waveForecastHeight * 0.46))
+            );
+            this._waveForecastLabel.lineHeight = this._waveForecastLabel.fontSize + 6;
+        }
+        this.drawWaveForecastBackground(this._waveForecastIsBoss);
+
+        this._laneUnlockDialogWidth = Math.round(
+            UIResponsive.clamp(viewportW * 0.84, LANE_DIALOG_MIN_WIDTH, LANE_DIALOG_MAX_WIDTH)
+        );
+        this._laneUnlockDialogHeight = Math.round(
+            UIResponsive.clamp(
+                viewportH * (compact ? 0.18 : 0.13),
+                LANE_DIALOG_MIN_HEIGHT,
+                LANE_DIALOG_MAX_HEIGHT
+            )
+        );
+        this._laneUnlockDialogRoot
+            ?.getComponent(UITransform)
+            ?.setContentSize(this._laneUnlockDialogWidth, this._laneUnlockDialogHeight);
+        const laneWidget = this._laneUnlockDialogRoot?.getComponent(Widget);
+        if (laneWidget) {
+            laneWidget.bottom = Math.max(16, Math.round(padding.bottom * 0.35));
+            laneWidget.updateAlignment();
+        }
+        this._laneUnlockDialogLabel?.node
+            .getComponent(UITransform)
+            ?.setContentSize(this._laneUnlockDialogWidth - 52, this._laneUnlockDialogHeight - 20);
+        if (this._laneUnlockDialogLabel) {
+            this._laneUnlockDialogLabel.fontSize = Math.max(
+                24,
+                Math.min(34, Math.round(this._laneUnlockDialogHeight * 0.32))
+            );
+            this._laneUnlockDialogLabel.lineHeight = this._laneUnlockDialogLabel.fontSize + 6;
+        }
+        this.drawLaneUnlockDialogBackground();
+
+        this._heroRespawnWidth = Math.round(
+            UIResponsive.clamp(
+                viewportW * (compact ? 0.86 : 0.74),
+                HERO_RESPAWN_MIN_WIDTH,
+                HERO_RESPAWN_MAX_WIDTH
+            )
+        );
+        this._heroRespawnHeight = Math.round(
+            UIResponsive.clamp(
+                viewportH * (compact ? 0.54 : 0.41),
+                HERO_RESPAWN_MIN_HEIGHT,
+                HERO_RESPAWN_MAX_HEIGHT
+            )
+        );
+        this._heroRespawnRoot
+            ?.getComponent(UITransform)
+            ?.setContentSize(this._heroRespawnWidth, this._heroRespawnHeight);
+        this.drawHeroRespawnBackground();
+
+        const countNode = this._heroRespawnCountdownLabel?.node;
+        countNode
+            ?.getComponent(UITransform)
+            ?.setContentSize(
+                this._heroRespawnWidth - 64,
+                Math.round(this._heroRespawnHeight * 0.54)
+            );
+        countNode?.setPosition(0, Math.round(this._heroRespawnHeight * 0.16), 0);
+        if (this._heroRespawnCountdownLabel) {
+            this._heroRespawnCountdownLabel.fontSize = Math.max(
+                84,
+                Math.min(138, Math.round(this._heroRespawnHeight * 0.47))
+            );
+            this._heroRespawnCountdownLabel.lineHeight =
+                this._heroRespawnCountdownLabel.fontSize + 8;
+        }
+
+        const msgNode = this._heroRespawnMessageLabel?.node;
+        msgNode
+            ?.getComponent(UITransform)
+            ?.setContentSize(
+                this._heroRespawnWidth - 88,
+                Math.round(this._heroRespawnHeight * 0.42)
+            );
+        msgNode?.setPosition(0, -Math.round(this._heroRespawnHeight * 0.29), 0);
+        if (this._heroRespawnMessageLabel) {
+            this._heroRespawnMessageLabel.fontSize = Math.max(
+                24,
+                Math.min(40, Math.round(this._heroRespawnHeight * 0.14))
+            );
+            this._heroRespawnMessageLabel.lineHeight = this._heroRespawnMessageLabel.fontSize + 8;
+        }
     }
 
     private resolveLocalizedByKey(key: string, fallback: string): string {
