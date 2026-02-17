@@ -287,9 +287,9 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
     }
 
     private getTowerTag(typeId: string): string {
-        if (typeId === 'frost_tower') return '冰霜';
-        if (typeId === 'lightning_tower') return '闪电';
-        return '机枪';
+        if (typeId === 'frost_tower') return Localization.instance.t('ui.tower.tag.frost');
+        if (typeId === 'lightning_tower') return Localization.instance.t('ui.tower.tag.lightning');
+        return Localization.instance.t('ui.tower.tag.machine_gun');
     }
 
     private get eventManager(): EventManager {
