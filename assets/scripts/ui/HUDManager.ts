@@ -37,6 +37,8 @@ import { Joystick } from './Joystick';
 import { AudioSettingsManager } from '../core/managers/AudioSettingsManager';
 import { WeaponSFXManager } from '../gameplay/weapons/WeaponSFXManager';
 import { UIResponsive } from './UIResponsive';
+import { BuildingManager } from '../gameplay/buildings/BuildingManager';
+import { BuildingType } from '../gameplay/buildings/Building';
 
 // UI_2D Layer
 const UI_LAYER = 33554432;
@@ -60,7 +62,7 @@ const GAME_OVER_RESTART_BTN_MAX_HEIGHT = 86;
 const GAME_OVER_RESTART_BTN_MIN_WIDTH = 190;
 const GAME_OVER_RESTART_BTN_MIN_HEIGHT = 64;
 const SETTINGS_PANEL_WIDTH = 500;
-const SETTINGS_PANEL_HEIGHT = 304;
+const SETTINGS_PANEL_HEIGHT = 400; // Increased to fit language row
 const SETTINGS_SLIDER_WIDTH = 262;
 const SETTINGS_BUTTON_WIDTH = 156;
 const SETTINGS_BUTTON_HEIGHT = 58;
@@ -450,21 +452,199 @@ export class HUDManager {
             panel,
             'SettingsBgmRow',
             'ui.settings.bgm',
-            38,
+            60,
             'bgm'
         );
         this._settingsSfxSlider = this.createVolumeSlider(
             panel,
             'SettingsSfxRow',
             'ui.settings.sfx',
-            -58,
+            -20,
             'sfx'
         );
+
+        this.createLanguageRow(panel, -100);
 
         this._settingsButtonNode = buttonNode;
         this._settingsPanelRoot = panelRoot;
         this.refreshSettingsPanelUI();
         panelRoot.active = false;
+    }
+
+    private createLanguageRow(parent: Node, posY: number): void {
+        const row = new Node('SettingsLangRow');
+        row.layer = UI_LAYER;
+        parent.addChild(row);
+        row.addComponent(UITransform).setContentSize(SETTINGS_PANEL_WIDTH - 44, 80);
+        row.setPosition(0, posY, 0);
+
+        const titleNode = new Node('SettingsLangTitle');
+        titleNode.layer = UI_LAYER;
+        row.addChild(titleNode);
+        titleNode.addComponent(UITransform).setContentSize(128, 36);
+        titleNode.setPosition(-162, 18, 0);
+        const titleLabel = titleNode.addComponent(Label);
+        titleLabel.string = Localization.instance.t('ui.settings.language');
+        titleLabel.fontSize = 26;
+        titleLabel.lineHeight = 32;
+        titleLabel.horizontalAlign = Label.HorizontalAlign.LEFT;
+        titleLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        titleLabel.color = new Color(238, 242, 252, 255);
+        this.applyGameLabelStyle(titleLabel, {
+            outlineColor: new Color(8, 20, 34, 255),
+            outlineWidth: 3,
+        });
+
+        // Add container for buttons
+        const btnContainer = new Node('LangBtnContainer');
+        btnContainer.layer = UI_LAYER;
+        row.addChild(btnContainer);
+        btnContainer.setPosition(60, 0, 0);
+
+        this.createLanguageButton(btnContainer, 'zh', -70, 'ui.settings.lang.zh');
+        this.createLanguageButton(btnContainer, 'en', 70, 'ui.settings.lang.en');
+    }
+
+    private createLanguageButton(
+        parent: Node,
+        langCode: string,
+        posX: number,
+        textKey: string
+    ): void {
+        const btnNode = new Node(`LangBtn_${langCode}`);
+        btnNode.layer = UI_LAYER;
+        parent.addChild(btnNode);
+        btnNode.addComponent(UITransform).setContentSize(120, 48);
+        btnNode.setPosition(posX, 0, 0);
+
+        const btn = btnNode.addComponent(Button);
+        btn.transition = Button.Transition.SCALE;
+        btn.zoomScale = 0.95;
+
+        const bg = btnNode.addComponent(Graphics);
+        this.drawLanguageButtonBg(bg, Localization.instance.currentLanguage === langCode);
+
+        const labelNode = new Node('Label');
+        labelNode.layer = UI_LAYER;
+        btnNode.addChild(labelNode);
+        const label = labelNode.addComponent(Label);
+        label.string = Localization.instance.t(textKey);
+        label.fontSize = 24;
+        label.lineHeight = 28;
+        label.color = new Color(255, 255, 255, 255);
+        this.applyGameLabelStyle(label);
+
+        btnNode.on('click', () => {
+            this.onLanguageSwitch(langCode as any);
+        });
+    }
+
+    private drawLanguageButtonBg(bg: Graphics, isSelected: boolean): void {
+        bg.clear();
+        const w = 120;
+        const h = 48;
+        const r = 8;
+        if (isSelected) {
+            bg.fillColor = new Color(82, 214, 255, 255);
+            bg.strokeColor = new Color(255, 255, 255, 255);
+        } else {
+            bg.fillColor = new Color(28, 42, 58, 255);
+            bg.strokeColor = new Color(116, 194, 236, 150);
+        }
+        bg.lineWidth = 2;
+        bg.roundRect(-w / 2, -h / 2, w, h, r);
+        bg.fill();
+        bg.stroke();
+    }
+
+    private onLanguageSwitch(lang: 'zh' | 'en'): void {
+        if (Localization.instance.currentLanguage === lang) return;
+
+        Localization.instance.setLanguage(lang);
+        this.refreshAllText();
+    }
+
+    private refreshAllText(): void {
+        // Refresh HUD labels
+        if (this._waveLabel) {
+            this._waveLabel.string = Localization.instance.t('ui.hud.wave', {
+                wave: WaveService.instance.currentWave,
+            });
+        }
+
+        if (this._baseHpLabel) {
+            // Need to fetch current HP if possible, or just refresh static text
+            // Here we just refresh the format
+            const baseBuilding = BuildingManager.instance.activeBuildings.find(
+                b => b.buildingType === BuildingType.BASE
+            );
+            const currentHP = baseBuilding?.currentHp ?? GameConfig.BUILDING.BASE_START_HP;
+
+            this._baseHpLabel.string = Localization.instance.t('ui.hud.baseHp', {
+                current: Math.max(0, Math.ceil(currentHP)),
+                max: GameConfig.BUILDING.BASE_START_HP,
+            });
+        }
+
+        // Refresh Settings Panel
+        const panel = this._settingsPanelRoot?.getChildByName('SettingsPanel');
+        if (panel) {
+            // Title
+            const title = panel.getChildByName('SettingsTitle')?.getComponent(Label);
+            if (title) title.string = Localization.instance.t('ui.settings.title');
+
+            // Sliders
+            const bgmRow = panel.getChildByName('SettingsBgmRow');
+            if (bgmRow) {
+                const l = bgmRow.getChildByName('SettingsBgmRow_Title')?.getComponent(Label);
+                if (l) l.string = Localization.instance.t('ui.settings.bgm');
+            }
+            const sfxRow = panel.getChildByName('SettingsSfxRow');
+            if (sfxRow) {
+                const l = sfxRow.getChildByName('SettingsSfxRow_Title')?.getComponent(Label);
+                if (l) l.string = Localization.instance.t('ui.settings.sfx');
+            }
+            // Language Row Title
+            const langRow = panel.getChildByName('SettingsLangRow');
+            if (langRow) {
+                const l = langRow.getChildByName('SettingsLangTitle')?.getComponent(Label);
+                if (l) l.string = Localization.instance.t('ui.settings.language');
+
+                // Buttons state update
+                const container = langRow.getChildByName('LangBtnContainer');
+                if (container) {
+                    ['zh', 'en'].forEach(code => {
+                        const btn = container.getChildByName(`LangBtn_${code}`);
+                        if (btn) {
+                            const bg = btn.getComponent(Graphics);
+                            if (bg) {
+                                this.drawLanguageButtonBg(
+                                    bg,
+                                    Localization.instance.currentLanguage === code
+                                );
+                            }
+                            const lb = btn.getChildByName('Label')?.getComponent(Label);
+                            if (lb)
+                                lb.string = Localization.instance.t(`ui.settings.lang.${code}`);
+                        }
+                    });
+                }
+            }
+        }
+
+        // Settings Button
+        const btnLabel = this._settingsButtonNode
+            ?.getChildByName('SettingsButtonLabel')
+            ?.getComponent(Label);
+        if (btnLabel) btnLabel.string = Localization.instance.t('ui.settings.button');
+
+        // Refresh Desktop Move Hint
+        if (this._desktopMoveHintWidget) {
+            const hintLabel = this._desktopMoveHintWidget.node.getComponent(Label);
+            if (hintLabel) {
+                hintLabel.string = Localization.instance.t('ui.hud.desktopMoveHint');
+            }
+        }
     }
 
     private createVolumeSlider(

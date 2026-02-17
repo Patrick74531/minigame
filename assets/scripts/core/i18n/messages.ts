@@ -118,8 +118,11 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.gameOver.button.restarting': '重启中...',
         'ui.settings.button': '设置',
         'ui.settings.title': '声音设置',
+        'ui.settings.language': '语言设置',
         'ui.settings.bgm': '背景音乐',
         'ui.settings.sfx': '音效',
+        'ui.settings.lang.zh': '中文',
+        'ui.settings.lang.en': 'English',
 
         'enemy.archetype.boss_robot_flying': '飞行机甲',
         'enemy.archetype.boss_robot_large': '巨型机甲',
@@ -258,8 +261,11 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.gameOver.button.restarting': 'Restarting...',
         'ui.settings.button': 'Settings',
         'ui.settings.title': 'Audio Settings',
+        'ui.settings.language': 'Language',
         'ui.settings.bgm': 'Background Music',
         'ui.settings.sfx': 'SFX',
+        'ui.settings.lang.zh': '中文',
+        'ui.settings.lang.en': 'English',
 
         'enemy.archetype.boss_robot_flying': 'Flying Warbot',
         'enemy.archetype.boss_robot_large': 'Titan Warbot',

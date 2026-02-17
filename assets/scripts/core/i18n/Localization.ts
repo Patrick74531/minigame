@@ -1,4 +1,6 @@
 import { _decorator } from 'cc';
+import { EventManager } from '../managers/EventManager';
+import { GameEvents } from '../../data/GameEvents';
 import { DEFAULT_LANGUAGE, DEFAULT_MESSAGES } from './messages';
 import type { LanguageCode, LocalizationDictionary, LocalizationParams } from './types';
 const { ccclass } = _decorator;
@@ -8,6 +10,7 @@ export class Localization {
     private static _instance: Localization;
     private _currentLang: LanguageCode = DEFAULT_LANGUAGE;
     private readonly _messages = new Map<LanguageCode, LocalizationDictionary>();
+    private readonly STORAGE_KEY = 'kingshit.lang';
 
     public static get instance(): Localization {
         if (!this._instance) {
@@ -26,6 +29,12 @@ export class Localization {
         for (const [lang, dictionary] of entries) {
             this._messages.set(lang, { ...dictionary });
         }
+
+        // Load persisted language
+        const savedLang = localStorage.getItem(this.STORAGE_KEY) as LanguageCode;
+        if (savedLang && this._messages.has(savedLang)) {
+            this._currentLang = savedLang;
+        }
     }
 
     public setLanguage(lang: LanguageCode): void {
@@ -37,6 +46,9 @@ export class Localization {
             return;
         }
         this._currentLang = lang;
+        localStorage.setItem(this.STORAGE_KEY, lang);
+
+        EventManager.instance.emit(GameEvents.LANGUAGE_CHANGED, { lang });
     }
 
     public get currentLanguage(): LanguageCode {

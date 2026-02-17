@@ -53,4 +53,8 @@ export class WaveService {
         candidates.sort((a, b) => b.priority - a.priority);
         return candidates[0].getSnapshot();
     }
+
+    public get currentWave(): number {
+        return this.getSnapshot().currentWave;
+    }
 }

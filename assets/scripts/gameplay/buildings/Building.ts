@@ -160,6 +160,7 @@ export class Building extends BaseComponent implements IAttackable {
         // Register Unit Died Event
         this.eventManager.on(GameEvents.UNIT_DIED, this.onUnitDied, this);
         this.eventManager.on(GameEvents.BASE_UPGRADE_READY, this.onBaseUpgradeReady, this);
+        this.eventManager.on(GameEvents.LANGUAGE_CHANGED, this.onLanguageChanged, this);
 
         // Setup Physics (Obstacle)
         this.setupPhysics();
@@ -644,6 +645,10 @@ export class Building extends BaseComponent implements IAttackable {
         if (nextLevel <= 0) return;
         Building._latestBaseLevel = Math.max(Building._latestBaseLevel, nextLevel);
         this._baseLevel = Building._latestBaseLevel;
+    }
+
+    private onLanguageChanged(): void {
+        this.updateHealthBarName();
     }
 
     protected get eventManager(): EventManager {

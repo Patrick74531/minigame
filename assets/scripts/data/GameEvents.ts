@@ -102,6 +102,9 @@ export const GameEvents = {
     REQUEST_TOWER_SELECTION: 'REQUEST_TOWER_SELECTION',
     /** 玩家选择了塔防类型 { padNode: Node, buildingTypeId: string } */
     TOWER_SELECTED: 'TOWER_SELECTED',
+
+    /** 语言变更 { lang: string } */
+    LANGUAGE_CHANGED: 'LANGUAGE_CHANGED',
 } as const;
 
 /** 事件名称类型 */
@@ -182,4 +185,5 @@ export type GameEventPayloads = {
     [GameEvents.REQUEST_TOWER_SELECTION]: { padNode: Node };
     /** 玩家选择了塔防类型 { padNode: Node, buildingTypeId: string } */
     [GameEvents.TOWER_SELECTED]: { padNode: Node; buildingTypeId: string };
+    [GameEvents.LANGUAGE_CHANGED]: { lang: string };
 };
