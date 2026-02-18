@@ -1,0 +1,4 @@
+Reddit HTML Compliance Scan
+root=/Users/patrickwang/kingshit/devvit/webroot
+
+status=PASS

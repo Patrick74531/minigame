@@ -178,10 +178,15 @@ export class Bullet extends BaseComponent implements IPoolable {
             col.isTrigger = true;
             col.size = new Vec3(0.5, 0.5, 0.5);
         }
-        col.setGroup(1 << 4);
-        col.setMask(1 << 3);
-
         col.on('onTriggerEnter', this.onTriggerEnter, this);
+
+        const _col = col;
+        this.scheduleOnce(() => {
+            if (_col && _col.isValid) {
+                _col.setGroup(1 << 4);
+                _col.setMask(1 << 3);
+            }
+        }, 0);
     }
 
     protected update(dt: number): void {
@@ -297,7 +302,7 @@ export class Bullet extends BaseComponent implements IPoolable {
 
         for (let i = 0, len = enemies.length; i < len; i++) {
             const enemy = enemies[i];
-            if (!enemy.isValid) continue;
+            if (!enemy || !enemy.isValid) continue;
             if (this.pierce && this._hitNodes.has(enemy)) continue;
 
             // 内联距离检测（避免函数调用开销）

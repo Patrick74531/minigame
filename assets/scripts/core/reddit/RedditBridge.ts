@@ -71,19 +71,47 @@ export class RedditBridge {
     }
 
     public requestInit(): void {
-        this._sendToDevvit({ type: 'INIT' });
+        if (this._isRedditEnvironment) {
+            this._sendToDevvit({ type: 'INIT' });
+        } else {
+            this._emit({
+                type: 'error',
+                message: 'Reddit bridge is unavailable outside Reddit/Devvit environment',
+            });
+        }
     }
 
     public submitScore(score: number, wave: number): void {
-        this._sendToDevvit({ type: 'SUBMIT_SCORE', payload: { score, wave } });
+        if (this._isRedditEnvironment) {
+            this._sendToDevvit({ type: 'SUBMIT_SCORE', payload: { score, wave } });
+        } else {
+            this._emit({
+                type: 'error',
+                message: 'SUBMIT_SCORE is unavailable outside Reddit/Devvit environment',
+            });
+        }
     }
 
     public requestLeaderboard(): void {
-        this._sendToDevvit({ type: 'GET_LEADERBOARD' });
+        if (this._isRedditEnvironment) {
+            this._sendToDevvit({ type: 'GET_LEADERBOARD' });
+        } else {
+            this._emit({
+                type: 'error',
+                message: 'GET_LEADERBOARD is unavailable outside Reddit/Devvit environment',
+            });
+        }
     }
 
     public requestSubscribe(): void {
-        this._sendToDevvit({ type: 'SUBSCRIBE' });
+        if (this._isRedditEnvironment) {
+            this._sendToDevvit({ type: 'SUBSCRIBE' });
+        } else {
+            this._emit({
+                type: 'error',
+                message: 'SUBSCRIBE is unavailable outside Reddit/Devvit environment',
+            });
+        }
     }
 
     public destroy(): void {
@@ -97,10 +125,19 @@ export class RedditBridge {
 
     private _detectRedditEnvironment(): boolean {
         if (typeof window === 'undefined') return false;
+
         try {
+            const host = window.location.hostname.toLowerCase();
+            const embedded = window.self !== window.top;
+            const isLocalHost =
+                host === 'localhost' ||
+                host === '127.0.0.1' ||
+                host.endsWith('.local') ||
+                host === '';
+
             return (
-                window.self !== window.top ||
-                window.location.hostname.includes('reddit.com') ||
+                (embedded && !isLocalHost) ||
+                host.includes('reddit.com') ||
                 (window as unknown as Record<string, unknown>)['__devvit__'] !== undefined
             );
         } catch {

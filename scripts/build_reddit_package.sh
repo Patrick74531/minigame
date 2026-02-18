@@ -122,6 +122,55 @@ rewrite_index_for_reddit() {
   # Move startup + contextmenu handler into an external JS file.
   cat > "$boot_file" <<'EOF'
 (function () {
+  function appendError(message) {
+    var panelId = 'BootErrorPanel';
+    var panel = document.getElementById(panelId);
+    if (!panel) {
+      panel = document.createElement('pre');
+      panel.id = panelId;
+      panel.style.position = 'fixed';
+      panel.style.left = '8px';
+      panel.style.right = '8px';
+      panel.style.bottom = '8px';
+      panel.style.maxHeight = '40%';
+      panel.style.overflow = 'auto';
+      panel.style.margin = '0';
+      panel.style.padding = '10px';
+      panel.style.background = 'rgba(0,0,0,0.75)';
+      panel.style.color = '#ffb4b4';
+      panel.style.font = '12px/1.4 Menlo, Monaco, monospace';
+      panel.style.border = '1px solid rgba(255,180,180,0.5)';
+      panel.style.borderRadius = '8px';
+      panel.style.zIndex = '2147483647';
+      panel.textContent = '[boot] runtime error\n';
+      document.body.appendChild(panel);
+    }
+    panel.textContent += '\n' + message;
+  }
+
+  var originalConsoleError = console.error ? console.error.bind(console) : null;
+  console.error = function () {
+    var parts = [];
+    for (var i = 0; i < arguments.length; i += 1) {
+      var item = arguments[i];
+      parts.push(String(item && item.stack ? item.stack : item));
+    }
+    appendError('[console.error] ' + parts.join(' | '));
+    if (originalConsoleError) {
+      originalConsoleError.apply(console, arguments);
+    }
+  };
+
+  window.addEventListener('error', function (event) {
+    var msg = event && (event.message || (event.error && event.error.stack));
+    if (msg) appendError('[window.error] ' + msg);
+  });
+
+  window.addEventListener('unhandledrejection', function (event) {
+    var reason = event && event.reason;
+    appendError('[unhandledrejection] ' + String(reason && reason.stack ? reason.stack : reason));
+  });
+
   var gameCanvas = document.getElementById('GameCanvas');
   if (gameCanvas) {
     gameCanvas.addEventListener('contextmenu', function (event) {
@@ -129,7 +178,13 @@ rewrite_index_for_reddit() {
     });
   }
 
+  if (typeof System === 'undefined') {
+    appendError('SystemJS is unavailable');
+    return;
+  }
+
   System.import('./index.js').catch(function (err) {
+    appendError('[System.import] ' + String(err && err.stack ? err.stack : err));
     console.error(err);
   });
 })();
@@ -143,6 +198,25 @@ EOF
 
   if ! rg -q 'src="boot\.js"' "$index_file"; then
     die "Failed to inject external boot.js into index.html"
+  fi
+}
+
+rewrite_systemjs_for_reddit_csp() {
+  local webroot="$1"
+  local system_bundle="${webroot}/src/system.bundle.js"
+  [ -f "$system_bundle" ] || return 0
+
+  log "Patching SystemJS for Reddit CSP (disable fetch+eval module path)..."
+
+  perl -0pi -e 's~\Qvar n=/^[^#?]+\.(css|html|json|wasm)([?#].*)?$/;t.shouldFetch=function(e){return n.test(e)}\E~t.shouldFetch=function(){return!1}~g' "$system_bundle"
+  perl -0pi -e 's~\Qt.shouldFetch=function(e){return n.test(e)}\E~t.shouldFetch=function(){return!1}~g' "$system_bundle"
+
+  if rg -q 'shouldFetch=function\(e\)\{return n\.test\(e\)\}' "$system_bundle"; then
+    die "Failed to patch system.bundle.js (unsafe shouldFetch pattern still present)"
+  fi
+
+  if ! rg -q 'shouldFetch=function\(\)\{return!1\}' "$system_bundle"; then
+    die "Failed to patch system.bundle.js for CSP-safe shouldFetch behavior"
   fi
 }
 
@@ -410,7 +484,7 @@ if [ "$SKIP_COCOS_BUILD" -eq 0 ]; then
     BUILD_OPT_BASE="${BUILD_OPT_BASE};${COCOS_BUILD_OPTS}"
   fi
   log "Running headless Cocos build..."
-  "$COCOS_CREATOR" --path "$ROOT_DIR" --build "$BUILD_OPT_BASE"
+  "$COCOS_CREATOR" --project "$ROOT_DIR" --build "$BUILD_OPT_BASE"
 fi
 
 if [ -z "$SOURCE_BUILD_DIR" ]; then
@@ -464,6 +538,7 @@ if has_cmd cwebp; then
 fi
 
 rewrite_index_for_reddit "$OUTPUT_WEBROOT"
+rewrite_systemjs_for_reddit_csp "$OUTPUT_WEBROOT"
 
 if ! scan_reddit_html_compliance "$OUTPUT_WEBROOT" "$COMPLIANCE_REPORT"; then
   warn "Reddit HTML compliance scan failed. See: $COMPLIANCE_REPORT"

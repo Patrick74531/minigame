@@ -350,9 +350,7 @@ export class HomePage extends Component {
             this._onBridgeEvent(event);
         };
         bridge.addListener(this._bridgeListener);
-        if (bridge.isRedditEnvironment) {
-            bridge.requestInit();
-        }
+        bridge.requestInit();
     }
 
     private _onBridgeEvent(event: RedditBridgeCallback): void {
@@ -398,20 +396,11 @@ export class HomePage extends Component {
         });
         this._leaderboardPanel.showLoading();
         const bridge = RedditBridge.instance;
-        if (bridge.isRedditEnvironment) {
-            bridge.requestLeaderboard();
-        } else {
-            this._leaderboardPanel.showEntries([]);
-        }
+        bridge.requestLeaderboard();
     }
 
     private onSubscribeClick() {
         const bridge = RedditBridge.instance;
-        if (bridge.isRedditEnvironment) {
-            bridge.requestSubscribe();
-        } else {
-            const name = bridge.subredditName || 'your community';
-            console.warn(`[HomePage] Subscribe: r/${name}`);
-        }
+        bridge.requestSubscribe();
     }
 }

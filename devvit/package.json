@@ -1,12 +1,15 @@
 {
-  "name": "tower-defense-game",
-  "version": "0.0.1",
-  "license": "BSD-3-Clause",
-  "scripts": {
-    "dev": "devvit playtest",
-    "upload": "devvit upload"
-  },
-  "dependencies": {
-    "@devvit/public-api": "0.12.13"
-  }
+    "name": "granny-vs-robot",
+    "version": "0.0.0",
+    "license": "BSD-3-Clause",
+    "scripts": {
+        "patch": "node scripts/patch-csp.cjs",
+        "dev": "node scripts/patch-csp.cjs && devvit playtest",
+        "upload": "node scripts/patch-csp.cjs && devvit upload"
+    },
+    "dependencies": {
+        "@devvit/public-api": "0.12.13"
+    },
+    "type": "module",
+    "private": true
 }
