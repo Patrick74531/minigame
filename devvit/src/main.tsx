@@ -23,9 +23,21 @@ async function getLeaderboard(redis: RedisClient): Promise<LeaderboardEntry[]> {
     });
     if (!members || members.length === 0) return [];
 
+    const allMeta = (await redis.hGetAll(META_KEY)) ?? {};
+
     return members.map((entry, i) => {
         const { member: username, score } = entry as { member: string; score: number };
-        return { rank: i + 1, username, score: Math.round(score), wave: 0 };
+        let wave = 0;
+        const metaStr = allMeta[username];
+        if (metaStr) {
+            try {
+                const parsed = JSON.parse(metaStr) as { wave?: number };
+                wave = parsed.wave ?? 0;
+            } catch {
+                wave = 0;
+            }
+        }
+        return { rank: i + 1, username, score: Math.round(score), wave };
     });
 }
 

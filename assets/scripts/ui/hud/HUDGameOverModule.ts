@@ -39,6 +39,8 @@ export class HUDGameOverModule implements HUDModule {
     private _gameOverButtonBg: Graphics | null = null;
     private _gameOverPanelBg: Graphics | null = null;
     private _gameOverOpacity: UIOpacity | null = null;
+    private _gameOverWaveLabel: Label | null = null;
+    private _gameOverWave = 0;
     private _gameOverRestarting = false;
     private _gameOverDialogWidth = GAME_OVER_DIALOG_MAX_WIDTH;
     private _gameOverDialogHeight = GAME_OVER_DIALOG_MAX_HEIGHT;
@@ -66,6 +68,7 @@ export class HUDGameOverModule implements HUDModule {
         this._gameOverRoot = null;
         this._gameOverTitleLabel = null;
         this._gameOverMessageLabel = null;
+        this._gameOverWaveLabel = null;
         this._gameOverButtonNode = null;
         this._gameOverButton = null;
         this._gameOverButtonLabel = null;
@@ -83,6 +86,11 @@ export class HUDGameOverModule implements HUDModule {
     public onLanguageChanged(): void {
         if (!this._gameOverRoot?.active) return;
 
+        if (this._gameOverWaveLabel) {
+            this._gameOverWaveLabel.string = Localization.instance.t('ui.gameOver.wave', {
+                wave: String(this._gameOverWave),
+            });
+        }
         if (this._gameOverButtonLabel) {
             this._gameOverButtonLabel.string = Localization.instance.t(
                 this._gameOverRestarting
@@ -93,7 +101,7 @@ export class HUDGameOverModule implements HUDModule {
         this.updateGameOverDialogLayout();
     }
 
-    public showGameOver(victory: boolean): void {
+    public showGameOver(victory: boolean, wave: number = 0): void {
         if (
             !this._gameOverRoot ||
             !this._gameOverOpacity ||
@@ -104,6 +112,7 @@ export class HUDGameOverModule implements HUDModule {
             return;
         }
 
+        this._gameOverWave = wave;
         this.updateGameOverDialogLayout();
         this._setInputEnabled(false);
         this._gameOverRestarting = false;
@@ -112,6 +121,12 @@ export class HUDGameOverModule implements HUDModule {
         this._gameOverTitleLabel.string = Localization.instance.t(
             victory ? 'ui.gameOver.title.victory' : 'ui.gameOver.title.defeat'
         );
+        if (this._gameOverWaveLabel) {
+            this._gameOverWaveLabel.string = Localization.instance.t('ui.gameOver.wave', {
+                wave: String(wave),
+            });
+            this._gameOverWaveLabel.node.active = wave > 0;
+        }
         this._gameOverMessageLabel.string = Localization.instance.t(
             victory ? 'ui.gameOver.message.victory' : 'ui.gameOver.message.defeat'
         );
@@ -208,13 +223,27 @@ export class HUDGameOverModule implements HUDModule {
         this._gameOverTitleLabel.overflow = Label.Overflow.SHRINK;
         this._gameOverTitleLabel.color = new Color(255, 224, 140, 255);
 
+        const waveNode = new Node('GameOverWaveLabel');
+        panel.addChild(waveNode);
+        waveNode.addComponent(UITransform).setContentSize(this._gameOverDialogWidth - 80, 44);
+        waveNode.setPosition(0, 28, 0);
+        this._gameOverWaveLabel = waveNode.addComponent(Label);
+        this._gameOverWaveLabel.fontSize = 28;
+        this._gameOverWaveLabel.lineHeight = 36;
+        this._gameOverWaveLabel.isBold = true;
+        this._gameOverWaveLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this._gameOverWaveLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._gameOverWaveLabel.overflow = Label.Overflow.SHRINK;
+        this._gameOverWaveLabel.color = new Color(255, 230, 100, 255);
+        waveNode.active = false;
+
         const messageNode = new Node('GameOverMessage');
         panel.addChild(messageNode);
-        messageNode.addComponent(UITransform).setContentSize(this._gameOverDialogWidth - 130, 116);
-        messageNode.setPosition(0, 20, 0);
+        messageNode.addComponent(UITransform).setContentSize(this._gameOverDialogWidth - 130, 96);
+        messageNode.setPosition(0, -16, 0);
         this._gameOverMessageLabel = messageNode.addComponent(Label);
-        this._gameOverMessageLabel.fontSize = 30;
-        this._gameOverMessageLabel.lineHeight = 40;
+        this._gameOverMessageLabel.fontSize = 28;
+        this._gameOverMessageLabel.lineHeight = 38;
         this._gameOverMessageLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._gameOverMessageLabel.verticalAlign = Label.VerticalAlign.CENTER;
         this._gameOverMessageLabel.enableWrapText = true;
@@ -459,18 +488,34 @@ export class HUDGameOverModule implements HUDModule {
             this._gameOverTitleLabel.lineHeight = this._gameOverTitleLabel.fontSize + 8;
         }
 
+        const waveNode = this._gameOverWaveLabel?.node;
+        waveNode
+            ?.getComponent(UITransform)
+            ?.setContentSize(
+                dialogW - Math.round(dialogW * 0.14),
+                Math.max(36, Math.round(dialogH * 0.14))
+            );
+        waveNode?.setPosition(0, Math.round(dialogH * 0.1), 0);
+        if (this._gameOverWaveLabel) {
+            this._gameOverWaveLabel.fontSize = Math.max(
+                22,
+                Math.min(28, Math.round(dialogH * 0.085))
+            );
+            this._gameOverWaveLabel.lineHeight = this._gameOverWaveLabel.fontSize + 8;
+        }
+
         const messageNode = this._gameOverMessageLabel?.node;
         messageNode
             ?.getComponent(UITransform)
             ?.setContentSize(
                 dialogW - Math.round(dialogW * 0.24),
-                Math.max(90, Math.round(dialogH * 0.34))
+                Math.max(80, Math.round(dialogH * 0.3))
             );
-        messageNode?.setPosition(0, Math.round(dialogH * 0.02), 0);
+        messageNode?.setPosition(0, -Math.round(dialogH * 0.07), 0);
         if (this._gameOverMessageLabel) {
             this._gameOverMessageLabel.fontSize = Math.max(
-                22,
-                Math.min(30, Math.round(dialogH * 0.088))
+                20,
+                Math.min(28, Math.round(dialogH * 0.082))
             );
             this._gameOverMessageLabel.lineHeight = this._gameOverMessageLabel.fontSize + 10;
         }

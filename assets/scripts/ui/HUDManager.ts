@@ -224,10 +224,9 @@ export class HUDManager {
     }
 
     private onGameOver(data: { victory: boolean }): void {
-        this._gameOverModule.showGameOver(Boolean(data?.victory));
         const wave = WaveService.instance.currentWave;
-        const score = wave * 100;
-        RedditBridge.instance.submitScore(score, wave);
+        this._gameOverModule.showGameOver(Boolean(data?.victory), wave);
+        RedditBridge.instance.submitScore(wave * 100, wave);
     }
 
     private onBossIntro(data: HUDBossIntroPayload): void {
