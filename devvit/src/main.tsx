@@ -121,16 +121,9 @@ function App(context: Devvit.Context) {
 
                     case 'SUBSCRIBE': {
                         const user = await reddit.getCurrentUser();
-                        const subreddit = await reddit.getSubredditById(context.subredditId!);
 
                         if (user) {
                             await redis.hSet(FOLLOW_KEY, { [user.username]: '1' });
-                        }
-
-                        if (subreddit) {
-                            await context.ui.navigateTo(
-                                `https://www.reddit.com/r/${subreddit.name}`
-                            );
                         }
 
                         send(wv, { type: 'SUBSCRIPTION_RESULT', payload: { success: true } });

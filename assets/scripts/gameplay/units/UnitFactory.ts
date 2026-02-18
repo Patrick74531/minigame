@@ -384,6 +384,8 @@ export class UnitFactory {
             // every frame by the CPU. Without this, baked mode (the default)
             // leaves bone transforms at the rest/bind pose, causing the weapon
             // socket to follow a near-origin position and land on the ground.
+            // NOTE: patch-csp.cjs (Patch H) strips this call from the deployed
+            // build and relies on baked GPU mode there instead.
             const anim = this.getModelSkeletalAnimation(model);
             if (anim) {
                 anim.useBakedAnimation = false;

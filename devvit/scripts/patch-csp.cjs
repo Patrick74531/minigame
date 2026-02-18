@@ -97,9 +97,43 @@ cc = cc.replace(
 console.log('[patch-csp]   ✓ Patched property-defaults Function("o",l)');
 
 // C2 – serialiser builder: Function("s","o","d","k", ...)
+// Fallback: reflect-mode that copies __values__ properties from source JSON (d) to target (o).
+// Skips asset-ref objects ({__id__:N}) since we can't resolve them without the document.
+// _rv: recursively revive a plain JSON value into a proper CCClass instance when possible.
+// __type__ objects are looked up via js.getClassByName (Cocos Creator class registry).
+// __id__ objects are asset refs – skip them (can't resolve without document).
+const C2_REFLECT_FN =
+    'function(s,o,d,k){' +
+    'try{' +
+    'function _rv(v){' +
+    'if(!v||typeof v!=="object")return v;' +
+    'if(Array.isArray(v))return v.map(_rv);' +
+    'if(typeof v.__id__==="number")return v;' +
+    'if(typeof v.__type__==="string"){' +
+    'var _c;try{_c=js.getClassByName(v.__type__);}catch(_e2){}' +
+    'if(_c){' +
+    'var _inst=new _c();' +
+    'for(var _q in v){if(_q==="__type__")continue;try{_inst[_q]=_rv(v[_q]);}catch(_e3){}}' +
+    'return _inst;' +
+    '}' +
+    '}' +
+    'var _r={};for(var _q2 in v)_r[_q2]=_rv(v[_q2]);return _r;' +
+    '}' +
+    'var _vals=(s&&s.__values__)||(k&&k.__values__)||[];' +
+    'for(var _i=0;_i<_vals.length;_i++){' +
+    'var _p=_vals[_i];if(_p==="_$erialized")continue;' +
+    'var _v=d[_p];if(typeof _v==="undefined")continue;' +
+    'if(_v!==null&&typeof _v==="object"&&typeof _v.__id__==="number")continue;' +
+    'o[_p]=_rv(_v);' +
+    '}' +
+    'if(d._id!==undefined&&o._id!==undefined)o._id=d._id;' +
+    '}catch(_e){}}';
+
 cc = cc.replace(
     /Function\("s","o","d","k",r\.join\(""\)\)/g,
-    '(function(){try{return Function("s","o","d","k",r.join(""));}catch(_csp){return function(s,o,d,k){};}})()'
+    '(function(){try{return Function("s","o","d","k",r.join(""));}catch(_csp){return ' +
+        C2_REFLECT_FN +
+        ';}})()'
 );
 console.log('[patch-csp]   ✓ Patched serialiser Function("s","o","d","k",...)');
 
@@ -206,6 +240,121 @@ const mainPath = path.join(WEBROOT, 'assets', 'main', 'index.js');
 if (fs.existsSync(mainPath)) {
     let main = fs.readFileSync(mainPath, 'utf8');
 
+    // ── Patch H: Restore useBakedAnimation=false (real-time CPU mode) ─────────────────────────
+    // The prefab was built without baked texture data, so GPU baked mode shows T-pose.
+    // Keep real-time CPU mode so _tracks (loaded via resources.load in Patch J) drive animation.
+    // Revert any previous void-0 replacement back to the original useBakedAnimation=false call.
+    const BAKED_VOID_CTX = ');(void 0),a.attachHeroWeaponVisuals';
+    const BAKED_ORIG_CTX = ');s&&(s.useBakedAnimation=!1),a.attachHeroWeaponVisuals';
+    if (main.includes(BAKED_VOID_CTX)) {
+        main = main.replace(BAKED_VOID_CTX, BAKED_ORIG_CTX);
+        console.log('[patch-csp]   ✓ Restored useBakedAnimation=false (real-time CPU mode)');
+    } else if (main.includes(BAKED_ORIG_CTX) || main.includes('s&&(s.useBakedAnimation=!1)')) {
+        console.log('[patch-csp]   ~ useBakedAnimation=false already present (skipping)');
+    } else {
+        console.warn('[patch-csp]   ~ useBakedAnimation context not found (skipping)');
+    }
+
+    // ── Patch I: Diagnostic logging around getModelSkeletalAnimation ─────────────
+    // Handles all known forms: with/without debug log, with/without void-0 vs useBakedAnimation.
+    const ANIM_FIND_VARIANTS = [
+        'var s=a.getModelSkeletalAnimation(t);(void 0),a.attachHeroWeaponVisuals(e,t);',
+        'var s=a.getModelSkeletalAnimation(t);s&&(s.useBakedAnimation=!1),a.attachHeroWeaponVisuals(e,t);',
+    ];
+    const ANIM_FIND_LOG =
+        'console.log("[DBG-anim] skelAnim=",s,"clips=",s&&s.clips&&s.clips.length),';
+    const ANIM_FIND_LOGGED = 'var s=a.getModelSkeletalAnimation(t);' + ANIM_FIND_LOG;
+    if (main.includes(ANIM_FIND_LOGGED)) {
+        console.log('[patch-csp]   ~ anim diagnostic log already injected (skipping)');
+    } else {
+        let injectedFind = false;
+        for (const variant of ANIM_FIND_VARIANTS) {
+            if (main.includes(variant)) {
+                main = main.replace(
+                    variant,
+                    'var s=a.getModelSkeletalAnimation(t);' +
+                        ANIM_FIND_LOG +
+                        variant.slice('var s=a.getModelSkeletalAnimation(t);'.length)
+                );
+                console.log(
+                    '[patch-csp]   ✓ Injected anim diagnostic log (getModelSkeletalAnimation)'
+                );
+                injectedFind = true;
+                break;
+            }
+        }
+        if (!injectedFind)
+            console.warn('[patch-csp]   ~ anim diagnostic log pattern not found (skipping)');
+    }
+
+    // ── Patch J: Always use ensureRunClip (resources.load path, never the direct prefab clip) ─
+    // prefab-embedded clip has _tracks=0 at play()-time (native binary loads async).
+    // resources.load() waits for the full binary → _tracks populated → animation works.
+    // Match the variant with the debug log already injected (from Patch I in v0.0.16).
+    const FORCE_J_OLD =
+        'if(E){var _=E,S=a.bindClipState(s,_,a.buildHeroStateName(i.key,"run"));' +
+        'f.setRunClip(S),f.setIdleClip(S),' +
+        'console.log("[DBG-anim] play direct state:",S,"clip:",_,"tracks:",_&&_._tracks&&_._tracks.length),' +
+        's.defaultClip=_,s.playOnLoad=!0,s.play(S)}else a.ensureRunClip(s,f);';
+    // Also handle the variant without the debug log (fresh build)
+    const FORCE_J_OLD2 =
+        'if(E){var _=E,S=a.bindClipState(s,_,a.buildHeroStateName(i.key,"run"));' +
+        'f.setRunClip(S),f.setIdleClip(S),' +
+        's.defaultClip=_,s.playOnLoad=!0,s.play(S)}else a.ensureRunClip(s,f);';
+    const FORCE_J_NEW = 'a.ensureRunClip(s,f);';
+    if (main.includes(FORCE_J_OLD)) {
+        main = main.replace(FORCE_J_OLD, FORCE_J_NEW);
+        console.log('[patch-csp]   ✓ Patch J: forced ensureRunClip (resources.load always)');
+    } else if (main.includes(FORCE_J_OLD2)) {
+        main = main.replace(FORCE_J_OLD2, FORCE_J_NEW);
+        console.log(
+            '[patch-csp]   ✓ Patch J: forced ensureRunClip (resources.load always, no-log variant)'
+        );
+    } else if (!main.includes('else a.ensureRunClip')) {
+        console.log('[patch-csp]   ~ Patch J already applied (skipping)');
+    } else {
+        console.warn(
+            '[patch-csp]   ~ Patch J pattern not found — check compiled index.js manually'
+        );
+    }
+
+    // ── Patch K: Diagnostic logs inside ensureRunClip success callback ───────────
+    const ENSURE_CB_OLD =
+        'n._heroRunClipCache.set(t.key,o);var l=n.bindClipState(e,o,n.buildHeroStateName(t.key,"run"));' +
+        'e.defaultClip=o,e.playOnLoad=!0,e.play(l),a&&(a.setRunClip(l),a.setIdleClip(l))';
+    const ENSURE_CB_NEW =
+        'n._heroRunClipCache.set(t.key,o);' +
+        'console.log("[DBG-K] clip loaded name:",o&&o.name,"tracks:",o&&o._tracks&&o._tracks.length,"nativeAsset:",!!(o&&o._nativeAsset));' +
+        'var l=n.bindClipState(e,o,n.buildHeroStateName(t.key,"run"));' +
+        'console.log("[DBG-K] state:",l,"anim enabled:",e&&e.enabled,"clips after:",e&&e.clips&&e.clips.length);' +
+        'try{e.defaultClip=o,e.playOnLoad=!0,e.play(l),a&&(a.setRunClip(l),a.setIdleClip(l));console.log("[DBG-K] play() called ok");}' +
+        'catch(_ke){console.error("[DBG-K] play() threw:",_ke);}';
+    if (main.includes(ENSURE_CB_OLD)) {
+        main = main.replace(ENSURE_CB_OLD, ENSURE_CB_NEW);
+        console.log('[patch-csp]   ✓ Patch K: injected ensureRunClip callback diagnostics');
+    } else if (main.includes('[DBG-K]')) {
+        console.log('[patch-csp]   ~ Patch K already applied (skipping)');
+    } else {
+        console.warn('[patch-csp]   ~ Patch K pattern not found');
+    }
+
+    const ANIM_LOAD_OLD = 'console.warn("[UnitFactory] Failed to load hero run clip:",i)';
+    const ANIM_LOAD_NEW = 'console.warn("[DBG-anim] CLIP LOAD FAILED:",i)';
+    const ANIM_LOAD_SUCCESS_OLD = 'this._heroRunClipCache.set(config.key,clip)';
+    const ANIM_LOAD_SUCCESS_NEW_PREFIX =
+        'console.log("[DBG-anim] clip loaded ok, tracks:",clip&&clip._tracks&&clip._tracks.length,"name:",clip&&clip.name),';
+    if (main.includes(ANIM_LOAD_OLD)) {
+        main = main.replace(ANIM_LOAD_OLD, ANIM_LOAD_NEW);
+        console.log('[patch-csp]   ✓ Injected clip-fail log');
+    }
+    if (main.includes(ANIM_LOAD_SUCCESS_OLD) && !main.includes(ANIM_LOAD_SUCCESS_NEW_PREFIX)) {
+        main = main.replace(
+            ANIM_LOAD_SUCCESS_OLD,
+            ANIM_LOAD_SUCCESS_NEW_PREFIX + ANIM_LOAD_SUCCESS_OLD
+        );
+        console.log('[patch-csp]   ✓ Injected clip-success log');
+    }
+
     const BULLET_OLD =
         'i.setGroup(16),i.setMask(8),i.on("onTriggerEnter",this.onTriggerEnter,this)}';
     const BULLET_NEW =
@@ -226,5 +375,51 @@ if (fs.existsSync(mainPath)) {
 } else {
     console.warn('[patch-csp]   ~ assets/main/index.js not found (skipping game patch)');
 }
+
+// ─── 4. Create .cconb aliases for animation binary files ─────────────────────
+// The engine's config.extensionMap[".cconb"] registers animation/skeleton binary
+// assets with .cconb extension. The Cocos Creator build however writes these files
+// as .bin (e.g. uuid@hash.bin). The engine constructs URLs with .cconb extension
+// → 404 → _nativeAsset never set → _tracks=0 → T-pose.
+// Fix: for every @hash.bin file in resources/import that starts with CCON magic,
+// create a sibling file with .cconb extension (same content).
+(function patchCconbAliases() {
+    const resImport = path.join(WEBROOT, 'assets', 'resources', 'import');
+    if (!fs.existsSync(resImport)) {
+        console.warn('[patch-csp]   ~ resources/import not found (skipping .cconb alias step)');
+        return;
+    }
+    const CCON_MAGIC = Buffer.from([0x43, 0x43, 0x4f, 0x4e]); // "CCON"
+    let created = 0,
+        skipped = 0;
+    const subdirs = fs.readdirSync(resImport);
+    for (const sub of subdirs) {
+        const subDir = path.join(resImport, sub);
+        if (!fs.statSync(subDir).isDirectory()) continue;
+        for (const fname of fs.readdirSync(subDir)) {
+            if (!fname.includes('@') || !fname.endsWith('.bin')) continue;
+            const binPath = path.join(subDir, fname);
+            const cconbPath = binPath.slice(0, -4) + '.cconb';
+            if (fs.existsSync(cconbPath)) {
+                skipped++;
+                continue;
+            }
+            const head = Buffer.allocUnsafe(4);
+            const fd = fs.openSync(binPath, 'r');
+            fs.readSync(fd, head, 0, 4, 0);
+            fs.closeSync(fd);
+            if (!head.equals(CCON_MAGIC)) continue;
+            fs.copyFileSync(binPath, cconbPath);
+            created++;
+        }
+    }
+    if (created > 0)
+        console.log(
+            '[patch-csp]   ✓ Created ' + created + ' .cconb aliases for animation binaries'
+        );
+    else if (skipped > 0)
+        console.log('[patch-csp]   ~ .cconb aliases already exist (' + skipped + ' skipped)');
+    else console.log('[patch-csp]   ~ no CCON .bin files found (skipping)');
+})();
 
 console.log('[patch-csp] All patches applied successfully.');
