@@ -122,6 +122,9 @@ rewrite_index_for_reddit() {
   # Move startup + contextmenu handler into an external JS file.
   cat > "$boot_file" <<'EOF'
 (function () {
+  if (screen.orientation && screen.orientation.lock) {
+    screen.orientation.lock('landscape-primary').catch(function () {});
+  }
   function appendError(message) {
     var panelId = 'BootErrorPanel';
     var panel = document.getElementById(panelId);

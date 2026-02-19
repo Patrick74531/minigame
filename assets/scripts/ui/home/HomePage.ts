@@ -15,6 +15,8 @@ import {
     Texture2D,
     ImageAsset,
     Graphics,
+    tween,
+    Vec3,
 } from 'cc';
 import { Localization } from '../../core/i18n/Localization';
 import { GameManager } from '../../core/managers/GameManager';
@@ -40,6 +42,7 @@ export class HomePage extends Component {
     private _subscribeBtn: Node | null = null;
     private _leaderboardPanel: LeaderboardPanel | null = null;
     private _bridgeListener: ((e: RedditBridgeCallback) => void) | null = null;
+    private _onStartRequested: (() => void) | null = null;
 
     public onLoad() {
         this._uiLayer = this.node.parent?.layer ?? Layers.Enum.UI_2D;
@@ -108,6 +111,7 @@ export class HomePage extends Component {
 
         this._contentNode = new Node('HomeContent');
         this._contentNode.layer = this._uiLayer;
+        this._contentNode.active = false;
         this.node.addChild(this._contentNode);
 
         this._contentNode.addComponent(UITransform);
@@ -146,19 +150,30 @@ export class HomePage extends Component {
         resources.load('ui/homepage', Texture2D, (textureErr, texture) => {
             if (!textureErr && texture) {
                 this.applyBackgroundTexture(texture);
+                this._revealContent();
                 return;
             }
 
             resources.load('ui/homepage', ImageAsset, (imageErr, imageAsset) => {
-                if (imageErr || !imageAsset) {
+                if (!imageErr && imageAsset) {
+                    const fallbackTexture = new Texture2D();
+                    fallbackTexture.image = imageAsset;
+                    this.applyBackgroundTexture(fallbackTexture);
+                } else {
                     console.warn('Failed to load homepage background', imageErr ?? textureErr);
-                    return;
                 }
-                const fallbackTexture = new Texture2D();
-                fallbackTexture.image = imageAsset;
-                this.applyBackgroundTexture(fallbackTexture);
+                this._revealContent();
             });
         });
+    }
+
+    private _revealContent(): void {
+        if (!this._contentNode || !this._contentNode.isValid) return;
+        this._contentNode.active = true;
+        this._contentNode.setScale(0.96, 0.96, 1);
+        tween(this._contentNode)
+            .to(0.3, { scale: new Vec3(1, 1, 1) })
+            .start();
     }
 
     private applyBackgroundTexture(texture: Texture2D) {
@@ -385,9 +400,17 @@ export class HomePage extends Component {
         }
     }
 
+    public setOnStartRequested(cb: () => void): void {
+        this._onStartRequested = cb;
+    }
+
     private onStartClick() {
-        GameManager.instance.startGame();
-        this.node.destroy();
+        if (this._onStartRequested) {
+            this._onStartRequested();
+        } else {
+            GameManager.instance.startGame();
+            this.node.destroy();
+        }
     }
 
     private onLeaderboardClick() {

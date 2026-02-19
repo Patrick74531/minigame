@@ -1,4 +1,4 @@
-import { Node, instantiate } from 'cc';
+import { Node } from 'cc';
 import { GameManager } from '../managers/GameManager';
 import { GameConfig } from '../../data/GameConfig';
 import { SpawnBootstrap } from './SpawnBootstrap';
@@ -7,8 +7,8 @@ import { MapGenerator } from '../../gameplay/map/MapGenerator';
 import { ServiceRegistry } from '../managers/ServiceRegistry';
 import { HomePage } from '../../ui/home/HomePage';
 import { HUDManager } from '../../ui/HUDManager';
-import { EventManager } from '../managers/EventManager';
-import { GameEvents } from '../../data/GameEvents';
+import { LoadingScreen } from '../../ui/LoadingScreen';
+import { GameResourceLoader } from './GameResourceLoader';
 
 export type StartContext = {
     mapGenerator: MapGenerator | null;
@@ -33,31 +33,42 @@ export class GameStartFlow {
 
         // If homepage is requested (default true) and not already playing
         if (ctx.showHomePage !== false) {
-             this.showHomePage(ctx);
-             return;
+            this.showHomePage(ctx);
+            return;
         }
 
         // Direct start (e.g. restart or debug)
         this.startGame(ctx);
-        game.startGame(); 
+        game.startGame();
     }
-    
+
     private static showHomePage(ctx: StartContext) {
-        // Hide HUD initially
         HUDManager.instance.setVisible(false);
 
-        // Create HomePage
         const homeNode = new Node('HomePage');
         ctx.containers.ui.addChild(homeNode);
-        homeNode.addComponent(HomePage);
-        
-        // Listen for GAME_START one time to proceed with game initialization
-        const onStart = () => {
-             this.startGame(ctx);
-             EventManager.instance.off(GameEvents.GAME_START, onStart, this);
-        };
-        
-        EventManager.instance.on(GameEvents.GAME_START, onStart, this);
+        const homePage = homeNode.addComponent(HomePage);
+
+        homePage.setOnStartRequested(() => {
+            homeNode.destroy();
+            this._showLoadingScreen(ctx);
+        });
+    }
+
+    private static _showLoadingScreen(ctx: StartContext) {
+        const screen = LoadingScreen.show(ctx.containers.ui, () => {
+            this.startGame(ctx);
+            this.gameManager.startGame();
+            GameResourceLoader.loadPhase2();
+        });
+
+        GameResourceLoader.loadPhase1((loaded, total) => {
+            if (screen.isValid) {
+                screen.setProgress(loaded, total);
+            }
+        }).catch(() => {
+            if (screen.isValid) screen.setProgress(1, 1);
+        });
     }
 
     // Refactored actual start logic (Map generation, Spawning)

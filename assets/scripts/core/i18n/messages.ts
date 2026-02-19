@@ -137,6 +137,17 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.leaderboard.wave_short': '第{wave}波',
         'ui.leaderboard.close': '关闭',
 
+        'ui.loading.tip.move': '用摇杆或WASD键移动奶奶，她会自动向最近的敌人开火！',
+        'ui.loading.tip.build': '把金币花在建造点上建造防御工事，覆盖多条进攻路线。',
+        'ui.loading.tip.tower': '机炮塔射程极远，可以同时覆盖两条路线的敌人！',
+        'ui.loading.tip.wall': '先建路障让敌人减速，再用炮塔集中火力，事半功倍。',
+        'ui.loading.tip.levelup': '每次升级可选一张强化卡牌，合理搭配能打出超强组合！',
+        'ui.loading.tip.boss': '每隔几波会出现强力BOSS，提前完善防线不要措手不及！',
+        'ui.loading.tip.gooseshed': '鹅棚持续生产鹅兵当肉盾，让它们吸收伤害保护你的炮塔。',
+        'ui.loading.tip.farm': '金矿稳定产出金币，越早建越快积累建造资源。',
+        'ui.loading.tip.spa': '温泉可以治疗英雄，血量低时别忘了靠近补血！',
+        'ui.loading.tip.lanes': '敌人会从中、上、下三条路线入侵，合理分配防御力量。',
+
         'enemy.archetype.boss_robot_flying': '飞行机甲',
         'enemy.archetype.boss_robot_large': '巨型机甲',
         'enemy.archetype.boss_legs_gun': '机炮步行者',
@@ -296,6 +307,26 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.leaderboard.empty': 'No records yet. Be the first!',
         'ui.leaderboard.wave_short': 'Wave {wave}',
         'ui.leaderboard.close': 'Close',
+
+        'ui.loading.tip.move':
+            'Use the joystick or WASD to move. Grandma auto-fires at nearby enemies!',
+        'ui.loading.tip.build':
+            'Spend coins on building pads to construct defenses across attack routes.',
+        'ui.loading.tip.tower':
+            'The Gatling Tower has extreme range and can cover two lanes at once!',
+        'ui.loading.tip.wall':
+            'Build a Barricade first to slow enemies, then focus tower fire for max effect.',
+        'ui.loading.tip.levelup':
+            'Each level-up lets you pick a buff card. Mix and match for powerful combos!',
+        'ui.loading.tip.boss':
+            'A powerful Boss appears every few waves. Reinforce your defenses early!',
+        'ui.loading.tip.gooseshed':
+            'Goose Sheds train soldiers as meat shields to protect your towers.',
+        'ui.loading.tip.farm':
+            'Gold Mines generate coins over time — build them early to snowball faster.',
+        'ui.loading.tip.spa': 'Hot Springs heal Grandma. Swing by when your health gets low!',
+        'ui.loading.tip.lanes':
+            'Enemies attack from Center, Top, and Bottom lanes. Spread your defenses wisely.',
 
         'enemy.archetype.boss_robot_flying': 'Flying Warbot',
         'enemy.archetype.boss_robot_large': 'Titan Warbot',
