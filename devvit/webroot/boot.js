@@ -1,4 +1,7 @@
 (function () {
+  if (screen.orientation && screen.orientation.lock) {
+    screen.orientation.lock('landscape-primary').catch(function () {});
+  }
   function appendError(message) {
     var panelId = 'BootErrorPanel';
     var panel = document.getElementById(panelId);

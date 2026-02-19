@@ -59,8 +59,8 @@ export class LoadingScreen extends Component {
     private _onComplete: (() => void) | null = null;
     private _completeCalled = false;
     private _minDurationElapsed = false;
-    private _loadDone = false;
-    private readonly MIN_DURATION = 1.5; // at least 1.5 s so bar feels meaningful
+    private _readyToClose = false;
+    private readonly MIN_DURATION = 1.5;
     private _elapsed = 0;
 
     private _uiLayer = Layers.Enum.UI_2D;
@@ -77,13 +77,18 @@ export class LoadingScreen extends Component {
         return screen;
     }
 
-    /** Call with loaded/total counts as Phase1 loads. */
+    /** Update progress bar display only — does NOT close the screen. */
     public setProgress(loaded: number, total: number): void {
         this._progress = total > 0 ? loaded / total : 1;
-        if (loaded >= total) {
-            this._loadDone = true;
-            this._tryComplete();
-        }
+    }
+
+    /**
+     * Call this after startGame() has run and GPU warmup delay has elapsed.
+     * Triggers the closing animation.
+     */
+    public signalReadyToClose(): void {
+        this._readyToClose = true;
+        this._tryComplete();
     }
 
     // ── Lifecycle ──────────────────────────────────────────────────────────
@@ -106,8 +111,8 @@ export class LoadingScreen extends Component {
         if (this._displayPct < this._progress) {
             this._displayPct = Math.min(this._progress, this._displayPct + speed * dt);
         }
-        // Force to 100 when fully done
-        if (this._loadDone && this._minDurationElapsed) {
+        // Force to 100 when ready to close
+        if (this._readyToClose && this._minDurationElapsed) {
             this._displayPct = 1;
         }
         this._redrawBar(this._displayPct);
@@ -329,7 +334,7 @@ export class LoadingScreen extends Component {
 
     private _tryComplete(): void {
         if (this._completeCalled) return;
-        if (!this._loadDone || !this._minDurationElapsed) return;
+        if (!this._readyToClose || !this._minDurationElapsed) return;
         this._completeCalled = true;
         // Brief "100% ready" hold, then fade out
         this._displayPct = 1;

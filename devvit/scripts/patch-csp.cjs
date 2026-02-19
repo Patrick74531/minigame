@@ -541,12 +541,41 @@ if (fs.existsSync(mainPath)) {
         'if(_){var E=_,S=n.bindClipState(s,E,n.buildHeroStateName(i.key,"run"));' +
         'f.setRunClip(S),f.setIdleClip(S),s.defaultClip=E,s.playOnLoad=!0,s.play(S)}' +
         'else n.ensureRunClip(s,f)';
-    const J_NEW = 'n.ensureRunClip(s,f)';
-    if (main.includes(J_NEW) && !main.includes(J_OLD)) {
-        console.log('[patch-csp]   ~ Patch J already applied (skipping)');
+    const J_NEW_F = 'n.ensureRunClip(s,f)';
+    // Current build variant: minifier uses y/M/w/S variables (without XEMBED patch)
+    const J_OLD2 =
+        'var y=s.clips&&s.clips.length>0?s.clips[0]:null;' +
+        'if(y){var M=y,w=n.bindClipState(s,M,n.buildHeroStateName(i.key,"run"));' +
+        'S.setRunClip(w),S.setIdleClip(w),s.defaultClip=M,s.playOnLoad=!0,s.play(w)}' +
+        'else n.ensureRunClip(s,S)';
+    // Current build variant: same as J_OLD2 but with XEMBED already injected before s.play(w)
+    const J_OLD2X =
+        'var y=s.clips&&s.clips.length>0?s.clips[0]:null;' +
+        'if(y){var M=y,w=n.bindClipState(s,M,n.buildHeroStateName(i.key,"run"));' +
+        'S.setRunClip(w),S.setIdleClip(w),s.defaultClip=M,s.playOnLoad=!0,' +
+        '(function(){try{var _xea=M&&M._exoticAnimation,_xna=_xea&&_xea._nodeAnimations;' +
+        'if(_xna){var _xpc=0;for(var _xni=0;_xni<_xna.length;_xni++){' +
+        'var _xbn=_xna[_xni];for(var _xtki=0;_xtki<3;_xtki++){' +
+        'var _xtk=["_position","_rotation","_scale"][_xtki];' +
+        'var _xtr=_xbn&&_xbn[_xtk];' +
+        'if(_xtr&&_xtr.values&&_xtr.values._values&&typeof _xtr.values.BYTES_PER_ELEMENT==="undefined"){' +
+        '_xtr.values.BYTES_PER_ELEMENT=_xtr.values._values.BYTES_PER_ELEMENT;_xpc++;}}}' +
+        'console.log("[DBG-X] embedded BPELEM:",_xpc,"tracks");}}catch(_xe){console.warn("[DBG-X] err",_xe);}})(),' +
+        's.play(w)}else n.ensureRunClip(s,S)';
+    const J_NEW_S = 'n.ensureRunClip(s,S)';
+    if (main.includes(J_OLD2X)) {
+        main = main.replace(J_OLD2X, J_NEW_S);
+        console.log(
+            '[patch-csp]   ✓ Patch J: forced ensureRunClip (removed embedded-clip+XEMBED path)'
+        );
+    } else if (main.includes(J_OLD2)) {
+        main = main.replace(J_OLD2, J_NEW_S);
+        console.log('[patch-csp]   ✓ Patch J: forced ensureRunClip (removed embedded-clip path)');
     } else if (main.includes(J_OLD)) {
-        main = main.replace(J_OLD, J_NEW);
+        main = main.replace(J_OLD, J_NEW_F);
         console.log('[patch-csp]   ✓ Patch J: forced ensureRunClip (resources.load always)');
+    } else if (!main.includes('var y=s.clips') && !main.includes('var _=s.clips')) {
+        console.log('[patch-csp]   ~ Patch J already applied (skipping)');
     } else {
         console.warn('[patch-csp]   ~ Patch J pattern not found');
     }
@@ -563,7 +592,7 @@ if (fs.existsSync(mainPath)) {
         'console.log("[DBG-K] clip:",o&&o.name,"exotic:",!!(o&&o._exoticAnimation),"tracks:",o&&o._tracks&&o._tracks.length,"nodeAnims:",_na?_na.length:"n/a");' +
         'if(_na&&_na.length){console.log("[DBG-K] bone[0]:",_na[0]&&_na[0]._path,"hasPos:",!!(_na[0]&&_na[0]._position),"hasRot:",!!(_na[0]&&_na[0]._rotation),"hasScale:",!!(_na[0]&&_na[0]._scale));}' +
         'try{' +
-        'e.defaultClip=o,e.playOnLoad=!0,e.play(l),n&&(n.setRunClip(l),n.setIdleClip(l));' +
+        'e.defaultClip=o,e.playOnLoad=!0,e.play(l),n&&(n.setRunClip(l),a._heroIdleClipCache.has(t.key)||n.setIdleClip(l));' +
         'console.log("[DBG-K] play() ok");' +
         'var _sn=e&&e.node;' +
         'if(_sn&&_sn.isValid){' +
@@ -1003,6 +1032,63 @@ if (fs.existsSync(mainPath)) {
     } else {
         console.warn(
             '[patch-csp]   ~ Patch W3: idle setIdleClip close-brace pattern not found (skipping)'
+        );
+    }
+
+    // ── Patch W3b: revert idle to run when idle evaluator is null ─────────────────
+    // W3 logs "hasEval: false" when the idle clip's V3 evaluator has null refs
+    // (ExoticTrackValues BPELEM fix did not propagate in time, or clip has no
+    // animation data). In that case crossFade to idle shows T-pose permanently.
+    // Fix: if !_gst._evaluator, call n.setIdleClip(n._runClip) so the hero
+    // falls back to run-clip-as-idle (frozen at frame 0 by Patch HC).
+    const W3B_OLD =
+        'if(_gst){e.crossFade(l,0);console.log("[DBG-W3] idle crossFade ok");}' +
+        'else{console.warn("[DBG-W3] idle state NOT found in _nameToState");}';
+    const W3B_NEW =
+        'if(_gst&&_gst._evaluator){e.crossFade(l,0);console.log("[DBG-W3] idle crossFade ok");}' +
+        'else if(_gst&&!_gst._evaluator){' +
+        'console.warn("[DBG-W3b] idle eval null, reverting idle->run");' +
+        'if(n&&n._runClip){n.setIdleClip(n._runClip);console.log("[DBG-W3b] idle->run:",n._runClip);}' +
+        '}else{console.warn("[DBG-W3] idle state NOT found in _nameToState");}';
+    if (main.includes('[DBG-W3b]')) {
+        console.log(
+            '[patch-csp]   ~ Patch W3b: idle evaluator fallback already applied (skipping)'
+        );
+    } else if (main.includes(W3B_OLD)) {
+        main = main.replace(W3B_OLD, W3B_NEW);
+        console.log('[patch-csp]   ✓ Patch W3b: idle eval-null → revert to run clip');
+    } else {
+        console.warn('[patch-csp]   ~ Patch W3b: W3 crossFade pattern not found (skipping)');
+    }
+
+    // ── Patch XEMBED: BPELEM fix for embedded-clip path in attachHeroModel ─────────
+    // When the prefab already contains the run clip (anim.clips[0] exists), the
+    // code skips loadClipWithFallbacks and plays the clip directly. K_NEW's
+    // PATCH_V never runs → ExoticTrackValues wrappers have no BYTES_PER_ELEMENT →
+    // Patches L/N/O guards fail → V3 evaluator skips all channels → T-pose.
+    // Fix: inject BPELEM fix inline, right before s.play(w) in the existing branch.
+    const XEMBED_OLD = 'S.setRunClip(w),S.setIdleClip(w),s.defaultClip=M,s.playOnLoad=!0,s.play(w)';
+    const XEMBED_NEW =
+        'S.setRunClip(w),S.setIdleClip(w),s.defaultClip=M,s.playOnLoad=!0,' +
+        '(function(){try{var _xea=M&&M._exoticAnimation,_xna=_xea&&_xea._nodeAnimations;' +
+        'if(_xna){var _xpc=0;for(var _xni=0;_xni<_xna.length;_xni++){' +
+        'var _xbn=_xna[_xni];for(var _xtki=0;_xtki<3;_xtki++){' +
+        'var _xtk=["_position","_rotation","_scale"][_xtki];' +
+        'var _xtr=_xbn&&_xbn[_xtk];' +
+        'if(_xtr&&_xtr.values&&_xtr.values._values&&typeof _xtr.values.BYTES_PER_ELEMENT==="undefined"){' +
+        '_xtr.values.BYTES_PER_ELEMENT=_xtr.values._values.BYTES_PER_ELEMENT;_xpc++;}}}' +
+        'console.log("[DBG-X] embedded BPELEM:",_xpc,"tracks");}}catch(_xe){console.warn("[DBG-X] err",_xe);}})(),' +
+        's.play(w)';
+    if (main.includes('[DBG-X]')) {
+        console.log(
+            '[patch-csp]   ~ Patch XEMBED: embedded-clip BPELEM already applied (skipping)'
+        );
+    } else if (main.includes(XEMBED_OLD)) {
+        main = main.replace(XEMBED_OLD, XEMBED_NEW);
+        console.log('[patch-csp]   ✓ Patch XEMBED: embedded-clip BPELEM fix injected');
+    } else {
+        console.warn(
+            '[patch-csp]   ~ Patch XEMBED: embedded-clip play pattern not found (skipping)'
         );
     }
 

@@ -449,7 +449,8 @@ export class UnitFactory {
                 } else {
                     this.ensureRunClip(anim, controller);
                 }
-                this.ensureIdleClip(anim, controller);
+                // Idle clip has no skeletal animation data; run clip serves as idle too.
+                // this.ensureIdleClip(anim, controller);
             }
 
             const hb = root.getComponent(HealthBar);

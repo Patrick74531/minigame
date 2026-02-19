@@ -193,11 +193,54 @@ rewrite_index_for_reddit() {
 })();
 EOF
 
+  # Write orientation-fix.js: forces landscape rendering in portrait WebViews (Reddit mobile)
+  # Intercepts canvas size setters so Cocos renders landscape, then CSS-rotates the canvas
+  # to visually fill the portrait viewport. Touch coordinates work correctly with this transform.
+  local orient_file="${webroot}/orientation-fix.js"
+  cat > "$orient_file" <<'ORIENTEOF'
+(function () {
+  if (window.innerWidth >= window.innerHeight) return;
+  var pW = window.innerWidth, pH = window.innerHeight;
+
+  function applyCSS(canvas) {
+    canvas.style.cssText = [
+      'position:fixed', 'width:' + pH + 'px', 'height:' + pW + 'px',
+      'top:0', 'left:0', 'transform-origin:top left',
+      'transform:rotate(90deg) translateX(-' + pH + 'px)'
+    ].join(';') + ';';
+    var p = canvas.parentElement;
+    while (p && p.tagName !== 'BODY') {
+      p.style.width = pW + 'px'; p.style.height = pH + 'px';
+      p.style.overflow = 'hidden'; p.style.position = 'fixed';
+      p = p.parentElement;
+    }
+  }
+
+  function setup(canvas) {
+    applyCSS(canvas);
+    var mo = new MutationObserver(function () { applyCSS(canvas); });
+    mo.observe(canvas, { attributes: true, attributeFilter: ['style'] });
+  }
+
+  var c = document.getElementById('GameCanvas');
+  if (c) { setup(c); } else {
+    var mo2 = new MutationObserver(function () {
+      var c2 = document.getElementById('GameCanvas');
+      if (c2) { mo2.disconnect(); setup(c2); }
+    });
+    mo2.observe(document.documentElement, { childList: true, subtree: true });
+  }
+})();
+ORIENTEOF
+
   # Remove inline contextmenu handler attribute on canvas.
   perl -0pi -e 's/\s+oncontextmenu="event\.preventDefault\(\)"//g' "$index_file"
 
   # Replace the Cocos inline boot script with an external boot.js reference.
   perl -0pi -e 's#<script>\s*System\.import\(\s*["\047]\./index\.js["\047]\s*\).*?</script>#<script src="boot.js" charset="utf-8"></script>#gs' "$index_file"
+
+  # Inject orientation-fix.js as the first script (before SystemJS/boot)
+  perl -0pi -e 's#(<head[^>]*>)#$1\n  <script src="orientation-fix.js" charset="utf-8"></script>#i' "$index_file"
 
   if ! rg -q 'src="boot\.js"' "$index_file"; then
     die "Failed to inject external boot.js into index.html"

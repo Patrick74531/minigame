@@ -56,19 +56,32 @@ export class GameStartFlow {
     }
 
     private static _showLoadingScreen(ctx: StartContext) {
+        // onComplete fires AFTER GPU warmup (loading screen still visible during warmup)
         const screen = LoadingScreen.show(ctx.containers.ui, () => {
-            this.startGame(ctx);
-            this.gameManager.startGame();
             GameResourceLoader.loadPhase2();
         });
 
         GameResourceLoader.loadPhase1((loaded, total) => {
-            if (screen.isValid) {
-                screen.setProgress(loaded, total);
-            }
-        }).catch(() => {
-            if (screen.isValid) screen.setProgress(1, 1);
-        });
+            if (screen.isValid) screen.setProgress(loaded, total);
+        })
+            .then(() => {
+                // Phase 1 in CPU memory. Start game NOW while loading screen covers the scene.
+                // The 3D scene renders behind the loading screen, uploading GPU textures.
+                this.startGame(ctx);
+                this.gameManager.startGame();
+                // GPU warmup: wait 0.5 s (~30 frames) for textures to upload before revealing scene.
+                if (screen.isValid) {
+                    screen.scheduleOnce(() => {
+                        if (screen.isValid) screen.signalReadyToClose();
+                    }, 0.5);
+                }
+            })
+            .catch(() => {
+                // On any load error still enter game
+                this.startGame(ctx);
+                this.gameManager.startGame();
+                if (screen.isValid) screen.signalReadyToClose();
+            });
     }
 
     // Refactored actual start logic (Map generation, Spawning)
