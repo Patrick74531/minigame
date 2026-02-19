@@ -886,6 +886,54 @@ if (fs.existsSync(mainPath)) {
         console.warn('[patch-csp]   ~ Patch Y: EFA detectClips pattern not found (skipping)');
     }
 
+    // ── Patch Z: BPELEM fix for embedded enemy/boss clips ────────────────────────
+    // Enemy animation clips are embedded in the prefab (unlike hero clips which are
+    // loaded separately). They have the same ExoticTrackValues wrapper issue: the
+    // wrapper class has no BYTES_PER_ELEMENT property, so V3 evaluator sets all track
+    // references to null → evaluate() does nothing → T-pose.
+    // Fix: after detectClips() runs, walk all _anim.clips and inject BYTES_PER_ELEMENT
+    // onto any ExoticTrackValues wrapper that is missing it.
+    // Z_OLD targets the Y_NEW output so it fires after Patch Y in the same run or on
+    // subsequent runs (both fresh and already-patched builds).
+    const Z_OLD = 'this._anim.useBakedAnimation=!1,this.detectClips(),this.updateAnimation(!0)';
+    // IIFE wrapping is required: the code is injected inside a ternary (expression
+    // context), so a bare try-statement would be a SyntaxError. The IIFE receives
+    // this._anim as _za so 'this' is not needed inside the function body.
+    // IIFE receives this._anim (not clips) so we can call removeState after BPELEM fix.
+    // removeState is critical: animation states are created by SkeletalAnimation.onLoad
+    // when addChild fires, which is BEFORE this code runs. V3 evaluators already have
+    // null position/rotation/scale refs at that point. Removing the state forces
+    // crossFade() to create a fresh state with BPELEM now set → V3 gets valid refs.
+    const Z_BPELEM =
+        '(function(_zaAnim){' +
+        'try{var _zaClips=_zaAnim&&_zaAnim.clips;if(_zaClips){' +
+        'for(var _zi=0;_zi<_zaClips.length;_zi++){' +
+        'var _zc=_zaClips[_zi];var _zea=_zc&&_zc._exoticAnimation;' +
+        'var _zna=_zea&&_zea._nodeAnimations;' +
+        'if(_zna){var _zpc=0;' +
+        'for(var _zni=0;_zni<_zna.length;_zni++){' +
+        'var _zbn=_zna[_zni];' +
+        'for(var _ztki=0;_ztki<3;_ztki++){' +
+        'var _ztk=["_position","_rotation","_scale"][_ztki];' +
+        'var _ztr=_zbn&&_zbn[_ztk];' +
+        'if(_ztr&&_ztr.values&&_ztr.values._values&&typeof _ztr.values.BYTES_PER_ELEMENT==="undefined"){' +
+        '_ztr.values.BYTES_PER_ELEMENT=_ztr.values._values.BYTES_PER_ELEMENT;_zpc++;}}}' +
+        'console.log("[DBG-Z] enemy clip["+_zi+"]: BPELEM to",_zpc,"tracks");}' +
+        'if(_zc){try{_zaAnim.removeState(_zc.name);}catch(_zre){}try{_zaAnim.createState(_zc,_zc.name);}catch(_zce){}}' +
+        '}}}catch(_zze){}}(this._anim)),';
+    const Z_NEW =
+        'this._anim.useBakedAnimation=!1,this.detectClips(),' +
+        Z_BPELEM +
+        'this.updateAnimation(!0)';
+    if (main.includes('[DBG-Z]')) {
+        console.log('[patch-csp]   ~ Patch Z: enemy BPELEM fix already applied (skipping)');
+    } else if (main.includes(Z_OLD)) {
+        main = main.replace(Z_OLD, Z_NEW);
+        console.log('[patch-csp]   ✓ Patch Z: BPELEM fix injected for embedded enemy/boss clips');
+    } else {
+        console.warn('[patch-csp]   ~ Patch Z: Z_OLD pattern not found (skipping)');
+    }
+
     // ── Patch W: Idle clip BYTES_PER_ELEMENT fix ─────────────────────────────────
     // Same ExoticTrackValues wrapper issue as hero run clip (Patch V), but for the
     // idle clip loaded asynchronously by ensureIdleClip. Without BYTES_PER_ELEMENT
