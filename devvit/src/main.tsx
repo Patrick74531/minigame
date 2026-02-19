@@ -114,19 +114,32 @@ function App(context: Devvit.Context) {
                     }
 
                     case 'GET_LEADERBOARD': {
-                        const leaderboard = await getLeaderboard(redis);
+                        let leaderboard: LeaderboardEntry[] = [];
+                        try {
+                            leaderboard = await getLeaderboard(redis);
+                        } catch (_e) {
+                            console.error('[Devvit] getLeaderboard failed:', _e);
+                        }
                         send(wv, { type: 'LEADERBOARD_DATA', payload: { entries: leaderboard } });
                         break;
                     }
 
                     case 'SUBSCRIBE': {
                         const user = await reddit.getCurrentUser();
+                        let alreadySubscribed = false;
 
                         if (user) {
-                            await redis.hSet(FOLLOW_KEY, { [user.username]: '1' });
+                            const existing = await redis.hGet(FOLLOW_KEY, user.username);
+                            alreadySubscribed = existing === '1';
+                            if (!alreadySubscribed) {
+                                await redis.hSet(FOLLOW_KEY, { [user.username]: '1' });
+                            }
                         }
 
-                        send(wv, { type: 'SUBSCRIPTION_RESULT', payload: { success: true } });
+                        send(wv, {
+                            type: 'SUBSCRIPTION_RESULT',
+                            payload: { success: true, alreadySubscribed },
+                        });
                         break;
                     }
                 }

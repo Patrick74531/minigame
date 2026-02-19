@@ -523,6 +523,8 @@ export class UnitFactory {
         return y;
     }
 
+    // ⚠️ 【重要，请勿修改】此方法的结构被 patch-csp.cjs Patch J/K/V 严格依赖。
+    // 不要改变 loadClipWithFallbacks 回调的结构、变量名或 bindClipState 调用顺序。
     private static ensureRunClip(
         anim: SkeletalAnimation,
         controller: HeroAnimationController | null
@@ -576,6 +578,8 @@ export class UnitFactory {
         });
     }
 
+    // ⚠️ 【重要，请勿修改】此方法的结构被 patch-csp.cjs Patch W/W2/W3 严格依赖。
+    // 不要改变 _heroIdleClipCache.set、bindClipState、setIdleClip 的调用顺序和变量名。
     private static ensureIdleClip(
         anim: SkeletalAnimation,
         controller: HeroAnimationController | null

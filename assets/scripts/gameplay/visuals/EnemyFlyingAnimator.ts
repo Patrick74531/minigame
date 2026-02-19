@@ -129,6 +129,9 @@ export class EnemyFlyingAnimator extends Component {
         }
 
         if (this._anim) {
+            // ⚠️ 【重要，请勿修改】以下两行方法调用的顺序和名称被 patch-csp.cjs 的 Patch Y/Z 严格依赖。
+            // 不要重命名 detectClips() 或 updateAnimation()，不要在这两行之间插入其他语句，
+            // 否则 Patch Y（设置 useBakedAnimation=false）和 Patch Z（BPELEM 修复）将失效。
             this.detectClips();
             this.updateAnimation(true);
         } else {
@@ -188,6 +191,7 @@ export class EnemyFlyingAnimator extends Component {
         return y;
     }
 
+    // ⚠️ 【重要，请勿修改】此方法名被 Patch Z 依赖，请勿重命名。
     private detectClips(): void {
         if (!this._anim) return;
 
@@ -228,6 +232,7 @@ export class EnemyFlyingAnimator extends Component {
         }
     }
 
+    // ⚠️ 【重要，请勿修改】此方法名被 Patch Y/Z 依赖，请勿重命名。
     private updateAnimation(force: boolean = false): void {
         if (this._useTween) {
             this.playTweenAnimation(this._currentState);

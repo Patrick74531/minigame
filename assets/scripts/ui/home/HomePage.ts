@@ -364,7 +364,13 @@ export class HomePage extends Component {
             case 'score_submitted':
                 break;
             case 'subscription_result':
-                if (event.success) this._updateSubscribeButton(true);
+                if (event.success) {
+                    this._updateSubscribeButton(true);
+                    const msgKey = event.alreadySubscribed
+                        ? 'ui.home.subscribe.already'
+                        : 'ui.home.subscribe.success';
+                    this._showToast(Localization.instance.t(msgKey));
+                }
                 break;
         }
     }
@@ -401,6 +407,61 @@ export class HomePage extends Component {
 
     private onSubscribeClick() {
         const bridge = RedditBridge.instance;
+        if (!bridge.isRedditEnvironment) {
+            this._showToast(Localization.instance.t('ui.home.subscribe.already'));
+            return;
+        }
         bridge.requestSubscribe();
+    }
+
+    private _showToast(text: string): void {
+        if (!this._contentNode) return;
+        const toast = new Node('Toast');
+        toast.layer = this._uiLayer;
+        const tf = toast.addComponent(UITransform);
+        tf.setContentSize(360, 70);
+        const bg = toast.addComponent(Graphics);
+        bg.fillColor = new Color(30, 30, 30, 220);
+        bg.roundRect(-180, -35, 360, 70, 16);
+        bg.fill();
+        const labelNode = new Node('ToastLabel');
+        labelNode.layer = this._uiLayer;
+        toast.addChild(labelNode);
+        labelNode.addComponent(UITransform);
+        const label = labelNode.addComponent(Label);
+        label.string = text;
+        label.fontSize = 30;
+        label.isBold = true;
+        label.color = Color.WHITE;
+        label.horizontalAlign = Label.HorizontalAlign.CENTER;
+        label.verticalAlign = Label.VerticalAlign.CENTER;
+        applyGameLabelStyle(label, { outlineWidth: 2, outlineColor: new Color(0, 0, 0, 180) });
+        const size = this.getCanvasSize();
+        toast.setPosition(0, -size.height * 0.3, 0);
+        this._contentNode.addChild(toast);
+        const totalMs = 2200;
+        const fadeMs = 600;
+        const holdMs = totalMs - fadeMs;
+        let elapsed = 0;
+        const id = setInterval(() => {
+            if (!toast.isValid || !label.isValid) {
+                clearInterval(id);
+                return;
+            }
+            elapsed += 16;
+            if (elapsed >= holdMs) {
+                const t = Math.min(1, (elapsed - holdMs) / fadeMs);
+                const alpha = Math.round(255 * (1 - t));
+                label.color = new Color(255, 255, 255, alpha);
+                bg.clear();
+                bg.fillColor = new Color(30, 30, 30, Math.round(220 * (1 - t)));
+                bg.roundRect(-180, -35, 360, 70, 16);
+                bg.fill();
+            }
+            if (elapsed >= totalMs) {
+                clearInterval(id);
+                if (toast.isValid) toast.destroy();
+            }
+        }, 16);
     }
 }

@@ -962,6 +962,179 @@ if (fs.existsSync(mainPath)) {
         console.warn('[patch-csp]   ~ Patch W: idle clip cache pattern not found (skipping)');
     }
 
+    // ── Patch W2: Force-remove stale idle state before recreating ─────────────────
+    // bindClipState returns the existing state if getState(name) finds one.
+    // A stale state (V3 evaluator with null refs) from a prior scene load would
+    // silently block createState → idle plays as T-pose. removeState first.
+    const W2_REMOVE =
+        'try{e.removeState(a.buildHeroStateName(t.key,"idle"));}catch(_wR){}' +
+        'console.log("[DBG-W2] idle removeState ok");';
+    const W2_OLD =
+        'var l=a.bindClipState(e,o,a.buildHeroStateName(t.key,"idle"));n&&n.setIdleClip(l)';
+    const W2_NEW = W2_REMOVE + W2_OLD;
+    if (main.includes('[DBG-W2]')) {
+        console.log('[patch-csp]   ~ Patch W2: idle removeState already applied (skipping)');
+    } else if (main.includes('[DBG-W]') && main.includes(W2_OLD)) {
+        main = main.replace(W2_OLD, W2_NEW);
+        console.log('[patch-csp]   ✓ Patch W2: idle state force-recreated before bind');
+    } else {
+        console.warn('[patch-csp]   ~ Patch W2: idle removeState target not found (skipping)');
+    }
+
+    // ── Patch W3: Force direct crossFade to idle state after creation ────────────
+    // setIdleClip triggers playClip → anim.play(name), but if the V3 evaluator was
+    // created with null refs (exotic-track BPELEM not propagated) crossFade silently
+    // outputs the bind pose (T-pose).  Calling e.crossFade(l,0) here is redundant but
+    // adds a diagnostic log so we can see in the console whether the state exists.
+    const W3_OLD = 'n&&n.setIdleClip(l)}}';
+    const W3_NEW =
+        'n&&n.setIdleClip(l);' +
+        'try{var _gst=e.getState&&e.getState(l);' +
+        'console.log("[DBG-W3] idle getState:",l,"found:",!!_gst,"hasEval:",!!(_gst&&_gst._evaluator));' +
+        'if(_gst){e.crossFade(l,0);console.log("[DBG-W3] idle crossFade ok");}' +
+        'else{console.warn("[DBG-W3] idle state NOT found in _nameToState");}' +
+        '}catch(_w3e){console.warn("[DBG-W3] err",_w3e);}' +
+        '}}';
+    if (main.includes('[DBG-W3]')) {
+        console.log('[patch-csp]   ~ Patch W3: idle crossFade diag already applied (skipping)');
+    } else if (main.includes(W3_OLD)) {
+        main = main.replace(W3_OLD, W3_NEW);
+        console.log('[patch-csp]   ✓ Patch W3: idle direct-crossFade + diagnostics injected');
+    } else {
+        console.warn(
+            '[patch-csp]   ~ Patch W3: idle setIdleClip close-brace pattern not found (skipping)'
+        );
+    }
+
+    // ── Patch HC: HeroAnimationController static-idle fallback ───────────────────
+    // If the idle AnimationClip's V3 evaluator still outputs T-pose, override
+    // playClip so that entering idle freezes the run animation at time=0 (first
+    // frame of the run cycle = neutral standing/aiming pose).  This guarantees a
+    // usable static idle pose regardless of V3 evaluator state.
+    // When returning to run, speed is restored to 1 and play() is called normally.
+    const HC_OLD = 'r.playClip=function(i){this._anim&&(this._anim.play(i),this._current=i)}';
+    const HC_NEW =
+        'r.playClip=function(i){' +
+        'if(!this._anim)return;' +
+        'this._current=i;' +
+        'if(i!==this._runClip&&this._runClip){' +
+        '/* idle: freeze run at frame-0 as guaranteed static pose */' +
+        'try{var _rSt=this._anim.getState(this._runClip);' +
+        'if(_rSt&&typeof _rSt.speed!=="undefined"){_rSt.speed=0;_rSt.time=0;}' +
+        '}catch(_hcF){}' +
+        '/* also attempt to play idle clip (works if V3 evaluator is valid) */' +
+        'try{this._anim.play(i);}catch(_hcI){}' +
+        '}else{' +
+        '/* run: restore speed */' +
+        'try{var _rSt2=this._anim.getState(i);' +
+        'if(_rSt2&&typeof _rSt2.speed!=="undefined"&&_rSt2.speed===0)_rSt2.speed=1;' +
+        '}catch(_hcR){}' +
+        'this._anim.play(i);' +
+        '}}';
+    if (main.includes('[DBG-W3]') && main.includes('_rSt.speed=0')) {
+        console.log('[patch-csp]   ~ Patch HC: static-idle playClip already applied (skipping)');
+    } else if (main.includes(HC_OLD)) {
+        main = main.replace(HC_OLD, HC_NEW);
+        console.log('[patch-csp]   ✓ Patch HC: static-idle fallback in playClip injected');
+    } else {
+        console.warn('[patch-csp]   ~ Patch HC: playClip pattern not found (skipping)');
+    }
+
+    // ── Patch SUB_R: Pass alreadySubscribed through SUBSCRIPTION_RESULT ──────────
+    // The Devvit backend (v0.0.65) sends {success,alreadySubscribed} but the
+    // compiled RedditBridge only forwards {success}.  Fix: also forward alreadySubscribed.
+    const SUBR_OLD =
+        'this._isSubscribed=!0,this._emit({type:"subscription_result",success:u.success})';
+    const SUBR_NEW =
+        'this._isSubscribed=!0,this._emit({type:"subscription_result",success:u.success,alreadySubscribed:!!u.alreadySubscribed})';
+    if (main.includes('alreadySubscribed:!!u.alreadySubscribed')) {
+        console.log('[patch-csp]   ~ Patch SUB_R: alreadySubscribed already forwarded (skipping)');
+    } else if (main.includes(SUBR_OLD)) {
+        main = main.replace(SUBR_OLD, SUBR_NEW);
+        console.log(
+            '[patch-csp]   ✓ Patch SUB_R: alreadySubscribed forwarded in subscription_result'
+        );
+    } else {
+        console.warn(
+            '[patch-csp]   ~ Patch SUB_R: SUBSCRIPTION_RESULT emit pattern not found (skipping)'
+        );
+    }
+
+    // ── Patch SUB_UI: Subscribe button feedback toast ────────────────────────────
+    // After _updateSubscribeButton, briefly flash a localised message on the button
+    // label: "关注成功！" (first follow) or "你已关注 ✓" (already followed).
+    // Reverts to the subscribed/not-subscribed key text after 2 s.
+    const SUBUI_OLD = 'case"subscription_result":t.success&&this._updateSubscribeButton(!0)';
+    const SUBUI_NEW =
+        'case"subscription_result":if(t.success){' +
+        'this._updateSubscribeButton(!0);' +
+        'try{' +
+        'var _sBtnN=this._subscribeBtn&&this._subscribeBtn.getChildByName&&this._subscribeBtn.getChildByName("Label");' +
+        'var _sLbl=_sBtnN&&_sBtnN.getComponent&&_sBtnN.getComponent("cc.Label");' +
+        'if(_sLbl){' +
+        'var _sOrig=_sLbl.string;' +
+        '_sLbl.string=t.alreadySubscribed?"\u4f60\u5df2\u5173\u6ce8 \u2713":"\u5173\u6ce8\u6210\u529f\uff01";' +
+        'setTimeout(function(){try{if(_sLbl&&_sLbl.isValid)_sLbl.string=_sOrig;}catch(_){}},2000);' +
+        '}}catch(_subE){}}';
+    if (main.includes('\u5173\u6ce8\u6210\u529f')) {
+        console.log('[patch-csp]   ~ Patch SUB_UI: subscribe feedback already applied (skipping)');
+    } else if (main.includes(SUBUI_OLD)) {
+        main = main.replace(SUBUI_OLD, SUBUI_NEW);
+        console.log('[patch-csp]   ✓ Patch SUB_UI: subscribe button feedback injected');
+    } else {
+        console.warn('[patch-csp]   ~ Patch SUB_UI: subscription_result case not found (skipping)');
+    }
+
+    // ── Patch MSG: Unwrap Devvit production message envelope ─────────────────────
+    // In devvit playtest (local), wv.postMessage() delivers messages directly:
+    //   ev.data = { type: 'INIT_RESPONSE', payload: {...} }
+    // In production Reddit, the Devvit client wraps them:
+    //   ev.data = { type: 'devvit-message', data: { message: { type: 'INIT_RESPONSE', ... } } }
+    // The compiled _handleDevvitMessage only handles the direct format, so ALL messages
+    // from Devvit are silently dropped in production.
+    // Fix: unwrap the envelope before the switch statement.
+    const MSG_OLD =
+        '_handleDevvitMessage=function(e){if(e.data&&"object"==typeof e.data){var t=e.data;switch(t.type){';
+    const MSG_NEW =
+        '_handleDevvitMessage=function(e){if(e.data&&"object"==typeof e.data){var t=e.data;' +
+        '/* Unwrap Devvit production message envelope */' +
+        'if(t.type==="devvit-message"&&t.data&&"object"==typeof t.data){' +
+        't=t.data.message&&"object"==typeof t.data.message?t.data.message:t.data;' +
+        '}' +
+        'switch(t.type){';
+    if (main.includes('Unwrap Devvit production message envelope')) {
+        console.log('[patch-csp]   ~ Patch MSG: devvit-message unwrap already applied (skipping)');
+    } else if (main.includes(MSG_OLD)) {
+        main = main.replace(MSG_OLD, MSG_NEW);
+        console.log('[patch-csp]   ✓ Patch MSG: devvit-message envelope unwrap injected');
+    } else {
+        console.warn(
+            '[patch-csp]   ~ Patch MSG: _handleDevvitMessage pattern not found (skipping)'
+        );
+    }
+
+    // ── Patch LB_LOCAL: Leaderboard fallback in non-Reddit env ───────────────────
+    // In local/non-Reddit env, requestLeaderboard() emits {type:'error'} which has no
+    // handler -> leaderboard panel stays on "loading" forever.
+    // Fix: emit empty leaderboard entries instead so the panel shows "empty" state.
+    const LB_LOCAL_OLD =
+        'this._emit({type:"error",message:"GET_LEADERBOARD is unavailable outside Reddit/Devvit environment"})';
+    const LB_LOCAL_NEW = 'this._emit({type:"leaderboard",entries:[]})';
+    if (main.includes(LB_LOCAL_NEW)) {
+        console.log(
+            '[patch-csp]   ~ Patch LB_LOCAL: leaderboard local fallback already applied (skipping)'
+        );
+    } else if (main.includes(LB_LOCAL_OLD)) {
+        main = main.replace(LB_LOCAL_OLD, LB_LOCAL_NEW);
+        console.log(
+            '[patch-csp]   ✓ Patch LB_LOCAL: leaderboard emits empty entries in non-Reddit env'
+        );
+    } else {
+        console.warn(
+            '[patch-csp]   ~ Patch LB_LOCAL: GET_LEADERBOARD error emit pattern not found (skipping)'
+        );
+    }
+
     const BULLET_OLD =
         'i.setGroup(16),i.setMask(8),i.on("onTriggerEnter",this.onTriggerEnter,this)}';
     const BULLET_NEW =

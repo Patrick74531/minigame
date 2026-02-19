@@ -129,6 +129,8 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.home.leaderboard': '排行榜',
         'ui.home.subscribe': '关注我们',
         'ui.home.subscribed': '已关注 ✓',
+        'ui.home.subscribe.success': '关注成功！',
+        'ui.home.subscribe.already': '你已关注 ✓',
         'ui.leaderboard.title': '🏆 排行榜',
         'ui.leaderboard.loading': '加载中...',
         'ui.leaderboard.empty': '暂无记录，快来创造第一条！',
@@ -286,6 +288,8 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.home.leaderboard': 'Leaderboard',
         'ui.home.subscribe': 'Follow Us',
         'ui.home.subscribed': 'Following ✓',
+        'ui.home.subscribe.success': 'Followed successfully!',
+        'ui.home.subscribe.already': 'Already following ✓',
 
         'ui.leaderboard.title': '🏆 Leaderboard',
         'ui.leaderboard.loading': 'Loading...',

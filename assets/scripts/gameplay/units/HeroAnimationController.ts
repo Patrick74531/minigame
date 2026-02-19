@@ -46,6 +46,8 @@ export class HeroAnimationController extends Component {
         }
     }
 
+    // ⚠️ 【重要，请勿修改】此方法结构被 patch-csp.cjs Patch HC 依赖。
+    // 不要改变 this._hero.state===UnitState.MOVING 判断或 playClip 调用结构。
     protected update(): void {
         if (!this._hero || !this._anim) return;
         const shouldRun = this._hero.state === UnitState.MOVING;
@@ -54,6 +56,7 @@ export class HeroAnimationController extends Component {
         this.playClip(target);
     }
 
+    // ⚠️ 【重要，请勿修改】此方法名和签名被 Patch HC 依赖，请勿重命名或改变参数。
     private playClip(target: string): void {
         if (!this._anim) return;
         this._anim.play(target);

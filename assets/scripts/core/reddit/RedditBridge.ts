@@ -16,7 +16,7 @@ export type RedditBridgeCallback =
     | { type: 'init'; data: InitData }
     | { type: 'leaderboard'; entries: LeaderboardEntry[] }
     | { type: 'score_submitted'; rank: number; score: number; isNewBest: boolean }
-    | { type: 'subscription_result'; success: boolean }
+    | { type: 'subscription_result'; success: boolean; alreadySubscribed: boolean }
     | { type: 'error'; message: string };
 
 type BridgeListener = (event: RedditBridgeCallback) => void;
@@ -202,9 +202,13 @@ export class RedditBridge {
             }
 
             case 'SUBSCRIPTION_RESULT': {
-                const p = msg.payload as { success: boolean };
+                const p = msg.payload as { success: boolean; alreadySubscribed?: boolean };
                 this._isSubscribed = true;
-                this._emit({ type: 'subscription_result', success: p.success });
+                this._emit({
+                    type: 'subscription_result',
+                    success: p.success,
+                    alreadySubscribed: p.alreadySubscribed ?? false,
+                });
                 break;
             }
 
