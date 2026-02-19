@@ -274,17 +274,32 @@ console.log('[patch-csp]   ✓ Patched funcModule Function("return "+i)');
 const CCF_ORIGINAL =
     'i.compileCreateFunction=function(){var t,e;this._createFunction=' +
     '(e=(t=this.data)instanceof C.Node&&t,new EE(t,e).result)},';
-const CCF_SAFE =
+const CCF_SAFE_V1 =
     'i.compileCreateFunction=function(){var t,e;' +
     'var _r=(e=(t=this.data)instanceof C.Node&&t,new EE(t,e).result);' +
     "if(typeof _r==='function'){this._createFunction=_r;}" +
     'else{var _d=t;this._createFunction=function(R){return _d._instantiate(R);};}},';
+// v2: wrap EE constructor in try-catch (throws for SkeletalAnimation nodes) AND
+//     wrap _d._instantiate(R) in try-catch (throws for complex prefabs) so that
+//     cc.instantiate() returns null gracefully instead of propagating the error.
+const CCF_SAFE =
+    'i.compileCreateFunction=function(){var t,e;' +
+    'var _r=null;try{_r=(e=(t=this.data)instanceof C.Node&&t,new EE(t,e).result);}catch(_ce){}' +
+    "if(typeof _r==='function'){this._createFunction=_r;}" +
+    'else{var _d=this.data;this._createFunction=function(R){' +
+    'try{return _d._instantiate(R);}catch(_ie){console.warn("[CSP] _instantiate fallback failed:",_ie&&_ie.message);return null;}' +
+    '};}},';
 
 if (cc.includes(CCF_ORIGINAL)) {
     cc = cc.replace(CCF_ORIGINAL, CCF_SAFE);
-    console.log('[patch-csp]   ✓ Patched compileCreateFunction (CSP fallback)');
+    console.log('[patch-csp]   ✓ Patched compileCreateFunction (CSP fallback v2)');
 } else if (cc.includes(CCF_SAFE)) {
-    console.log('[patch-csp]   ~ compileCreateFunction already patched (skipping)');
+    console.log('[patch-csp]   ~ compileCreateFunction already patched v2 (skipping)');
+} else if (cc.includes(CCF_SAFE_V1)) {
+    cc = cc.replace(CCF_SAFE_V1, CCF_SAFE);
+    console.log(
+        '[patch-csp]   ✓ Upgraded compileCreateFunction to v2 (try-catch around EE+instantiate)'
+    );
 } else {
     console.warn('[patch-csp]   ~ compileCreateFunction pattern not found (skipping)');
 }
@@ -704,6 +719,22 @@ if (fs.existsSync(mainPath)) {
         console.warn('[patch-csp]   ~ Patch K pattern not found');
     }
 
+    // ── Patch V-standalone: ensure BPELEM fix always runs in the same pass as K ──
+    // The K if/else chain fires only ONE branch per run. For a fresh build, K_OLD→K_NEW
+    // runs but Patch V is skipped (K_PV_OLD check requires 'PatchM:' which is absent).
+    // K_PV_OLD IS a substring of K_NEW's output, so this standalone block injects
+    // Patch V in the same run regardless of PatchM or prior K level.
+    if (!main.includes('patchedV')) {
+        if (main.includes(K_PV_OLD)) {
+            main = main.replace(K_PV_OLD, K_PV_NEW);
+            console.log('[patch-csp]   ✓ Patch V-standalone: BPELEM fix for run clip injected');
+        } else {
+            console.warn(
+                '[patch-csp]   ~ Patch V-standalone: K_PV_OLD not found (Patch V missing!)'
+            );
+        }
+    }
+
     // ── Patch P: Force reloadAsset in loadClipWithFallbacks ───────────────────────
     // Root cause of T-pose: animation clips are deserialized inline from the prefab
     // WITHOUT their .cconb binary companion → typed arrays remain as {__id__:N} stubs.
@@ -808,6 +839,79 @@ if (fs.existsSync(mainPath)) {
         console.log('[patch-csp]   ✓ Patch R: clip validation + UUID-retry on stale data');
     } else {
         console.warn('[patch-csp]   ~ Patch R: pattern not found (skipping)');
+    }
+
+    // ── Patch X: EnemyFlyingAnimator.onModelLoaded null-guard ────────────────────
+    // instantiate(prefab) can return null (or throw) when the prefab contains a
+    // SkeletalAnimation component, because CCF_SAFE's _d._instantiate(R) fallback
+    // fails for complex nodes. Without a null check, applyShadowSettingsRecursive(null)
+    // throws, the whole onModelLoaded callback crashes, and the boss model is never
+    // added to the scene.
+    const X_OLD =
+        'if(t&&t.isValid){this._model=m(e),this.applyShadowSettingsRecursive(this._model),t.addChild(this._model)';
+    const X_NEW =
+        'if(t&&t.isValid){' +
+        'try{this._model=m(e);}catch(_ife){console.warn("[EFA] instantiate threw:",_ife&&_ife.message);this._model=null;}' +
+        'if(!this._model){return void this.createFallback();}' +
+        'this.applyShadowSettingsRecursive(this._model),t.addChild(this._model)';
+    if (main.includes('[EFA] instantiate threw')) {
+        console.log('[patch-csp]   ~ Patch X: EFA null-guard already applied (skipping)');
+    } else if (main.includes(X_OLD)) {
+        main = main.replace(X_OLD, X_NEW);
+        console.log(
+            '[patch-csp]   ✓ Patch X: EnemyFlyingAnimator.onModelLoaded null-guard injected'
+        );
+    } else {
+        console.warn('[patch-csp]   ~ Patch X: EFA onModelLoaded pattern not found (skipping)');
+    }
+
+    // ── Patch Y: EnemyFlyingAnimator – set useBakedAnimation=false on enemy skel ──
+    // Hero gets useBakedAnimation=false via Patch H. Enemy SkeletalAnimations are
+    // handled by EnemyFlyingAnimator which never sets this flag, so the engine defaults
+    // to GPU baked mode. Without a pre-baked texture the mesh renders invisible.
+    // Fix: inject useBakedAnimation=false right before detectClips() is called.
+    const Y_OLD = 'this._anim?(this.detectClips(),this.updateAnimation(!0))';
+    const Y_NEW =
+        'this._anim?(this._anim.useBakedAnimation=!1,this.detectClips(),this.updateAnimation(!0))';
+    if (main.includes(Y_NEW.slice(0, 50))) {
+        console.log(
+            '[patch-csp]   ~ Patch Y: EFA useBakedAnimation=false already applied (skipping)'
+        );
+    } else if (main.includes(Y_OLD)) {
+        main = main.replace(Y_OLD, Y_NEW);
+        console.log(
+            '[patch-csp]   ✓ Patch Y: EnemyFlyingAnimator useBakedAnimation=false injected'
+        );
+    } else {
+        console.warn('[patch-csp]   ~ Patch Y: EFA detectClips pattern not found (skipping)');
+    }
+
+    // ── Patch W: Idle clip BYTES_PER_ELEMENT fix ─────────────────────────────────
+    // Same ExoticTrackValues wrapper issue as hero run clip (Patch V), but for the
+    // idle clip loaded asynchronously by ensureIdleClip. Without BYTES_PER_ELEMENT
+    // on the values wrapper, Patches L/N/O skip all evaluators → idle = T-pose.
+    const W_OLD =
+        'a._heroIdleClipCache.set(t.key,o);var l=a.bindClipState(e,o,a.buildHeroStateName(t.key,"idle"));n&&n.setIdleClip(l)';
+    const W_PATCHV =
+        'try{var _ea1=o&&o._exoticAnimation,_na1=_ea1&&_ea1._nodeAnimations;' +
+        'if(_na1){var _pvc1=0;' +
+        'for(var _ni1=0;_ni1<_na1.length;_ni1++){var _bn1=_na1[_ni1];' +
+        'for(var _tki1=0;_tki1<3;_tki1++){var _tk1=["_position","_rotation","_scale"][_tki1];' +
+        'var _tr1=_bn1&&_bn1[_tk1];' +
+        'if(_tr1&&_tr1.values&&_tr1.values._values&&typeof _tr1.values.BYTES_PER_ELEMENT==="undefined"){' +
+        '_tr1.values.BYTES_PER_ELEMENT=_tr1.values._values.BYTES_PER_ELEMENT;_pvc1++;}}}' +
+        'console.log("[DBG-W] idle: added BPELEM to",_pvc1,"tracks");}}catch(_pve1){}';
+    const W_NEW =
+        'a._heroIdleClipCache.set(t.key,o);' +
+        W_PATCHV +
+        'var l=a.bindClipState(e,o,a.buildHeroStateName(t.key,"idle"));n&&n.setIdleClip(l)';
+    if (main.includes('[DBG-W]')) {
+        console.log('[patch-csp]   ~ Patch W: idle BPELEM already applied (skipping)');
+    } else if (main.includes(W_OLD)) {
+        main = main.replace(W_OLD, W_NEW);
+        console.log('[patch-csp]   ✓ Patch W: idle clip BYTES_PER_ELEMENT fix injected');
+    } else {
+        console.warn('[patch-csp]   ~ Patch W: idle clip cache pattern not found (skipping)');
     }
 
     const BULLET_OLD =
