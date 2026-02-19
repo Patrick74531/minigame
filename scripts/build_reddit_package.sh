@@ -628,6 +628,14 @@ if [ "$MAX_SIZE" -gt "$MAX_FILE_BYTES" ]; then
   exit 2
 fi
 
+PATCH_SCRIPT="${ROOT_DIR}/devvit/scripts/patch-csp.cjs"
+if [ -f "$PATCH_SCRIPT" ] && has_cmd node; then
+  log "Applying CSP patches to $OUTPUT_WEBROOT ..."
+  WEBROOT="$OUTPUT_WEBROOT" node "$PATCH_SCRIPT" || warn "CSP patching returned non-zero exit (see above)"
+else
+  warn "patch-csp.cjs not found or node unavailable – skipping CSP patches"
+fi
+
 log "Done."
 log "Output webroot: $OUTPUT_WEBROOT"
 log "Output size: $TOTAL_HUMAN"

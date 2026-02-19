@@ -1,0 +1,11 @@
+{
+    "name": "csp-compat",
+    "version": "1.0.0",
+    "description": "Auto-patches Cocos web-mobile build for Reddit/Devvit CSP (no unsafe-eval). Fixes Function()/eval calls, animation deserialization, and model visibility issues.",
+    "main": "main.js",
+    "contributions": {
+        "builder": {
+            "hooks": "./hooks.js"
+        }
+    }
+}

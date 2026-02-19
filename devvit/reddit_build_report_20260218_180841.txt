@@ -1,0 +1,52 @@
+Reddit Build Report
+run_id=20260218_180841
+root_dir=/Users/patrickwang/kingshit
+source_build_dir=/Users/patrickwang/kingshit/build/reddit-web
+output_webroot=/Users/patrickwang/kingshit/devvit/webroot
+total_bytes=16419178
+total_human=15.66 MB
+largest_file_bytes=3133775
+largest_file_path=/Users/patrickwang/kingshit/devvit/webroot/cocos-js/_virtual_cc-CArsJ5Rl.js
+largest_file_limit_mb=95
+largest_file_limit_bytes=99614720
+
+=== Source Asset Optimization ===
+enabled=0
+
+=== Compliance ===
+compliance_report=/Users/patrickwang/kingshit/devvit/reddit_compliance_20260218_180841.txt
+html_inline_check=PASS
+
+=== Top Files (bytes<TAB>path) ===
+3133775	/Users/patrickwang/kingshit/devvit/webroot/cocos-js/_virtual_cc-CArsJ5Rl.js
+1077339	/Users/patrickwang/kingshit/devvit/webroot/assets/internal/import/07/07d3aae9f.json
+1049896	/Users/patrickwang/kingshit/devvit/webroot/assets/resources/import/03/033833fb7.json
+940787	/Users/patrickwang/kingshit/devvit/webroot/cocos-js/bullet.release.asm-D_68nJYa.js
+738055	/Users/patrickwang/kingshit/devvit/webroot/assets/main/index.js
+640518	/Users/patrickwang/kingshit/devvit/webroot/assets/resources/native/cb/cba0b7b3-a985-4dec-8737-a36059d2af15@ef8a8.bin
+493830	/Users/patrickwang/kingshit/devvit/webroot/assets/resources/native/05/0527c06a-9885-4725-adf8-c7a1b7a2effe@ec353.bin
+485300	/Users/patrickwang/kingshit/devvit/webroot/assets/resources/native/67/67b10b20-f3d3-4162-820c-750d113cd1f4.mp3
+469455	/Users/patrickwang/kingshit/devvit/webroot/cocos-js/assets/bullet.release.wasm-BIzkn7bF.wasm
+404550	/Users/patrickwang/kingshit/devvit/webroot/assets/resources/native/ae/aec21863-1a6e-4d25-872d-ad1c1f81bd42@f04db.bin
+371520	/Users/patrickwang/kingshit/devvit/webroot/assets/resources/native/db/db3965aa-c55d-4bf3-8718-3a824dfc6079@45f73.bin
+362717	/Users/patrickwang/kingshit/devvit/webroot/cocos-js/spine.asm-BCCB8IGt.js
+288136	/Users/patrickwang/kingshit/devvit/webroot/assets/resources/native/2f/2fb9ff76-a1a6-4e0e-bbc7-9f6ce4d9b313@5c918.bin
+211482	/Users/patrickwang/kingshit/devvit/webroot/assets/resources/native/28/28023c26-664c-433e-87c3-02032f03dacd@4ee8c.bin
+207786	/Users/patrickwang/kingshit/devvit/webroot/assets/resources/native/3f/3fb00522-0aff-4131-8c22-6da9e735f33d@44224.bin
+205175	/Users/patrickwang/kingshit/devvit/webroot/cocos-js/assets/spine-CC34fKUR.wasm
+189720	/Users/patrickwang/kingshit/devvit/webroot/assets/resources/native/70/7090fdc9-ee52-48be-b115-1c7db9192e30@53f03.bin
+184914	/Users/patrickwang/kingshit/devvit/webroot/assets/resources/native/22/229209b6-bc26-43f8-8b6a-1a497e30a704@09c3a.bin
+171420	/Users/patrickwang/kingshit/devvit/webroot/assets/resources/native/69/69ed52e7-f430-473b-85f7-85e44f472481@85b90.bin
+160320	/Users/patrickwang/kingshit/devvit/webroot/assets/resources/native/7e/7e085162-86f3-46c6-8dff-dfc341297a69@b793b.bin
+
+=== File Counts by Extension (ext<TAB>count) ===
+bin	99
+css	1
+html	1
+jpg	1
+js	18
+json	123
+mp3	5
+png	42
+wasm	2
+webp	33

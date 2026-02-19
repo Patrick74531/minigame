@@ -33,7 +33,7 @@ async function getLeaderboard(redis: RedisClient): Promise<LeaderboardEntry[]> {
             try {
                 const parsed = JSON.parse(metaStr) as { wave?: number };
                 wave = parsed.wave ?? 0;
-            } catch {
+            } catch (_e) {
                 wave = 0;
             }
         }

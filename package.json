@@ -9,7 +9,11 @@
         "format": "prettier --write \"assets/scripts/**/*.ts\"",
         "format:check": "prettier --check \"assets/scripts/**/*.ts\"",
         "prepare": "husky",
-        "deploy": "node devvit/scripts/patch-csp.cjs && cd devvit && devvit upload"
+        "patch": "node devvit/scripts/patch-csp.cjs",
+        "upload": "cd devvit && devvit upload",
+        "playtest": "cd devvit && devvit playtest",
+        "build": "bash scripts/build_reddit_package.sh --skip-cocos-build --source-build-dir build/reddit-web --output-webroot devvit/webroot --no-optimize-source-assets",
+        "deploy": "node devvit/scripts/patch-csp.cjs && cd devvit && devvit upload && devvit install granny_vs_robot_dev"
     },
     "keywords": [
         "game",

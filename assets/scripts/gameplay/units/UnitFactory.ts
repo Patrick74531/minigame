@@ -358,10 +358,12 @@ export class UnitFactory {
     private static attachHeroModel(root: Node): void {
         if (root.getChildByName('HeroModel')) return;
 
+        console.log('[UnitFactory:ANIM] attachHeroModel called, loading prefab...');
         const attach = (prefab: Prefab) => {
             if (!root.isValid) return;
             if (root.getChildByName('HeroModel')) return;
 
+            console.log('[UnitFactory:ANIM] prefab loaded, instantiating...');
             const model = instantiate(prefab);
             model.name = 'HeroModel';
             const config = resolveHeroModelConfig();
@@ -387,7 +389,19 @@ export class UnitFactory {
             // NOTE: patch-csp.cjs (Patch H) strips this call from the deployed
             // build and relies on baked GPU mode there instead.
             const anim = this.getModelSkeletalAnimation(model);
+            console.log('[UnitFactory:ANIM] SkeletalAnimation found:', !!anim);
             if (anim) {
+                const clipNames = (anim.clips ?? []).map(
+                    (c: AnimationClip | null) => c?.name ?? 'null'
+                );
+                console.log('[UnitFactory:ANIM] clips:', clipNames.length, clipNames);
+                const exotic = (anim.clips?.[0] as unknown as { _exoticAnimation?: unknown })
+                    ?._exoticAnimation;
+                console.log(
+                    '[UnitFactory:ANIM] clip[0]._exoticAnimation:',
+                    typeof exotic,
+                    !!exotic
+                );
                 anim.useBakedAnimation = false;
             }
 
@@ -449,6 +463,20 @@ export class UnitFactory {
 
     private static getModelSkeletalAnimation(model: Node): SkeletalAnimation | null {
         const skels = model.getComponentsInChildren(SkeletalAnimation);
+        if (skels.length === 0) {
+            const allComps: string[] = [];
+            const walk = (n: Node) => {
+                for (const c of n.components) {
+                    allComps.push((c.constructor as { name?: string })?.name ?? String(c));
+                }
+                for (let i = 0; i < n.children.length; i++) walk(n.children[i]);
+            };
+            walk(model);
+            console.log(
+                '[UnitFactory:ANIM] getModelSkeletalAnimation: 0 found, all components:',
+                allComps.join(',')
+            );
+        }
         return skels[0] ?? null;
     }
 
