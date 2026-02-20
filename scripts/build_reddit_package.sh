@@ -123,9 +123,18 @@ rewrite_index_for_reddit() {
   # Move startup + contextmenu handler into an external JS file.
   cat > "$boot_file" <<'EOF'
 (function () {
-  // ── Portrait→Landscape fix for iOS portrait-locked WebViews ──────────────────
-  // Rotates #GameDiv via !important CSS so the landscape game fills the portrait
-  // viewport. Transform: rotate(-90deg) translateX(-100vh) with origin (0,0).
+  // ╔══════════════════════════════════════════════════════════════════════════════╗
+  // ║  DO NOT MODIFY — Portrait→Landscape fix for iOS portrait-locked WebViews   ║
+  // ║  This IIFE is the result of many iterations of debugging. Changes here      ║
+  // ║  will break full-screen display or touch input on iOS Reddit WebView.       ║
+  // ║                                                                              ║
+  // ║  Key facts:                                                                  ║
+  // ║  • W/H captured BEFORE any overrides (real portrait dimensions).            ║
+  // ║  • window.innerWidth/Height overridden → Cocos creates landscape canvas.    ║
+  // ║  • #GameDiv rotated via !important CSS (immune to Cocos inline resets).     ║
+  // ║  • canvas.getBoundingClientRect() overridden → prevents Cocos scale ×2 bug. ║
+  // ║  • Touch events proxied: portrait (tx,ty) → landscape (H-ty, tx).           ║
+  // ╚══════════════════════════════════════════════════════════════════════════════╝
   (function () {
     var W = window.innerWidth, H = window.innerHeight;
     if (W >= H) return;
@@ -218,9 +227,24 @@ rewrite_index_for_reddit() {
   }
 
   var _splashHidden = false;
+  var _hideScheduled = false;
   var _progressTimer = 0;
-  var _retryTimer = 0;
   var _fallbackHideTimer = 0;
+
+  // Re-entry fix: reload if WebView resurfaces after being hidden for >5 s.
+  var _hiddenAt = 0;
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') {
+      _hiddenAt = Date.now();
+    } else if (_hiddenAt > 0 && _splashHidden && (Date.now() - _hiddenAt) > 5000) {
+      location.reload();
+    } else {
+      _hiddenAt = 0;
+    }
+  });
+  window.addEventListener('pageshow', function (e) {
+    if (e && e.persisted) location.reload();
+  });
 
   function byId(id) {
     return document.getElementById(id);
@@ -236,15 +260,8 @@ rewrite_index_for_reddit() {
       '  <div class="boot-splash__sub">加载游戏资源中，请稍候...</div>' +
       '  <div class="boot-splash__bar"><div id="boot-splash-fill" class="boot-splash__fill"></div></div>' +
       '  <div id="boot-splash-pct" class="boot-splash__pct">0%</div>' +
-      '  <button id="boot-splash-retry" class="boot-splash__retry">重新加载</button>' +
       '</div>';
     document.body.appendChild(wrap);
-    var retry = byId('boot-splash-retry');
-    if (retry) {
-      retry.addEventListener('click', function () {
-        location.reload();
-      });
-    }
   }
 
   function setSplashText(text) {
@@ -265,22 +282,16 @@ rewrite_index_for_reddit() {
     setSplashProgress(0);
     _progressTimer = window.setInterval(function () {
       if (_splashHidden) return;
-      var step = pct < 35 ? 4.5 : pct < 70 ? 2.2 : pct < 90 ? 0.8 : 0;
-      pct = Math.min(92, pct + step);
+      var step = pct < 35 ? 4.5 : pct < 70 ? 2.2 : pct < 90 ? 0.8 : 0.12;
+      pct = Math.min(99, pct + step);
       setSplashProgress(pct);
     }, 220);
-  }
-
-  function showRetryButton() {
-    var retry = byId('boot-splash-retry');
-    if (retry) retry.style.display = 'inline-flex';
   }
 
   function hideSplash() {
     if (_splashHidden) return;
     _splashHidden = true;
     clearInterval(_progressTimer);
-    clearTimeout(_retryTimer);
     clearTimeout(_fallbackHideTimer);
     setSplashProgress(100);
     var splash = byId('boot-splash');
@@ -291,7 +302,11 @@ rewrite_index_for_reddit() {
     }, 420);
   }
 
-  window._hideSplash = hideSplash;
+  window._hideSplash = function () {
+    if (_splashHidden || _hideScheduled) return;
+    _hideScheduled = true;
+    setTimeout(hideSplash, 800);
+  };
 
   function appendError(message) {
     var panelId = 'BootErrorPanel';
@@ -344,7 +359,6 @@ rewrite_index_for_reddit() {
 
   mountSplash();
   startSplashProgress();
-  _retryTimer = setTimeout(showRetryButton, 20000);
 
   var gameCanvas = document.getElementById('GameCanvas');
   if (gameCanvas) {
@@ -356,23 +370,19 @@ rewrite_index_for_reddit() {
   if (typeof System === 'undefined') {
     appendError('SystemJS is unavailable');
     setSplashText('运行环境初始化失败，请重试。');
-    showRetryButton();
     return;
   }
 
   System.import('./index.js')
     .then(function () {
-      // Prefer explicit hide from runtime (`window._hideSplash()`).
-      // Fallback hides automatically if runtime signal never arrives.
       _fallbackHideTimer = setTimeout(function () {
         if (!_splashHidden) hideSplash();
-      }, 8000);
+      }, 25000);
     })
     .catch(function (err) {
       appendError('[System.import] ' + String(err && err.stack ? err.stack : err));
       console.error(err);
       setSplashText('加载失败，请重试。');
-      showRetryButton();
     });
 })();
 EOF
@@ -606,6 +616,7 @@ ORIENTEOF
     perl -0pi -e 's/"orientation":"auto"/"orientation":"landscape"/g' "$settings_file"
     perl -0pi -e 's/"orientation":"portrait"/"orientation":"landscape"/g' "$settings_file"
     perl -0pi -e 's/"designResolution"\s*:\s*\{([^{}]*?)"policy"\s*:\s*\d+/"designResolution":{$1"policy":0/s' "$settings_file"
+    perl -0pi -e 's/"splashScreen"\s*:\s*\{([^{}]*?)"totalTime"\s*:\s*\d+/"splashScreen":{$1"totalTime":0/s' "$settings_file"
   fi
 
   # Ensure runtime UI resolution policy avoids letterboxing while preserving aspect ratio.

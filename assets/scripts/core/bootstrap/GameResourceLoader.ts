@@ -14,6 +14,7 @@ export type LoadProgressCallback = (loaded: number, total: number) => void;
 export class GameResourceLoader {
     // Phase 1 directories — fully preloaded before game starts
     private static readonly PHASE1_DIRS = [
+        'ui', // homepage background + any other UI textures — preload first for fast splash→game transition
         'building', // rifle_tower, fencebar, house, spa, barn_3d, gold, radar_3d
         'enemies/vehicle', // Tank, Rover, Truck, Turret, RoundRover (wave-1 enemies)
         'models/nature', // trees, bushes, rocks

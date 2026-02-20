@@ -169,16 +169,20 @@ export class HomePage extends Component {
 
     private _revealContent(): void {
         if (!this._contentNode || !this._contentNode.isValid) return;
-        // Dismiss HTML loading splash now that Cocos home screen is ready
-        const w = window as unknown as { _hideSplash?: () => void };
-        if (typeof w._hideSplash === 'function') {
-            w._hideSplash();
-        }
         this._contentNode.active = true;
         this._contentNode.setScale(0.96, 0.96, 1);
         tween(this._contentNode)
             .to(0.3, { scale: new Vec3(1, 1, 1) })
             .start();
+        // Delay hiding the HTML boot splash by ~3 frames so the GPU has time to
+        // upload the background texture and render at least one full frame before
+        // the HTML overlay starts fading. Without this delay a 1-frame black flash
+        // is visible as the HTML splash fades to reveal an empty canvas.
+        this.scheduleOnce(() => {
+            if (!this.isValid) return;
+            const w = window as unknown as { _hideSplash?: () => void };
+            if (typeof w._hideSplash === 'function') w._hideSplash();
+        }, 0.15);
     }
 
     private applyBackgroundTexture(texture: Texture2D) {
