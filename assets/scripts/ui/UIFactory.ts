@@ -34,7 +34,9 @@ export class UIFactory {
         view.setDesignResolutionSize(
             this.DESIGN_WIDTH,
             this.DESIGN_HEIGHT,
-            ResolutionPolicy.SHOW_ALL
+            // Avoid letterboxing on mobile webviews while preserving aspect ratio.
+            // NO_BORDER crops overflow instead of stretching UI elements.
+            ResolutionPolicy.NO_BORDER
         );
         transform.setContentSize(this.DESIGN_WIDTH, this.DESIGN_HEIGHT);
 

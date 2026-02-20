@@ -115,6 +115,7 @@ rewrite_index_for_reddit() {
   local webroot="$1"
   local index_file="${webroot}/index.html"
   local boot_file="${webroot}/boot.js"
+  local boot_css_file="${webroot}/boot.css"
 
   [ -f "$index_file" ] || die "index.html not found for compliance rewrite: $index_file"
   log "Rewriting index.html for Reddit web constraints (no inline JS/CSS)..."
@@ -122,9 +123,176 @@ rewrite_index_for_reddit() {
   # Move startup + contextmenu handler into an external JS file.
   cat > "$boot_file" <<'EOF'
 (function () {
+  // ── Portrait→Landscape fix for iOS portrait-locked WebViews ──────────────────
+  // Rotates #GameDiv via !important CSS so the landscape game fills the portrait
+  // viewport. Transform: rotate(-90deg) translateX(-100vh) with origin (0,0).
+  (function () {
+    var W = window.innerWidth, H = window.innerHeight;
+    if (W >= H) return;
+    var LAND_W = H, LAND_H = W;
+    Object.defineProperty(window, 'innerWidth',  { get: function () { return LAND_W; }, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { get: function () { return LAND_H; }, configurable: true });
+    if (window.visualViewport) {
+      try {
+        Object.defineProperty(window.visualViewport, 'width',  { get: function () { return LAND_W; }, configurable: true });
+        Object.defineProperty(window.visualViewport, 'height', { get: function () { return LAND_H; }, configurable: true });
+      } catch (_) {}
+    }
+    var style = document.createElement('style');
+    style.textContent =
+      'html, body {' +
+      '  margin: 0 !important; padding: 0 !important;' +
+      '  width: 100% !important; height: 100% !important;' +
+      '  overflow: hidden !important; background: #000 !important;' +
+      '}' +
+      '#GameDiv {' +
+      '  position: fixed !important; top: 0 !important; left: 0 !important;' +
+      '  width: 100vh !important; height: 100vw !important;' +
+      '  transform-origin: 0 0 !important;' +
+      '  transform: rotate(-90deg) translateX(-100vh) !important;' +
+      '  overflow: hidden !important;' +
+      '}' +
+      '#Cocos3dGameContainer, #GameCanvas {' +
+      '  width: 100% !important; height: 100% !important;' +
+      '}';
+    document.head.appendChild(style);
+    var REMAP = { touchstart:1, touchmove:1, touchend:1, touchcancel:1,
+      pointerdown:1, pointermove:1, pointerup:1, pointercancel:1,
+      mousedown:1, mousemove:1, mouseup:1, click:1 };
+    function patchCanvas(c) {
+      c.getBoundingClientRect = function () {
+        return { left: 0, top: 0, right: LAND_W, bottom: LAND_H,
+                 width: LAND_W, height: LAND_H, x: 0, y: 0,
+                 toJSON: function () { return this; } };
+      };
+      function rxy(tx, ty) {
+        return { x: H - ty, y: tx };
+      }
+      function pTouch(t) {
+        var p = rxy(t.clientX, t.clientY);
+        return new Proxy(t, { get: function (o, k) {
+          if (k === 'clientX' || k === 'x' || k === 'pageX' || k === 'screenX') return p.x;
+          if (k === 'clientY' || k === 'y' || k === 'pageY' || k === 'screenY') return p.y;
+          var v = o[k]; return typeof v === 'function' ? v.bind(o) : v;
+        }});
+      }
+      function pTouchList(l) {
+        var a = [];
+        for (var i = 0; i < l.length; i++) a.push(pTouch(l[i]));
+        a.item = function (i) { return a[i]; };
+        return a;
+      }
+      function pEvent(e) {
+        if (e.changedTouches !== undefined) {
+          return new Proxy(e, { get: function (o, k) {
+            if (k === 'touches' || k === 'changedTouches' || k === 'targetTouches') return pTouchList(o[k]);
+            var v = o[k]; return typeof v === 'function' ? v.bind(o) : v;
+          }});
+        }
+        var p = rxy(e.clientX, e.clientY);
+        return new Proxy(e, { get: function (o, k) {
+          if (k === 'clientX' || k === 'x' || k === 'pageX' || k === 'screenX') return p.x;
+          if (k === 'clientY' || k === 'y' || k === 'pageY' || k === 'screenY') return p.y;
+          var v = o[k]; return typeof v === 'function' ? v.bind(o) : v;
+        }});
+      }
+      var _add = c.addEventListener.bind(c);
+      c.addEventListener = function (type, fn, opts) {
+        if (REMAP[type]) { _add(type, function (e) { fn.call(this, pEvent(e)); }, opts); }
+        else { _add(type, fn, opts); }
+      };
+    }
+    var _c = document.getElementById('GameCanvas');
+    if (_c) { patchCanvas(_c); }
+    else {
+      var _mo = new MutationObserver(function () {
+        var c = document.getElementById('GameCanvas');
+        if (c) { _mo.disconnect(); patchCanvas(c); }
+      });
+      _mo.observe(document.documentElement, { childList: true, subtree: true });
+    }
+  })();
+
   if (screen.orientation && screen.orientation.lock) {
     screen.orientation.lock('landscape-primary').catch(function () {});
   }
+
+  var _splashHidden = false;
+  var _progressTimer = 0;
+  var _retryTimer = 0;
+  var _fallbackHideTimer = 0;
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function mountSplash() {
+    if (byId('boot-splash')) return;
+    var wrap = document.createElement('div');
+    wrap.id = 'boot-splash';
+    wrap.innerHTML =
+      '<div class="boot-splash__panel">' +
+      '  <div class="boot-splash__title">Tower Defense</div>' +
+      '  <div class="boot-splash__sub">加载游戏资源中，请稍候...</div>' +
+      '  <div class="boot-splash__bar"><div id="boot-splash-fill" class="boot-splash__fill"></div></div>' +
+      '  <div id="boot-splash-pct" class="boot-splash__pct">0%</div>' +
+      '  <button id="boot-splash-retry" class="boot-splash__retry">重新加载</button>' +
+      '</div>';
+    document.body.appendChild(wrap);
+    var retry = byId('boot-splash-retry');
+    if (retry) {
+      retry.addEventListener('click', function () {
+        location.reload();
+      });
+    }
+  }
+
+  function setSplashText(text) {
+    var sub = document.querySelector('.boot-splash__sub');
+    if (sub) sub.textContent = text;
+  }
+
+  function setSplashProgress(pct) {
+    var p = Math.max(0, Math.min(100, Math.round(pct)));
+    var fill = byId('boot-splash-fill');
+    var label = byId('boot-splash-pct');
+    if (fill) fill.style.width = p + '%';
+    if (label) label.textContent = p + '%';
+  }
+
+  function startSplashProgress() {
+    var pct = 0;
+    setSplashProgress(0);
+    _progressTimer = window.setInterval(function () {
+      if (_splashHidden) return;
+      var step = pct < 35 ? 4.5 : pct < 70 ? 2.2 : pct < 90 ? 0.8 : 0;
+      pct = Math.min(92, pct + step);
+      setSplashProgress(pct);
+    }, 220);
+  }
+
+  function showRetryButton() {
+    var retry = byId('boot-splash-retry');
+    if (retry) retry.style.display = 'inline-flex';
+  }
+
+  function hideSplash() {
+    if (_splashHidden) return;
+    _splashHidden = true;
+    clearInterval(_progressTimer);
+    clearTimeout(_retryTimer);
+    clearTimeout(_fallbackHideTimer);
+    setSplashProgress(100);
+    var splash = byId('boot-splash');
+    if (!splash) return;
+    splash.classList.add('boot-splash--fade');
+    setTimeout(function () {
+      if (splash.parentNode) splash.parentNode.removeChild(splash);
+    }, 420);
+  }
+
+  window._hideSplash = hideSplash;
+
   function appendError(message) {
     var panelId = 'BootErrorPanel';
     var panel = document.getElementById(panelId);
@@ -174,6 +342,10 @@ rewrite_index_for_reddit() {
     appendError('[unhandledrejection] ' + String(reason && reason.stack ? reason.stack : reason));
   });
 
+  mountSplash();
+  startSplashProgress();
+  _retryTimer = setTimeout(showRetryButton, 20000);
+
   var gameCanvas = document.getElementById('GameCanvas');
   if (gameCanvas) {
     gameCanvas.addEventListener('contextmenu', function (event) {
@@ -183,64 +355,273 @@ rewrite_index_for_reddit() {
 
   if (typeof System === 'undefined') {
     appendError('SystemJS is unavailable');
+    setSplashText('运行环境初始化失败，请重试。');
+    showRetryButton();
     return;
   }
 
-  System.import('./index.js').catch(function (err) {
-    appendError('[System.import] ' + String(err && err.stack ? err.stack : err));
-    console.error(err);
-  });
+  System.import('./index.js')
+    .then(function () {
+      // Prefer explicit hide from runtime (`window._hideSplash()`).
+      // Fallback hides automatically if runtime signal never arrives.
+      _fallbackHideTimer = setTimeout(function () {
+        if (!_splashHidden) hideSplash();
+      }, 8000);
+    })
+    .catch(function (err) {
+      appendError('[System.import] ' + String(err && err.stack ? err.stack : err));
+      console.error(err);
+      setSplashText('加载失败，请重试。');
+      showRetryButton();
+    });
 })();
 EOF
 
-  # Write orientation-fix.js: forces landscape rendering in portrait WebViews (Reddit mobile)
-  # Intercepts canvas size setters so Cocos renders landscape, then CSS-rotates the canvas
-  # to visually fill the portrait viewport. Touch coordinates work correctly with this transform.
+  cat > "$boot_css_file" <<'BOOTCSS'
+#boot-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 30% 20%, #1f2d4f 0%, #0f1423 60%, #0a0f1b 100%);
+  opacity: 1;
+  transition: opacity 0.36s ease;
+}
+
+#boot-splash.boot-splash--fade {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.boot-splash__panel {
+  width: min(88vw, 420px);
+  padding: 24px 22px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(3px);
+  text-align: center;
+  color: #f4f6ff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.boot-splash__title {
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+  color: #ffd47a;
+}
+
+.boot-splash__sub {
+  font-size: 13px;
+  color: rgba(240, 244, 255, 0.85);
+  margin-bottom: 14px;
+}
+
+.boot-splash__bar {
+  width: 100%;
+  height: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.boot-splash__fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #f5b840 0%, #ffe49d 100%);
+  transition: width 0.2s ease;
+}
+
+.boot-splash__pct {
+  margin-top: 8px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: rgba(240, 244, 255, 0.85);
+}
+
+.boot-splash__retry {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #f5b840;
+  color: #111722;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+BOOTCSS
+
+  # Write orientation-fix.js:
+  # - Keep DOM intervention minimal so Cocos can manage orientation/rotation itself.
+  # - Request immersive mode in supported Devvit clients.
   local orient_file="${webroot}/orientation-fix.js"
   cat > "$orient_file" <<'ORIENTEOF'
 (function () {
-  if (window.innerWidth >= window.innerHeight) return;
-  var pW = window.innerWidth, pH = window.innerHeight;
+  var DEFAULT_VIEWPORT =
+    'width=device-width,user-scalable=no,initial-scale=1,minimum-scale=1,maximum-scale=1,viewport-fit=cover';
+  var DEVVIT_INTERNAL_MESSAGE = 'devvit-internal';
+  var CLIENT_SCOPE = 0;
+  var IMMERSIVE_MODE = 2;
+  var DESIGN_WIDTH = 1280;
+  var DESIGN_HEIGHT = 720;
+  var requestedImmersive = false;
+  var appliedCocosOverrides = false;
 
-  function applyCSS(canvas) {
-    canvas.style.cssText = [
-      'position:fixed', 'width:' + pH + 'px', 'height:' + pW + 'px',
-      'top:0', 'left:0', 'transform-origin:top left',
-      'transform:rotate(90deg) translateX(-' + pH + 'px)'
-    ].join(';') + ';';
-    var p = canvas.parentElement;
-    while (p && p.tagName !== 'BODY') {
-      p.style.width = pW + 'px'; p.style.height = pH + 'px';
-      p.style.overflow = 'hidden'; p.style.position = 'fixed';
-      p = p.parentElement;
+  function lockLandscape() {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape-primary').catch(function () {});
     }
   }
 
-  function setup(canvas) {
-    applyCSS(canvas);
-    var mo = new MutationObserver(function () { applyCSS(canvas); });
-    mo.observe(canvas, { attributes: true, attributeFilter: ['style'] });
+  function requestImmersiveMode() {
+    if (requestedImmersive) return;
+    requestedImmersive = true;
+    try {
+      window.parent.postMessage(
+        {
+          type: DEVVIT_INTERNAL_MESSAGE,
+          scope: CLIENT_SCOPE,
+          immersiveMode: { immersiveMode: IMMERSIVE_MODE },
+        },
+        '*'
+      );
+    } catch (_err) {
+      // Ignore; older clients may not support immersive mode requests.
+    }
   }
 
-  var c = document.getElementById('GameCanvas');
-  if (c) { setup(c); } else {
-    var mo2 = new MutationObserver(function () {
-      var c2 = document.getElementById('GameCanvas');
-      if (c2) { mo2.disconnect(); setup(c2); }
-    });
-    mo2.observe(document.documentElement, { childList: true, subtree: true });
+  function getViewportMeta() {
+    return document.querySelector('meta[name="viewport"]');
   }
+
+  function setViewport(content) {
+    var meta = getViewportMeta();
+    if (meta && meta.getAttribute('content') !== content) {
+      meta.setAttribute('content', content);
+    }
+  }
+
+  function normalizeRootBase() {
+    var html = document.documentElement;
+    var body = document.body;
+    html.style.margin = '0';
+    html.style.padding = '0';
+    html.style.touchAction = 'none';
+    html.style.overflow = 'hidden';
+    html.style.background = '#000';
+    html.style.width = '100%';
+    html.style.height = '100%';
+    html.style.position = 'relative';
+    if (body) {
+      body.style.margin = '0';
+      body.style.padding = '0';
+      body.style.touchAction = 'none';
+      body.style.overflow = 'hidden';
+      body.style.background = '#000';
+      body.style.width = '100%';
+      body.style.height = '100%';
+      body.style.position = 'absolute';
+      body.style.left = '0';
+      body.style.top = '0';
+    }
+  }
+
+  function maybeApplyCocosOverrides() {
+    if (appliedCocosOverrides) return;
+    var cc = window.cc;
+    if (!cc || !cc.view || !cc.macro || !cc.ResolutionPolicy) return;
+
+    try {
+      if (cc.macro.ORIENTATION_LANDSCAPE !== undefined) {
+        cc.view.setOrientation(cc.macro.ORIENTATION_LANDSCAPE);
+      }
+      if (cc.ResolutionPolicy.FIXED_HEIGHT !== undefined) {
+        cc.view.setDesignResolutionSize(
+          DESIGN_WIDTH,
+          DESIGN_HEIGHT,
+          cc.ResolutionPolicy.FIXED_HEIGHT
+        );
+      }
+      cc.view.resizeWithBrowserSize(true);
+      appliedCocosOverrides = true;
+    } catch (_err) {
+      // Retry later if engine isn't fully initialized yet.
+    }
+  }
+
+  function apply() {
+    setViewport(DEFAULT_VIEWPORT);
+    lockLandscape();
+    requestImmersiveMode();
+    normalizeRootBase();
+    maybeApplyCocosOverrides();
+  }
+
+  function setup() {
+    var raf = 0;
+    var schedule = function () {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(function () {
+        apply();
+      });
+    };
+
+    schedule();
+    window.addEventListener('resize', schedule, { passive: true });
+    window.addEventListener('orientationchange', schedule, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', schedule, { passive: true });
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', schedule, { once: true });
+    }
+    setTimeout(schedule, 80);
+    setTimeout(schedule, 260);
+    setTimeout(schedule, 800);
+    setTimeout(schedule, 1600);
+    setTimeout(schedule, 2600);
+  }
+
+  setup();
 })();
 ORIENTEOF
 
   # Remove inline contextmenu handler attribute on canvas.
   perl -0pi -e 's/\s+oncontextmenu="event\.preventDefault\(\)"//g' "$index_file"
+  # Avoid exact-fit non-uniform stretch in Reddit portrait-host WebView.
+  perl -0pi -e 's/\bcc_exact_fit_screen="true"/cc_exact_fit_screen="false"/g' "$index_file"
+
+  local settings_file="${webroot}/src/settings.json"
+  if [ -f "$settings_file" ]; then
+    perl -0pi -e 's/"exactFitScreen":true/"exactFitScreen":false/g' "$settings_file"
+    perl -0pi -e 's/"orientation":"auto"/"orientation":"landscape"/g' "$settings_file"
+    perl -0pi -e 's/"orientation":"portrait"/"orientation":"landscape"/g' "$settings_file"
+    perl -0pi -e 's/"designResolution"\s*:\s*\{([^{}]*?)"policy"\s*:\s*\d+/"designResolution":{$1"policy":0/s' "$settings_file"
+  fi
+
+  # Ensure runtime UI resolution policy avoids letterboxing while preserving aspect ratio.
+  local main_bundle="${webroot}/assets/main/index.js"
+  if [ -f "$main_bundle" ]; then
+    perl -0pi -e 's/setDesignResolutionSize(this.DESIGN_WIDTH,this.DESIGN_HEIGHT,r.NO_BORDER)/setDesignResolutionSize(this.DESIGN_WIDTH,this.DESIGN_HEIGHT,r.FIXED_HEIGHT)/g' "$main_bundle"
+  fi
+
+  # Inject splash markup so loading UI is visible before large JS bundles finish downloading.
+  perl -0pi -e 's#(<body[^>]*>)#$1\n  <div id="boot-splash">\n    <div class="boot-splash__panel">\n      <div class="boot-splash__title">Tower Defense</div>\n      <div class="boot-splash__sub">Loading game assets...</div>\n      <div class="boot-splash__bar"><div id="boot-splash-fill" class="boot-splash__fill"></div></div>\n      <div id="boot-splash-pct" class="boot-splash__pct">0%</div>\n      <button id="boot-splash-retry" class="boot-splash__retry">Reload</button>\n    </div>\n  </div>#i' "$index_file"
 
   # Replace the Cocos inline boot script with an external boot.js reference.
   perl -0pi -e 's#<script>\s*System\.import\(\s*["\047]\./index\.js["\047]\s*\).*?</script>#<script src="boot.js" charset="utf-8"></script>#gs' "$index_file"
 
-  # Inject orientation-fix.js as the first script (before SystemJS/boot)
-  perl -0pi -e 's#(<head[^>]*>)#$1\n  <script src="orientation-fix.js" charset="utf-8"></script>#i' "$index_file"
+  # Inject orientation-fix.js and boot.css in head.
+  perl -0pi -e 's#(<head[^>]*>)#$1\n  <script src="orientation-fix.js" charset="utf-8"></script>\n  <link rel="stylesheet" type="text/css" href="boot.css" />#i' "$index_file"
 
   if ! rg -q 'src="boot\.js"' "$index_file"; then
     die "Failed to inject external boot.js into index.html"

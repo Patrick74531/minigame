@@ -1,214 +1,76 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="utf-8" />
+<head>
+  <script src="orientation-fix.js" charset="utf-8"></script>
+  <link rel="stylesheet" type="text/css" href="boot.css" />
+  <meta charset="utf-8">
 
-        <title>Cocos Creator | kingshit</title>
+  <title>Cocos Creator | kingshit</title>
 
-        <!--http://www.html5rocks.com/en/mobile/mobifying/-->
-        <meta
-            name="viewport"
-            content="width=device-width,user-scalable=no,initial-scale=1,minimum-scale=1,maximum-scale=1,minimal-ui=true"
-        />
-        <meta name="screen-orientation" content="landscape" />
-        <meta name="x5-orientation" content="landscape" />
-        <meta name="x5-fullscreen" content="true" />
+  <!--http://www.html5rocks.com/en/mobile/mobifying/-->
+  <meta name="viewport"
+        content="width=device-width,user-scalable=no,initial-scale=1,minimum-scale=1,maximum-scale=1,minimal-ui=true"/>
+  <meta name="screen-orientation" content="landscape">
+  <meta name="x5-orientation" content="landscape">
+  <meta name="x5-fullscreen" content="true">
 
-        <!--https://developer.apple.com/library/safari/documentation/AppleApplications/Reference/SafariHTMLRef/Articles/MetaTags.html-->
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="format-detection" content="telephone=no" />
+  <!--https://developer.apple.com/library/safari/documentation/AppleApplications/Reference/SafariHTMLRef/Articles/MetaTags.html-->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
 
-        <!-- force webkit on 360 -->
-        <meta name="renderer" content="webkit" />
-        <meta name="force-rendering" content="webkit" />
-        <!-- force edge on IE -->
-        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
-        <meta name="msapplication-tap-highlight" content="no" />
+  <!-- force webkit on 360 -->
+  <meta name="renderer" content="webkit"/>
+  <meta name="force-rendering" content="webkit"/>
+  <!-- force edge on IE -->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+  <meta name="msapplication-tap-highlight" content="no">
 
-        <!-- force full screen on some browser -->
-        <meta name="full-screen" content="yes" />
-        <meta name="x5-fullscreen" content="true" />
-        <meta name="360-fullscreen" content="true" />
+  <!-- force full screen on some browser -->
+  <meta name="full-screen" content="yes"/>
+  <meta name="x5-fullscreen" content="true"/>
+  <meta name="360-fullscreen" content="true"/>
 
-        <!--fix fireball/issues/3568 -->
-        <!--<meta name="browsermode" content="application">-->
-        <meta name="x5-page-mode" content="app" />
+  <!--fix fireball/issues/3568 -->
+  <!--<meta name="browsermode" content="application">-->
+  <meta name="x5-page-mode" content="app">
 
-        <!--<link rel="apple-touch-icon" href=".png" />-->
-        <!--<link rel="apple-touch-icon-precomposed" href=".png" />-->
+  <!--<link rel="apple-touch-icon" href=".png" />-->
+  <!--<link rel="apple-touch-icon-precomposed" href=".png" />-->
 
-        <!-- Preload largest bundles so download starts while <head> is parsed -->
-        <link rel="preload" href="cocos-js/_virtual_cc-CArsJ5Rl.js" as="script" />
-        <link rel="preload" href="assets/main/index.js" as="script" />
-        <link rel="stylesheet" type="text/css" href="style.css" />
-        <style>
-            body {
-                background: #1a1a2e;
-            }
-            #splash {
-                position: fixed;
-                inset: 0;
-                z-index: 10000;
-                background: #1a1a2e;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                font-family: system-ui, sans-serif;
-                color: #fff;
-                transition: opacity 0.5s;
-            }
-            #splash.fade {
-                opacity: 0;
-                pointer-events: none;
-            }
-            #splash-title {
-                font-size: 2rem;
-                font-weight: 900;
-                letter-spacing: 2px;
-                margin-bottom: 6px;
-                color: #ffc657;
-                text-transform: uppercase;
-            }
-            #splash-sub {
-                font-size: 1rem;
-                color: #aaa;
-                margin-bottom: 40px;
-            }
-            #splash-dots span {
-                display: inline-block;
-                width: 10px;
-                height: 10px;
-                margin: 0 4px;
-                background: #e94560;
-                border-radius: 50%;
-                animation: sdot 1.2s ease-in-out infinite;
-            }
-            #splash-dots span:nth-child(2) {
-                animation-delay: 0.2s;
-            }
-            #splash-dots span:nth-child(3) {
-                animation-delay: 0.4s;
-            }
-            @keyframes sdot {
-                0%,
-                80%,
-                100% {
-                    transform: scale(0.6);
-                    opacity: 0.4;
-                }
-                40% {
-                    transform: scale(1);
-                    opacity: 1;
-                }
-            }
-            #splash-progress {
-                width: 180px;
-                height: 4px;
-                background: rgba(255, 255, 255, 0.15);
-                border-radius: 2px;
-                overflow: hidden;
-                margin-bottom: 8px;
-            }
-            #splash-progress-fill {
-                height: 100%;
-                width: 0%;
-                background: #e94560;
-                border-radius: 2px;
-                transition: width 0.3s ease;
-            }
-            #splash-pct {
-                font-size: 0.8rem;
-                color: #666;
-                margin-bottom: 32px;
-            }
-            #splash-retry {
-                display: none;
-                margin-top: 24px;
-                padding: 12px 28px;
-                background: #e94560;
-                color: #fff;
-                border: none;
-                border-radius: 8px;
-                font-size: 1rem;
-                cursor: pointer;
-                font-weight: bold;
-            }
-            /* Orientation hint – non-blocking small bar, hidden by JS after viewport swap */
-            #rotate-prompt {
-                display: none;
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                z-index: 20000;
-                background: #1a1a2e;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                font-family: system-ui, sans-serif;
-                color: #fff;
-                text-align: center;
-                padding: 8px;
-            }
-            #rotate-prompt .rp-icon {
-                font-size: 2rem;
-                margin-bottom: 8px;
-                animation: rpspin 2s ease-in-out infinite;
-            }
-            #rotate-prompt .rp-title {
-                font-size: 1rem;
-                font-weight: bold;
-                margin-bottom: 4px;
-                color: #ffc657;
-            }
-            #rotate-prompt .rp-sub {
-                font-size: 0.95rem;
-                color: #aaa;
-            }
-            @keyframes rpspin {
-                0%,
-                100% {
-                    transform: rotate(0deg);
-                }
-                50% {
-                    transform: rotate(90deg);
-                }
-            }
-            @media screen and (orientation: portrait) and (max-width: 1024px) {
-                #rotate-prompt {
-                    display: flex;
-                }
-            }
-        </style>
-    </head>
-    <body>
-        <div id="splash">
-            <div id="splash-title">Tower Defense</div>
-            <div id="splash-sub">Defend the base. Set the high score.</div>
-            <div id="splash-dots"><span></span><span></span><span></span></div>
-            <div id="splash-progress"><div id="splash-progress-fill"></div></div>
-            <div id="splash-pct">0%</div>
-            <button id="splash-retry" onclick="location.reload()">Tap to Retry</button>
-        </div>
-        <div id="GameDiv" cc_exact_fit_screen="true">
-            <div id="Cocos3dGameContainer">
-                <canvas id="GameCanvas" tabindex="99"></canvas>
-            </div>
-        </div>
+  <link rel="stylesheet" type="text/css" href="style.css"/>
 
-        <!-- Polyfills bundle. -->
+</head>
+<body>
+  <div id="boot-splash">
+    <div class="boot-splash__panel">
+      <div class="boot-splash__title">Tower Defense</div>
+      <div class="boot-splash__sub">Loading game assets...</div>
+      <div class="boot-splash__bar"><div id="boot-splash-fill" class="boot-splash__fill"></div></div>
+      <div id="boot-splash-pct" class="boot-splash__pct">0%</div>
+      <button id="boot-splash-retry" class="boot-splash__retry">Reload</button>
+    </div>
+  </div>
+  <div id="GameDiv" cc_exact_fit_screen="false">
+      <div id="Cocos3dGameContainer">
+        <canvas id="GameCanvas" tabindex="99"></canvas>
+      </div>
+    </div>
+  
 
-        <script src="src/polyfills.bundle.js" charset="utf-8"></script>
+<!-- Polyfills bundle. -->
 
-        <!-- SystemJS support. -->
-        <script src="src/system.bundle.js" charset="utf-8"></script>
+<script src="src/polyfills.bundle.js" charset="utf-8"> </script>
 
-        <!-- Import map -->
-        <script src="src/import-map.json" type="systemjs-importmap" charset="utf-8"></script>
 
-        <script src="boot.js" charset="utf-8"></script>
-    </body>
+<!-- SystemJS support. -->
+<script src="src/system.bundle.js" charset="utf-8"> </script>
+
+<!-- Import map -->
+<script src="src/import-map.json" type="systemjs-importmap" charset="utf-8"> </script>
+
+<script src="boot.js" charset="utf-8"></script>
+
+</body>
 </html>
