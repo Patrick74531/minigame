@@ -31,6 +31,7 @@ import { HeroLevelSystem } from './HeroLevelSystem';
 import { GameEvents } from '../../data/GameEvents';
 import { EventManager } from '../../core/managers/EventManager';
 import { Building } from '../buildings/Building';
+import { HitFeedback } from '../visuals/HitFeedback';
 
 const { ccclass, property } = _decorator;
 const PHYSICS_GROUP_WALL = 1 << 5;
@@ -74,6 +75,9 @@ export class Hero extends Unit {
     private _appliedBaseUpgradeLevel: number = 1;
     private static readonly _tmpLookAt = new Vec3();
 
+    // --- Hit Feedback Component ---
+    private _hitFeedback: HitFeedback | null = null;
+    
     public onDespawn(): void {
         this.unschedule(this.tickRespawnCountdown);
         this.unschedule(this.finishRespawn);
@@ -234,6 +238,34 @@ export class Hero extends Unit {
 
     public get coinCount(): number {
         return this._stackVisualizer ? this._stackVisualizer.count : 0;
+    }
+
+    // === Hit Feedback ===
+
+    public override takeDamage(damage: number, attacker?: any, isCrit: boolean = false): void {
+        const hpBefore = this._stats.currentHp;
+        super.takeDamage(damage, attacker, isCrit);
+
+        // Only trigger feedback if actual damage was taken and still alive
+        if (hpBefore > this._stats.currentHp) {
+            this.playHitFeedback();
+        }
+    }
+
+    private playHitFeedback(): void {
+        if (!this._hitFeedback) {
+            const modelNode = this.node.getChildByName('HeroModel');
+            if (modelNode) {
+                this._hitFeedback = modelNode.getComponent(HitFeedback);
+                if (!this._hitFeedback) {
+                    this._hitFeedback = modelNode.addComponent(HitFeedback);
+                }
+            }
+        }
+        
+        if (this._hitFeedback) {
+            this._hitFeedback.playHitFeedback();
+        }
     }
 
     /**

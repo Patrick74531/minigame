@@ -41,7 +41,12 @@ export class ScreenShake {
      * @param duration  持续时间（秒）
      */
     public static shake(intensity: number = 0.3, duration: number = 0.2): void {
-        if (!this._cameraNode) return;
+        this.ensureBound();
+        if (!this._cameraNode) {
+            console.warn('[ScreenShake] Cannot shake, no camera bound.');
+            return;
+        }
+
         this._intensity = intensity;
         this._duration = duration;
         this._elapsed = 0;
@@ -52,10 +57,18 @@ export class ScreenShake {
         }
     }
 
+    private static ensureBound(): void {
+        if (!this._follow && this._cameraNode) {
+            const comp = this._cameraNode.getComponent('CameraFollow') as unknown as HasOffset | null;
+            this._follow = comp;
+        }
+    }
+
     /**
      * 每帧更新（由 CameraFollow.lateUpdate 驱动）
      */
     public static update(dt: number): void {
+        this.ensureBound();
         if (!this._shaking || !this._cameraNode) return;
 
         this._elapsed += dt;
