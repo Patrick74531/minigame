@@ -174,6 +174,8 @@ export class HomePage extends Component {
         tween(this._contentNode)
             .to(0.3, { scale: new Vec3(1, 1, 1) })
             .start();
+        // Show settings button at the same time as content buttons.
+        this._settingsModule?.show();
         // Delay hiding the HTML boot splash by ~3 frames so the GPU has time to
         // upload the background texture and render at least one full frame before
         // the HTML overlay starts fading. Without this delay a 1-frame black flash

@@ -1,0 +1,41 @@
+{
+    "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+    "name": "granny-vs-robot",
+    "post": {
+        "dir": "webroot",
+        "entrypoints": {
+            "default": {
+                "entry": "preview.html",
+                "height": "regular",
+                "inline": true
+            },
+            "game": {
+                "entry": "index.html",
+                "height": "tall"
+            }
+        }
+    },
+    "server": {
+        "dir": "dist/server",
+        "entry": "index.cjs"
+    },
+    "permissions": {
+        "redis": true,
+        "reddit": {
+            "enable": true
+        }
+    },
+    "menu": {
+        "items": [
+            {
+                "label": "🏰 New Tower Defense Post",
+                "description": "Create a new Tower Defense game post",
+                "location": "subreddit",
+                "endpoint": "/internal/menu/create-post"
+            }
+        ]
+    },
+    "dev": {
+        "subreddit": "granny_vs_robot_dev"
+    }
+}

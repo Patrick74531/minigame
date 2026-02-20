@@ -13,7 +13,7 @@
   // ╚══════════════════════════════════════════════════════════════════════════════╝
   (function () {
     var W = window.innerWidth, H = window.innerHeight;
-    if (W >= H) return; // Already landscape.
+    if (W >= H) return;
     var LAND_W = H, LAND_H = W;
     Object.defineProperty(window, 'innerWidth',  { get: function () { return LAND_W; }, configurable: true });
     Object.defineProperty(window, 'innerHeight', { get: function () { return LAND_H; }, configurable: true });
@@ -44,17 +44,12 @@
     var REMAP = { touchstart:1, touchmove:1, touchend:1, touchcancel:1,
       pointerdown:1, pointermove:1, pointerup:1, pointercancel:1,
       mousedown:1, mousemove:1, mouseup:1, click:1 };
-    // ── DO NOT MODIFY: canvas.getBoundingClientRect override ─────────────────────
-    //    Returns landscape dims so Cocos sees scale=1 (prevents ×2 scale distortion
-    //    caused by the canvas being CSS-rotated into portrait physical rect).
     function patchCanvas(c) {
       c.getBoundingClientRect = function () {
         return { left: 0, top: 0, right: LAND_W, bottom: LAND_H,
                  width: LAND_W, height: LAND_H, x: 0, y: 0,
                  toJSON: function () { return this; } };
       };
-      // ── DO NOT MODIFY: Touch coordinate remapping ─────────────────────────────
-      //    portrait (tx,ty) → landscape game (gx,gy): gx = H-ty, gy = tx
       function rxy(tx, ty) {
         return { x: H - ty, y: tx };
       }
@@ -114,13 +109,13 @@
 
   // ── Re-entry fix ──────────────────────────────────────────────────────────────
   // DevVit keeps the WebView alive between sessions. If the user was away for
-  // >5 s after the game fully loaded, force a fresh reload on return so the game
+  // >3 s after the game fully loaded, force a fresh reload on return so the game
   // starts in a clean state instead of a stale/paused one.
   var _hiddenAt = 0;
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden') {
       _hiddenAt = Date.now();
-    } else if (_hiddenAt > 0 && _splashHidden && (Date.now() - _hiddenAt) > 5000) {
+    } else if (_hiddenAt > 0 && _splashHidden && (Date.now() - _hiddenAt) > 3000) {
       location.reload();
     } else {
       _hiddenAt = 0;
@@ -131,8 +126,21 @@
   window.addEventListener('pageshow', function (e) {
     if (e && e.persisted) location.reload();
   });
+  // DevVit "Play Now" sends WEBVIEW_REMOUNTED each time the button is pressed.
+  // If the splash was already dismissed (game was running), reload for a clean start.
+  // Messages from DevVit arrive either direct or wrapped in a devvit-message envelope.
+  window.addEventListener('message', function (e) {
+    var d = e && e.data;
+    if (!d || typeof d !== 'object') return;
+    if (d.type === 'devvit-message' && d.data && d.data.message) d = d.data.message;
+    if (d.type === 'WEBVIEW_REMOUNTED' && _splashHidden) {
+      location.reload();
+    }
+  });
 
-  function byId(id) { return document.getElementById(id); }
+  function byId(id) {
+    return document.getElementById(id);
+  }
 
   function mountSplash() {
     if (byId('boot-splash')) return;
@@ -164,8 +172,6 @@
   function startSplashProgress() {
     var pct = 0;
     setSplashProgress(0);
-    // Progress advances quickly at first, slows near 90%, then creeps to 99%
-    // so the bar never freezes. _hideSplash() jumps it to 100% and fades out.
     _progressTimer = window.setInterval(function () {
       if (_splashHidden) return;
       var step = pct < 35 ? 4.5 : pct < 70 ? 2.2 : pct < 90 ? 0.8 : 0.12;
@@ -188,10 +194,6 @@
     }, 420);
   }
 
-  // Called by Cocos once the homepage background texture is loaded and set on
-  // the sprite. We wait 800 ms before fading so the GPU has time to upload the
-  // texture and render at least one full frame — eliminating the flash of gray
-  // that appeared when the splash faded to an unrendered canvas.
   window._hideSplash = function () {
     if (_splashHidden || _hideScheduled) return;
     _hideScheduled = true;
@@ -204,10 +206,20 @@
     if (!panel) {
       panel = document.createElement('pre');
       panel.id = panelId;
-      panel.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;max-height:40%;' +
-        'overflow:auto;margin:0;padding:10px;background:rgba(0,0,0,0.75);color:#ffb4b4;' +
-        'font:12px/1.4 Menlo,Monaco,monospace;border:1px solid rgba(255,180,180,0.5);' +
-        'border-radius:8px;z-index:2147483647';
+      panel.style.position = 'fixed';
+      panel.style.left = '8px';
+      panel.style.right = '8px';
+      panel.style.bottom = '8px';
+      panel.style.maxHeight = '40%';
+      panel.style.overflow = 'auto';
+      panel.style.margin = '0';
+      panel.style.padding = '10px';
+      panel.style.background = 'rgba(0,0,0,0.75)';
+      panel.style.color = '#ffb4b4';
+      panel.style.font = '12px/1.4 Menlo, Monaco, monospace';
+      panel.style.border = '1px solid rgba(255,180,180,0.5)';
+      panel.style.borderRadius = '8px';
+      panel.style.zIndex = '2147483647';
       panel.textContent = '[boot] runtime error\n';
       document.body.appendChild(panel);
     }
@@ -222,7 +234,9 @@
       parts.push(String(item && item.stack ? item.stack : item));
     }
     appendError('[console.error] ' + parts.join(' | '));
-    if (originalConsoleError) originalConsoleError.apply(console, arguments);
+    if (originalConsoleError) {
+      originalConsoleError.apply(console, arguments);
+    }
   };
 
   window.addEventListener('error', function (event) {
@@ -240,7 +254,9 @@
 
   var gameCanvas = document.getElementById('GameCanvas');
   if (gameCanvas) {
-    gameCanvas.addEventListener('contextmenu', function (event) { event.preventDefault(); });
+    gameCanvas.addEventListener('contextmenu', function (event) {
+      event.preventDefault();
+    });
   }
 
   if (typeof System === 'undefined') {
@@ -251,7 +267,6 @@
 
   System.import('./index.js')
     .then(function () {
-      // Fallback: hide splash automatically if Cocos never calls window._hideSplash().
       _fallbackHideTimer = setTimeout(function () {
         if (!_splashHidden) hideSplash();
       }, 25000);

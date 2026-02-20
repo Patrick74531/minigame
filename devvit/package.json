@@ -2,14 +2,21 @@
     "name": "granny-vs-robot",
     "version": "0.0.0",
     "license": "BSD-3-Clause",
+    "type": "module",
+    "private": true,
     "scripts": {
+        "build:preview": "esbuild src/client/preview-entry.ts --bundle --format=iife --platform=browser --outfile=webroot/preview.js --minify",
+        "build:server": "esbuild src/server/index.ts --bundle --platform=node --format=cjs --outfile=dist/server/index.cjs",
+        "build": "npm run build:preview && npm run build:server",
         "patch": "node scripts/patch-csp.cjs",
-        "dev": "node scripts/patch-csp.cjs && devvit playtest",
-        "upload": "node scripts/patch-csp.cjs && devvit upload"
+        "upload": "node scripts/patch-csp.cjs && npm run build && devvit upload"
     },
     "dependencies": {
-        "@devvit/public-api": "0.12.13"
-    },
-    "type": "module",
-    "private": true
+        "@devvit/public-api": "0.12.13",
+        "@devvit/web": "0.12.12",
+        "@hono/node-server": "^1.13.7",
+        "devvit": "0.12.12",
+        "esbuild": "^0.24.0",
+        "hono": "^4.6.0"
+    }
 }

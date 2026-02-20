@@ -231,19 +231,35 @@ rewrite_index_for_reddit() {
   var _progressTimer = 0;
   var _fallbackHideTimer = 0;
 
-  // Re-entry fix: reload if WebView resurfaces after being hidden for >5 s.
+  // ── Re-entry fix ──────────────────────────────────────────────────────────────
+  // DevVit keeps the WebView alive between sessions. If the user was away for
+  // >3 s after the game fully loaded, force a fresh reload on return so the game
+  // starts in a clean state instead of a stale/paused one.
   var _hiddenAt = 0;
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden') {
       _hiddenAt = Date.now();
-    } else if (_hiddenAt > 0 && _splashHidden && (Date.now() - _hiddenAt) > 5000) {
+    } else if (_hiddenAt > 0 && _splashHidden && (Date.now() - _hiddenAt) > 3000) {
       location.reload();
     } else {
       _hiddenAt = 0;
     }
   });
+  // iOS back-forward cache (bfcache) — the page is served from memory without
+  // re-running scripts. Always force a real reload in that case.
   window.addEventListener('pageshow', function (e) {
     if (e && e.persisted) location.reload();
+  });
+  // DevVit "Play Now" sends WEBVIEW_REMOUNTED each time the button is pressed.
+  // If the splash was already dismissed (game was running), reload for a clean start.
+  // Messages from DevVit arrive either direct or wrapped in a devvit-message envelope.
+  window.addEventListener('message', function (e) {
+    var d = e && e.data;
+    if (!d || typeof d !== 'object') return;
+    if (d.type === 'devvit-message' && d.data && d.data.message) d = d.data.message;
+    if (d.type === 'WEBVIEW_REMOUNTED' && _splashHidden) {
+      location.reload();
+    }
   });
 
   function byId(id) {
@@ -624,6 +640,10 @@ ORIENTEOF
   if [ -f "$main_bundle" ]; then
     perl -0pi -e 's/setDesignResolutionSize(this.DESIGN_WIDTH,this.DESIGN_HEIGHT,r.NO_BORDER)/setDesignResolutionSize(this.DESIGN_WIDTH,this.DESIGN_HEIGHT,r.FIXED_HEIGHT)/g' "$main_bundle"
   fi
+
+  # Do not duplicate homepage.webp into webroot root.
+  # Post card background uses the already bundled Cocos resource:
+  # assets/resources/native/43/43df4bfb-9353-4896-bd99-3c6cda36e111.webp
 
   # Inject splash markup so loading UI is visible before large JS bundles finish downloading.
   perl -0pi -e 's#(<body[^>]*>)#$1\n  <div id="boot-splash">\n    <div class="boot-splash__panel">\n      <div class="boot-splash__title">Tower Defense</div>\n      <div class="boot-splash__sub">Loading game assets...</div>\n      <div class="boot-splash__bar"><div id="boot-splash-fill" class="boot-splash__fill"></div></div>\n      <div id="boot-splash-pct" class="boot-splash__pct">0%</div>\n      <button id="boot-splash-retry" class="boot-splash__retry">Reload</button>\n    </div>\n  </div>#i' "$index_file"

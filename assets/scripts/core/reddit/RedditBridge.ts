@@ -29,13 +29,9 @@ export class RedditBridge {
     private _username: string = 'Anonymous';
     private _isSubscribed: boolean = false;
     private _subredditName: string = '';
-    private _boundHandler: ((ev: MessageEvent) => void) | null = null;
 
     private constructor() {
         this._isRedditEnvironment = this._detectRedditEnvironment();
-        if (this._isRedditEnvironment) {
-            this._bindMessageListener();
-        }
     }
 
     public static get instance(): RedditBridge {
@@ -71,61 +67,106 @@ export class RedditBridge {
     }
 
     public requestInit(): void {
-        if (this._isRedditEnvironment) {
-            this._sendToDevvit({ type: 'INIT' });
-        } else {
-            this._emit({
-                type: 'error',
-                message: 'Reddit bridge is unavailable outside Reddit/Devvit environment',
-            });
+        if (!this._isRedditEnvironment) {
+            this._emit({ type: 'error', message: 'Reddit bridge is unavailable outside Devvit' });
+            return;
         }
+        fetch('/api/init')
+            .then(r => r.json())
+            .then((data: unknown) => {
+                const d = data as {
+                    username?: string;
+                    isSubscribed?: boolean;
+                    subredditName?: string;
+                    leaderboard?: LeaderboardEntry[];
+                };
+                this._username = d.username ?? 'Anonymous';
+                this._isSubscribed = !!d.isSubscribed;
+                this._subredditName = d.subredditName ?? '';
+                this._emit({
+                    type: 'init',
+                    data: {
+                        username: this._username,
+                        isSubscribed: this._isSubscribed,
+                        subredditName: this._subredditName,
+                        leaderboard: d.leaderboard ?? [],
+                    },
+                });
+            })
+            .catch((e: unknown) => {
+                this._emit({ type: 'error', message: String(e) });
+            });
     }
 
     public submitScore(score: number, wave: number): void {
-        if (this._isRedditEnvironment) {
-            this._sendToDevvit({ type: 'SUBMIT_SCORE', payload: { score, wave } });
-        } else {
-            this._emit({
-                type: 'error',
-                message: 'SUBMIT_SCORE is unavailable outside Reddit/Devvit environment',
-            });
+        if (!this._isRedditEnvironment) {
+            this._emit({ type: 'error', message: 'SUBMIT_SCORE unavailable outside Devvit' });
+            return;
         }
+        fetch('/api/submit-score', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ score, wave }),
+        })
+            .then(r => r.json())
+            .then((data: unknown) => {
+                const d = data as { rank?: number; score?: number; isNewBest?: boolean };
+                this._emit({
+                    type: 'score_submitted',
+                    rank: d.rank ?? 0,
+                    score: d.score ?? score,
+                    isNewBest: d.isNewBest ?? false,
+                });
+            })
+            .catch((e: unknown) => {
+                this._emit({ type: 'error', message: String(e) });
+            });
     }
 
     public requestLeaderboard(): void {
-        if (this._isRedditEnvironment) {
-            this._sendToDevvit({ type: 'GET_LEADERBOARD' });
-        } else {
-            this._emit({
-                type: 'error',
-                message: 'GET_LEADERBOARD is unavailable outside Reddit/Devvit environment',
-            });
+        if (!this._isRedditEnvironment) {
+            this._emit({ type: 'error', message: 'GET_LEADERBOARD unavailable outside Devvit' });
+            return;
         }
+        fetch('/api/leaderboard')
+            .then(r => r.json())
+            .then((data: unknown) => {
+                const d = data as { entries?: LeaderboardEntry[] };
+                this._emit({ type: 'leaderboard', entries: d.entries ?? [] });
+            })
+            .catch((e: unknown) => {
+                this._emit({ type: 'error', message: String(e) });
+            });
     }
 
     public requestSubscribe(): void {
-        if (this._isRedditEnvironment) {
-            this._sendToDevvit({ type: 'SUBSCRIBE' });
-        } else {
-            this._emit({
-                type: 'error',
-                message: 'SUBSCRIBE is unavailable outside Reddit/Devvit environment',
-            });
+        if (!this._isRedditEnvironment) {
+            this._emit({ type: 'error', message: 'SUBSCRIBE unavailable outside Devvit' });
+            return;
         }
+        fetch('/api/subscribe', { method: 'POST' })
+            .then(r => r.json())
+            .then((data: unknown) => {
+                const d = data as { success?: boolean };
+                this._isSubscribed = true;
+                this._emit({
+                    type: 'subscription_result',
+                    success: d.success ?? true,
+                    alreadySubscribed: false,
+                });
+            })
+            .catch((e: unknown) => {
+                this._emit({ type: 'error', message: String(e) });
+            });
     }
 
     public destroy(): void {
-        if (this._boundHandler) {
-            window.removeEventListener('message', this._boundHandler);
-            this._boundHandler = null;
-        }
         this._listeners = [];
         _instance = null;
     }
 
     private _detectRedditEnvironment(): boolean {
         if (typeof window === 'undefined') return false;
-
         try {
             const host = window.location.hostname.toLowerCase();
             const embedded = window.self !== window.top;
@@ -134,7 +175,6 @@ export class RedditBridge {
                 host === '127.0.0.1' ||
                 host.endsWith('.local') ||
                 host === '';
-
             return (
                 (embedded && !isLocalHost) ||
                 host.includes('reddit.com') ||
@@ -142,90 +182,6 @@ export class RedditBridge {
             );
         } catch {
             return true;
-        }
-    }
-
-    private _bindMessageListener(): void {
-        this._boundHandler = (ev: MessageEvent) => {
-            this._handleDevvitMessage(ev);
-        };
-        window.addEventListener('message', this._boundHandler);
-    }
-
-    private _handleDevvitMessage(ev: MessageEvent): void {
-        if (!ev.data || typeof ev.data !== 'object') return;
-
-        const msg = ev.data as { type: string; payload?: unknown };
-
-        switch (msg.type) {
-            case 'INIT_RESPONSE': {
-                const p = msg.payload as {
-                    username: string;
-                    isSubscribed: boolean;
-                    subredditName: string;
-                    leaderboard: LeaderboardEntry[];
-                };
-                this._username = p.username ?? 'Anonymous';
-                this._isSubscribed = !!p.isSubscribed;
-                this._subredditName = p.subredditName ?? '';
-                this._emit({
-                    type: 'init',
-                    data: {
-                        username: this._username,
-                        isSubscribed: this._isSubscribed,
-                        subredditName: this._subredditName,
-                        leaderboard: p.leaderboard ?? [],
-                    },
-                });
-                break;
-            }
-
-            case 'LEADERBOARD_DATA': {
-                const p = msg.payload as { entries: LeaderboardEntry[] };
-                this._emit({ type: 'leaderboard', entries: p.entries ?? [] });
-                break;
-            }
-
-            case 'SCORE_SUBMITTED': {
-                const p = msg.payload as {
-                    rank: number;
-                    score: number;
-                    isNewBest: boolean;
-                };
-                this._emit({
-                    type: 'score_submitted',
-                    rank: p.rank,
-                    score: p.score,
-                    isNewBest: p.isNewBest,
-                });
-                break;
-            }
-
-            case 'SUBSCRIPTION_RESULT': {
-                const p = msg.payload as { success: boolean; alreadySubscribed?: boolean };
-                this._isSubscribed = true;
-                this._emit({
-                    type: 'subscription_result',
-                    success: p.success,
-                    alreadySubscribed: p.alreadySubscribed ?? false,
-                });
-                break;
-            }
-
-            case 'ERROR': {
-                const p = msg.payload as { message: string };
-                this._emit({ type: 'error', message: p.message });
-                break;
-            }
-        }
-    }
-
-    private _sendToDevvit(message: unknown): void {
-        if (!this._isRedditEnvironment) return;
-        try {
-            window.parent.postMessage(message, '*');
-        } catch (e) {
-            console.warn('[RedditBridge] postMessage failed', e);
         }
     }
 

@@ -66,6 +66,12 @@ export class HUDSettingsModule implements HUDModule {
         this.updateSettingsLayout();
     }
 
+    public show(): void {
+        if (this._settingsButtonNode) {
+            this._settingsButtonNode.active = true;
+        }
+    }
+
     public cleanup(): void {
         if (this._settingsPanelOpacity) {
             Tween.stopAllByTarget(this._settingsPanelOpacity);
@@ -244,6 +250,7 @@ export class HUDSettingsModule implements HUDModule {
         this._settingsPanelRoot = panelRoot;
         this._settingsPanelNode = panel;
         this.refreshSettingsPanelUI();
+        buttonNode.active = false;
         panelRoot.active = false;
         applyLayerRecursive(buttonNode, HUD_UI_LAYER);
         applyLayerRecursive(panelRoot, HUD_UI_LAYER);

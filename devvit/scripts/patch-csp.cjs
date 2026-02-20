@@ -1349,3 +1349,82 @@ if (fs.existsSync(mainPath)) {
 })();
 
 console.log('[patch-csp] All patches applied successfully.');
+
+// ─── Inject preview launch screen into webroot ────────────────────────────────
+(function injectPreview() {
+    var DEVVIT_DIR = path.resolve(__dirname, '..');
+    var clientDir = path.join(DEVVIT_DIR, 'src', 'client');
+    var previewHtmlSrc = path.join(clientDir, 'preview.html');
+    var previewCssSrc = path.join(clientDir, 'preview.css');
+
+    if (!fs.existsSync(previewHtmlSrc) || !fs.existsSync(previewCssSrc)) {
+        console.warn(
+            '[patch-csp] preview source files not found in src/client/ – skipping preview injection.'
+        );
+        return;
+    }
+
+    fs.copyFileSync(previewHtmlSrc, path.join(WEBROOT, 'preview.html'));
+    fs.copyFileSync(previewCssSrc, path.join(WEBROOT, 'preview.css'));
+    console.log('[patch-csp]   ✓ Copied preview.html + preview.css into webroot');
+
+    var PROJECT_ROOT = path.resolve(DEVVIT_DIR, '..');
+    var previewAssets = ['granny.webp', 'robot.webp'];
+    previewAssets.forEach(function (fname) {
+        var src = path.join(PROJECT_ROOT, 'assets', 'resources', 'preview', fname);
+        if (fs.existsSync(src)) {
+            fs.copyFileSync(src, path.join(WEBROOT, fname));
+        }
+    });
+    console.log('[patch-csp]   ✓ Copied character preview images into webroot');
+
+    var esbuildBin = path.join(DEVVIT_DIR, 'node_modules', 'esbuild', 'bin', 'esbuild');
+    if (!fs.existsSync(esbuildBin)) {
+        console.warn(
+            '[patch-csp] esbuild not found in devvit/node_modules – run "cd devvit && npm install" first.'
+        );
+        return;
+    }
+
+    var { execSync } = require('child_process');
+    var previewEntry = path.join(clientDir, 'preview-entry.ts');
+    var previewOut = path.join(WEBROOT, 'preview.js');
+    try {
+        execSync(
+            JSON.stringify(esbuildBin) +
+                ' ' +
+                JSON.stringify(previewEntry) +
+                ' --bundle --format=iife --platform=browser --outfile=' +
+                JSON.stringify(previewOut) +
+                ' --minify',
+            { cwd: DEVVIT_DIR, stdio: 'pipe' }
+        );
+        console.log('[patch-csp]   ✓ Bundled preview-entry.ts → webroot/preview.js');
+    } catch (err) {
+        console.error(
+            '[patch-csp] esbuild preview bundle failed:',
+            err.stderr ? err.stderr.toString() : err.message
+        );
+    }
+
+    var serverEntry = path.join(DEVVIT_DIR, 'src', 'server', 'index.ts');
+    var serverOut = path.join(DEVVIT_DIR, 'dist', 'server', 'index.cjs');
+    var serverOutDir = path.dirname(serverOut);
+    if (!fs.existsSync(serverOutDir)) fs.mkdirSync(serverOutDir, { recursive: true });
+    try {
+        execSync(
+            JSON.stringify(esbuildBin) +
+                ' ' +
+                JSON.stringify(serverEntry) +
+                ' --bundle --platform=node --format=cjs --outfile=' +
+                JSON.stringify(serverOut),
+            { cwd: DEVVIT_DIR, stdio: 'pipe' }
+        );
+        console.log('[patch-csp]   ✓ Bundled server/index.ts → dist/server/index.cjs');
+    } catch (err) {
+        console.error(
+            '[patch-csp] esbuild server bundle failed:',
+            err.stderr ? err.stderr.toString() : err.message
+        );
+    }
+})();
