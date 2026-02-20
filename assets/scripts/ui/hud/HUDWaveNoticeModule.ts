@@ -134,9 +134,9 @@ export class HUDWaveNoticeModule implements HUDModule {
         // Or if 'visible' is true, we don't necessarily show them (they show on event).
         // So this might just be "force hide" if false.
         if (!visible) {
-             if (this._waveForecastRoot) this._waveForecastRoot.active = false;
-             if (this._laneUnlockDialogRoot) this._laneUnlockDialogRoot.active = false;
-             if (this._heroRespawnRoot) this._heroRespawnRoot.active = false;
+            if (this._waveForecastRoot) this._waveForecastRoot.active = false;
+            if (this._laneUnlockDialogRoot) this._laneUnlockDialogRoot.active = false;
+            if (this._heroRespawnRoot) this._heroRespawnRoot.active = false;
         }
     }
 
@@ -616,11 +616,13 @@ export class HUDWaveNoticeModule implements HUDModule {
     }
 
     private applyResponsiveLayout(): void {
-        const canvasTransform = this._uiCanvas?.getComponent(UITransform);
-        if (!canvasTransform) return;
+        if (!this._uiCanvas) return;
 
-        const viewportW = Math.max(480, Math.round(canvasTransform.contentSize.width));
-        const viewportH = Math.max(320, Math.round(canvasTransform.contentSize.height));
+        const vis = UIResponsive.getVisibleSize();
+        if (vis.width <= 0 || vis.height <= 0) return;
+
+        const viewportW = Math.max(480, Math.round(vis.width));
+        const viewportH = Math.max(320, Math.round(vis.height));
         const compact = viewportW < 900 || viewportH < 620;
         const padding = UIResponsive.getControlPadding();
 

@@ -34,9 +34,10 @@ export class UIFactory {
         view.setDesignResolutionSize(
             this.DESIGN_WIDTH,
             this.DESIGN_HEIGHT,
-            // Avoid letterboxing on mobile webviews while preserving aspect ratio.
-            // NO_BORDER crops overflow instead of stretching UI elements.
-            ResolutionPolicy.NO_BORDER
+            // FIXED_HEIGHT: design height is always 720 design units, width scales
+            // with viewport aspect ratio. This ensures top/bottom Widget anchors
+            // always align to camera edges on all screen sizes (desktop & mobile).
+            ResolutionPolicy.FIXED_HEIGHT
         );
         transform.setContentSize(this.DESIGN_WIDTH, this.DESIGN_HEIGHT);
 

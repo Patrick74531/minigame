@@ -635,12 +635,6 @@ ORIENTEOF
     perl -0pi -e 's/"splashScreen"\s*:\s*\{([^{}]*?)"totalTime"\s*:\s*\d+/"splashScreen":{$1"totalTime":0/s' "$settings_file"
   fi
 
-  # Ensure runtime UI resolution policy avoids letterboxing while preserving aspect ratio.
-  local main_bundle="${webroot}/assets/main/index.js"
-  if [ -f "$main_bundle" ]; then
-    perl -0pi -e 's/setDesignResolutionSize(this.DESIGN_WIDTH,this.DESIGN_HEIGHT,r.NO_BORDER)/setDesignResolutionSize(this.DESIGN_WIDTH,this.DESIGN_HEIGHT,r.FIXED_HEIGHT)/g' "$main_bundle"
-  fi
-
   # Do not duplicate homepage.webp into webroot root.
   # Post card background uses the already bundled Cocos resource:
   # assets/resources/native/43/43df4bfb-9353-4896-bd99-3c6cda36e111.webp

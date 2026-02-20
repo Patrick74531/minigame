@@ -70,7 +70,6 @@ export class HUDSettingsModule implements HUDModule {
         if (!this._settingsButtonNode) return;
         this.updateSettingsLayout();
         this._settingsButtonNode.active = true;
-        this._settingsButtonNode.getComponent(Widget)?.updateAlignment();
         this._settingsButtonNode.setScale(0.96, 0.96, 1);
         tween(this._settingsButtonNode)
             .to(0.3, { scale: new Vec3(1, 1, 1) })
