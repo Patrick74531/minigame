@@ -67,9 +67,14 @@ export class HUDSettingsModule implements HUDModule {
     }
 
     public show(): void {
-        if (this._settingsButtonNode) {
-            this._settingsButtonNode.active = true;
-        }
+        if (!this._settingsButtonNode) return;
+        this.updateSettingsLayout();
+        this._settingsButtonNode.active = true;
+        this._settingsButtonNode.getComponent(Widget)?.updateAlignment();
+        this._settingsButtonNode.setScale(0.96, 0.96, 1);
+        tween(this._settingsButtonNode)
+            .to(0.3, { scale: new Vec3(1, 1, 1) })
+            .start();
     }
 
     public cleanup(): void {
@@ -717,13 +722,13 @@ export class HUDSettingsModule implements HUDModule {
     }
 
     private updateSettingsLayout(): void {
-        const canvasTransform = this._uiCanvas?.getComponent(UITransform);
-        if (!canvasTransform || !this._settingsButtonNode || !this._settingsPanelNode) {
+        if (!this._settingsButtonNode || !this._settingsPanelNode) {
             return;
         }
 
-        const viewportW = Math.max(480, Math.round(canvasTransform.contentSize.width));
-        const viewportH = Math.max(320, Math.round(canvasTransform.contentSize.height));
+        const vis = UIResponsive.getVisibleSize();
+        const viewportW = Math.max(480, Math.round(vis.width));
+        const viewportH = Math.max(320, Math.round(vis.height));
         const compact = viewportW < 920 || viewportH < 620;
         const padding = UIResponsive.getControlPadding();
 
@@ -743,12 +748,24 @@ export class HUDSettingsModule implements HUDModule {
         );
         const buttonTf = this._settingsButtonNode.getComponent(UITransform);
         buttonTf?.setContentSize(buttonW, buttonH);
+
+        // Bypass Widget entirely — position directly relative to the visible viewport center.
+        // UICanvas UITransform is hardcoded 1280×720, so Widget.isAlignRight would place
+        // elements at canvas-edge ±640, while the camera only shows ±(vis.width/2).
+        const topPad = Math.max(10, Math.round(padding.top * 0.45));
+        const rightPad = Math.max(10, Math.round(padding.right * 0.55));
+        const halfW = vis.width * 0.5;
+        const halfH = vis.height * 0.5;
+
+        // Disable Widget entirely so its onEnable() cannot re-apply the original
+        // isAlignTop/isAlignRight values and override our explicit setPosition.
         const buttonWidget = this._settingsButtonNode.getComponent(Widget);
-        if (buttonWidget) {
-            buttonWidget.top = Math.max(10, Math.round(padding.top * 0.45));
-            buttonWidget.right = Math.max(10, Math.round(padding.right * 0.42));
-            buttonWidget.updateAlignment();
-        }
+        if (buttonWidget) buttonWidget.enabled = false;
+        this._settingsButtonNode.setPosition(
+            Math.round(halfW - rightPad - buttonW * 0.5),
+            Math.round(halfH - topPad - buttonH * 0.5),
+            0
+        );
         const buttonLabel = this._settingsButtonNode.getChildByName('SettingsButtonLabel');
         const buttonLabelTf = buttonLabel?.getComponent(UITransform);
         buttonLabelTf?.setContentSize(buttonW - 48, buttonH - 8);
@@ -784,15 +801,18 @@ export class HUDSettingsModule implements HUDModule {
                 SETTINGS_PANEL_MAX_HEIGHT
             )
         );
-        const panelTopCandidate = (buttonWidget?.top ?? 10) + buttonH + (compact ? 8 : 10);
+        const gap = compact ? 8 : 10;
         const panelH = Math.max(SETTINGS_PANEL_MIN_HEIGHT, Math.min(desiredPanelH, viewportH - 16));
         this._settingsPanelNode.getComponent(UITransform)?.setContentSize(panelW, panelH);
         const panelWidget = this._settingsPanelNode.getComponent(Widget);
-        if (panelWidget && buttonWidget) {
-            panelWidget.top = Math.max(8, Math.min(panelTopCandidate, viewportH - panelH - 8));
-            panelWidget.right = buttonWidget.right;
-            panelWidget.updateAlignment();
-        }
+        if (panelWidget) panelWidget.enabled = false;
+        // Panel sits directly below the button, right-aligned to the same edge.
+        // panelRoot fills UICanvas (1280×720); local coords are same as UICanvas coords.
+        const panelTopFromCenter = halfH - topPad - buttonH - gap;
+        const panelY = Math.round(
+            Math.max(-(halfH - panelH * 0.5 - 8), panelTopFromCenter - panelH * 0.5)
+        );
+        this._settingsPanelNode.setPosition(Math.round(halfW - rightPad - panelW * 0.5), panelY, 0);
         if (this._settingsPanelBg) {
             this.drawSettingsPanelBackground(this._settingsPanelBg);
         }

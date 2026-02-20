@@ -1200,25 +1200,121 @@ if (fs.existsSync(mainPath)) {
     }
 
     // ── Patch LB_LOCAL: Leaderboard fallback in non-Reddit env ───────────────────
-    // In local/non-Reddit env, requestLeaderboard() emits {type:'error'} which has no
-    // handler -> leaderboard panel stays on "loading" forever.
-    // Fix: emit empty leaderboard entries instead so the panel shows "empty" state.
+    // Source now emits {type:'leaderboard',entries:cachedLeaderboard} instead of
+    // {type:'error'} in non-Reddit env, so panel never stays on "loading" forever.
+    // This patch is a safety net for builds compiled from the old source.
     const LB_LOCAL_OLD =
-        'this._emit({type:"error",message:"GET_LEADERBOARD is unavailable outside Reddit/Devvit environment"})';
-    const LB_LOCAL_NEW = 'this._emit({type:"leaderboard",entries:[]})';
-    if (main.includes(LB_LOCAL_NEW)) {
+        'this._emit({type:"error",message:"GET_LEADERBOARD unavailable outside Devvit"})';
+    const LB_LOCAL_NEW = 'this._emit({type:"leaderboard",entries:this._cachedLeaderboard})';
+    if (main.includes('type:"leaderboard",entries:this.') || main.includes(LB_LOCAL_NEW)) {
         console.log(
-            '[patch-csp]   ~ Patch LB_LOCAL: leaderboard local fallback already applied (skipping)'
+            '[patch-csp]   ~ Patch LB_LOCAL: leaderboard local fallback already in source (skipping)'
         );
     } else if (main.includes(LB_LOCAL_OLD)) {
         main = main.replace(LB_LOCAL_OLD, LB_LOCAL_NEW);
         console.log(
-            '[patch-csp]   ✓ Patch LB_LOCAL: leaderboard emits empty entries in non-Reddit env'
+            '[patch-csp]   ✓ Patch LB_LOCAL: leaderboard emits cached entries in non-Reddit env'
+        );
+    } else {
+        console.log(
+            '[patch-csp]   ~ Patch LB_LOCAL: pattern not found (source already fixed – OK)'
+        );
+    }
+
+    // ── Patch RB_MOBILE_SYNC: unify mobile/desktop leaderboard pipeline ─────────
+    // Some shipped bundles still gate /api calls on static hostname detection.
+    // In mobile WebView, hostname can be localhost/empty and gets misclassified.
+    // Fixes:
+    //  1) requestInit/requestLeaderboard/submitScore always attempt /api fetch.
+    //  2) add no-store + credentials + cache-busting query for leaderboard/init.
+    //  3) submit-score uses keepalive and updates cached leaderboard immediately.
+    //  4) broaden environment detection for empty host + redd.it.
+    const RB_DETECT_OLD =
+        'i="localhost"===e||"127.0.0.1"===e||e.endsWith(".local")||""===e;return t&&!i||e.includes("reddit.com")||void 0!==window.__devvit__';
+    const RB_DETECT_NEW =
+        'i="localhost"===e||"127.0.0.1"===e||e.endsWith(".local");return t&&!i||""===e||e.includes("reddit.com")||e.includes("redd.it")||void 0!==window.__devvit__';
+    if (main.includes('e.includes("redd.it")')) {
+        console.log('[patch-csp]   ~ Patch RB_MOBILE_SYNC: detectRedditEnvironment already updated');
+    } else if (main.includes(RB_DETECT_OLD)) {
+        main = main.replace(RB_DETECT_OLD, RB_DETECT_NEW);
+        console.log(
+            '[patch-csp]   ✓ Patch RB_MOBILE_SYNC: detectRedditEnvironment accepts mobile hosts'
         );
     } else {
         console.warn(
-            '[patch-csp]   ~ Patch LB_LOCAL: GET_LEADERBOARD error emit pattern not found (skipping)'
+            '[patch-csp]   ~ Patch RB_MOBILE_SYNC: detectRedditEnvironment pattern not found (skipping)'
         );
+    }
+
+    const RB_INIT_FETCH_OLD = 'this._isRedditEnvironment?fetch("/api/init")';
+    const RB_INIT_FETCH_NEW =
+        'fetch("/api/init?_ts="+Date.now(),{cache:"no-store",credentials:"include"})';
+    if (main.includes(RB_INIT_FETCH_NEW)) {
+        console.log('[patch-csp]   ~ Patch RB_MOBILE_SYNC: requestInit fetch already updated');
+    } else if (main.includes(RB_INIT_FETCH_OLD)) {
+        main = main.replace(RB_INIT_FETCH_OLD, RB_INIT_FETCH_NEW);
+        main = main.replace(
+            ')):this._emit({type:"error",message:"Reddit bridge is unavailable outside Devvit"})',
+            '))'
+        );
+        main = main.replace(
+            'var i,n,r,s,d=t;e._username=',
+            'var i,n,r,s,d=t;e._isRedditEnvironment=!0,e._username='
+        );
+        console.log('[patch-csp]   ✓ Patch RB_MOBILE_SYNC: requestInit always calls /api/init');
+    } else {
+        console.warn('[patch-csp]   ~ Patch RB_MOBILE_SYNC: requestInit pattern not found');
+    }
+
+    const RB_LB_FETCH_OLD = 'this._isRedditEnvironment?fetch("/api/leaderboard")';
+    const RB_LB_FETCH_NEW =
+        'fetch("/api/leaderboard?_ts="+Date.now(),{cache:"no-store",credentials:"include"})';
+    if (main.includes(RB_LB_FETCH_NEW)) {
+        console.log(
+            '[patch-csp]   ~ Patch RB_MOBILE_SYNC: requestLeaderboard fetch already updated'
+        );
+    } else if (main.includes(RB_LB_FETCH_OLD)) {
+        main = main.replace(RB_LB_FETCH_OLD, RB_LB_FETCH_NEW);
+        main = main.replace(')):this._emit({type:"leaderboard",entries:this._cachedLeaderboard})', '))');
+        console.log(
+            '[patch-csp]   ✓ Patch RB_MOBILE_SYNC: requestLeaderboard always calls /api/leaderboard'
+        );
+    } else {
+        console.warn('[patch-csp]   ~ Patch RB_MOBILE_SYNC: requestLeaderboard pattern not found');
+    }
+
+    const RB_SUBMIT_FETCH_OLD =
+        'this._isRedditEnvironment?fetch("/api/submit-score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({score:e,wave:t})})';
+    const RB_SUBMIT_FETCH_NEW =
+        'fetch("/api/submit-score",{method:"POST",keepalive:!0,cache:"no-store",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({score:e,wave:t})})';
+    if (main.includes('keepalive:!0,cache:"no-store",credentials:"include"')) {
+        console.log(
+            '[patch-csp]   ~ Patch RB_MOBILE_SYNC: submitScore fetch keepalive/no-store already updated'
+        );
+    } else if (main.includes(RB_SUBMIT_FETCH_OLD)) {
+        main = main.replace(RB_SUBMIT_FETCH_OLD, RB_SUBMIT_FETCH_NEW);
+        main = main.replace(
+            '):this._emit({type:"error",message:"SUBMIT_SCORE unavailable outside Devvit"})',
+            ')'
+        );
+        console.log('[patch-csp]   ✓ Patch RB_MOBILE_SYNC: submitScore always posts with keepalive');
+    } else {
+        console.warn('[patch-csp]   ~ Patch RB_MOBILE_SYNC: submitScore pattern not found');
+    }
+
+    const RB_SUBMIT_EMIT_OLD =
+        'var n,r,s,d=t;i._emit({type:"score_submitted",rank:null!=(n=d.rank)?n:0,score:null!=(r=d.score)?r:e,isNewBest:null!=(s=d.isNewBest)&&s})';
+    const RB_SUBMIT_EMIT_NEW =
+        'var n,r,s,d=t;Array.isArray(d.leaderboard)?(i._cachedLeaderboard=d.leaderboard,i._emit({type:"leaderboard",entries:d.leaderboard})):i.requestLeaderboard(),i._emit({type:"score_submitted",rank:null!=(n=d.rank)?n:0,score:null!=(r=d.score)?r:e,isNewBest:null!=(s=d.isNewBest)&&s})';
+    if (main.includes('Array.isArray(d.leaderboard)')) {
+        console.log(
+            '[patch-csp]   ~ Patch RB_MOBILE_SYNC: submitScore leaderboard sync already updated'
+        );
+    } else if (main.includes(RB_SUBMIT_EMIT_OLD)) {
+        main = main.replace(RB_SUBMIT_EMIT_OLD, RB_SUBMIT_EMIT_NEW);
+        console.log('[patch-csp]   ✓ Patch RB_MOBILE_SYNC: submitScore now refreshes leaderboard cache');
+    } else {
+        console.warn('[patch-csp]   ~ Patch RB_MOBILE_SYNC: submitScore emit pattern not found');
     }
 
     const BULLET_OLD =

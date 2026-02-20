@@ -52,22 +52,6 @@
       ],
       "subMetas": {}
     },
-    "95217": {
-      "importer": "gltf-material",
-      "uuid": "7090fdc9-ee52-48be-b115-1c7db9192e30@95217",
-      "displayName": "",
-      "id": "95217",
-      "name": "Main2.material",
-      "userData": {
-        "gltfIndex": 5
-      },
-      "ver": "1.0.14",
-      "imported": true,
-      "files": [
-        ".json"
-      ],
-      "subMetas": {}
-    },
     "99380": {
       "importer": "gltf-material",
       "uuid": "7090fdc9-ee52-48be-b115-1c7db9192e30@99380",
@@ -316,38 +300,6 @@
       ],
       "subMetas": {}
     },
-    "087e2": {
-      "importer": "gltf-material",
-      "uuid": "7090fdc9-ee52-48be-b115-1c7db9192e30@087e2",
-      "displayName": "",
-      "id": "087e2",
-      "name": "Edge.material",
-      "userData": {
-        "gltfIndex": 6
-      },
-      "ver": "1.0.14",
-      "imported": true,
-      "files": [
-        ".json"
-      ],
-      "subMetas": {}
-    },
-    "925cb": {
-      "importer": "gltf-material",
-      "uuid": "7090fdc9-ee52-48be-b115-1c7db9192e30@925cb",
-      "displayName": "",
-      "id": "925cb",
-      "name": "Main.material",
-      "userData": {
-        "gltfIndex": 7
-      },
-      "ver": "1.0.14",
-      "imported": true,
-      "files": [
-        ".json"
-      ],
-      "subMetas": {}
-    },
     "844a7": {
       "importer": "gltf-scene",
       "uuid": "7090fdc9-ee52-48be-b115-1c7db9192e30@844a7",
@@ -400,10 +352,7 @@
         "7090fdc9-ee52-48be-b115-1c7db9192e30@99380",
         "7090fdc9-ee52-48be-b115-1c7db9192e30@e736c",
         "7090fdc9-ee52-48be-b115-1c7db9192e30@a9549",
-        "7090fdc9-ee52-48be-b115-1c7db9192e30@b4e6b",
-        "7090fdc9-ee52-48be-b115-1c7db9192e30@95217",
-        "7090fdc9-ee52-48be-b115-1c7db9192e30@087e2",
-        "7090fdc9-ee52-48be-b115-1c7db9192e30@925cb"
+        "7090fdc9-ee52-48be-b115-1c7db9192e30@b4e6b"
       ],
       "scenes": [
         "7090fdc9-ee52-48be-b115-1c7db9192e30@844a7"

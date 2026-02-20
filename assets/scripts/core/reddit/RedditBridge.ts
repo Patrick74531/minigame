@@ -24,11 +24,13 @@ type BridgeListener = (event: RedditBridgeCallback) => void;
 let _instance: RedditBridge | null = null;
 
 export class RedditBridge {
+    private static readonly API_TIMEOUT_MS = 8000;
     private _listeners: BridgeListener[] = [];
     private _isRedditEnvironment: boolean = false;
     private _username: string = 'Anonymous';
     private _isSubscribed: boolean = false;
     private _subredditName: string = '';
+    private _cachedLeaderboard: LeaderboardEntry[] = [];
 
     private constructor() {
         this._isRedditEnvironment = this._detectRedditEnvironment();
@@ -67,13 +69,12 @@ export class RedditBridge {
     }
 
     public requestInit(): void {
-        if (!this._isRedditEnvironment) {
-            this._emit({ type: 'error', message: 'Reddit bridge is unavailable outside Devvit' });
-            return;
-        }
-        fetch('/api/init')
-            .then(r => r.json())
+        // Always attempt — mobile Devvit WebView may have hostname='localhost'
+        // (Devvit's embedded HTTP server) which static detection misclassifies as dev.
+        // Confirm the environment on first successful response instead.
+        this._fetchJson('/api/init', { bustCache: true })
             .then((data: unknown) => {
+                this._isRedditEnvironment = true;
                 const d = data as {
                     username?: string;
                     isSubscribed?: boolean;
@@ -83,6 +84,7 @@ export class RedditBridge {
                 this._username = d.username ?? 'Anonymous';
                 this._isSubscribed = !!d.isSubscribed;
                 this._subredditName = d.subredditName ?? '';
+                this._cachedLeaderboard = d.leaderboard ?? [];
                 this._emit({
                     type: 'init',
                     data: {
@@ -99,18 +101,27 @@ export class RedditBridge {
     }
 
     public submitScore(score: number, wave: number): void {
-        if (!this._isRedditEnvironment) {
-            this._emit({ type: 'error', message: 'SUBMIT_SCORE unavailable outside Devvit' });
-            return;
-        }
-        fetch('/api/submit-score', {
+        // Always attempt — by game-over time, requestInit has confirmed the environment.
+        // On non-Devvit environments fetch will fail and be caught gracefully.
+        this._fetchJson('/api/submit-score', {
             method: 'POST',
+            keepalive: true,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ score, wave }),
         })
-            .then(r => r.json())
             .then((data: unknown) => {
-                const d = data as { rank?: number; score?: number; isNewBest?: boolean };
+                const d = data as {
+                    rank?: number;
+                    score?: number;
+                    isNewBest?: boolean;
+                    leaderboard?: LeaderboardEntry[];
+                };
+                if (Array.isArray(d.leaderboard)) {
+                    this._cachedLeaderboard = d.leaderboard;
+                    this._emit({ type: 'leaderboard', entries: d.leaderboard });
+                } else {
+                    this.requestLeaderboard();
+                }
                 this._emit({
                     type: 'score_submitted',
                     rank: d.rank ?? 0,
@@ -124,19 +135,23 @@ export class RedditBridge {
     }
 
     public requestLeaderboard(): void {
-        if (!this._isRedditEnvironment) {
-            this._emit({ type: 'error', message: 'GET_LEADERBOARD unavailable outside Devvit' });
-            return;
-        }
-        fetch('/api/leaderboard')
-            .then(r => r.json())
+        // Always attempt — same reason as requestInit: mobile may have hostname='localhost'
+        // causing _isRedditEnvironment=false even though the server is reachable.
+        // Fall back to cache only if the fetch actually fails.
+        this._fetchJson('/api/leaderboard', { bustCache: true })
             .then((data: unknown) => {
                 const d = data as { entries?: LeaderboardEntry[] };
-                this._emit({ type: 'leaderboard', entries: d.entries ?? [] });
+                const entries = d.entries ?? [];
+                this._cachedLeaderboard = entries;
+                this._emit({ type: 'leaderboard', entries });
             })
-            .catch((e: unknown) => {
-                this._emit({ type: 'error', message: String(e) });
+            .catch(() => {
+                this._emit({ type: 'leaderboard', entries: this._cachedLeaderboard });
             });
+    }
+
+    public get cachedLeaderboard(): LeaderboardEntry[] {
+        return this._cachedLeaderboard;
     }
 
     public requestSubscribe(): void {
@@ -144,8 +159,7 @@ export class RedditBridge {
             this._emit({ type: 'error', message: 'SUBSCRIBE unavailable outside Devvit' });
             return;
         }
-        fetch('/api/subscribe', { method: 'POST' })
-            .then(r => r.json())
+        this._fetchJson('/api/subscribe', { method: 'POST' })
             .then((data: unknown) => {
                 const d = data as { success?: boolean };
                 this._isSubscribed = true;
@@ -170,19 +184,61 @@ export class RedditBridge {
         try {
             const host = window.location.hostname.toLowerCase();
             const embedded = window.self !== window.top;
+            // Only treat explicit local dev servers as non-Reddit.
+            // Empty hostname (mobile WebView / file:// / devvit WebView) is NOT localhost.
             const isLocalHost =
-                host === 'localhost' ||
-                host === '127.0.0.1' ||
-                host.endsWith('.local') ||
-                host === '';
+                host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local');
             return (
                 (embedded && !isLocalHost) ||
+                host === '' ||
                 host.includes('reddit.com') ||
+                host.includes('redd.it') ||
                 (window as unknown as Record<string, unknown>)['__devvit__'] !== undefined
             );
         } catch {
             return true;
         }
+    }
+
+    private _fetchJson(
+        path: string,
+        init: RequestInit = {},
+        options: { bustCache?: boolean } = {}
+    ): Promise<unknown> {
+        const url = options.bustCache ? this._withCacheBust(path) : path;
+        const headers = new Headers(init.headers ?? undefined);
+        if (!headers.has('Accept')) {
+            headers.set('Accept', 'application/json');
+        }
+
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timeoutId = controller
+            ? globalThis.setTimeout(() => controller.abort(), RedditBridge.API_TIMEOUT_MS)
+            : 0;
+
+        return fetch(url, {
+            ...init,
+            headers,
+            credentials: 'include',
+            cache: 'no-store',
+            signal: controller?.signal,
+        })
+            .then(r => {
+                if (!r.ok) {
+                    throw new Error(`HTTP ${r.status} ${r.statusText}`);
+                }
+                return r.json() as Promise<unknown>;
+            })
+            .finally(() => {
+                if (timeoutId) {
+                    globalThis.clearTimeout(timeoutId);
+                }
+            });
+    }
+
+    private _withCacheBust(path: string): string {
+        const divider = path.includes('?') ? '&' : '?';
+        return `${path}${divider}_ts=${Date.now()}`;
     }
 
     private _emit(event: RedditBridgeCallback): void {

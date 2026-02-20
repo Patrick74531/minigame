@@ -144,9 +144,18 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         this._iconSize = isTouch ? TOUCH_ICON_SIZE : DESKTOP_ICON_SIZE;
         this._barNode.setScale(scale, scale, 1);
 
-        this._barWidget.bottom = padding.bottom;
-        this._barWidget.right = padding.right;
-        this._barWidget.updateAlignment();
+        // Bypass Widget entirely — position directly from visible viewport edges.
+        // UICanvas UITransform is hardcoded 1280×720 by UIFactory; Widget.isAlignRight
+        // anchors to canvas-edge ±640, while the camera only shows ±(visW/2).
+        // Disable Widget entirely so onEnable() cannot re-apply original alignment values.
+        if (this._barWidget) this._barWidget.enabled = false;
+        const vis = UIResponsive.getVisibleSize();
+        // Bar anchor is (1, 0): setPosition places the right-bottom corner of the node.
+        this._barNode.setPosition(
+            Math.round(vis.width * 0.5 - padding.right),
+            Math.round(-vis.height * 0.5 + padding.bottom),
+            0
+        );
 
         this._showKeyboardHints = !isTouch;
         this.refresh();

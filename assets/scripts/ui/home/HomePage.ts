@@ -383,11 +383,15 @@ export class HomePage extends Component {
         switch (event.type) {
             case 'init':
                 this._updateSubscribeButton(event.data.isSubscribed);
+                if (this._leaderboardPanel && event.data.leaderboard) {
+                    this._leaderboardPanel.showEntries(event.data.leaderboard);
+                }
                 break;
             case 'leaderboard':
                 this._leaderboardPanel?.showEntries(event.entries);
                 break;
             case 'score_submitted':
+                // Cache/UI refresh is handled inside RedditBridge.submitScore().
                 break;
             case 'subscription_result':
                 if (event.success) {
@@ -397,6 +401,9 @@ export class HomePage extends Component {
                         : 'ui.home.subscribe.success';
                     this._showToast(Localization.instance.t(msgKey));
                 }
+                break;
+            case 'error':
+                this._leaderboardPanel?.showError();
                 break;
         }
     }
@@ -434,8 +441,13 @@ export class HomePage extends Component {
             this._leaderboardPanel?.destroy();
             this._leaderboardPanel = null;
         });
-        this._leaderboardPanel.showLoading();
         const bridge = RedditBridge.instance;
+        const cached = bridge.cachedLeaderboard;
+        if (cached.length > 0) {
+            this._leaderboardPanel.showEntries(cached);
+        } else {
+            this._leaderboardPanel.showLoading();
+        }
         bridge.requestLeaderboard();
     }
 

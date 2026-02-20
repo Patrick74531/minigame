@@ -30,6 +30,7 @@ npm-debug.log*
 
 # Build outputs
 dist/
+backups/
 *.aab
 *.apk
 *.ipa

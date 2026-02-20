@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { context, redis, reddit } from '@devvit/web/server';
 
 const RANK_KEY = 'leaderboard:scores';
@@ -40,6 +41,13 @@ async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
 
 export const api = new Hono();
 
+function jsonNoCache(c: Context, payload: unknown, status: number = 200) {
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate');
+    c.header('Pragma', 'no-cache');
+    c.header('Expires', '0');
+    return c.json(payload, status);
+}
+
 api.get('/init', async c => {
     try {
         const [username, leaderboard] = await Promise.all([
@@ -53,7 +61,7 @@ api.get('/init', async c => {
                 ? (await redis.hGet(FOLLOW_KEY, resolvedUsername)) === '1'
                 : false;
 
-        return c.json({
+        return jsonNoCache(c, {
             username: resolvedUsername,
             isSubscribed,
             subredditName: context.subredditName ?? '',
@@ -61,7 +69,7 @@ api.get('/init', async c => {
         });
     } catch (error) {
         console.error('[api/init] error:', error);
-        return c.json({ status: 'error', message: String(error) }, 400);
+        return jsonNoCache(c, { status: 'error', message: String(error) }, 400);
     }
 });
 
@@ -69,7 +77,7 @@ api.post('/submit-score', async c => {
     try {
         const username = await reddit.getCurrentUsername();
         if (!username) {
-            return c.json({ status: 'error', message: 'Not logged in' }, 401);
+            return jsonNoCache(c, { status: 'error', message: 'Not logged in' }, 401);
         }
 
         const body = (await c.req.json()) as { score?: number; wave?: number };
@@ -89,24 +97,25 @@ api.post('/submit-score', async c => {
         const leaderboard = await fetchLeaderboard();
         const rankIdx = leaderboard.findIndex(e => e.username === username);
 
-        return c.json({
+        return jsonNoCache(c, {
             rank: rankIdx >= 0 ? rankIdx + 1 : LEADERBOARD_SIZE + 1,
             score,
             isNewBest,
+            leaderboard,
         });
     } catch (error) {
         console.error('[api/submit-score] error:', error);
-        return c.json({ status: 'error', message: String(error) }, 400);
+        return jsonNoCache(c, { status: 'error', message: String(error) }, 400);
     }
 });
 
 api.get('/leaderboard', async c => {
     try {
         const leaderboard = await fetchLeaderboard();
-        return c.json({ entries: leaderboard });
+        return jsonNoCache(c, { entries: leaderboard });
     } catch (error) {
         console.error('[api/leaderboard] error:', error);
-        return c.json({ entries: [] });
+        return jsonNoCache(c, { entries: [] });
     }
 });
 
@@ -119,9 +128,9 @@ api.post('/subscribe', async c => {
                 await redis.hSet(FOLLOW_KEY, { [username]: '1' });
             }
         }
-        return c.json({ success: true });
+        return jsonNoCache(c, { success: true });
     } catch (error) {
         console.error('[api/subscribe] error:', error);
-        return c.json({ success: false, message: String(error) }, 400);
+        return jsonNoCache(c, { success: false, message: String(error) }, 400);
     }
 });

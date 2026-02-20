@@ -9,13 +9,12 @@ import {
     Layers,
     ScrollView,
     Layout,
+    view,
 } from 'cc';
 import type { LeaderboardEntry } from '../../core/reddit/RedditBridge';
 import { Localization } from '../../core/i18n/Localization';
 import { applyGameLabelStyle } from '../hud/HUDCommon';
 
-const PANEL_W = 520;
-const PANEL_H = 600;
 const ROW_H = 56;
 const GOLD = new Color(255, 198, 88, 255);
 const SILVER = new Color(192, 192, 192, 255);
@@ -32,15 +31,29 @@ export class LeaderboardPanel {
     private _statusLabel: Label | null = null;
     private _uiLayer: number;
     private _onClose: (() => void) | null = null;
+    private _panelW: number = 520;
+    private _panelH: number = 600;
 
     constructor(parent: Node, onClose: () => void) {
         this._uiLayer = parent.layer ?? Layers.Enum.UI_2D;
         this._onClose = onClose;
+        const vs = view.getVisibleSize();
+        this._panelW = Math.min(520, Math.floor(vs.width * 0.88));
+        this._panelH = Math.min(620, Math.floor(vs.height * 0.88));
         this._root = this._buildPanel(parent);
     }
 
     public get node(): Node {
         return this._root;
+    }
+
+    public showError(): void {
+        if (this._listContent) {
+            this._listContent.removeAllChildren();
+        }
+        if (this._statusLabel) {
+            this._statusLabel.string = Localization.instance.t('ui.leaderboard.error');
+        }
     }
 
     public showLoading(): void {
@@ -60,16 +73,11 @@ export class LeaderboardPanel {
         this._listContent.removeAllChildren();
 
         if (entries.length === 0) {
-            const emptyLabel = this._makeLabel(
-                Localization.instance.t('ui.leaderboard.empty'),
-                24,
-                TEXT_DIM
-            );
-            const emptyNode = new Node('Empty');
-            emptyNode.layer = this._uiLayer;
-            emptyNode.addComponent(UITransform)?.setContentSize(PANEL_W - 40, ROW_H);
-            emptyNode.addChild(emptyLabel);
-            this._listContent.addChild(emptyNode);
+            if (this._statusLabel) {
+                this._statusLabel.string = Localization.instance.t('ui.leaderboard.empty');
+                this._statusLabel.overflow = Label.Overflow.NONE;
+                this._statusLabel.enableWrapText = true;
+            }
             return;
         }
 
@@ -106,14 +114,14 @@ export class LeaderboardPanel {
         overlay.addChild(panel);
 
         const panelTf = panel.addComponent(UITransform);
-        panelTf.setContentSize(PANEL_W, PANEL_H);
+        panelTf.setContentSize(this._panelW, this._panelH);
         const panelWidget = panel.addComponent(Widget);
         panelWidget.isAlignHorizontalCenter = panelWidget.isAlignVerticalCenter = true;
         panelWidget.horizontalCenter = panelWidget.verticalCenter = 0;
         panelWidget.updateAlignment();
 
         const panelBg = panel.addComponent(Graphics);
-        this._drawRoundRect(panelBg, PANEL_W, PANEL_H, 18, BG_DARK);
+        this._drawRoundRect(panelBg, this._panelW, this._panelH, 18, BG_DARK);
 
         this._buildTitle(panel);
         this._buildList(panel);
@@ -123,12 +131,14 @@ export class LeaderboardPanel {
     }
 
     private _buildTitle(panel: Node): void {
+        const W = this._panelW;
+        const H = this._panelH;
         const titleNode = new Node('Title');
         titleNode.layer = this._uiLayer;
         panel.addChild(titleNode);
         const titleTf = titleNode.addComponent(UITransform);
-        titleTf.setContentSize(PANEL_W - 40, 60);
-        titleNode.setPosition(0, PANEL_H / 2 - 40, 0);
+        titleTf.setContentSize(W - 40, 60);
+        titleNode.setPosition(0, H / 2 - 40, 0);
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.leaderboard.title');
@@ -143,17 +153,19 @@ export class LeaderboardPanel {
         divider.layer = this._uiLayer;
         panel.addChild(divider);
         const dTf = divider.addComponent(UITransform);
-        dTf.setContentSize(PANEL_W - 60, 2);
-        divider.setPosition(0, PANEL_H / 2 - 72, 0);
+        dTf.setContentSize(W - 60, 2);
+        divider.setPosition(0, H / 2 - 72, 0);
         const dg = divider.addComponent(Graphics);
         dg.fillColor = GOLD;
-        dg.fillRect(-(PANEL_W - 60) / 2, -1, PANEL_W - 60, 2);
+        dg.fillRect(-(W - 60) / 2, -1, W - 60, 2);
         dg.fill();
     }
 
     private _buildList(panel: Node): void {
-        const listH = PANEL_H - 150;
-        const listW = PANEL_W - 32;
+        const W = this._panelW;
+        const H = this._panelH;
+        const listH = H - 150;
+        const listW = W - 32;
 
         const scrollNode = new Node('Scroll');
         scrollNode.layer = this._uiLayer;
@@ -188,17 +200,19 @@ export class LeaderboardPanel {
         statusNode.layer = this._uiLayer;
         panel.addChild(statusNode);
         const sTf = statusNode.addComponent(UITransform);
-        sTf.setContentSize(listW, 48);
-        statusNode.setPosition(0, -32, 0);
+        sTf.setContentSize(listW, Math.round(listH * 0.7));
+        statusNode.setPosition(0, -8, 0);
         this._statusLabel = statusNode.addComponent(Label);
         this._statusLabel.fontSize = 22;
         this._statusLabel.color = TEXT_DIM;
         this._statusLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._statusLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._statusLabel.enableWrapText = true;
+        this._statusLabel.overflow = Label.Overflow.SHRINK;
     }
 
     private _buildRow(entry: LeaderboardEntry, idx: number): Node {
-        const listW = PANEL_W - 32;
+        const listW = this._panelW - 32;
         const row = new Node(`Row_${idx}`);
         row.layer = this._uiLayer;
         const rowTf = row.addComponent(UITransform);
@@ -250,7 +264,7 @@ export class LeaderboardPanel {
         panel.addChild(btnNode);
         const btnTf = btnNode.addComponent(UITransform);
         btnTf.setContentSize(180, 54);
-        btnNode.setPosition(0, -PANEL_H / 2 + 36, 0);
+        btnNode.setPosition(0, -this._panelH / 2 + 36, 0);
 
         const btn = btnNode.addComponent(Button);
         btn.transition = Button.Transition.SCALE;

@@ -68,6 +68,7 @@ export class HUDManager {
         this._bossIntroModule.initialize(uiCanvas);
         this._gameOverModule.initialize(uiCanvas);
         this._settingsModule.initialize(uiCanvas);
+        this._settingsModule.show();
 
         view.on('canvas-resize', this.onCanvasResize, this);
         this.onCanvasResize();
