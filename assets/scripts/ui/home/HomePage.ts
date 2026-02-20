@@ -169,6 +169,11 @@ export class HomePage extends Component {
 
     private _revealContent(): void {
         if (!this._contentNode || !this._contentNode.isValid) return;
+        // Dismiss HTML loading splash now that Cocos home screen is ready
+        const w = window as unknown as { _hideSplash?: () => void };
+        if (typeof w._hideSplash === 'function') {
+            w._hideSplash();
+        }
         this._contentNode.active = true;
         this._contentNode.setScale(0.96, 0.96, 1);
         tween(this._contentNode)

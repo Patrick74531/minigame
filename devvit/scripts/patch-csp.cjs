@@ -1236,6 +1236,26 @@ if (fs.existsSync(mainPath)) {
         console.warn('[patch-csp]   ~ Bullet setGroup/setMask pattern not found (skipping)');
     }
 
+    // ── Patch SPLASH: dismiss HTML loading overlay when Cocos home screen is ready ──
+    // _revealContent() is called in HomePage once the background texture loads.
+    // Inject window._hideSplash&&window._hideSplash() at the start of its body so the
+    // CSS splash (added in index.html) fades out as soon as the first Cocos frame is visible.
+    const SPLASH_OLD =
+        'i._revealContent=function(){this._contentNode&&this._contentNode.isValid&&' +
+        '(this._contentNode.active=!0,this._contentNode.setScale(.96,.96,1),';
+    const SPLASH_NEW =
+        'i._revealContent=function(){this._contentNode&&this._contentNode.isValid&&' +
+        '(window._hideSplash&&window._hideSplash(),' +
+        'this._contentNode.active=!0,this._contentNode.setScale(.96,.96,1),';
+    if (main.includes(SPLASH_NEW)) {
+        console.log('[patch-csp]   ~ Patch SPLASH: _hideSplash already injected (skipping)');
+    } else if (main.includes(SPLASH_OLD)) {
+        main = main.replace(SPLASH_OLD, SPLASH_NEW);
+        console.log('[patch-csp]   ✓ Patch SPLASH: _hideSplash injected into _revealContent');
+    } else {
+        console.warn('[patch-csp]   ~ Patch SPLASH: _revealContent pattern not found (skipping)');
+    }
+
     fs.writeFileSync(mainPath, main, 'utf8');
     console.log('[patch-csp] Saved', mainPath);
 } else {
