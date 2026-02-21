@@ -313,10 +313,9 @@ export const BUILDING_CONFIG = {
         { x: -6, z: -10.5, type: 'tower', angle: 135 },
         { x: -7.9, z: -3.4, type: 'tower', angle: -45, overrideCost: 10 },
         { x: -3.4, z: -7.9, type: 'tower', angle: 135, prebuild: true },
-        { x: -5.4, z: -0.9, type: 'tower', angle: -45, overrideCost: 40 },
         // Mid lane prebuilt tower moved here: this slot is now buildable
-        { x: -0.9, z: -5.4, type: 'tower', angle: 135, overrideCost: 20 },
-        { x: -2.9, z: 1.7, type: 'tower', angle: -45 },
+        { x: -0.9, z: -5.4, type: 'tower', angle: 135, prebuild: true },
+        { x: -2.9, z: 1.7, type: 'tower', angle: -45, overrideCost: 10 },
         { x: 1.7, z: -2.9, type: 'tower', angle: 135 },
     ],
 } as const;

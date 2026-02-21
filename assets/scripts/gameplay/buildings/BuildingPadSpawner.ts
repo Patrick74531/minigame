@@ -1,4 +1,13 @@
-import { Node } from 'cc';
+import {
+    Billboard,
+    Color,
+    Label,
+    LabelOutline,
+    LabelShadow,
+    Node,
+    RenderRoot2D,
+    UITransform,
+} from 'cc';
 import { BuildingFactory } from './BuildingFactory';
 import { Building } from './Building';
 import { BuildingPad } from './BuildingPad';
@@ -16,6 +25,12 @@ import type { RouteLane } from '../wave/WaveLaneRouting';
  */
 export class BuildingPadSpawner {
     private static readonly PREBUILT_LEVEL1_TYPES = new Set(['barracks', 'farm']);
+    private static readonly SHOW_HIDDEN_PAD_INDEX_MARKERS = true;
+    private static readonly HIDDEN_PAD_INDEX_MARKER_Y = 2.9;
+    private static readonly INITIAL_VISIBLE_PAD_INDEXES = new Set([20, 21]);
+    private static readonly INITIAL_PREBUILT_PAD_INDEX = 21;
+    private static readonly INITIAL_BUILD_COST_PAD_INDEX = 20;
+    private static readonly INITIAL_BUILD_COST = 10;
     private static readonly LOCKED_LANE_PAD_TYPES = new Set([
         'tower',
         'frost_tower',
@@ -91,14 +106,35 @@ export class BuildingPadSpawner {
             if (typeof pos.overrideCost === 'number') {
                 pad.overrideCost = pos.overrideCost;
             }
+            if (index === this.INITIAL_BUILD_COST_PAD_INDEX) {
+                pad.overrideCost = this.INITIAL_BUILD_COST;
+            }
+
+            const lane = this.resolveLaneByNearestPath(pos.x, pos.z);
+            if (lane === 'mid') {
+                pad.padIndex = index;
+            }
 
             buildingManager.registerPad(pad);
             this.applyLockedLanePadVisibility(padNode, pos.type, pos.x, pos.z);
 
+            // 初始阶段仅开放 20/21 号板子，其它全部隐藏等待后续解锁。
+            const isInitiallyVisiblePad = this.INITIAL_VISIBLE_PAD_INDEXES.has(index);
+            if (!isInitiallyVisiblePad) {
+                padNode.active = false;
+            }
+            if (this.SHOW_HIDDEN_PAD_INDEX_MARKERS && !isInitiallyVisiblePad) {
+                this.createHiddenPadIndexMarker(buildingContainer, index, pos.x, pos.z);
+            }
+
+            const shouldForceBuildable = index === this.INITIAL_BUILD_COST_PAD_INDEX;
+            const shouldForcePrebuild = index === this.INITIAL_PREBUILT_PAD_INDEX;
             const shouldPrebuild =
-                pos.prebuild === true ||
-                this.PREBUILT_LEVEL1_TYPES.has(pos.type) ||
-                index === fallbackPrebuildTowerIndex;
+                shouldForcePrebuild ||
+                (!shouldForceBuildable &&
+                    (pos.prebuild === true ||
+                        this.PREBUILT_LEVEL1_TYPES.has(pos.type) ||
+                        index === fallbackPrebuildTowerIndex));
             if (!shouldPrebuild) {
                 continue;
             }
@@ -118,6 +154,9 @@ export class BuildingPadSpawner {
                 );
                 continue;
             }
+            if (index !== this.INITIAL_PREBUILT_PAD_INDEX && pos.type !== 'spa') {
+                buildingNode.active = false;
+            }
 
             const building = buildingNode.getComponent(Building);
             if (!building) {
@@ -131,6 +170,9 @@ export class BuildingPadSpawner {
             const nextUpgradeCost = Math.ceil(baseCost * building.upgradeCostMultiplier);
             pad.initForExistingBuilding(building, nextUpgradeCost);
 
+            // Globally hide all upgrade pads initially for prebuilt buildings
+            padNode.active = false;
+
             console.log(
                 `[BuildingPadSpawner] Prebuilt level-1 ${pos.type} at (${pos.x}, 0, ${pos.z}), next upgrade cost=${nextUpgradeCost}`
             );
@@ -140,11 +182,48 @@ export class BuildingPadSpawner {
             `[BuildingPadSpawner] 创建了 ${padPositions.length} 个建造点, 父节点: ${buildingContainer.name}`
         );
 
+        buildingManager.refreshUpgradePadVisibilityGate();
         this.ensureLaneUnlockListener();
     }
 
     private static get buildingRegistry(): BuildingRegistry {
         return BuildingRegistry.instance;
+    }
+
+    private static createHiddenPadIndexMarker(
+        parent: Node,
+        index: number,
+        x: number,
+        z: number
+    ): void {
+        const markerRoot = new Node(`HiddenPadIndex_${index}`);
+        parent.addChild(markerRoot);
+        markerRoot.setPosition(x, this.HIDDEN_PAD_INDEX_MARKER_Y, z);
+        markerRoot.addComponent(RenderRoot2D);
+        markerRoot.addComponent(Billboard);
+        markerRoot.setScale(0.012, 0.012, 0.012);
+
+        const labelNode = new Node('Label');
+        markerRoot.addChild(labelNode);
+        labelNode.addComponent(UITransform).setContentSize(260, 100);
+
+        const label = labelNode.addComponent(Label);
+        label.string = `${index}`;
+        label.fontSize = 82;
+        label.lineHeight = 86;
+        label.isBold = true;
+        label.horizontalAlign = Label.HorizontalAlign.CENTER;
+        label.verticalAlign = Label.VerticalAlign.CENTER;
+        label.color = new Color(255, 216, 92, 255);
+
+        const outline = labelNode.addComponent(LabelOutline);
+        outline.color = new Color(0, 0, 0, 255);
+        outline.width = 5;
+
+        const shadow = labelNode.addComponent(LabelShadow);
+        shadow.color = new Color(0, 0, 0, 210);
+        shadow.offset.set(3, -3);
+        shadow.blur = 2;
     }
 
     private static applyLockedLanePadVisibility(
@@ -177,6 +256,7 @@ export class BuildingPadSpawner {
             node.active = true;
         }
         this._hiddenPadNodesByLane[data.lane] = [];
+        BuildingManager.instance.refreshUpgradePadVisibilityGate();
     }
 
     private static resolveLaneByNearestPath(x: number, z: number): RouteLane {

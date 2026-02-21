@@ -69,6 +69,8 @@ export class BuildingPad extends BaseComponent {
     @property
     public lockWorldPosition: boolean = true;
     
+    public padIndex: number = -1;
+
     /** 初始化时特定的覆写花费（如新手福利塔） */
     public overrideCost: number | null = null;
 
@@ -299,7 +301,8 @@ export class BuildingPad extends BaseComponent {
         const refs = BuildingPadVisuals.createVisuals(
             this.node,
             this.buildingTypeId,
-            this.requiredCoins
+            this.requiredCoins,
+            this.padIndex
         );
         this._label = refs.label;
         this._costLabelNode = refs.costLabelNode;

@@ -1,7 +1,8 @@
 import { _decorator, Node, Vec3 } from 'cc';
-import { BuildingPad } from './BuildingPad';
+import { BuildingPad, BuildingPadState } from './BuildingPad';
 import { BuildingFactory } from './BuildingFactory';
 import { Building } from './Building';
+import { BuildingPadPlacement } from './BuildingPadPlacement';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
@@ -20,6 +21,7 @@ export class BuildingManager {
     private _activeBuildings: Building[] = [];
     private _heroNode: Node | null = null;
     private _buildingContainer: Node | null = null;
+    private _upgradePadsUnlocked: boolean = false;
 
     public static get instance(): BuildingManager {
         if (!this._instance) {
@@ -41,6 +43,7 @@ export class BuildingManager {
         this._buildingContainer = buildingContainer;
         this._unitContainer = unitContainer;
         this._pads = [];
+        this._upgradePadsUnlocked = false;
 
         // 监听建造完成事件
         this.eventManager.on(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
@@ -140,6 +143,7 @@ export class BuildingManager {
         // Link Building back to Pad for upgrades
         pad.onBuildingCreated(buildingComp);
         pad.placeUpgradeZoneInFront(buildingNode);
+        this.refreshUpgradePadVisibilityGate();
 
         // DO NOT Destroy Pad. It persists for upgrades.
         // data.padNode.destroy();
@@ -161,6 +165,7 @@ export class BuildingManager {
         this.eventManager.off(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
         this._pads = [];
         this._activeBuildings = [];
+        this._upgradePadsUnlocked = false;
     }
 
     public get activeBuildings(): Building[] {
@@ -198,6 +203,28 @@ export class BuildingManager {
                 break;
             }
         }
+        this.refreshUpgradePadVisibilityGate();
+    }
+
+    public refreshUpgradePadVisibilityGate(): void {
+        if (!this._upgradePadsUnlocked && this.areAllTowerPadsBuilt()) {
+            this._upgradePadsUnlocked = true;
+            console.log('[BuildingManager] 全部塔位建成，开放所有已建建筑升级 pad');
+        }
+
+        for (const pad of this._pads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            if (pad.state !== BuildingPadState.UPGRADING) continue;
+            pad.node.active = this._upgradePadsUnlocked;
+        }
+    }
+
+    private areAllTowerPadsBuilt(): boolean {
+        const towerPads = this._pads.filter(pad =>
+            BuildingPadPlacement.isTowerType(pad.buildingTypeId)
+        );
+        if (towerPads.length <= 0) return true;
+        return towerPads.every(pad => pad.state === BuildingPadState.UPGRADING);
     }
 
     private get eventManager(): EventManager {
