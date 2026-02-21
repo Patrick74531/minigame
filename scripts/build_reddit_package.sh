@@ -99,6 +99,110 @@ latest_index_html_dir() {
   fi
 }
 
+latest_file_mtime_under() {
+  local root="$1"
+  local latest_file=""
+  local latest_time=0
+
+  [ -d "$root" ] || {
+    echo "0|"
+    return
+  }
+
+  while IFS= read -r -d '' f; do
+    local mt
+    mt="$(file_mtime "$f")"
+    if [ "$mt" -gt "$latest_time" ]; then
+      latest_time="$mt"
+      latest_file="$f"
+    fi
+  done < <(find "$root" -type f -print0 2>/dev/null || true)
+
+  echo "${latest_time}|${latest_file}"
+}
+
+detect_default_cocos_creator() {
+  local version=""
+  if has_cmd node && [ -f "$ROOT_DIR/package.json" ]; then
+    version="$(node -e "try{const p=require('$ROOT_DIR/package.json');process.stdout.write((p.creator&&p.creator.version)||'')}catch(_e){}")"
+  fi
+
+  local candidates=()
+  if [ -n "$version" ]; then
+    candidates+=("/Applications/Cocos/Creator/${version}/CocosCreator.app/Contents/MacOS/CocosCreator")
+  fi
+  candidates+=(
+    "/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/MacOS/CocosCreator"
+    "/Applications/Cocos/Creator/CocosCreator.app/Contents/MacOS/CocosCreator"
+  )
+
+  for c in "${candidates[@]}"; do
+    if [ -x "$c" ]; then
+      printf "%s" "$c"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+validate_source_build_freshness() {
+  local source_build_dir="$1"
+  local allow_stale="$2"
+  local latest_src_time=0
+  local latest_src_file=""
+  local latest_build_time=0
+  local latest_build_file=""
+
+  local source_inputs=(
+    "$ROOT_DIR/assets"
+    "$ROOT_DIR/settings"
+    "$ROOT_DIR/extensions"
+    "$ROOT_DIR/profiles"
+    "$ROOT_DIR/package.json"
+  )
+
+  for input in "${source_inputs[@]}"; do
+    if [ -f "$input" ]; then
+      local mt
+      mt="$(file_mtime "$input")"
+      if [ "$mt" -gt "$latest_src_time" ]; then
+        latest_src_time="$mt"
+        latest_src_file="$input"
+      fi
+      continue
+    fi
+    if [ -d "$input" ]; then
+      local info
+      info="$(latest_file_mtime_under "$input")"
+      local mt="${info%%|*}"
+      local file="${info#*|}"
+      if [ "${mt:-0}" -gt "$latest_src_time" ]; then
+        latest_src_time="$mt"
+        latest_src_file="$file"
+      fi
+    fi
+  done
+
+  local build_info
+  build_info="$(latest_file_mtime_under "$source_build_dir")"
+  latest_build_time="${build_info%%|*}"
+  latest_build_file="${build_info#*|}"
+
+  if [ "${latest_src_time:-0}" -le "${latest_build_time:-0}" ]; then
+    return 0
+  fi
+
+  local msg="Source files are newer than source build output. latest_source=${latest_src_file} (${latest_src_time}), latest_build=${latest_build_file} (${latest_build_time}). Rebuild Cocos output first, or remove --skip-cocos-build."
+  if [ "$allow_stale" -eq 1 ]; then
+    warn "$msg"
+    warn "Proceeding because --allow-stale-source-build is set."
+    return 0
+  fi
+
+  die "$msg"
+}
+
 copy_dir_clean() {
   local src="$1"
   local dst="$2"
@@ -757,6 +861,7 @@ scan_reddit_html_compliance() {
 }
 
 SKIP_COCOS_BUILD=0
+ALLOW_STALE_SOURCE_BUILD=0
 OPTIMIZE_SOURCE_ASSETS=1
 SOURCE_BUILD_DIR=""
 OUTPUT_WEBROOT="dist/reddit-package/webroot"
@@ -774,6 +879,7 @@ Usage:
 
 Options:
   --skip-cocos-build                Skip headless Cocos build and only package existing output.
+  --allow-stale-source-build        Allow packaging stale source-build-dir when newer source files exist.
   --source-build-dir <dir>          Existing web build directory (must contain index.html).
   --output-webroot <dir>            Output webroot directory. Default: dist/reddit-package/webroot
   --report-dir <dir>                Report directory. Default: dist/reddit-package
@@ -800,6 +906,7 @@ EOF
 while [ $# -gt 0 ]; do
   case "$1" in
     --skip-cocos-build) SKIP_COCOS_BUILD=1 ;;
+    --allow-stale-source-build) ALLOW_STALE_SOURCE_BUILD=1 ;;
     --source-build-dir) SOURCE_BUILD_DIR="$2"; shift ;;
     --output-webroot) OUTPUT_WEBROOT="$2"; shift ;;
     --report-dir) REPORT_DIR="$2"; shift ;;
@@ -929,14 +1036,44 @@ if [ "$OPTIMIZE_SOURCE_ASSETS" -eq 1 ]; then
 fi
 
 if [ "$SKIP_COCOS_BUILD" -eq 0 ]; then
-  [ -n "$COCOS_CREATOR" ] || die "Missing COCOS_CREATOR path. Pass --cocos-creator or set COCOS_CREATOR env."
+  if [ -z "$COCOS_CREATOR" ]; then
+    if COCOS_CREATOR="$(detect_default_cocos_creator)"; then
+      log "Auto-detected COCOS_CREATOR: $COCOS_CREATOR"
+    else
+      die "Missing COCOS_CREATOR path. Pass --cocos-creator or set COCOS_CREATOR env."
+    fi
+  fi
   [ -x "$COCOS_CREATOR" ] || die "CocosCreator executable not found or not executable: $COCOS_CREATOR"
   BUILD_OPT_BASE="platform=${BUILD_PLATFORM};debug=false;sourceMaps=false"
   if [ -n "$COCOS_BUILD_OPTS" ]; then
     BUILD_OPT_BASE="${BUILD_OPT_BASE};${COCOS_BUILD_OPTS}"
   fi
   log "Running headless Cocos build..."
+  BUILD_STARTED_AT="$(date +%s)"
+  set +e
   "$COCOS_CREATOR" --project "$ROOT_DIR" --build "$BUILD_OPT_BASE"
+  COCOS_EXIT_CODE=$?
+  set -e
+  if [ "$COCOS_EXIT_CODE" -ne 0 ]; then
+    warn "Cocos build exited non-zero (${COCOS_EXIT_CODE}). Verifying whether fresh output was still produced..."
+    CHECK_BUILD_DIR="$SOURCE_BUILD_DIR"
+    if [ -z "$CHECK_BUILD_DIR" ]; then
+      CHECK_BUILD_DIR="$(latest_index_html_dir)"
+    fi
+    if [ -n "$CHECK_BUILD_DIR" ] && [ "${CHECK_BUILD_DIR#/}" = "$CHECK_BUILD_DIR" ]; then
+      CHECK_BUILD_DIR="${ROOT_DIR}/${CHECK_BUILD_DIR#./}"
+    fi
+    if [ -n "$CHECK_BUILD_DIR" ] && [ -f "$CHECK_BUILD_DIR/index.html" ]; then
+      CHECK_BUILD_MTIME="$(file_mtime "$CHECK_BUILD_DIR/index.html")"
+      if [ "$CHECK_BUILD_MTIME" -ge $((BUILD_STARTED_AT - 2)) ]; then
+        warn "Detected fresh build output at $CHECK_BUILD_DIR/index.html (mtime=${CHECK_BUILD_MTIME}). Continuing."
+      else
+        die "Cocos build failed and no fresh output was generated in $CHECK_BUILD_DIR."
+      fi
+    else
+      die "Cocos build failed and source build dir is unavailable. Please check Cocos build logs."
+    fi
+  fi
 fi
 
 if [ -z "$SOURCE_BUILD_DIR" ]; then
@@ -948,6 +1085,9 @@ if [ "${SOURCE_BUILD_DIR#/}" = "$SOURCE_BUILD_DIR" ]; then
   SOURCE_BUILD_DIR="${ROOT_DIR}/${SOURCE_BUILD_DIR#./}"
 fi
 [ -f "$SOURCE_BUILD_DIR/index.html" ] || die "index.html not found in source build dir: $SOURCE_BUILD_DIR"
+if [ "$SKIP_COCOS_BUILD" -eq 1 ]; then
+  validate_source_build_freshness "$SOURCE_BUILD_DIR" "$ALLOW_STALE_SOURCE_BUILD"
+fi
 
 log "Packaging build output from $SOURCE_BUILD_DIR"
 copy_dir_clean "$SOURCE_BUILD_DIR" "$OUTPUT_WEBROOT"

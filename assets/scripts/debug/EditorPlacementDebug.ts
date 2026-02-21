@@ -281,10 +281,21 @@ export class EditorPlacementDebug extends Component {
             const key = `${pad.type}|${rx}|${rz}`;
             previousOverrideCostByKey.set(key, pad.overrideCost);
         }
+        const forcedStateByPadIndex = new Map<
+            number,
+            { prebuild?: boolean; overrideCost?: number | null }
+        >([
+            [17, { prebuild: true, overrideCost: null }],
+            [19, { prebuild: false, overrideCost: 20 }],
+        ]);
         pads.length = 0;
+        let nonSpaPadIndex = 0;
         for (const entry of this.padPlacements) {
             const type = (entry.type || '').trim();
             if (!type) continue;
+            if (type !== 'spa') {
+                nonSpaPadIndex += 1;
+            }
             const pad: {
                 x: number;
                 z: number;
@@ -300,21 +311,30 @@ export class EditorPlacementDebug extends Component {
             if (Math.abs(entry.angle) > 0.001) {
                 pad.angle = entry.angle;
             }
-            if (entry.prebuild) {
+            const forcedState = forcedStateByPadIndex.get(nonSpaPadIndex);
+            const shouldPrebuild = forcedState?.prebuild ?? entry.prebuild;
+            if (shouldPrebuild) {
                 pad.prebuild = true;
             }
-            const normalizedOverrideCost = Number.isFinite(entry.overrideCost)
-                ? Math.round(entry.overrideCost)
-                : -1;
-            if (normalizedOverrideCost >= 0) {
-                pad.overrideCost = normalizedOverrideCost;
-            } else {
-                const rx = Math.round(entry.x * 10);
-                const rz = Math.round(entry.z * 10);
-                const fallbackKey = `${type}|${rx}|${rz}`;
-                const fallbackOverrideCost = previousOverrideCostByKey.get(fallbackKey);
-                if (typeof fallbackOverrideCost === 'number') {
-                    pad.overrideCost = fallbackOverrideCost;
+            if (typeof forcedState?.overrideCost === 'number') {
+                const forcedOverrideCost = Math.round(forcedState.overrideCost);
+                if (forcedOverrideCost >= 0) {
+                    pad.overrideCost = forcedOverrideCost;
+                }
+            } else if (forcedState?.overrideCost !== null) {
+                const normalizedOverrideCost = Number.isFinite(entry.overrideCost)
+                    ? Math.round(entry.overrideCost)
+                    : -1;
+                if (normalizedOverrideCost >= 0) {
+                    pad.overrideCost = normalizedOverrideCost;
+                } else {
+                    const rx = Math.round(entry.x * 10);
+                    const rz = Math.round(entry.z * 10);
+                    const fallbackKey = `${type}|${rx}|${rz}`;
+                    const fallbackOverrideCost = previousOverrideCostByKey.get(fallbackKey);
+                    if (typeof fallbackOverrideCost === 'number') {
+                        pad.overrideCost = fallbackOverrideCost;
+                    }
                 }
             }
             pads.push(pad);
