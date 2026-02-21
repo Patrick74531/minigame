@@ -369,11 +369,8 @@ export class BuildingPad extends BaseComponent {
             this._config = this.buildingRegistry.get(this.buildingTypeId) ?? null;
         }
 
-        // Calculate next upgrade cost
-        const baseCost = this._config?.cost ?? 0;
-        const costMult = building.upgradeCostMultiplier;
-
-        this._nextUpgradeCost = Math.ceil(baseCost * costMult);
+        // Use unified upgrade curve, keep legacy fallback for mixed remote caches.
+        this._nextUpgradeCost = this.resolveInitialUpgradeCost();
 
         // Change state AFTER calculation
         this._state = BuildingPadState.UPGRADING;
@@ -387,9 +384,7 @@ export class BuildingPad extends BaseComponent {
         // Recompute with real built footprint even if pad was initially world-locked.
         this.placeUpgradeZoneInFront(building.node, true);
 
-        console.log(
-            `[BuildingPad] Entered Upgrade Mode. Base: ${baseCost}, Next Cost: ${this._nextUpgradeCost}`
-        );
+        console.log(`[BuildingPad] Entered Upgrade Mode. Next Cost: ${this._nextUpgradeCost}`);
     }
 
     public onAssociatedBuildingDestroyed(buildingId: string): boolean {
@@ -439,12 +434,14 @@ export class BuildingPad extends BaseComponent {
             return this._nextUpgradeCost;
         }
 
-        if (
-            this.overrideCost !== null &&
-            this._state === BuildingPadState.WAITING &&
-            !this._associatedBuilding
-        ) {
-            return this.overrideCost;
+        if (this._state === BuildingPadState.WAITING && !this._associatedBuilding) {
+            if (this.overrideCost !== null) {
+                return this.overrideCost;
+            }
+
+            if (this._isTowerSlot) {
+                return this.resolveTowerDefaultBuildCost();
+            }
         }
 
         return this._config?.cost ?? 0;
@@ -633,8 +630,8 @@ export class BuildingPad extends BaseComponent {
                 return;
             }
 
-            // Calculate NEXT cost
-            const costMult = this._associatedBuilding.upgradeCostMultiplier;
+            // Use unified curve, fallback to legacy multipliers.
+            const costMult = this.resolveUpgradeCostMultiplier();
             this._nextUpgradeCost = Math.ceil(this._nextUpgradeCost * costMult);
 
             // Reset
@@ -714,6 +711,53 @@ export class BuildingPad extends BaseComponent {
                 if (onComplete) onComplete();
             }, 1.5);
         });
+    }
+
+    private resolveInitialUpgradeCost(): number {
+        const unifiedStart = GameConfig.BUILDING.UPGRADE_COST?.START_COST;
+        if (typeof unifiedStart === 'number' && Number.isFinite(unifiedStart)) {
+            return unifiedStart;
+        }
+
+        const legacyStart = GameConfig.BUILDING.BASE_UPGRADE?.START_COST;
+        if (typeof legacyStart === 'number' && Number.isFinite(legacyStart)) {
+            return legacyStart;
+        }
+
+        return 20;
+    }
+
+    private resolveUpgradeCostMultiplier(): number {
+        const unifiedMultiplier = GameConfig.BUILDING.UPGRADE_COST?.COST_MULTIPLIER;
+        if (typeof unifiedMultiplier === 'number' && Number.isFinite(unifiedMultiplier)) {
+            return unifiedMultiplier;
+        }
+
+        const perBuildingMultiplier = this._associatedBuilding?.upgradeCostMultiplier;
+        if (typeof perBuildingMultiplier === 'number' && Number.isFinite(perBuildingMultiplier)) {
+            return perBuildingMultiplier;
+        }
+
+        const defaultMultiplier = GameConfig.BUILDING.DEFAULT_COST_MULTIPLIER;
+        if (typeof defaultMultiplier === 'number' && Number.isFinite(defaultMultiplier)) {
+            return defaultMultiplier;
+        }
+
+        return 1.35;
+    }
+
+    private resolveTowerDefaultBuildCost(): number {
+        const unifiedCost = GameConfig.BUILDING.TOWER_DEFAULT_BUILD_COST;
+        if (typeof unifiedCost === 'number' && Number.isFinite(unifiedCost)) {
+            return unifiedCost;
+        }
+
+        const configuredCost = this._config?.cost;
+        if (typeof configuredCost === 'number' && Number.isFinite(configuredCost)) {
+            return configuredCost;
+        }
+
+        return 40;
     }
 
     private get eventManager(): EventManager {

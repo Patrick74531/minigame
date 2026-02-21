@@ -16,6 +16,15 @@ export const BUILDING_CONFIG = {
     DEFAULT_MAX_LEVEL: 5,
     /** 全局默认升级成本倍率 */
     DEFAULT_COST_MULTIPLIER: BALANCE.building.defaultCostMultiplier,
+    /** 防御塔建造位默认建造费（未单独 overrideCost 时使用） */
+    TOWER_DEFAULT_BUILD_COST: 40,
+    /** 所有已建成建筑统一升级费用曲线 */
+    UPGRADE_COST: {
+        /** 第一次升级花费 */
+        START_COST: 20,
+        /** 每次升级后的下一次花费倍率（20 -> 27 -> 37 -> 50 ...） */
+        COST_MULTIPLIER: 1.35,
+    },
     /** 升级投放区（建造后）参数 */
     UPGRADE_PAD: {
         /** 投放区半径（视觉与触发区共用） */

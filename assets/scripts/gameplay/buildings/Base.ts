@@ -57,8 +57,10 @@ export class Base extends Building {
             buildingManager.registerPad(pad);
         }
 
-        // Initialize for existing building (Base starts at Lv1)
-        const startCost = GameConfig.BUILDING.BASE_UPGRADE.START_COST;
+        // Use unified upgrade curve for all built buildings, keep legacy fallback.
+        const startCost =
+            GameConfig.BUILDING.UPGRADE_COST?.START_COST ??
+            GameConfig.BUILDING.BASE_UPGRADE.START_COST;
         pad.initForExistingBuilding(this, startCost);
 
         // Position it

@@ -70,7 +70,8 @@ export class BuildingPadSpawner {
             padPositions,
             fallbackPrebuildTowerIndex
         );
-        const initialVisiblePadIndexes = this.resolveInitialVisiblePadIndexes(initialPrebuiltPadIndex);
+        const initialVisiblePadIndexes =
+            this.resolveInitialVisiblePadIndexes(initialPrebuiltPadIndex);
         if (fallbackPrebuildTowerIndex >= 0) {
             const fallback = padPositions[fallbackPrebuildTowerIndex];
             console.log(
@@ -192,8 +193,7 @@ export class BuildingPadSpawner {
                 continue;
             }
 
-            const baseCost = this.buildingRegistry.get(pos.type)?.cost ?? 0;
-            const nextUpgradeCost = Math.ceil(baseCost * building.upgradeCostMultiplier);
+            const nextUpgradeCost = this.resolveInitialUpgradeCost();
             pad.initForExistingBuilding(building, nextUpgradeCost);
 
             // Globally hide all upgrade pads initially for prebuilt buildings
@@ -419,6 +419,20 @@ export class BuildingPadSpawner {
         }
 
         return -1;
+    }
+
+    private static resolveInitialUpgradeCost(): number {
+        const unifiedStart = GameConfig.BUILDING.UPGRADE_COST?.START_COST;
+        if (typeof unifiedStart === 'number' && Number.isFinite(unifiedStart)) {
+            return unifiedStart;
+        }
+
+        const legacyStart = GameConfig.BUILDING.BASE_UPGRADE?.START_COST;
+        if (typeof legacyStart === 'number' && Number.isFinite(legacyStart)) {
+            return legacyStart;
+        }
+
+        return 20;
     }
 
     private static isForceBuildablePadIndex(index: number): boolean {
