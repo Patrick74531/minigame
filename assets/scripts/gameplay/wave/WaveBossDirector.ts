@@ -104,9 +104,9 @@ export function rollNextBossWave(
     bossEventConfig: BossEventConfig | null
 ): number {
     if (!bossEventConfig) return Number.MAX_SAFE_INTEGER;
-    const min = Math.max(1, bossEventConfig.INTERVAL_MIN_WAVES);
-    const max = Math.max(min, bossEventConfig.INTERVAL_MAX_WAVES);
-    return fromWave + randomInt(min, max);
+    const fixedInterval = 10;
+    const safeFromWave = Math.max(1, Math.floor(fromWave));
+    return Math.ceil(safeFromWave / fixedInterval) * fixedInterval;
 }
 
 export function advanceBossLaneState(params: {

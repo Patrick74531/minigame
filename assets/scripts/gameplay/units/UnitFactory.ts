@@ -39,8 +39,8 @@ export interface EnemySpawnOptions {
     attackMultiplier?: number;
     speedMultiplier?: number;
     isElite?: boolean;
+    spawnType?: 'regular' | 'elite' | 'boss';
     scaleMultiplier?: number;
-    coinDropMultiplier?: number;
     /** 攻击范围（可造成伤害的距离） */
     attackRange?: number;
     /** 索敌范围（发现/锁定目标距离） */
@@ -182,7 +182,7 @@ export class UnitFactory {
         });
         enemy.setVariant({
             isElite,
-            coinDropMultiplier: options.coinDropMultiplier ?? 1,
+            spawnType: options.spawnType ?? (isElite ? 'elite' : 'regular'),
         });
         enemy.setCombatProfile({
             aggroRange: options.aggroRange ?? GameConfig.ENEMY.AGGRO_RANGE,

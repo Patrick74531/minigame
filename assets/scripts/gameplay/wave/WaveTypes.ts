@@ -128,6 +128,5 @@ export interface SpawnCombatProfile {
     attackMultiplier: number;
     speedMultiplier: number;
     scaleMultiplier: number;
-    coinDropMultiplier: number;
     isElite: boolean;
 }

@@ -459,12 +459,9 @@ export class WaveManager {
     public checkWaveComplete(onComplete: (bonus: number) => void): void {
         if (this._waveActive || this._enemies.length > 0 || !this._waveConfig) return;
 
-        const bonusBase = GameConfig.WAVE.INFINITE.BONUS_PER_WAVE;
-        const bonusGrowth = GameConfig.WAVE.INFINITE.BONUS_GROWTH_PER_WAVE;
-        const waveBonus = bonusBase + (this._currentWave - 1) * bonusGrowth;
-        const eliteBonus = this._waveConfig.eliteCount * Math.floor(bonusBase * 0.75);
-        const bonus = waveBonus + eliteBonus;
-        console.log(`✅ 第 ${this._currentWave} 波完成! +${bonus} 金币`);
+        // 当前版本金币仅来自击杀掉落，波次完成不再追加金币奖励。
+        const bonus = 0;
+        console.log(`✅ 第 ${this._currentWave} 波完成`);
 
         this.eventManager.emit(GameEvents.WAVE_COMPLETE, {
             wave: this._currentWave,
@@ -519,13 +516,6 @@ export class WaveManager {
             entry.spawnType === 'boss'
                 ? this.resolveBossHpMultiplierFloor(waveConfig.waveNumber, defaultHpMultiplier)
                 : defaultHpMultiplier;
-        const finalCoinDropMultiplier =
-            entry.spawnType === 'boss'
-                ? this.resolveBossCoinDropMultiplier(
-                      waveConfig.waveNumber,
-                      spawnCombat.coinDropMultiplier
-                  )
-                : spawnCombat.coinDropMultiplier;
 
         const enemy = UnitFactory.createEnemy(
             this._enemyContainer,
@@ -541,8 +531,8 @@ export class WaveManager {
                     spawnCombat.attackMultiplier *
                     powerAttackMultiplier,
                 isElite: spawnCombat.isElite,
+                spawnType: entry.spawnType,
                 scaleMultiplier: spawnCombat.scaleMultiplier,
-                coinDropMultiplier: finalCoinDropMultiplier,
                 visualVariant,
                 attackType: archetype.attackType,
                 modelPath: archetype.modelPath,
@@ -749,11 +739,6 @@ export class WaveManager {
                 attackMultiplier: clamp(toFinite(combat?.BOSS_ATTACK_MULTIPLIER, 3.2), 1, 20),
                 speedMultiplier: clamp(toFinite(combat?.BOSS_SPEED_MULTIPLIER, 1), 0.4, 3),
                 scaleMultiplier: clamp(toFinite(combat?.BOSS_SCALE_MULTIPLIER, 1.75), 1, 8),
-                coinDropMultiplier: clamp(
-                    toFinite(combat?.BOSS_COIN_MULTIPLIER, 6),
-                    elite.COIN_DROP_MULTIPLIER,
-                    30
-                ),
                 isElite: true,
             };
         }
@@ -774,7 +759,6 @@ export class WaveManager {
                 attackMultiplier: elite.ATTACK_MULTIPLIER,
                 speedMultiplier: elite.SPEED_MULTIPLIER,
                 scaleMultiplier: eliteScale,
-                coinDropMultiplier: elite.COIN_DROP_MULTIPLIER,
                 isElite: true,
             };
         }
@@ -783,7 +767,6 @@ export class WaveManager {
             attackMultiplier: 1,
             speedMultiplier: 1,
             scaleMultiplier: 1,
-            coinDropMultiplier: 1,
             isElite: false,
         };
     }
@@ -1103,35 +1086,11 @@ export class WaveManager {
         return Math.max(fallbackHpMultiplier, floorMultiplier);
     }
 
-    private resolveBossCoinDropMultiplier(
-        waveNumber: number,
-        fallbackCoinDropMultiplier: number
-    ): number {
-        const avgCoinDropPerEnemy = Math.max(
-            1,
-            GameConfig.ENEMY.COIN_DROP + GameConfig.ENEMY.COIN_DROP_VARIANCE * 0.5
-        );
-        const adjacentWaveCoinIncome = this.estimateAdjacentWaveTotalCoinIncome(waveNumber);
-        if (!Number.isFinite(adjacentWaveCoinIncome) || adjacentWaveCoinIncome <= 0) {
-            return fallbackCoinDropMultiplier;
-        }
-
-        const floorMultiplier = adjacentWaveCoinIncome / avgCoinDropPerEnemy;
-        return clamp(floorMultiplier, fallbackCoinDropMultiplier, 200);
-    }
-
     private estimateAdjacentWaveTotalHpSum(waveNumber: number): number {
         const wave = Math.max(1, Math.floor(waveNumber));
         const prevHp = this.estimateRegularWaveTotalHp(wave - 1);
         const nextHp = this.estimateRegularWaveTotalHp(wave + 1);
         return Math.max(0, prevHp) + Math.max(0, nextHp);
-    }
-
-    private estimateAdjacentWaveTotalCoinIncome(waveNumber: number): number {
-        const wave = Math.max(1, Math.floor(waveNumber));
-        const prevCoinIncome = this.estimateRegularWaveTotalCoinIncome(wave - 1);
-        const nextCoinIncome = this.estimateRegularWaveTotalCoinIncome(wave + 1);
-        return Math.max(0, prevCoinIncome) + Math.max(0, nextCoinIncome);
     }
 
     private estimateRegularWaveTotalHp(waveNumber: number): number {
@@ -1151,27 +1110,6 @@ export class WaveManager {
         const regularUnitHp = GameConfig.ENEMY.BASE_HP * hpMult * avgPowerHpMultiplier;
         const eliteUnitHp = regularUnitHp * Math.max(1, GameConfig.ENEMY.ELITE.HP_MULTIPLIER);
         return regularCount * regularUnitHp + eliteCount * eliteUnitHp;
-    }
-
-    private estimateRegularWaveTotalCoinIncome(waveNumber: number): number {
-        const wave = Math.max(1, Math.floor(waveNumber));
-        const infinite = GameConfig.WAVE.INFINITE;
-        const waveIndex = wave - 1;
-        const countStepBonus =
-            Math.floor(waveIndex / infinite.COUNT_GROWTH_STEP_WAVES) *
-            infinite.COUNT_GROWTH_STEP_BONUS;
-        const regularCount = Math.max(
-            1,
-            Math.round(infinite.BASE_COUNT + waveIndex * infinite.COUNT_PER_WAVE + countStepBonus)
-        );
-        const eliteCount = this.getEliteCountForWave(wave);
-        const avgRegularDrop = Math.max(
-            1,
-            GameConfig.ENEMY.COIN_DROP + GameConfig.ENEMY.COIN_DROP_VARIANCE * 0.5
-        );
-        const avgEliteDrop =
-            avgRegularDrop * Math.max(1, GameConfig.ENEMY.ELITE.COIN_DROP_MULTIPLIER);
-        return regularCount * avgRegularDrop + eliteCount * avgEliteDrop;
     }
 
     private resolveAverageRegularPowerHpMultiplier(): number {

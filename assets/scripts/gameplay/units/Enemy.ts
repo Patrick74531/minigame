@@ -15,6 +15,7 @@ import { EnemyQuery } from '../../core/managers/EnemyQuery';
 
 const { ccclass } = _decorator;
 type RouteLane = 'top' | 'mid' | 'bottom';
+type EnemySpawnType = 'regular' | 'elite' | 'boss';
 
 /**
  * Enemy Unit
@@ -43,7 +44,7 @@ export class Enemy extends Unit {
     // Target position (Base)
     private _targetPos: Vec3 = new Vec3(0, 0, 0);
     private _isElite: boolean = false;
-    private _coinDropMultiplier: number = 1;
+    private _spawnType: EnemySpawnType = 'regular';
     private _isAttackVisualActive: boolean = false;
     private _logicAccum: number = 0;
     private _aggroRange: number = GameConfig.ENEMY.AGGRO_RANGE;
@@ -85,7 +86,7 @@ export class Enemy extends Unit {
         this._state = UnitState.MOVING;
         this._target = null;
         this._isElite = false;
-        this._coinDropMultiplier = 1;
+        this._spawnType = 'regular';
         this._aggroRange = GameConfig.ENEMY.AGGRO_RANGE;
         this._routeLane = 'mid';
         this._scanTimer = 0;
@@ -145,9 +146,9 @@ export class Enemy extends Unit {
         this._targetPos.set(target);
     }
 
-    public setVariant(config: { isElite?: boolean; coinDropMultiplier?: number }): void {
+    public setVariant(config: { isElite?: boolean; spawnType?: EnemySpawnType }): void {
         this._isElite = config.isElite ?? false;
-        this._coinDropMultiplier = config.coinDropMultiplier ?? 1;
+        this._spawnType = config.spawnType ?? (this._isElite ? 'elite' : 'regular');
     }
 
     public setCombatProfile(config: { aggroRange?: number; attackRange?: number }): void {
@@ -171,8 +172,8 @@ export class Enemy extends Unit {
         return this._isElite;
     }
 
-    public get coinDropMultiplier(): number {
-        return this._coinDropMultiplier;
+    public get spawnType(): EnemySpawnType {
+        return this._spawnType;
     }
 
     protected updateMovement(dt: number): void {

@@ -18,17 +18,12 @@ export const ENEMY_CONFIG = {
     AGGRO_RANGE: BALANCE.enemy.aggroRange,
     /** 抵达基地时造成伤害 */
     BASE_REACH_DAMAGE: BALANCE.enemy.baseReachDamage,
-    /** 死亡掉落金币 */
-    COIN_DROP: BALANCE.economy.enemyCoinDrop,
-    /** 死亡掉落随机浮动 */
-    COIN_DROP_VARIANCE: BALANCE.economy.enemyCoinDropVariance,
     /** 精英敌人数值倍率 */
     ELITE: {
         HP_MULTIPLIER: BALANCE.enemy.elite.hpMultiplier,
         ATTACK_MULTIPLIER: BALANCE.enemy.elite.attackMultiplier,
         SPEED_MULTIPLIER: BALANCE.enemy.elite.speedMultiplier,
         SCALE_MULTIPLIER: BALANCE.enemy.elite.scaleMultiplier,
-        COIN_DROP_MULTIPLIER: BALANCE.enemy.elite.coinDropMultiplier,
     },
     /** 飞行敌人（assets/resources/enemies/flying）远程直线弹道参数 */
     FLYING_RANGED: {

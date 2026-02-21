@@ -19,8 +19,6 @@ export const WAVE_INFINITE_CONFIG = {
     BASE_SPAWN_INTERVAL: BALANCE.waveInfinite.baseSpawnInterval,
     SPAWN_INTERVAL_DECAY_PER_WAVE: BALANCE.waveInfinite.spawnIntervalDecayPerWave,
     MIN_SPAWN_INTERVAL: BALANCE.waveInfinite.minSpawnInterval,
-    BONUS_PER_WAVE: BALANCE.waveInfinite.bonusPerWave,
-    BONUS_GROWTH_PER_WAVE: BALANCE.waveInfinite.bonusGrowthPerWave,
     SPAWN_RANGE: BALANCE.waveInfinite.spawnRange,
     /**
      * 固定刷怪口设置
