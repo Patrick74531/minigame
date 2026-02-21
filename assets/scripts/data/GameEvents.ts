@@ -38,6 +38,8 @@ export const GameEvents = {
     WAVE_FORECAST: 'WAVE_FORECAST',
     /** 波次完成 { wave?: number, waveIndex?: number, bonus?: number } */
     WAVE_COMPLETE: 'WAVE_COMPLETE',
+    /** 波次倒计时 { seconds: number } */
+    WAVE_COUNTDOWN: 'WAVE_COUNTDOWN',
     /** Boss 出场演出 { bossNode: Node, archetypeId?: string, modelPath?: string, lane?: 'top'|'mid'|'bottom' } */
     BOSS_INTRO: 'BOSS_INTRO',
     /** 道路即将解锁 { lane: 'top'|'mid'|'bottom', focusPosition?: Vec3, padFocusPosition?: Vec3, remainSeconds?: number } */
@@ -134,6 +136,7 @@ export type GameEventPayloads = {
         spawnType?: 'regular' | 'elite' | 'boss';
     };
     [GameEvents.WAVE_COMPLETE]: { wave?: number; waveIndex?: number; bonus?: number };
+    [GameEvents.WAVE_COUNTDOWN]: { seconds: number };
     [GameEvents.BOSS_INTRO]: {
         bossNode: Node;
         archetypeId?: string;

@@ -29,6 +29,9 @@ export class HUDStatusModule implements HUDModule {
     private _xpBarWidth = 320;
     private _xpBarHeight = 16;
 
+    private _isWaitingForNextWave: boolean = false;
+    private _currentCountdownSeconds: number = 0;
+
     public initialize(uiCanvas: Node): void {
         this._coinLabel = UIFactory.createCoinDisplay(uiCanvas);
         this._coinLabel.overflow = Label.Overflow.SHRINK;
@@ -124,9 +127,15 @@ export class HUDStatusModule implements HUDModule {
 
     public onLanguageChanged(): void {
         if (this._waveLabel) {
-            this._waveLabel.string = Localization.instance.t('ui.hud.wave', {
-                wave: WaveService.instance.currentWave,
-            });
+            if (this._isWaitingForNextWave) {
+                this._waveLabel.string = Localization.instance.t('ui.hud.wave.countdown', {
+                    seconds: this._currentCountdownSeconds,
+                });
+            } else {
+                this._waveLabel.string = Localization.instance.t('ui.hud.wave', {
+                    wave: WaveService.instance.currentWave,
+                });
+            }
         }
 
         if (this._baseHpLabel) {
@@ -182,7 +191,15 @@ export class HUDStatusModule implements HUDModule {
 
     public updateWaveDisplay(wave: number): void {
         if (!this._waveLabel) return;
+        this._isWaitingForNextWave = false;
         this._waveLabel.string = Localization.instance.t('ui.hud.wave', { wave });
+    }
+
+    public updateWaveCountdown(seconds: number): void {
+        if (!this._waveLabel) return;
+        this._isWaitingForNextWave = true;
+        this._currentCountdownSeconds = seconds;
+        this._waveLabel.string = Localization.instance.t('ui.hud.wave.countdown', { seconds });
     }
 
     public showBuildingInfo(title: string, requiredCoins: number, collectedCoins: number): void {

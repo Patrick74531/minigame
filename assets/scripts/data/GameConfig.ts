@@ -155,9 +155,9 @@ export const GameConfig = {
         /** 首波刷新延迟（秒） */
         FIRST_WAVE_DELAY: 2,
         /** 每波清空后刷新下一波的等待时间（秒） */
-        NEXT_WAVE_DELAY: 3,
+        NEXT_WAVE_DELAY: 15,
         /** 兼容旧字段：等价于 NEXT_WAVE_DELAY */
-        WAVE_INTERVAL: 3,
+        WAVE_INTERVAL: 15,
         /** 敌人生成间隔（秒） */
         SPAWN_INTERVAL: 0.5,
         /** 每波难度递增系数 */

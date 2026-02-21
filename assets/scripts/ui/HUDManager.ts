@@ -119,6 +119,7 @@ export class HUDManager {
         this.eventManager.on(GameEvents.WAVE_START, this.onWaveStart, this);
         this.eventManager.on(GameEvents.WAVE_FORECAST, this.onWaveForecast, this);
         this.eventManager.on(GameEvents.WAVE_COMPLETE, this.onWaveComplete, this);
+        this.eventManager.on(GameEvents.WAVE_COUNTDOWN, this.onWaveCountdown, this);
         // 监听英雄经验变化
         this.eventManager.on(GameEvents.HERO_XP_GAINED, this.onXpGained, this);
         this.eventManager.on(GameEvents.HERO_LEVEL_UP, this.onHeroLevelUp, this);
@@ -149,6 +150,17 @@ export class HUDManager {
      */
     public updateWaveDisplay(wave: number): void {
         this._statusModule.updateWaveDisplay(wave);
+    }
+
+    /**
+     * 更新波次倒计时
+     */
+    public updateWaveCountdown(seconds: number): void {
+        this._statusModule.updateWaveCountdown(seconds);
+    }
+
+    private onWaveCountdown(data: { seconds: number }): void {
+        this.updateWaveCountdown(data.seconds);
     }
 
     /**
