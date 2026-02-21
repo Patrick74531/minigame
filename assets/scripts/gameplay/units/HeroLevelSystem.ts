@@ -149,11 +149,16 @@ export class HeroLevelSystem {
         }
     }
 
-    private onUnitDied(data: { unitType: string; node?: Node }): void {
+    private onUnitDied(data: {
+        unitType: string;
+        node?: Node;
+        enemySpawnType?: 'regular' | 'elite' | 'boss';
+        enemyIsElite?: boolean;
+    }): void {
         if (data.unitType !== UnitType.ENEMY || !data.node) return;
 
         const enemy = data.node.getComponent(Enemy);
-        const isElite = enemy ? enemy.isElite : false;
+        const isElite = data.enemySpawnType === 'boss' || data.enemyIsElite || enemy?.isElite;
         const xp = isElite
             ? GameConfig.HERO_LEVEL.XP_PER_ELITE_KILL
             : GameConfig.HERO_LEVEL.XP_PER_KILL;

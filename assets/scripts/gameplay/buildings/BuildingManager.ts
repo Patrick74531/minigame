@@ -29,7 +29,7 @@ export class BuildingManager {
         'barracks',
     ];
     private static readonly MID_SUPPORT_REVEAL_INTERVAL_SECONDS = 1;
-    private static readonly MID_SUPPORT_CINEMATIC_HOLD_SECONDS = 2;
+    private static readonly MID_SUPPORT_CINEMATIC_HOLD_SECONDS = 3;
 
     private _pads: BuildingPad[] = [];
     private _activeBuildings: Building[] = [];

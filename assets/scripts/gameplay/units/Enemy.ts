@@ -40,6 +40,8 @@ export class Enemy extends Unit {
         GameConfig.ENEMY.FLYING_RANGED.PROJECTILE_HIT_RADIUS;
     private static readonly RANGED_PROJECTILE_SPAWN_OFFSET_Y =
         GameConfig.ENEMY.FLYING_RANGED.PROJECTILE_SPAWN_OFFSET_Y;
+    /** 敌方远程子弹最大飞行距离（约 3 个塔位间距） */
+    private static readonly RANGED_PROJECTILE_MAX_DISTANCE = 8.4;
 
     // Target position (Base)
     private _targetPos: Vec3 = new Vec3(0, 0, 0);
@@ -124,7 +126,9 @@ export class Enemy extends Unit {
         projectile.setVisualStyle(this.rangedProjectileStyle);
         projectile.speed = Enemy.RANGED_PROJECTILE_SPEED;
         projectile.damage = this._stats.attack;
-        projectile.maxLifetime = Enemy.RANGED_PROJECTILE_LIFETIME;
+        const projectileSpeed = Math.max(0.1, Enemy.RANGED_PROJECTILE_SPEED);
+        const lifetimeByDistance = Enemy.RANGED_PROJECTILE_MAX_DISTANCE / projectileSpeed;
+        projectile.maxLifetime = Math.min(Enemy.RANGED_PROJECTILE_LIFETIME, lifetimeByDistance);
         projectile.hitRadius = Enemy.RANGED_PROJECTILE_HIT_RADIUS;
         projectile.launch(direction, this);
     }

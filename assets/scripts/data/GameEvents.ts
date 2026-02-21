@@ -22,7 +22,7 @@ export const GameEvents = {
     // === 单位系统 ===
     /** 单位生成 { unitType: string, node: Node } */
     UNIT_SPAWNED: 'UNIT_SPAWNED',
-    /** 单位死亡 { unitType: string, node: Node, position: Vec3 } */
+    /** 单位死亡 { unitType: string, node: Node, position: Vec3, enemySpawnType?: 'regular'|'elite'|'boss', enemyIsElite?: boolean } */
     UNIT_DIED: 'UNIT_DIED',
     /** 单位受伤 { node: Node, damage: number, currentHp: number } */
     UNIT_DAMAGED: 'UNIT_DAMAGED',
@@ -130,7 +130,13 @@ export type GameEventPayloads = {
     [GameEvents.BUILDING_UPGRADED]: { buildingId: string; level: number };
     [GameEvents.BUILDING_DESTROYED]: { buildingId: string; building?: unknown };
     [GameEvents.UNIT_SPAWNED]: { unitType: string; node: Node };
-    [GameEvents.UNIT_DIED]: { unitType: string; node: Node; position?: Vec3 };
+    [GameEvents.UNIT_DIED]: {
+        unitType: string;
+        node: Node;
+        position?: Vec3;
+        enemySpawnType?: 'regular' | 'elite' | 'boss';
+        enemyIsElite?: boolean;
+    };
     [GameEvents.UNIT_DAMAGED]: { node: Node; damage: number; currentHp: number };
     [GameEvents.ENEMY_KILLED]: { enemy: Node; position?: Vec3 };
     [GameEvents.ENEMY_REACHED_BASE]: { enemy: Node; damage: number };

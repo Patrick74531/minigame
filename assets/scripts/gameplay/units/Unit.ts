@@ -232,15 +232,34 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
 
         this._state = UnitState.DEAD;
         this.setHealthBarEnabled(false);
+        const enemyMeta = this.resolveEnemyDeathMeta();
 
         this.eventManager.emit(GameEvents.UNIT_DIED, {
             unitType: this.unitType,
             node: this.node,
             position: this.node.position.clone(),
+            enemySpawnType: enemyMeta.spawnType,
+            enemyIsElite: enemyMeta.isElite,
         });
 
         // 子类可重写此方法添加死亡动画
         this.onDeath();
+    }
+
+    private resolveEnemyDeathMeta():
+        | { spawnType?: 'regular' | 'elite' | 'boss'; isElite?: boolean }
+        | { spawnType?: undefined; isElite?: undefined } {
+        if (this.unitType !== UnitType.ENEMY) {
+            return {};
+        }
+        const enemyLike = this as unknown as {
+            spawnType?: 'regular' | 'elite' | 'boss';
+            isElite?: boolean;
+        };
+        return {
+            spawnType: enemyLike.spawnType,
+            isElite: enemyLike.isElite,
+        };
     }
 
     /**

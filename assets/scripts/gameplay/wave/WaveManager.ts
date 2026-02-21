@@ -88,6 +88,8 @@ export class WaveManager {
     private static readonly LANE_UNLOCK_FOCUS_INWARD: number = 8.5;
     private static readonly SPAWN_MIN_ENEMY_DISTANCE: number = 0.9;
     private static readonly SPAWN_POSITION_TRIES: number = 10;
+    private static readonly BOSS_HP_FLOOR_ADJACENT_AVERAGE_WEIGHT = 0.5;
+    private static readonly BOSS_HP_FLOOR_TARGET_SHARE = 0.6;
     private static readonly LOCKED_LANE_PAD_TYPES: ReadonlySet<string> = new Set([
         'tower',
         'frost_tower',
@@ -1082,7 +1084,11 @@ export class WaveManager {
         if (!Number.isFinite(adjacentWaveHpSum) || adjacentWaveHpSum <= 0) {
             return fallbackHpMultiplier;
         }
-        const floorMultiplier = adjacentWaveHpSum / baseHp;
+        // Boss floor uses a share of adjacent-wave average HP, avoiding over-inflated boss HP spikes.
+        const adjacentAverageHp =
+            adjacentWaveHpSum * WaveManager.BOSS_HP_FLOOR_ADJACENT_AVERAGE_WEIGHT;
+        const floorMultiplier =
+            (adjacentAverageHp * WaveManager.BOSS_HP_FLOOR_TARGET_SHARE) / baseHp;
         return Math.max(fallbackHpMultiplier, floorMultiplier);
     }
 

@@ -14,6 +14,7 @@ export class CoinDropManager {
     private static readonly REGULAR_DROP_COINS = 1;
     private static readonly ELITE_DROP_COINS = 5;
     private static readonly BOSS_DROP_COINS_STEP = 50;
+    private static readonly DROP_SPREAD_RADIUS = 0.42;
 
     private static _instance: CoinDropManager | null = null;
     private _coinContainer: Node | null = null;
@@ -46,35 +47,62 @@ export class CoinDropManager {
         unitType: string;
         node?: Node;
         position?: { x: number; z: number };
+        enemySpawnType?: 'regular' | 'elite' | 'boss';
+        enemyIsElite?: boolean;
     }): void {
         if (data.unitType !== UnitType.ENEMY) return;
 
         if (data.position && this._coinContainer) {
             const enemyComp = data.node?.getComponent(Enemy);
-            const dropCoins = this.resolveDropCoins(enemyComp);
+            const dropCoins = this.resolveDropCoins({
+                enemyComp,
+                spawnType: data.enemySpawnType,
+                isElite: data.enemyIsElite,
+            });
             for (let i = 0; i < dropCoins; i++) {
-                CoinFactory.createCoin(this._coinContainer, data.position.x, data.position.z, 1);
+                const jitter = this.resolveDropJitter(i, dropCoins);
+                CoinFactory.createCoin(
+                    this._coinContainer,
+                    data.position.x + jitter.x,
+                    data.position.z + jitter.z,
+                    1
+                );
             }
-        }
-
-        if (data.node && data.node.isValid) {
-            data.node.destroy();
         }
     }
 
-    private resolveDropCoins(enemyComp: Enemy | null | undefined): number {
-        if (!enemyComp) return CoinDropManager.REGULAR_DROP_COINS;
+    private resolveDropCoins(input: {
+        enemyComp: Enemy | null | undefined;
+        spawnType?: 'regular' | 'elite' | 'boss';
+        isElite?: boolean;
+    }): number {
+        const enemyComp = input.enemyComp;
+        const spawnType = input.spawnType ?? enemyComp?.spawnType;
+        const isElite = input.isElite ?? enemyComp?.isElite ?? false;
 
-        if (enemyComp.spawnType === 'boss') {
+        if (spawnType === 'boss') {
             this._bossKillCount += 1;
             return this._bossKillCount * CoinDropManager.BOSS_DROP_COINS_STEP;
         }
 
-        if (enemyComp.spawnType === 'elite' || enemyComp.isElite) {
+        if (spawnType === 'elite' || isElite) {
             return CoinDropManager.ELITE_DROP_COINS;
         }
 
         return CoinDropManager.REGULAR_DROP_COINS;
+    }
+
+    private resolveDropJitter(index: number, total: number): { x: number; z: number } {
+        if (total <= 1) {
+            return { x: 0, z: 0 };
+        }
+        const ratio = index / total;
+        const angle = ratio * Math.PI * 2 + Math.random() * 0.25;
+        const radius = CoinDropManager.DROP_SPREAD_RADIUS * (0.35 + Math.random() * 0.65);
+        return {
+            x: Math.cos(angle) * radius,
+            z: Math.sin(angle) * radius,
+        };
     }
 
     private get eventManager(): EventManager {

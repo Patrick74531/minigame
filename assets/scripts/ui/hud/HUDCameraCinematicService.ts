@@ -4,6 +4,8 @@ import type { HUDModule } from './HUDModule';
 
 const BOSS_CINEMATIC_MOVE_SECONDS = 0.58;
 const BOSS_CINEMATIC_HOLD_SECONDS = 2;
+const FOCUS_CINEMATIC_DISTANCE_MULTIPLIER = 1.18;
+const FOCUS_CINEMATIC_MIN_HEIGHT = 3.6;
 
 export class HUDCameraCinematicService implements HUDModule {
     private _uiCanvas: Node | null = null;
@@ -181,10 +183,12 @@ export class HUDCameraCinematicService implements HUDModule {
         const token = this.beginCameraSequence(follow);
         const camNode = follow.node;
         const from = camNode.getWorldPosition(new Vec3());
-        const focusOffset = follow.offset.clone().multiplyScalar(0.76);
+        const focusOffset = follow.offset
+            .clone()
+            .multiplyScalar(FOCUS_CINEMATIC_DISTANCE_MULTIPLIER);
         const to = new Vec3(
             focus.x + focusOffset.x,
-            Math.max(focus.y + 2.4, focusOffset.y),
+            Math.max(focus.y + FOCUS_CINEMATIC_MIN_HEIGHT, focusOffset.y),
             focus.z + focusOffset.z
         );
 

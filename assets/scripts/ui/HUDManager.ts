@@ -268,7 +268,7 @@ export class HUDManager {
 
         this._cameraCinematicService.playFocusCinematic(
             focus,
-            Math.max(0, data?.holdSeconds ?? 2),
+            Math.max(0, data?.holdSeconds ?? 3),
             () => {
                 this.eventManager.emit(GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FINISHED);
             },
