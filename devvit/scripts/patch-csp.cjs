@@ -577,7 +577,21 @@ if (fs.existsSync(mainPath)) {
     } else if (!main.includes('var y=s.clips') && !main.includes('var _=s.clips')) {
         console.log('[patch-csp]   ~ Patch J already applied (skipping)');
     } else {
-        console.warn('[patch-csp]   ~ Patch J pattern not found');
+        // Regex fallback for minifier variable changes (i/o/f/S etc).
+        var J_RE =
+            /var (\w+)=s\.clips&&s\.clips\.length>0\?s\.clips\[0\]:null;if\(\1\)\{[\s\S]*?n\.buildHeroStateName\(\w+\.key,"run"\)[\s\S]*?\}else n\.ensureRunClip\(s,(\w+)\)/;
+        var jMatch = main.match(J_RE);
+        if (jMatch) {
+            var jControllerVar = jMatch[2];
+            main = main.replace(jMatch[0], 'n.ensureRunClip(s,' + jControllerVar + ')');
+            console.log(
+                '[patch-csp]   ✓ Patch J-regex: forced ensureRunClip (controller=' +
+                    jControllerVar +
+                    ')'
+            );
+        } else {
+            console.warn('[patch-csp]   ~ Patch J pattern not found');
+        }
     }
 
     // ── Patch K: Diagnostics + try-catch in ensureRunClip success callback ────────
@@ -745,7 +759,42 @@ if (fs.existsSync(mainPath)) {
         main = main.replace(K_OLD, K_NEW);
         console.log('[patch-csp]   ✓ Patch K: injected ensureRunClip diagnostics + try-catch');
     } else {
-        console.warn('[patch-csp]   ~ Patch K pattern not found');
+        // Regex fallback for minifier variable changes (e.g. clip var o→i).
+        var K_RE =
+            /a\._heroRunClipCache\.set\(t\.key,(\w+)\);var l=a\.bindClipState\(e,\1,a\.buildHeroStateName\(t\.key,"run"\)\);e\.defaultClip=\1,e\.playOnLoad=!0,e\.play\(l\),n&&\(n\.setRunClip\(l\),n\.setIdleClip\(l\)\)/;
+        var kMatch = main.match(K_RE);
+        if (kMatch) {
+            var kv = kMatch[1];
+            var K_PATCHV_DYN =
+                'try{var _ea0=' +
+                kv +
+                '&&' +
+                kv +
+                '._exoticAnimation,_na0=_ea0&&_ea0._nodeAnimations;' +
+                'if(_na0){var _pvc=0;' +
+                'for(var _ni0=0;_ni0<_na0.length;_ni0++){var _bn0=_na0[_ni0];' +
+                'for(var _tki=0;_tki<3;_tki++){var _tk=["_position","_rotation","_scale"][_tki];' +
+                'var _tr=_bn0&&_bn0[_tk];' +
+                'if(_tr&&_tr.values&&_tr.values._values&&typeof _tr.values.BYTES_PER_ELEMENT==="undefined"){' +
+                '_tr.values.BYTES_PER_ELEMENT=_tr.values._values.BYTES_PER_ELEMENT;_pvc++;}}' +
+                '}console.log("[DBG-K] patchedV: added BPELEM to",_pvc,"tracks");}}catch(_pve){console.error("[DBG-K] pV:",_pve);}';
+            var K_NEW_DYN =
+                'a._heroRunClipCache.set(t.key,' +
+                kv +
+                ');' +
+                K_PATCHV_DYN +
+                'try{var _stName=a.buildHeroStateName(t.key,"run");if(e._nameToState&&e._nameToState[_stName]){e.removeState(_stName);console.log("[DBG-K] cleared stale state:",_stName);}}catch(_stE){}' +
+                'var l=a.bindClipState(e,' +
+                kv +
+                ',a.buildHeroStateName(t.key,"run"));' +
+                'try{e.defaultClip=' +
+                kv +
+                ',e.playOnLoad=!0,e.play(l),n&&(n.setRunClip(l),a._heroIdleClipCache.has(t.key)||n.setIdleClip(l));console.log("[DBG-K] play() ok");}catch(_ke){console.error("[DBG-K] play() threw:",_ke);}';
+            main = main.replace(kMatch[0], K_NEW_DYN);
+            console.log('[patch-csp]   ✓ Patch K-regex: ensureRunClip fix (var=' + kv + ')');
+        } else {
+            console.warn('[patch-csp]   ~ Patch K pattern not found');
+        }
     }
 
     // ── Patch V-standalone: ensure BPELEM fix always runs in the same pass as K ──
@@ -758,9 +807,38 @@ if (fs.existsSync(mainPath)) {
             main = main.replace(K_PV_OLD, K_PV_NEW);
             console.log('[patch-csp]   ✓ Patch V-standalone: BPELEM fix for run clip injected');
         } else {
-            console.warn(
-                '[patch-csp]   ~ Patch V-standalone: K_PV_OLD not found (Patch V missing!)'
-            );
+            // Regex fallback: minifier may rename the clip variable (e.g. o→i).
+            // Match a._heroRunClipCache.set(t.key,X); ... var l=a.bindClipState(e,X,...)
+            var V_RE =
+                /a\._heroRunClipCache\.set\(t\.key,(\w+)\);(var l=a\.bindClipState\(e,\1,a\.buildHeroStateName\(t\.key,"run"\)\))/;
+            var vMatch = main.match(V_RE);
+            if (vMatch) {
+                var cv = vMatch[1];
+                var BPELEM_RUN =
+                    'try{var _ea0=' +
+                    cv +
+                    '&&' +
+                    cv +
+                    '._exoticAnimation,_na0=_ea0&&_ea0._nodeAnimations;' +
+                    'if(_na0){var _pvc=0;' +
+                    'for(var _ni0=0;_ni0<_na0.length;_ni0++){var _bn0=_na0[_ni0];' +
+                    'for(var _tki=0;_tki<3;_tki++){var _tk=["_position","_rotation","_scale"][_tki];' +
+                    'var _tr=_bn0&&_bn0[_tk];' +
+                    'if(_tr&&_tr.values&&_tr.values._values&&typeof _tr.values.BYTES_PER_ELEMENT==="undefined"){' +
+                    '_tr.values.BYTES_PER_ELEMENT=_tr.values._values.BYTES_PER_ELEMENT;_pvc++;}}' +
+                    '}console.log("[DBG-K] patchedV: added BPELEM to",_pvc,"tracks");}}catch(_pve){console.error("[DBG-K] pV:",_pve);}';
+                main = main.replace(
+                    vMatch[0],
+                    'a._heroRunClipCache.set(t.key,' + cv + ');' + BPELEM_RUN + vMatch[2]
+                );
+                console.log(
+                    '[patch-csp]   ✓ Patch V-regex: BPELEM fix for run clip (var=' + cv + ')'
+                );
+            } else {
+                console.warn(
+                    '[patch-csp]   ~ Patch V-standalone: K_PV_OLD not found (Patch V missing!)'
+                );
+            }
         }
     }
 
@@ -988,7 +1066,33 @@ if (fs.existsSync(mainPath)) {
         main = main.replace(W_OLD, W_NEW);
         console.log('[patch-csp]   ✓ Patch W: idle clip BYTES_PER_ELEMENT fix injected');
     } else {
-        console.warn('[patch-csp]   ~ Patch W: idle clip cache pattern not found (skipping)');
+        // Regex fallback: minifier may rename the clip variable (e.g. o→i).
+        var W_RE =
+            /a\._heroIdleClipCache\.set\(t\.key,(\w+)\);(var l=a\.bindClipState\(e,\1,a\.buildHeroStateName\(t\.key,"idle"\)\);n&&n\.setIdleClip\(l\))/;
+        var wMatch = main.match(W_RE);
+        if (wMatch) {
+            var wv = wMatch[1];
+            var BPELEM_IDLE =
+                'try{var _ea1=' +
+                wv +
+                '&&' +
+                wv +
+                '._exoticAnimation,_na1=_ea1&&_ea1._nodeAnimations;' +
+                'if(_na1){var _pvc1=0;' +
+                'for(var _ni1=0;_ni1<_na1.length;_ni1++){var _bn1=_na1[_ni1];' +
+                'for(var _tki1=0;_tki1<3;_tki1++){var _tk1=["_position","_rotation","_scale"][_tki1];' +
+                'var _tr1=_bn1&&_bn1[_tk1];' +
+                'if(_tr1&&_tr1.values&&_tr1.values._values&&typeof _tr1.values.BYTES_PER_ELEMENT==="undefined"){' +
+                '_tr1.values.BYTES_PER_ELEMENT=_tr1.values._values.BYTES_PER_ELEMENT;_pvc1++;}}}' +
+                'console.log("[DBG-W] idle: added BPELEM to",_pvc1,"tracks");}}catch(_pve1){}';
+            main = main.replace(
+                wMatch[0],
+                'a._heroIdleClipCache.set(t.key,' + wv + ');' + BPELEM_IDLE + wMatch[2]
+            );
+            console.log('[patch-csp]   ✓ Patch W-regex: idle BPELEM fix (var=' + wv + ')');
+        } else {
+            console.warn('[patch-csp]   ~ Patch W: idle clip cache pattern not found (skipping)');
+        }
     }
 
     // ── Patch W2: Force-remove stale idle state before recreating ─────────────────
@@ -1006,6 +1110,20 @@ if (fs.existsSync(mainPath)) {
     } else if (main.includes('[DBG-W]') && main.includes(W2_OLD)) {
         main = main.replace(W2_OLD, W2_NEW);
         console.log('[patch-csp]   ✓ Patch W2: idle state force-recreated before bind');
+    } else if (main.includes('[DBG-W]')) {
+        // Regex fallback for variable name changes
+        var W2_RE =
+            /var l=a\.bindClipState\(e,(\w+),a\.buildHeroStateName\(t\.key,"idle"\)\);n&&n\.setIdleClip\(l\)/;
+        var w2Match = main.match(W2_RE);
+        if (w2Match) {
+            var W2_OLD_DYN = w2Match[0];
+            main = main.replace(W2_OLD_DYN, W2_REMOVE + W2_OLD_DYN);
+            console.log(
+                '[patch-csp]   ✓ Patch W2-regex: idle removeState (var=' + w2Match[1] + ')'
+            );
+        } else {
+            console.warn('[patch-csp]   ~ Patch W2: idle removeState target not found (skipping)');
+        }
     } else {
         console.warn('[patch-csp]   ~ Patch W2: idle removeState target not found (skipping)');
     }
