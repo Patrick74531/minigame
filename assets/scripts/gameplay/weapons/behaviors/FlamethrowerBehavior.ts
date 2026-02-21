@@ -69,7 +69,7 @@ export class FlamethrowerBehavior extends WeaponBehavior {
         WeaponVFX.initialize();
 
         const spawnPos = owner.position.clone();
-        spawnPos.y += GameConfig.PHYSICS.PROJECTILE_SPAWN_OFFSET_Y - 0.1;
+        spawnPos.y += GameConfig.PHYSICS.PROJECTILE_SPAWN_OFFSET_Y;
 
         const dx = target.position.x - spawnPos.x;
         const dz = target.position.z - spawnPos.z;
@@ -78,6 +78,15 @@ export class FlamethrowerBehavior extends WeaponBehavior {
 
         const dirX = dx / len;
         const dirZ = dz / len;
+
+        // 向右偏移贴合手部武器，向前偏移避免火焰遮挡身体中心
+        const rightX = -dirZ;
+        const rightZ = dirX;
+        const rightOffset = 0.35;
+        const forwardOffset = 0.5;
+        spawnPos.x += dirX * forwardOffset + rightX * rightOffset;
+        spawnPos.z += dirZ * forwardOffset + rightZ * rightOffset;
+
         const idx = Math.min(level - 1, 4);
         const range = Math.max(1.6, stats.range);
         const streamLength = Math.max(1.6, Math.min(range, len + 0.95));

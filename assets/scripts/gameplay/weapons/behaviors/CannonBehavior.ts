@@ -45,6 +45,7 @@ export class CannonBehavior extends WeaponBehavior {
         const spawnUp =
             beamCfg?.spawnUpOffset ?? Math.max(0.35, GameConfig.PHYSICS.PROJECTILE_SPAWN_OFFSET_Y);
         const spawnForward = beamCfg?.spawnForwardOffset ?? 0.85;
+        const spawnRight = beamCfg?.spawnRightOffset ?? 0.35;
 
         const ownerPos = owner.position.clone();
         const spawnY = ownerPos.y + spawnUp;
@@ -56,10 +57,15 @@ export class CannonBehavior extends WeaponBehavior {
         if (toLen < 0.001) return;
         const dirX = toX / toLen;
         const dirZ = toZ / toLen;
+        
+        // FORWARD cross UP: (dirX, 0, dirZ) x (0, 1, 0) = (-dirZ, 0, dirX)
+        const rightX = -dirZ;
+        const rightZ = dirX;
+        
         const spawnPos = new Vec3(
-            ownerPos.x + dirX * spawnForward,
+            ownerPos.x + dirX * spawnForward + rightX * spawnRight,
             spawnY,
-            ownerPos.z + dirZ * spawnForward
+            ownerPos.z + dirZ * spawnForward + rightZ * spawnRight
         );
 
         const beamMaxLevel = beamCfg?.maxLevel ?? 5;

@@ -79,10 +79,10 @@ export class MachineGunBehavior extends WeaponBehavior {
 
         this._shotCount++;
 
-        // 生成位置（机枪出膛高度略低，避免射过敌人头顶）
+        // 生成位置（机枪出膛高度下调，对齐手部枪口）
         const spawnPos = MachineGunBehavior._tmpPos;
         spawnPos.set(owner.position);
-        spawnPos.y += 0.5;
+        spawnPos.y -= 0.4;
 
         // 射击方向（含 Y 分量，瞄准敌人身体中心而非头顶）
         const targetCenterY = target.position.y + 0.5;
@@ -94,9 +94,16 @@ export class MachineGunBehavior extends WeaponBehavior {
         const dirY = dist3d > 0.001 ? dy / dist3d : 0;
         const dirZ = dist3d > 0.001 ? dz / dist3d : 1;
 
-        // 枪口位置（前移 1.2，避免第一颗子弹距角色过近导致方向偏转）
+        // 枪口位置（前移 1.2，避免第一颗子弹距角色过近导致方向偏转，右移 0.35 贴合枪口）
+        const rightX = -dirZ;
+        const rightZ = dirX;
+        const rightOffset = 0.35;
         const muzzlePos = MachineGunBehavior._tmpMuzzle;
-        muzzlePos.set(spawnPos.x + dirX * 1.2, spawnPos.y, spawnPos.z + dirZ * 1.2);
+        muzzlePos.set(
+            spawnPos.x + dirX * 1.2 + rightX * rightOffset, 
+            spawnPos.y, 
+            spawnPos.z + dirZ * 1.2 + rightZ * rightOffset
+        );
 
         // ==================== 弹壳抛射（按节奏） ====================
         const casingInterval = MachineGunBehavior.CASING_INTERVAL[idx];
@@ -114,10 +121,12 @@ export class MachineGunBehavior extends WeaponBehavior {
         }
 
         if (flameNode) {
-            // 将火焰移动到枪口位置 (比子弹生成点稍微靠后一点，贴近枪管)
-            // 子弹偏移是 1.2，火焰改用 0.6，使其更贴近角色（任务->人物）
-            flameNode.setPosition(spawnPos.x + dirX * 0.6, spawnPos.y, spawnPos.z + dirZ * 0.6);
-            // 触发脉冲
+            // 将火焰移动到枪口位置 (比子弹生成点稍微靠后一点，贴近枪管，同时向右偏移)
+            flameNode.setPosition(
+                spawnPos.x + dirX * 0.6 + rightX * rightOffset, 
+                spawnPos.y, 
+                spawnPos.z + dirZ * 0.6 + rightZ * rightOffset
+            );
             WeaponVFX.pulseMuzzleFlame(flameNode, 1.0 + level * 0.1);
         }
 

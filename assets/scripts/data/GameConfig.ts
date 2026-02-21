@@ -27,8 +27,8 @@ export const GameConfig = {
         HERO_Y: 1.0,
         /** 金币默认高度（Y） */
         COIN_Y: 0.5,
-        /** 远程武器子弹出生高度偏移 */
-        PROJECTILE_SPAWN_OFFSET_Y: 1.0,
+        /** 远程武器子弹出生高度偏移（英雄锚点在y=1.0位置，下调到腰部/枪口大约-0.4） */
+        PROJECTILE_SPAWN_OFFSET_Y: -0.4,
         /** 单位刚体阻尼 */
         UNIT_LINEAR_DAMPING: 0.5,
     },
@@ -51,7 +51,8 @@ export const GameConfig = {
             noiseAmp: { base: 0.025, perLevel: 0.004 },
             intensity: { base: 2.2, perLevel: 0.5 },
             spawnForwardOffset: 0.85,
-            spawnUpOffset: 0.0,
+            spawnUpOffset: -0.4,
+            spawnRightOffset: 0.35,
             fadeIn: 0.03,
             fadeOut: 0.05,
         },
