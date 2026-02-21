@@ -16,12 +16,20 @@ const { ccclass } = _decorator;
 @ccclass('BuildingManager')
 export class BuildingManager {
     private static _instance: BuildingManager | null = null;
+    private static readonly PAD20_UNLOCK_TRIGGER_INDEX = 20;
+    private static readonly PAD20_UNLOCK_TARGET_INDEXES = new Set([1, 18, 19]);
+    private static readonly PAD20_UNLOCK_TARGET_COST = 20;
+    private static readonly PAD_STAGE2_TRIGGER_INDEXES = new Set([1, 18, 19]);
+    private static readonly PAD_STAGE2_UNLOCK_TARGET_INDEXES = new Set([14, 15, 16, 17]);
+    private static readonly PAD_STAGE2_UNLOCK_TARGET_COST = 40;
 
     private _pads: BuildingPad[] = [];
     private _activeBuildings: Building[] = [];
     private _heroNode: Node | null = null;
     private _buildingContainer: Node | null = null;
     private _upgradePadsUnlocked: boolean = false;
+    private _padNodeToIndex: Map<string, number> = new Map();
+    private _stage2PadsUnlocked: boolean = false;
 
     public static get instance(): BuildingManager {
         if (!this._instance) {
@@ -44,6 +52,8 @@ export class BuildingManager {
         this._unitContainer = unitContainer;
         this._pads = [];
         this._upgradePadsUnlocked = false;
+        this._padNodeToIndex.clear();
+        this._stage2PadsUnlocked = false;
 
         // 监听建造完成事件
         this.eventManager.on(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
@@ -66,10 +76,13 @@ export class BuildingManager {
     /**
      * 注册建造点
      */
-    public registerPad(pad: BuildingPad): void {
+    public registerPad(pad: BuildingPad, runtimeIndex?: number): void {
         this._pads.push(pad);
         if (this._heroNode) {
             pad.setHeroNode(this._heroNode);
+        }
+        if (typeof runtimeIndex === 'number' && Number.isFinite(runtimeIndex)) {
+            this._padNodeToIndex.set(pad.node.uuid, Math.floor(runtimeIndex));
         }
     }
 
@@ -143,6 +156,7 @@ export class BuildingManager {
         // Link Building back to Pad for upgrades
         pad.onBuildingCreated(buildingComp);
         pad.placeUpgradeZoneInFront(buildingNode);
+        this.tryUnlockPadsAfterTriggerBuild(data.padNode);
         this.refreshUpgradePadVisibilityGate();
 
         // DO NOT Destroy Pad. It persists for upgrades.
@@ -166,6 +180,8 @@ export class BuildingManager {
         this._pads = [];
         this._activeBuildings = [];
         this._upgradePadsUnlocked = false;
+        this._padNodeToIndex.clear();
+        this._stage2PadsUnlocked = false;
     }
 
     public get activeBuildings(): Building[] {
@@ -200,10 +216,63 @@ export class BuildingManager {
         for (const pad of this._pads) {
             if (!pad || !pad.node || !pad.node.isValid) continue;
             if (pad.onAssociatedBuildingDestroyed(data.buildingId)) {
+                // 建筑被摧毁后，恢复该点位为“可重建”状态并立即显示建造 pad。
+                pad.node.active = true;
                 break;
             }
         }
         this.refreshUpgradePadVisibilityGate();
+    }
+
+    private tryUnlockPadsAfterTriggerBuild(triggerPadNode: Node): void {
+        const builtPadIndex = this._padNodeToIndex.get(triggerPadNode.uuid);
+        if (builtPadIndex === BuildingManager.PAD20_UNLOCK_TRIGGER_INDEX) {
+            this.activatePadsByIndexes(
+                BuildingManager.PAD20_UNLOCK_TARGET_INDEXES,
+                BuildingManager.PAD20_UNLOCK_TARGET_COST
+            );
+        }
+
+        if (
+            !this._stage2PadsUnlocked &&
+            this.areIndexedPadsBuilt(BuildingManager.PAD_STAGE2_TRIGGER_INDEXES)
+        ) {
+            this._stage2PadsUnlocked = true;
+            this.activatePadsByIndexes(
+                BuildingManager.PAD_STAGE2_UNLOCK_TARGET_INDEXES,
+                BuildingManager.PAD_STAGE2_UNLOCK_TARGET_COST
+            );
+        }
+    }
+
+    private activatePadsByIndexes(indexes: ReadonlySet<number>, overrideCost?: number): void {
+        for (const pad of this._pads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            const idx = this._padNodeToIndex.get(pad.node.uuid);
+            if (idx === undefined || !indexes.has(idx)) continue;
+            if (typeof overrideCost === 'number') {
+                pad.overrideCost = overrideCost;
+            }
+            pad.node.active = true;
+        }
+    }
+
+    private areIndexedPadsBuilt(indexes: ReadonlySet<number>): boolean {
+        for (const targetIndex of indexes) {
+            let matchedPad: BuildingPad | null = null;
+            for (const pad of this._pads) {
+                if (!pad || !pad.node || !pad.node.isValid) continue;
+                const idx = this._padNodeToIndex.get(pad.node.uuid);
+                if (idx === targetIndex) {
+                    matchedPad = pad;
+                    break;
+                }
+            }
+            if (!matchedPad || matchedPad.state !== BuildingPadState.UPGRADING) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public refreshUpgradePadVisibilityGate(): void {

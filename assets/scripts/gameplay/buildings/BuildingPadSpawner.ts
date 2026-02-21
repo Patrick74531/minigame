@@ -29,8 +29,13 @@ export class BuildingPadSpawner {
     private static readonly HIDDEN_PAD_INDEX_MARKER_Y = 2.9;
     private static readonly INITIAL_VISIBLE_PAD_INDEXES = new Set([20, 21]);
     private static readonly INITIAL_PREBUILT_PAD_INDEX = 21;
+    private static readonly INITIAL_PREBUILT_REBUILD_COST = 10;
     private static readonly INITIAL_BUILD_COST_PAD_INDEX = 20;
     private static readonly INITIAL_BUILD_COST = 10;
+    private static readonly PAD20_UNLOCK_TARGET_INDEXES = new Set([1, 18, 19]);
+    private static readonly PAD20_UNLOCK_TARGET_COST = 20;
+    private static readonly STAGE2_UNLOCK_TARGET_INDEXES = new Set([14, 15, 16, 17]);
+    private static readonly STAGE2_UNLOCK_TARGET_COST = 40;
     private static readonly LOCKED_LANE_PAD_TYPES = new Set([
         'tower',
         'frost_tower',
@@ -106,6 +111,15 @@ export class BuildingPadSpawner {
             if (typeof pos.overrideCost === 'number') {
                 pad.overrideCost = pos.overrideCost;
             }
+            if (this.PAD20_UNLOCK_TARGET_INDEXES.has(index)) {
+                pad.overrideCost = this.PAD20_UNLOCK_TARGET_COST;
+            }
+            if (this.STAGE2_UNLOCK_TARGET_INDEXES.has(index)) {
+                pad.overrideCost = this.STAGE2_UNLOCK_TARGET_COST;
+            }
+            if (index === this.INITIAL_PREBUILT_PAD_INDEX) {
+                pad.overrideCost = this.INITIAL_PREBUILT_REBUILD_COST;
+            }
             if (index === this.INITIAL_BUILD_COST_PAD_INDEX) {
                 pad.overrideCost = this.INITIAL_BUILD_COST;
             }
@@ -115,7 +129,7 @@ export class BuildingPadSpawner {
                 pad.padIndex = index;
             }
 
-            buildingManager.registerPad(pad);
+            buildingManager.registerPad(pad, index);
             this.applyLockedLanePadVisibility(padNode, pos.type, pos.x, pos.z);
 
             // 初始阶段仅开放 20/21 号板子，其它全部隐藏等待后续解锁。
@@ -127,7 +141,10 @@ export class BuildingPadSpawner {
                 this.createHiddenPadIndexMarker(buildingContainer, index, pos.x, pos.z);
             }
 
-            const shouldForceBuildable = index === this.INITIAL_BUILD_COST_PAD_INDEX;
+            const shouldForceBuildable =
+                index === this.INITIAL_BUILD_COST_PAD_INDEX ||
+                this.PAD20_UNLOCK_TARGET_INDEXES.has(index) ||
+                this.STAGE2_UNLOCK_TARGET_INDEXES.has(index);
             const shouldForcePrebuild = index === this.INITIAL_PREBUILT_PAD_INDEX;
             const shouldPrebuild =
                 shouldForcePrebuild ||
