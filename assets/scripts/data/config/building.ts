@@ -299,23 +299,23 @@ export const BUILDING_CONFIG = {
         { x: -22, z: -22, type: 'spa' },
         { x: -12, z: -25, type: 'farm' },
         // Top lane inner side (tower #1 removed, one added to the right of tower #4)
-        { x: -7.1, z: -21.3, type: 'tower', angle: 0 },
+        { x: -7.1, z: -21.3, type: 'tower', angle: 0, overrideCost: 40 },
         { x: -3.5, z: -21.3, type: 'tower', angle: 0 },
         { x: 0.1, z: -21.3, type: 'tower', angle: 0 },
         { x: 3.7, z: -21.3, type: 'tower', angle: 0 },
         // Bottom lane inner side
-        { x: -21.3, z: -10.7, type: 'tower', angle: 90 },
+        { x: -21.3, z: -10.7, type: 'tower', angle: 90, overrideCost: 40 },
         { x: -21.3, z: -7.1, type: 'tower', angle: 90 },
         { x: -21.3, z: -3.5, type: 'tower', angle: 90 },
         { x: -21.3, z: 0.1, type: 'tower', angle: 90 },
         // Mid lane roadside towers
         { x: -10.5, z: -6, type: 'tower', angle: -45 },
         { x: -6, z: -10.5, type: 'tower', angle: 135 },
-        { x: -7.9, z: -3.4, type: 'tower', angle: -45 },
-        { x: -3.4, z: -7.9, type: 'tower', angle: 135 },
-        { x: -5.4, z: -0.9, type: 'tower', angle: -45 },
-        // Mid lane upper-side third tower starts as prebuilt machine-gun tower
-        { x: -0.9, z: -5.4, type: 'tower', angle: 135, prebuild: true },
+        { x: -7.9, z: -3.4, type: 'tower', angle: -45, overrideCost: 10 },
+        { x: -3.4, z: -7.9, type: 'tower', angle: 135, prebuild: true },
+        { x: -5.4, z: -0.9, type: 'tower', angle: -45, overrideCost: 40 },
+        // Mid lane prebuilt tower moved here: this slot is now buildable
+        { x: -0.9, z: -5.4, type: 'tower', angle: 135, overrideCost: 20 },
         { x: -2.9, z: 1.7, type: 'tower', angle: -45 },
         { x: 1.7, z: -2.9, type: 'tower', angle: 135 },
     ],

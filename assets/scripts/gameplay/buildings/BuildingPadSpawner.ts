@@ -44,6 +44,7 @@ export class BuildingPadSpawner {
                 z: number;
                 angle?: number;
                 prebuild?: boolean;
+                overrideCost?: number;
             }>) ?? [];
         const fallbackPrebuildTowerIndex = this.resolveFallbackPrebuildTowerIndex(padPositions);
         if (fallbackPrebuildTowerIndex >= 0) {
@@ -87,6 +88,9 @@ export class BuildingPadSpawner {
 
             const pad = padNode.addComponent(BuildingPad);
             pad.buildingTypeId = pos.type;
+            if (typeof pos.overrideCost === 'number') {
+                pad.overrideCost = pos.overrideCost;
+            }
 
             buildingManager.registerPad(pad);
             this.applyLockedLanePadVisibility(padNode, pos.type, pos.x, pos.z);

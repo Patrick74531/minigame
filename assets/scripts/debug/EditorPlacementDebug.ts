@@ -38,6 +38,9 @@ export class PadPlacementEntry {
 
     @property({ tooltip: '是否开局预建（对应 GameConfig.BUILDING.PADS[*].prebuild）' })
     public prebuild: boolean = false;
+
+    @property({ tooltip: '覆写建造花费（>=0 生效，<0 使用默认）' })
+    public overrideCost: number = -1;
 }
 
 @ccclass('BuildingScaleEntry')
@@ -226,12 +229,13 @@ export class EditorPlacementDebug extends Component {
         this.baseSpawnX = spawn.x;
         this.baseSpawnZ = spawn.z;
 
-        const pads = GameConfig.BUILDING.PADS as Array<{
+        const pads = GameConfig.BUILDING.PADS as unknown as Array<{
             x: number;
             z: number;
             type: string;
             angle?: number;
             prebuild?: boolean;
+            overrideCost?: number;
         }>;
         this.padPlacements = pads.map(pad => {
             const entry = new PadPlacementEntry();
@@ -240,6 +244,7 @@ export class EditorPlacementDebug extends Component {
             entry.z = pad.z;
             entry.angle = typeof pad.angle === 'number' ? pad.angle : 0;
             entry.prebuild = pad.prebuild === true;
+            entry.overrideCost = typeof pad.overrideCost === 'number' ? pad.overrideCost : -1;
             return entry;
         });
         this.refreshPadPlacementIds();
@@ -260,13 +265,22 @@ export class EditorPlacementDebug extends Component {
         spawn.x = this.baseSpawnX;
         spawn.z = this.baseSpawnZ;
 
-        const pads = GameConfig.BUILDING.PADS as Array<{
+        const pads = GameConfig.BUILDING.PADS as unknown as Array<{
             x: number;
             z: number;
             type: string;
             angle?: number;
             prebuild?: boolean;
+            overrideCost?: number;
         }>;
+        const previousOverrideCostByKey = new Map<string, number>();
+        for (const pad of pads) {
+            if (typeof pad.overrideCost !== 'number') continue;
+            const rx = Math.round(pad.x * 10);
+            const rz = Math.round(pad.z * 10);
+            const key = `${pad.type}|${rx}|${rz}`;
+            previousOverrideCostByKey.set(key, pad.overrideCost);
+        }
         pads.length = 0;
         for (const entry of this.padPlacements) {
             const type = (entry.type || '').trim();
@@ -277,6 +291,7 @@ export class EditorPlacementDebug extends Component {
                 type: string;
                 angle?: number;
                 prebuild?: boolean;
+                overrideCost?: number;
             } = {
                 type,
                 x: entry.x,
@@ -287,6 +302,20 @@ export class EditorPlacementDebug extends Component {
             }
             if (entry.prebuild) {
                 pad.prebuild = true;
+            }
+            const normalizedOverrideCost = Number.isFinite(entry.overrideCost)
+                ? Math.round(entry.overrideCost)
+                : -1;
+            if (normalizedOverrideCost >= 0) {
+                pad.overrideCost = normalizedOverrideCost;
+            } else {
+                const rx = Math.round(entry.x * 10);
+                const rz = Math.round(entry.z * 10);
+                const fallbackKey = `${type}|${rx}|${rz}`;
+                const fallbackOverrideCost = previousOverrideCostByKey.get(fallbackKey);
+                if (typeof fallbackOverrideCost === 'number') {
+                    pad.overrideCost = fallbackOverrideCost;
+                }
             }
             pads.push(pad);
         }
@@ -329,11 +358,12 @@ export class EditorPlacementDebug extends Component {
         const hasAnyNonZero = this.padPlacements.some(entry => Math.abs(entry.angle) > 0.001);
         if (hasAnyNonZero) return;
 
-        const cfgPads = GameConfig.BUILDING.PADS as Array<{
+        const cfgPads = GameConfig.BUILDING.PADS as unknown as Array<{
             x: number;
             z: number;
             type: string;
             angle?: number;
+            overrideCost?: number;
         }>;
         const angleByKey = new Map<string, number>();
         for (const pad of cfgPads) {
