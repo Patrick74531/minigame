@@ -446,12 +446,12 @@ const BASE = {
         defaultCostMultiplier: 1.75,
         costs: {
             barracks: 65,
-            base: 140,
+            base: 70,
             tower: 90,
             frostTower: 95,
             lightningTower: 105,
             farm: 80,
-            wall: 42,
+            wall: 21,
         },
         upgradeCostMultiplier: {
             barracks: 1.65,
@@ -462,9 +462,9 @@ const BASE = {
             wall: 1.6,
         },
         baseUpgrade: {
-            startCost: 90,
+            startCost: 45,
             costMultiplier: 1.85,
-            hpMultiplier: 1.45,
+            hpMultiplier: 1.8,
             collectRadius: 3.0,
             collectRate: 2,
             collectInterval: 0.1,
@@ -561,7 +561,7 @@ const BASE = {
         wall: {
             hp: 1100,
             tauntRange: 15,
-            statMultiplier: 1.25,
+            statMultiplier: 1.5,
         },
     },
     soldier: {
