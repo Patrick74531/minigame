@@ -312,10 +312,12 @@ export const BUILDING_CONFIG = {
         { x: -10.5, z: -6, type: 'tower', angle: -45 },
         { x: -6, z: -10.5, type: 'tower', angle: 135 },
         { x: -7.9, z: -3.4, type: 'tower', angle: -45, overrideCost: 10 },
-        { x: -3.4, z: -7.9, type: 'tower', angle: 135, prebuild: true },
-        // Mid lane prebuilt tower moved here: this slot is now buildable
-        { x: -0.9, z: -5.4, type: 'tower', angle: 135, prebuild: true },
+        // Mid lane missing tower restored: between #16 and #19
+        { x: -5.4, z: -0.9, type: 'tower', angle: -45, overrideCost: 40 },
+        { x: -0.9, z: -5.4, type: 'tower', angle: 135 },
         { x: -2.9, z: 1.7, type: 'tower', angle: -45, overrideCost: 10 },
         { x: 1.7, z: -2.9, type: 'tower', angle: 135 },
+        // Mid lane extra tower restored: between #15 and #18
+        { x: -3.4, z: -7.9, type: 'tower', angle: 135 },
     ],
 } as const;

@@ -320,7 +320,7 @@
     },
     "_enabled": true,
     "__prefab": null,
-    "autoApplyOnLoad": true,
+    "autoApplyOnLoad": false,
     "baseSpawnX": -15,
     "baseSpawnZ": -15,
     "padPlacements": [

@@ -27,14 +27,13 @@ export class BuildingPadSpawner {
     private static readonly PREBUILT_LEVEL1_TYPES = new Set(['barracks', 'farm']);
     private static readonly SHOW_HIDDEN_PAD_INDEX_MARKERS = true;
     private static readonly HIDDEN_PAD_INDEX_MARKER_Y = 2.9;
-    private static readonly INITIAL_VISIBLE_PAD_INDEXES = new Set([20, 21]);
-    private static readonly INITIAL_PREBUILT_PAD_INDEX = 21;
+    private static readonly INITIAL_PREBUILT_PAD_INDEX_HINT = 20;
     private static readonly INITIAL_PREBUILT_REBUILD_COST = 10;
-    private static readonly INITIAL_BUILD_COST_PAD_INDEX = 20;
+    private static readonly INITIAL_BUILD_COST_PAD_INDEX = 19;
     private static readonly INITIAL_BUILD_COST = 10;
-    private static readonly PAD20_UNLOCK_TARGET_INDEXES = new Set([1, 18, 19]);
+    private static readonly PAD20_UNLOCK_TARGET_INDEXES = new Set([1, 17, 18]);
     private static readonly PAD20_UNLOCK_TARGET_COST = 20;
-    private static readonly STAGE2_UNLOCK_TARGET_INDEXES = new Set([14, 15, 16, 17]);
+    private static readonly STAGE2_UNLOCK_TARGET_INDEXES = new Set([14, 15, 16, 21]);
     private static readonly STAGE2_UNLOCK_TARGET_COST = 40;
     private static readonly LOCKED_LANE_PAD_TYPES = new Set([
         'tower',
@@ -67,11 +66,24 @@ export class BuildingPadSpawner {
                 overrideCost?: number;
             }>) ?? [];
         const fallbackPrebuildTowerIndex = this.resolveFallbackPrebuildTowerIndex(padPositions);
+        const initialPrebuiltPadIndex = this.resolveInitialPrebuiltPadIndex(
+            padPositions,
+            fallbackPrebuildTowerIndex
+        );
+        const initialVisiblePadIndexes = this.resolveInitialVisiblePadIndexes(initialPrebuiltPadIndex);
         if (fallbackPrebuildTowerIndex >= 0) {
             const fallback = padPositions[fallbackPrebuildTowerIndex];
             console.log(
                 `[BuildingPadSpawner] Fallback prebuild tower selected at (${fallback.x}, 0, ${fallback.z})`
             );
+        }
+        if (initialPrebuiltPadIndex >= 0) {
+            const initial = padPositions[initialPrebuiltPadIndex];
+            console.log(
+                `[BuildingPadSpawner] Initial prebuilt tower index=${initialPrebuiltPadIndex}, pos=(${initial.x}, 0, ${initial.z})`
+            );
+        } else {
+            console.warn('[BuildingPadSpawner] No valid initial prebuilt tower index resolved.');
         }
 
         for (let index = 0; index < padPositions.length; index++) {
@@ -117,7 +129,7 @@ export class BuildingPadSpawner {
             if (this.STAGE2_UNLOCK_TARGET_INDEXES.has(index)) {
                 pad.overrideCost = this.STAGE2_UNLOCK_TARGET_COST;
             }
-            if (index === this.INITIAL_PREBUILT_PAD_INDEX) {
+            if (index === initialPrebuiltPadIndex) {
                 pad.overrideCost = this.INITIAL_PREBUILT_REBUILD_COST;
             }
             if (index === this.INITIAL_BUILD_COST_PAD_INDEX) {
@@ -133,7 +145,7 @@ export class BuildingPadSpawner {
             this.applyLockedLanePadVisibility(padNode, pos.type, pos.x, pos.z);
 
             // 初始阶段仅开放 20/21 号板子，其它全部隐藏等待后续解锁。
-            const isInitiallyVisiblePad = this.INITIAL_VISIBLE_PAD_INDEXES.has(index);
+            const isInitiallyVisiblePad = initialVisiblePadIndexes.has(index);
             if (!isInitiallyVisiblePad) {
                 padNode.active = false;
             }
@@ -141,11 +153,8 @@ export class BuildingPadSpawner {
                 this.createHiddenPadIndexMarker(buildingContainer, index, pos.x, pos.z);
             }
 
-            const shouldForceBuildable =
-                index === this.INITIAL_BUILD_COST_PAD_INDEX ||
-                this.PAD20_UNLOCK_TARGET_INDEXES.has(index) ||
-                this.STAGE2_UNLOCK_TARGET_INDEXES.has(index);
-            const shouldForcePrebuild = index === this.INITIAL_PREBUILT_PAD_INDEX;
+            const shouldForceBuildable = this.isForceBuildablePadIndex(index);
+            const shouldForcePrebuild = index === initialPrebuiltPadIndex;
             const shouldPrebuild =
                 shouldForcePrebuild ||
                 (!shouldForceBuildable &&
@@ -171,7 +180,7 @@ export class BuildingPadSpawner {
                 );
                 continue;
             }
-            if (index !== this.INITIAL_PREBUILT_PAD_INDEX && pos.type !== 'spa') {
+            if (index !== initialPrebuiltPadIndex && pos.type !== 'spa') {
                 buildingNode.active = false;
             }
 
@@ -338,6 +347,86 @@ export class BuildingPadSpawner {
         // Fallback default: mid-lane upper-side third tower (index 2 after sorting from base).
         const targetSlot = Math.min(2, candidates.length - 1);
         return candidates[targetSlot].index;
+    }
+
+    private static resolveInitialVisiblePadIndexes(initialPrebuiltPadIndex: number): Set<number> {
+        const indexes = new Set<number>([this.INITIAL_BUILD_COST_PAD_INDEX]);
+        if (initialPrebuiltPadIndex >= 0) {
+            indexes.add(initialPrebuiltPadIndex);
+        }
+        return indexes;
+    }
+
+    private static resolveInitialPrebuiltPadIndex(
+        pads: ReadonlyArray<{
+            type: string;
+            x: number;
+            z: number;
+            prebuild?: boolean;
+        }>,
+        fallbackPrebuildTowerIndex: number
+    ): number {
+        const hintedIndex = this.INITIAL_PREBUILT_PAD_INDEX_HINT;
+        if (
+            hintedIndex >= 0 &&
+            hintedIndex < pads.length &&
+            pads[hintedIndex]?.type === 'tower' &&
+            !this.isForceBuildablePadIndex(hintedIndex)
+        ) {
+            return hintedIndex;
+        }
+
+        const buildPad = pads[this.INITIAL_BUILD_COST_PAD_INDEX];
+        const explicitPrebuildTowers: number[] = [];
+        for (let index = 0; index < pads.length; index++) {
+            const pad = pads[index];
+            if (pad.type === 'tower' && pad.prebuild === true) {
+                explicitPrebuildTowers.push(index);
+            }
+        }
+        if (explicitPrebuildTowers.length > 0) {
+            explicitPrebuildTowers.sort((a, b) => {
+                const padA = pads[a];
+                const padB = pads[b];
+                const laneA = this.resolveLaneByNearestPath(padA.x, padA.z);
+                const laneB = this.resolveLaneByNearestPath(padB.x, padB.z);
+                const laneWeightA = laneA === 'mid' ? 0 : 1;
+                const laneWeightB = laneB === 'mid' ? 0 : 1;
+                if (laneWeightA !== laneWeightB) return laneWeightA - laneWeightB;
+
+                if (buildPad) {
+                    const distA = Math.hypot(padA.x - buildPad.x, padA.z - buildPad.z);
+                    const distB = Math.hypot(padB.x - buildPad.x, padB.z - buildPad.z);
+                    if (Math.abs(distA - distB) > 1e-4) return distA - distB;
+                }
+                return a - b;
+            });
+            return explicitPrebuildTowers[0];
+        }
+
+        if (
+            fallbackPrebuildTowerIndex >= 0 &&
+            fallbackPrebuildTowerIndex < pads.length &&
+            pads[fallbackPrebuildTowerIndex]?.type === 'tower'
+        ) {
+            return fallbackPrebuildTowerIndex;
+        }
+
+        for (let index = 0; index < pads.length; index++) {
+            if (pads[index]?.type !== 'tower') continue;
+            if (this.isForceBuildablePadIndex(index)) continue;
+            return index;
+        }
+
+        return -1;
+    }
+
+    private static isForceBuildablePadIndex(index: number): boolean {
+        return (
+            index === this.INITIAL_BUILD_COST_PAD_INDEX ||
+            this.PAD20_UNLOCK_TARGET_INDEXES.has(index) ||
+            this.STAGE2_UNLOCK_TARGET_INDEXES.has(index)
+        );
     }
 
     private static getLanePolylinesWorld(): Record<RouteLane, Array<{ x: number; z: number }>> {

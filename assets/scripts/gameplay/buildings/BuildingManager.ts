@@ -16,11 +16,11 @@ const { ccclass } = _decorator;
 @ccclass('BuildingManager')
 export class BuildingManager {
     private static _instance: BuildingManager | null = null;
-    private static readonly PAD20_UNLOCK_TRIGGER_INDEX = 20;
-    private static readonly PAD20_UNLOCK_TARGET_INDEXES = new Set([1, 18, 19]);
+    private static readonly PAD20_UNLOCK_TRIGGER_INDEX = 19;
+    private static readonly PAD20_UNLOCK_TARGET_INDEXES = new Set([1, 17, 18]);
     private static readonly PAD20_UNLOCK_TARGET_COST = 20;
-    private static readonly PAD_STAGE2_TRIGGER_INDEXES = new Set([1, 18, 19]);
-    private static readonly PAD_STAGE2_UNLOCK_TARGET_INDEXES = new Set([14, 15, 16, 17]);
+    private static readonly PAD_STAGE2_TRIGGER_INDEXES = new Set([1, 17, 18]);
+    private static readonly PAD_STAGE2_UNLOCK_TARGET_INDEXES = new Set([14, 15, 16, 21]);
     private static readonly PAD_STAGE2_UNLOCK_TARGET_COST = 40;
     private static readonly PAD_STAGE3_TRIGGER_INDEXES = new Set([14, 15, 16, 17]);
     private static readonly MID_SUPPORT_BUILDING_TYPES = new Set(['barracks', 'farm']);
