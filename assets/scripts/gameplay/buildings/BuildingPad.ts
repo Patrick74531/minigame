@@ -68,7 +68,7 @@ export class BuildingPad extends BaseComponent {
     /** 锁定在初始世界坐标（建成后不自动移动到建筑前方） */
     @property
     public lockWorldPosition: boolean = true;
-    
+
     public padIndex: number = -1;
 
     /** 初始化时特定的覆写花费（如新手福利塔） */
@@ -405,6 +405,12 @@ export class BuildingPad extends BaseComponent {
         return true;
     }
 
+    public getAssociatedBuilding(): Building | null {
+        if (!this._associatedBuilding) return null;
+        if (!this._associatedBuilding.node || !this._associatedBuilding.node.isValid) return null;
+        return this._associatedBuilding;
+    }
+
     /**
      * 将投放区放到建筑前方，避免与建筑模型重叠
      */
@@ -433,7 +439,11 @@ export class BuildingPad extends BaseComponent {
             return this._nextUpgradeCost;
         }
 
-        if (this.overrideCost !== null && this._state === BuildingPadState.WAITING && !this._associatedBuilding) {
+        if (
+            this.overrideCost !== null &&
+            this._state === BuildingPadState.WAITING &&
+            !this._associatedBuilding
+        ) {
             return this.overrideCost;
         }
 

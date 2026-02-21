@@ -1,4 +1,4 @@
-import { Node, view } from 'cc';
+import { Node, Vec3, view } from 'cc';
 import { EventManager } from '../core/managers/EventManager';
 import { GameEvents } from '../data/GameEvents';
 import { WaveService } from '../core/managers/WaveService';
@@ -125,6 +125,11 @@ export class HUDManager {
         this.eventManager.on(GameEvents.HERO_LEVEL_UP, this.onHeroLevelUp, this);
         this.eventManager.on(GameEvents.BOSS_INTRO, this.onBossIntro, this);
         this.eventManager.on(GameEvents.LANE_UNLOCK_IMMINENT, this.onLaneUnlockImminent, this);
+        this.eventManager.on(
+            GameEvents.MID_SUPPORT_REVEAL_CINEMATIC,
+            this.onMidSupportRevealCinematic,
+            this
+        );
         this.eventManager.on(GameEvents.GAME_OVER, this.onGameOver, this);
         this.eventManager.on(GameEvents.LANGUAGE_CHANGED, this.onLanguageChanged, this);
     }
@@ -252,6 +257,25 @@ export class HUDManager {
         this._waveNoticeModule.showLaneUnlockImminent(data, (focus, padFocus, holdSeconds) => {
             this._cameraCinematicService.playLaneUnlockCinematic(focus, padFocus, holdSeconds);
         });
+    }
+
+    private onMidSupportRevealCinematic(data: { focusPosition: Vec3; holdSeconds?: number }): void {
+        const focus = data?.focusPosition;
+        if (!focus) {
+            this.eventManager.emit(GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FINISHED);
+            return;
+        }
+
+        this._cameraCinematicService.playFocusCinematic(
+            focus,
+            Math.max(0, data?.holdSeconds ?? 2),
+            () => {
+                this.eventManager.emit(GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FINISHED);
+            },
+            () => {
+                this.eventManager.emit(GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FOCUS_REACHED);
+            }
+        );
     }
 
     private onLanguageChanged(): void {

@@ -166,6 +166,74 @@ export class HUDCameraCinematicService implements HUDModule {
             .start();
     }
 
+    public playFocusCinematic(
+        focus: Vec3,
+        holdSeconds: number,
+        onComplete?: () => void,
+        onFocusReached?: () => void
+    ): void {
+        const follow = this.resolveMainCameraFollow();
+        if (!follow || !follow.node || !follow.node.isValid) {
+            if (onComplete) onComplete();
+            return;
+        }
+
+        const token = this.beginCameraSequence(follow);
+        const camNode = follow.node;
+        const from = camNode.getWorldPosition(new Vec3());
+        const focusOffset = follow.offset.clone().multiplyScalar(0.76);
+        const to = new Vec3(
+            focus.x + focusOffset.x,
+            Math.max(focus.y + 2.4, focusOffset.y),
+            focus.z + focusOffset.z
+        );
+
+        const cameraState = { x: from.x, y: from.y, z: from.z };
+        this._activeTweenTarget = cameraState;
+        const tempLook = new Vec3();
+
+        tween(cameraState)
+            .to(
+                BOSS_CINEMATIC_MOVE_SECONDS,
+                { x: to.x, y: to.y, z: to.z },
+                {
+                    onUpdate: () => {
+                        if (token !== this._token || !camNode.isValid) return;
+                        camNode.setWorldPosition(cameraState.x, cameraState.y, cameraState.z);
+                        tempLook.set(focus.x, focus.y, focus.z);
+                        camNode.lookAt(tempLook);
+                    },
+                }
+            )
+            .call(() => {
+                if (token !== this._token) return;
+                if (onFocusReached) onFocusReached();
+            })
+            .delay(Math.max(0, holdSeconds))
+            .to(
+                BOSS_CINEMATIC_MOVE_SECONDS,
+                { x: from.x, y: from.y, z: from.z },
+                {
+                    onUpdate: () => {
+                        if (token !== this._token || !camNode.isValid) return;
+                        camNode.setWorldPosition(cameraState.x, cameraState.y, cameraState.z);
+                        const target = this._cameraOriginalTarget;
+                        if (target && target.isValid) {
+                            target.getWorldPosition(tempLook);
+                            camNode.lookAt(tempLook);
+                        }
+                    },
+                }
+            )
+            .call(() => {
+                if (token !== this._token) return;
+                this.restoreCamera();
+                this._activeTweenTarget = null;
+                if (onComplete) onComplete();
+            })
+            .start();
+    }
+
     public stop(restoreCamera: boolean): void {
         if (this._activeTweenTarget) {
             Tween.stopAllByTarget(this._activeTweenTarget);

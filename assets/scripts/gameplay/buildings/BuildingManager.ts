@@ -1,4 +1,4 @@
-import { _decorator, Node, Vec3 } from 'cc';
+import { _decorator, Node, Vec3, tween } from 'cc';
 import { BuildingPad, BuildingPadState } from './BuildingPad';
 import { BuildingFactory } from './BuildingFactory';
 import { Building } from './Building';
@@ -22,6 +22,14 @@ export class BuildingManager {
     private static readonly PAD_STAGE2_TRIGGER_INDEXES = new Set([1, 18, 19]);
     private static readonly PAD_STAGE2_UNLOCK_TARGET_INDEXES = new Set([14, 15, 16, 17]);
     private static readonly PAD_STAGE2_UNLOCK_TARGET_COST = 40;
+    private static readonly PAD_STAGE3_TRIGGER_INDEXES = new Set([14, 15, 16, 17]);
+    private static readonly MID_SUPPORT_BUILDING_TYPES = new Set(['barracks', 'farm']);
+    private static readonly MID_SUPPORT_REVEAL_ORDER: ReadonlyArray<'farm' | 'barracks'> = [
+        'farm',
+        'barracks',
+    ];
+    private static readonly MID_SUPPORT_REVEAL_INTERVAL_SECONDS = 1;
+    private static readonly MID_SUPPORT_CINEMATIC_HOLD_SECONDS = 2;
 
     private _pads: BuildingPad[] = [];
     private _activeBuildings: Building[] = [];
@@ -30,6 +38,12 @@ export class BuildingManager {
     private _upgradePadsUnlocked: boolean = false;
     private _padNodeToIndex: Map<string, number> = new Map();
     private _stage2PadsUnlocked: boolean = false;
+    private _stage3PadsBuilt: boolean = false;
+    private _isInterWaveWaiting: boolean = false;
+    private _stage3SequenceTriggered: boolean = false;
+    private _midSupportBuildingsRevealed: boolean = false;
+    private _midSupportRevealToken: number = 0;
+    private _midUpgradePadsUnlockedAfterCinematic: boolean = false;
 
     public static get instance(): BuildingManager {
         if (!this._instance) {
@@ -54,10 +68,28 @@ export class BuildingManager {
         this._upgradePadsUnlocked = false;
         this._padNodeToIndex.clear();
         this._stage2PadsUnlocked = false;
+        this._stage3PadsBuilt = false;
+        this._isInterWaveWaiting = false;
+        this._stage3SequenceTriggered = false;
+        this._midSupportBuildingsRevealed = false;
+        this._midSupportRevealToken = 0;
+        this._midUpgradePadsUnlockedAfterCinematic = false;
 
         // 监听建造完成事件
         this.eventManager.on(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
         this.eventManager.on(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
+        this.eventManager.on(GameEvents.WAVE_START, this.onWaveStart, this);
+        this.eventManager.on(GameEvents.WAVE_COMPLETE, this.onWaveComplete, this);
+        this.eventManager.on(
+            GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FOCUS_REACHED,
+            this.onMidSupportRevealCinematicFocusReached,
+            this
+        );
+        this.eventManager.on(
+            GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FINISHED,
+            this.onMidSupportRevealCinematicFinished,
+            this
+        );
 
         console.log('[BuildingManager] 初始化完成');
     }
@@ -177,11 +209,29 @@ export class BuildingManager {
     public cleanup(): void {
         this.eventManager.off(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
         this.eventManager.off(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
+        this.eventManager.off(GameEvents.WAVE_START, this.onWaveStart, this);
+        this.eventManager.off(GameEvents.WAVE_COMPLETE, this.onWaveComplete, this);
+        this.eventManager.off(
+            GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FOCUS_REACHED,
+            this.onMidSupportRevealCinematicFocusReached,
+            this
+        );
+        this.eventManager.off(
+            GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FINISHED,
+            this.onMidSupportRevealCinematicFinished,
+            this
+        );
         this._pads = [];
         this._activeBuildings = [];
         this._upgradePadsUnlocked = false;
         this._padNodeToIndex.clear();
         this._stage2PadsUnlocked = false;
+        this._stage3PadsBuilt = false;
+        this._isInterWaveWaiting = false;
+        this._stage3SequenceTriggered = false;
+        this._midSupportBuildingsRevealed = false;
+        this._midSupportRevealToken += 1;
+        this._midUpgradePadsUnlockedAfterCinematic = false;
     }
 
     public get activeBuildings(): Building[] {
@@ -243,6 +293,15 @@ export class BuildingManager {
                 BuildingManager.PAD_STAGE2_UNLOCK_TARGET_COST
             );
         }
+
+        if (
+            !this._stage3PadsBuilt &&
+            this.areIndexedPadsBuilt(BuildingManager.PAD_STAGE3_TRIGGER_INDEXES)
+        ) {
+            this._stage3PadsBuilt = true;
+        }
+
+        this.tryTriggerMidSupportRevealSequence();
     }
 
     private activatePadsByIndexes(indexes: ReadonlySet<number>, overrideCost?: number): void {
@@ -275,6 +334,129 @@ export class BuildingManager {
         return true;
     }
 
+    private onWaveStart(): void {
+        this._isInterWaveWaiting = false;
+    }
+
+    private onWaveComplete(): void {
+        this._isInterWaveWaiting = true;
+        this.tryTriggerMidSupportRevealSequence();
+    }
+
+    private tryTriggerMidSupportRevealSequence(): void {
+        if (this._stage3SequenceTriggered) return;
+        if (!this._stage3PadsBuilt) return;
+        if (!this._isInterWaveWaiting) return;
+
+        this._stage3SequenceTriggered = true;
+        const focusPosition = this.resolveMidSupportFocusPosition();
+        if (!focusPosition) {
+            this.unlockMidUpgradePadsAfterSupportCinematic();
+            return;
+        }
+
+        this.hideMidSupportBuildingsBeforeCinematic();
+
+        if (!this.eventManager.hasListeners(GameEvents.MID_SUPPORT_REVEAL_CINEMATIC)) {
+            this.onMidSupportRevealCinematicFocusReached();
+            const token = this._midSupportRevealToken;
+            tween({})
+                .delay(BuildingManager.MID_SUPPORT_CINEMATIC_HOLD_SECONDS)
+                .call(() => {
+                    if (token !== this._midSupportRevealToken) return;
+                    this.onMidSupportRevealCinematicFinished();
+                })
+                .start();
+            return;
+        }
+
+        this.eventManager.emit(GameEvents.MID_SUPPORT_REVEAL_CINEMATIC, {
+            focusPosition,
+            holdSeconds: BuildingManager.MID_SUPPORT_CINEMATIC_HOLD_SECONDS,
+        });
+    }
+
+    private resolveMidSupportFocusPosition(): Vec3 | null {
+        const focusSum = new Vec3();
+        const samplePos = new Vec3();
+        let focusCount = 0;
+
+        for (const pad of this._pads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            if (!BuildingManager.MID_SUPPORT_BUILDING_TYPES.has(pad.buildingTypeId)) continue;
+
+            const building = pad.getAssociatedBuilding();
+            if (building?.node?.isValid) {
+                building.node.getWorldPosition(samplePos);
+            } else {
+                pad.node.getWorldPosition(samplePos);
+            }
+            focusSum.add(samplePos);
+            focusCount += 1;
+        }
+
+        if (focusCount <= 0) return null;
+        focusSum.multiplyScalar(1 / focusCount);
+        return focusSum;
+    }
+
+    private hideMidSupportBuildingsBeforeCinematic(): void {
+        for (const typeId of BuildingManager.MID_SUPPORT_REVEAL_ORDER) {
+            this.setMidSupportBuildingVisible(typeId, false);
+        }
+    }
+
+    private onMidSupportRevealCinematicFocusReached(): void {
+        if (!this._stage3SequenceTriggered || this._midSupportBuildingsRevealed) return;
+
+        this._midSupportBuildingsRevealed = true;
+        const token = ++this._midSupportRevealToken;
+        const [firstType, secondType] = BuildingManager.MID_SUPPORT_REVEAL_ORDER;
+
+        this.setMidSupportBuildingVisible(firstType, true);
+        tween({})
+            .delay(BuildingManager.MID_SUPPORT_REVEAL_INTERVAL_SECONDS)
+            .call(() => {
+                if (token !== this._midSupportRevealToken) return;
+                this.setMidSupportBuildingVisible(secondType, true);
+            })
+            .start();
+    }
+
+    private setMidSupportBuildingVisible(typeId: string, visible: boolean): void {
+        for (const pad of this._pads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            if (pad.buildingTypeId !== typeId) continue;
+
+            const building = pad.getAssociatedBuilding();
+            if (building?.node?.isValid) {
+                building.node.active = visible;
+            }
+
+            if (
+                pad.state === BuildingPadState.UPGRADING &&
+                !this._midUpgradePadsUnlockedAfterCinematic
+            ) {
+                pad.node.active = false;
+            } else if (!building && visible) {
+                pad.node.active = true;
+            }
+        }
+    }
+
+    private onMidSupportRevealCinematicFinished(): void {
+        if (!this._midSupportBuildingsRevealed) {
+            this.onMidSupportRevealCinematicFocusReached();
+        }
+        this.unlockMidUpgradePadsAfterSupportCinematic();
+    }
+
+    private unlockMidUpgradePadsAfterSupportCinematic(): void {
+        if (this._midUpgradePadsUnlockedAfterCinematic) return;
+        this._midUpgradePadsUnlockedAfterCinematic = true;
+        this.refreshUpgradePadVisibilityGate();
+    }
+
     public refreshUpgradePadVisibilityGate(): void {
         if (!this._upgradePadsUnlocked && this.areAllTowerPadsBuilt()) {
             this._upgradePadsUnlocked = true;
@@ -284,7 +466,8 @@ export class BuildingManager {
         for (const pad of this._pads) {
             if (!pad || !pad.node || !pad.node.isValid) continue;
             if (pad.state !== BuildingPadState.UPGRADING) continue;
-            pad.node.active = this._upgradePadsUnlocked;
+            pad.node.active =
+                this._upgradePadsUnlocked || this._midUpgradePadsUnlockedAfterCinematic;
         }
     }
 

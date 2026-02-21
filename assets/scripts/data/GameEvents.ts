@@ -46,6 +46,12 @@ export const GameEvents = {
     LANE_UNLOCK_IMMINENT: 'LANE_UNLOCK_IMMINENT',
     /** 道路解锁 { lane: 'top'|'mid'|'bottom' } */
     LANE_UNLOCKED: 'LANE_UNLOCKED',
+    /** 中路支援建筑演出请求 { focusPosition: Vec3, holdSeconds?: number } */
+    MID_SUPPORT_REVEAL_CINEMATIC: 'MID_SUPPORT_REVEAL_CINEMATIC',
+    /** 中路支援建筑演出镜头已到达焦点 */
+    MID_SUPPORT_REVEAL_CINEMATIC_FOCUS_REACHED: 'MID_SUPPORT_REVEAL_CINEMATIC_FOCUS_REACHED',
+    /** 中路支援建筑演出结束 */
+    MID_SUPPORT_REVEAL_CINEMATIC_FINISHED: 'MID_SUPPORT_REVEAL_CINEMATIC_FINISHED',
     /** 所有波次完成 */
     ALL_WAVES_COMPLETE: 'ALL_WAVES_COMPLETE',
 
@@ -150,6 +156,9 @@ export type GameEventPayloads = {
         remainSeconds?: number;
     };
     [GameEvents.LANE_UNLOCKED]: { lane: 'top' | 'mid' | 'bottom' };
+    [GameEvents.MID_SUPPORT_REVEAL_CINEMATIC]: { focusPosition: Vec3; holdSeconds?: number };
+    [GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FOCUS_REACHED]: void;
+    [GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FINISHED]: void;
     [GameEvents.ALL_WAVES_COMPLETE]: void;
     [GameEvents.GAME_START]: void;
     [GameEvents.GAME_PAUSE]: void;
