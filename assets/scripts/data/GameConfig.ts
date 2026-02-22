@@ -376,28 +376,28 @@ export const GameConfig = {
                 levels: [
                     { damage: 6, attackInterval: 0.12, range: 4.8, projectileSpeed: 28, spread: 4 },
                     {
-                        damage: 7,
+                        damage: 8,
                         attackInterval: 0.1,
                         range: 5.0,
                         projectileSpeed: 30,
                         spread: 5,
                     },
                     {
-                        damage: 9,
+                        damage: 11,
                         attackInterval: 0.08,
                         range: 5.2,
                         projectileSpeed: 32,
                         spread: 6,
                     },
                     {
-                        damage: 11,
+                        damage: 14,
                         attackInterval: 0.06,
                         range: 5.4,
                         projectileSpeed: 34,
                         spread: 7,
                     },
                     {
-                        damage: 13,
+                        damage: 17,
                         attackInterval: 0.04,
                         range: 5.6,
                         projectileSpeed: 36,
@@ -421,7 +421,7 @@ export const GameConfig = {
                         burnDuration: 1.5,
                     },
                     {
-                        damage: 24,
+                        damage: 27,
                         attackInterval: 0.27,
                         range: 3.8,
                         projectileSpeed: 11,
@@ -429,7 +429,7 @@ export const GameConfig = {
                         burnDuration: 2.0,
                     },
                     {
-                        damage: 31,
+                        damage: 38,
                         attackInterval: 0.24,
                         range: 4.2,
                         projectileSpeed: 12,
@@ -437,7 +437,7 @@ export const GameConfig = {
                         burnDuration: 2.5,
                     },
                     {
-                        damage: 39,
+                        damage: 50,
                         attackInterval: 0.21,
                         range: 4.7,
                         projectileSpeed: 13,
@@ -445,7 +445,7 @@ export const GameConfig = {
                         burnDuration: 3.0,
                     },
                     {
-                        damage: 49,
+                        damage: 65,
                         attackInterval: 0.18,
                         range: 5.2,
                         projectileSpeed: 14,
@@ -470,7 +470,7 @@ export const GameConfig = {
                         spinSpeed: 15,
                     },
                     {
-                        damage: 45,
+                        damage: 51,
                         attackInterval: 1.1,
                         range: 7.2,
                         projectileSpeed: 19,
@@ -478,7 +478,7 @@ export const GameConfig = {
                         spinSpeed: 18,
                     },
                     {
-                        damage: 58,
+                        damage: 70,
                         attackInterval: 1.0,
                         range: 7.5,
                         projectileSpeed: 20,
@@ -486,7 +486,7 @@ export const GameConfig = {
                         spinSpeed: 20,
                     },
                     {
-                        damage: 74,
+                        damage: 94,
                         attackInterval: 0.9,
                         range: 7.8,
                         projectileSpeed: 21,
@@ -494,7 +494,7 @@ export const GameConfig = {
                         spinSpeed: 22,
                     },
                     {
-                        damage: 92,
+                        damage: 121,
                         attackInterval: 0.8,
                         range: 8.1,
                         projectileSpeed: 22,
@@ -520,7 +520,7 @@ export const GameConfig = {
                         slowDuration: 1.6,
                     },
                     {
-                        damage: 19,
+                        damage: 22,
                         attackInterval: 1.8,
                         range: 5.9,
                         waveSpeed: 9,
@@ -529,7 +529,7 @@ export const GameConfig = {
                         slowDuration: 1.9,
                     },
                     {
-                        damage: 25,
+                        damage: 31,
                         attackInterval: 1.6,
                         range: 6.4,
                         waveSpeed: 10,
@@ -538,7 +538,7 @@ export const GameConfig = {
                         slowDuration: 2.2,
                     },
                     {
-                        damage: 32,
+                        damage: 41,
                         attackInterval: 1.4,
                         range: 6.9,
                         waveSpeed: 11,
@@ -547,7 +547,7 @@ export const GameConfig = {
                         slowDuration: 2.5,
                     },
                     {
-                        damage: 40,
+                        damage: 53,
                         attackInterval: 1.2,
                         range: 7.4,
                         waveSpeed: 12,

@@ -589,7 +589,7 @@ const BASE = {
         baseAttack: 12,
         attackInterval: 0.9,
         attackRange: 2.5,
-        moveSpeed: 5.5,
+        moveSpeed: 6.6,
         critRate: 0.05,
         critDamage: 1.5,
     },

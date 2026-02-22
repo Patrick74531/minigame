@@ -36,12 +36,12 @@ export class Soldier extends Unit {
     private static readonly EXPLOSION_TRIGGER_DISTANCE = 0.95;
     private static readonly CHARGE_TRIGGER_DISTANCE = 3.2;
     private static readonly CHARGE_SPEED_MULTIPLIER = 1.85;
-    private static readonly EXPLOSION_DAMAGE_MULTIPLIER = 1.35;
-    private static readonly EXPLOSION_TOWER_DAMAGE_FACTOR = 2.0;
+    private static readonly EXPLOSION_DAMAGE_MULTIPLIER = 2.7;
+    private static readonly EXPLOSION_TOWER_DAMAGE_FACTOR = 4.0;
     private static readonly EXPLOSION_RADIUS_BASE = 1.25;
     private static readonly EXPLOSION_RADIUS_FROM_ATTACK_RANGE = 1.15;
-    private static readonly EXPLOSION_RADIUS_LEVEL_LINEAR = 0.22;
-    private static readonly EXPLOSION_RADIUS_LEVEL_QUADRATIC = 0.03;
+    private static readonly EXPLOSION_RADIUS_LEVEL_LINEAR = 0.44;
+    private static readonly EXPLOSION_RADIUS_LEVEL_QUADRATIC = 0.06;
     private static readonly EXPLOSION_RADIUS_MAX = 4.6;
     private static readonly EXPLOSION_VFX_RADIUS_PAD = 1.08;
     private static readonly DEFAULT_GROWTH: BarracksGrowthConfig = {

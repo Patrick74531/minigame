@@ -131,6 +131,11 @@ export class Building extends BaseComponent implements IAttackable {
     /** 升级完成后的短暂无敌，避免被瞬间连击覆盖“满血恢复”观感 */
     private _upgradeDamageImmunityTimer: number = 0;
     private _healthBarResyncTimer: number = 0;
+    /** 建筑基础节点缩放（用于按等级线性插值缩放） */
+    private _baseNodeScale: Vec3 | null = null;
+    private static readonly BUILDING_SCALE_INITIAL = 0.8;
+    private static readonly BUILDING_SCALE_MAX = 1.2;
+    private static readonly BUILDING_SCALE_LEVELS_TO_MAX = 10;
 
     // === 访问器 ===
 
@@ -174,6 +179,9 @@ export class Building extends BaseComponent implements IAttackable {
         this.setupHealthBar();
 
         this.gameManager.activeBuildings.push(this.node);
+
+        this._baseNodeScale = new Vec3(this.node.scale.x, this.node.scale.y, this.node.scale.z);
+        this.applyLevelScale();
     }
 
     private setupHealthBar(): void {
@@ -366,6 +374,8 @@ export class Building extends BaseComponent implements IAttackable {
         const oldHp = this.maxHp;
         this.level++;
 
+        this.applyLevelScale();
+
         // Scale core stats
         this.maxHp = Math.floor(this.maxHp * this.statMultiplier);
         // 兵营升级：缩短产兵间隔（同时间隔始终只产 1 只）。
@@ -391,6 +401,23 @@ export class Building extends BaseComponent implements IAttackable {
         });
 
         return true;
+    }
+
+    private applyLevelScale(): void {
+        if (!this._baseNodeScale) return;
+        const n = Math.max(0, this.level - 1);
+        const stepPerLevel =
+            (Building.BUILDING_SCALE_MAX - Building.BUILDING_SCALE_INITIAL) /
+            Building.BUILDING_SCALE_LEVELS_TO_MAX;
+        const factor = Math.min(
+            Building.BUILDING_SCALE_MAX,
+            Building.BUILDING_SCALE_INITIAL + n * stepPerLevel
+        );
+        this.node.setScale(
+            this._baseNodeScale.x * factor,
+            this._baseNodeScale.y * factor,
+            this._baseNodeScale.z * factor
+        );
     }
 
     /**
