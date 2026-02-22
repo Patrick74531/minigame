@@ -627,6 +627,8 @@ export class BuildingPad extends BaseComponent {
                 return;
             }
 
+            this._associatedBuilding.restoreToFullHealth();
+
             // Use unified curve, fallback to legacy multipliers.
             const costMult = this.resolveUpgradeCostMultiplier();
             this._nextUpgradeCost = Math.ceil(this._nextUpgradeCost * costMult);

@@ -13,7 +13,13 @@
   // ╚══════════════════════════════════════════════════════════════════════════════╝
   (function () {
     var W = window.innerWidth, H = window.innerHeight;
-    if (W >= H) return;
+    var shouldForceLandscape = W < H;
+    window.__BOOT_FORCE_LANDSCAPE__ = shouldForceLandscape;
+    if (!shouldForceLandscape) return;
+    document.documentElement.classList.add('boot-force-landscape');
+    if (document.body) {
+      document.body.classList.add('boot-force-landscape');
+    }
     var LAND_W = H, LAND_H = W;
     Object.defineProperty(window, 'innerWidth',  { get: function () { return LAND_W; }, configurable: true });
     Object.defineProperty(window, 'innerHeight', { get: function () { return LAND_H; }, configurable: true });
@@ -153,7 +159,8 @@
       '  <div class="boot-splash__bar"><div id="boot-splash-fill" class="boot-splash__fill"></div></div>' +
       '  <div id="boot-splash-pct" class="boot-splash__pct">0%</div>' +
       '</div>';
-    document.body.appendChild(wrap);
+    var host = byId('GameDiv') || document.body;
+    host.appendChild(wrap);
   }
 
   function setSplashText(text) {

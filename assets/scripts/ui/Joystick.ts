@@ -61,6 +61,7 @@ export class Joystick extends Component {
 
     protected onLoad(): void {
         this._desktopMode = !UIResponsive.shouldUseTouchControls();
+        this.setInputEnabled(!this._desktopMode);
         if (this._desktopMode) {
             this.hideVisuals();
         } else {
@@ -94,6 +95,7 @@ export class Joystick extends Component {
 
     private onResize(): void {
         this._desktopMode = !UIResponsive.shouldUseTouchControls();
+        this.setInputEnabled(!this._desktopMode);
         this.updateDefaultPosition();
         if (this._touchId === null && !this._mouseActive) {
             if (this._desktopMode) {
@@ -217,6 +219,7 @@ export class Joystick extends Component {
 
     private tryBeginInput(screenX: number, screenY: number): boolean {
         if (!this._inputEnabled) return false;
+        if (this._desktopMode) return false;
         if (!this.isInJoystickZone(screenX, screenY)) return false;
 
         const localPos = this.clampToMovementBounds(this.screenToLocal(screenX, screenY));

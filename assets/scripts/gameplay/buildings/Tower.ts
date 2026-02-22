@@ -49,6 +49,7 @@ export class Tower extends Building {
     private static readonly TOWER_MG_MODEL_NODE_NAME = Tower.TOWER_MG.MODEL_NODE_NAME;
     private static readonly TOWER_MG_MUZZLE_FALLBACK_Y = Tower.TOWER_MG.MUZZLE_FALLBACK_Y;
     private static readonly TOWER_MG_MUZZLE_TOP_INSET = Tower.TOWER_MG.MUZZLE_TOP_INSET;
+    private static readonly MIN_RANGE_GAIN_PER_LEVEL = 0.35;
     private static _lanePolylines: Record<RouteLane, Array<{ x: number; z: number }>> | null = null;
 
     @property
@@ -206,7 +207,9 @@ export class Tower extends Building {
         if (!upgraded) return false;
 
         this.attackDamage = Math.floor(this.attackDamage * this.attackMultiplier);
-        this.attackRange *= this.rangeMultiplier;
+        const prevRange = this.attackRange;
+        const scaledRange = prevRange * this.rangeMultiplier;
+        this.attackRange = Math.max(scaledRange, prevRange + Tower.MIN_RANGE_GAIN_PER_LEVEL);
         this.attackInterval = this.attackInterval * this.intervalMultiplier;
         if (this.chainRangePerLevel > 0) {
             this.chainRange += this.chainRangePerLevel;

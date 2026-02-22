@@ -324,6 +324,14 @@ export class Building extends BaseComponent implements IAttackable {
         }
     }
 
+    public restoreToFullHealth(): void {
+        this.currentHp = this.maxHp;
+        if (this._healthBar) {
+            this._healthBar.updateHealth(this.currentHp, this.maxHp);
+            this.updateHealthBarName();
+        }
+    }
+
     /**
      * 升级建筑
      */
@@ -349,12 +357,7 @@ export class Building extends BaseComponent implements IAttackable {
         }
 
         // Heal to full (bonus)
-        this.currentHp = this.maxHp;
-
-        if (this._healthBar) {
-            this._healthBar.updateHealth(this.currentHp, this.maxHp);
-            this.updateHealthBarName();
-        }
+        this.restoreToFullHealth();
 
         console.log(`[Building] Upgraded to Level ${this.level}. HP: ${oldHp} -> ${this.maxHp}`);
 
