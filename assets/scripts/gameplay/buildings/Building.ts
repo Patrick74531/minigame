@@ -406,8 +406,11 @@ export class Building extends BaseComponent implements IAttackable {
         const remainCapacity = this.maxUnits - this._activeUnits;
         if (remainCapacity <= 0) return;
 
-        // 需求：每次产兵仅生成 1 只。
-        this.spawnSoldier(0, 1);
+        // 需求：每次刷新 2 只士兵（受剩余容量限制）。
+        const spawnCount = Math.max(1, Math.min(remainCapacity, 2));
+        for (let i = 0; i < spawnCount; i++) {
+            this.spawnSoldier(i, spawnCount);
+        }
     }
 
     private spawnSoldier(slotIndex: number = 0, totalInBatch: number = 1): void {

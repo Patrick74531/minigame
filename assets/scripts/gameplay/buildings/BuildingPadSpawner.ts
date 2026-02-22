@@ -1,13 +1,4 @@
-import {
-    Billboard,
-    Color,
-    Label,
-    LabelOutline,
-    LabelShadow,
-    Node,
-    RenderRoot2D,
-    UITransform,
-} from 'cc';
+import { Node } from 'cc';
 import { BuildingFactory } from './BuildingFactory';
 import { Building } from './Building';
 import { BuildingPad } from './BuildingPad';
@@ -25,8 +16,6 @@ import type { RouteLane } from '../wave/WaveLaneRouting';
  */
 export class BuildingPadSpawner {
     private static readonly PREBUILT_LEVEL1_TYPES = new Set(['barracks', 'farm']);
-    private static readonly SHOW_HIDDEN_PAD_INDEX_MARKERS = true;
-    private static readonly HIDDEN_PAD_INDEX_MARKER_Y = 2.9;
     private static readonly INITIAL_PREBUILT_PAD_INDEX_HINT = 20;
     private static readonly INITIAL_PREBUILT_REBUILD_COST = 10;
     private static readonly INITIAL_BUILD_COST_PAD_INDEX = 19;
@@ -137,11 +126,6 @@ export class BuildingPadSpawner {
                 pad.overrideCost = this.INITIAL_BUILD_COST;
             }
 
-            const lane = this.resolveLaneByNearestPath(pos.x, pos.z);
-            if (lane === 'mid') {
-                pad.padIndex = index;
-            }
-
             buildingManager.registerPad(pad, index);
             this.applyLockedLanePadVisibility(padNode, pos.type, pos.x, pos.z);
 
@@ -149,9 +133,6 @@ export class BuildingPadSpawner {
             const isInitiallyVisiblePad = initialVisiblePadIndexes.has(index);
             if (!isInitiallyVisiblePad) {
                 padNode.active = false;
-            }
-            if (this.SHOW_HIDDEN_PAD_INDEX_MARKERS && !isInitiallyVisiblePad) {
-                this.createHiddenPadIndexMarker(buildingContainer, index, pos.x, pos.z);
             }
 
             const shouldForceBuildable = this.isForceBuildablePadIndex(index);
@@ -214,42 +195,6 @@ export class BuildingPadSpawner {
 
     private static get buildingRegistry(): BuildingRegistry {
         return BuildingRegistry.instance;
-    }
-
-    private static createHiddenPadIndexMarker(
-        parent: Node,
-        index: number,
-        x: number,
-        z: number
-    ): void {
-        const markerRoot = new Node(`HiddenPadIndex_${index}`);
-        parent.addChild(markerRoot);
-        markerRoot.setPosition(x, this.HIDDEN_PAD_INDEX_MARKER_Y, z);
-        markerRoot.addComponent(RenderRoot2D);
-        markerRoot.addComponent(Billboard);
-        markerRoot.setScale(0.012, 0.012, 0.012);
-
-        const labelNode = new Node('Label');
-        markerRoot.addChild(labelNode);
-        labelNode.addComponent(UITransform).setContentSize(260, 100);
-
-        const label = labelNode.addComponent(Label);
-        label.string = `${index}`;
-        label.fontSize = 82;
-        label.lineHeight = 86;
-        label.isBold = true;
-        label.horizontalAlign = Label.HorizontalAlign.CENTER;
-        label.verticalAlign = Label.VerticalAlign.CENTER;
-        label.color = new Color(255, 216, 92, 255);
-
-        const outline = labelNode.addComponent(LabelOutline);
-        outline.color = new Color(0, 0, 0, 255);
-        outline.width = 5;
-
-        const shadow = labelNode.addComponent(LabelShadow);
-        shadow.color = new Color(0, 0, 0, 210);
-        shadow.offset.set(3, -3);
-        shadow.blur = 2;
     }
 
     private static applyLockedLanePadVisibility(

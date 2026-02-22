@@ -139,6 +139,11 @@ export class WaveManager {
     private _nextBossLaneCursor: number = 0;
     private _pendingLaneUnlock: { lane: RouteLane; remainSeconds: number } | null = null;
     private _spawnedEnemyMeta: Map<Node, { spawnType: SpawnType; lane: RouteLane }> = new Map();
+    private _regularLaneRemaining: Record<RouteLane, number> = {
+        top: 0,
+        mid: 0,
+        bottom: 0,
+    };
     private _laneFogController: LaneFogController = new LaneFogController();
 
     private _archetypes: EnemyArchetypeConfig[] = [];
@@ -203,6 +208,7 @@ export class WaveManager {
         this._nextUnlockLaneCursor = 1;
         this._nextBossLaneCursor = 0;
         this._pendingLaneUnlock = null;
+        this.resetRegularLaneAllocation();
         this._spawnedEnemyMeta.clear();
         this._laneFogController.initialize(
             baseNode,
@@ -373,6 +379,7 @@ export class WaveManager {
 
         this._wavePlan = wavePlan;
         this._waveSpawnCursor = 0;
+        this.initializeRegularLaneAllocation(wavePlan.entries);
         if (wavePlan.entries.length > 0) {
             this._nextSpawnInterval =
                 this._waveConfig.spawnInterval *
@@ -638,24 +645,57 @@ export class WaveManager {
         if (this._waveSpawnCursor === 0 && this._forcedFirstSpawnLane) {
             const lane = this._forcedFirstSpawnLane;
             this._forcedFirstSpawnLane = null;
+            if (spawnType !== 'boss') {
+                this.consumeRegularLaneAllocation(lane);
+            }
             return lane;
         }
 
         if (spawnType === 'boss') {
             return this.getCurrentBossLane();
         }
-        return this.pickRandomUnlockedLane();
+        const lane = this.pickRegularLaneWithAllocation();
+        this.consumeRegularLaneAllocation(lane);
+        return lane;
     }
 
     private resolveForecastLane(spawnType: SpawnType): RouteLane {
         if (spawnType === 'boss') {
             return this.getCurrentBossLane();
         }
-        return this.pickRandomUnlockedLane();
+        return this.pickRegularLaneWithAllocation();
     }
 
     private getCurrentBossLane(): RouteLane {
-        return ROUTE_LANE_SEQUENCE[this._nextBossLaneCursor] ?? 'mid';
+        return 'mid';
+    }
+
+    private pickRegularLaneWithAllocation(): RouteLane {
+        const unlocked = ROUTE_LANE_SEQUENCE.filter(lane => this._unlockedLanes.has(lane));
+        if (unlocked.length <= 0) return 'mid';
+
+        const candidates = unlocked.filter(lane => this._regularLaneRemaining[lane] > 0);
+        if (candidates.length <= 0) {
+            return this.pickRandomUnlockedLane();
+        }
+
+        const totalRemain = candidates.reduce(
+            (sum, lane) => sum + this._regularLaneRemaining[lane],
+            0
+        );
+        if (!Number.isFinite(totalRemain) || totalRemain <= 0) {
+            return this.pickRandomUnlockedLane();
+        }
+
+        let cursor = Math.random() * totalRemain;
+        for (const lane of candidates) {
+            cursor -= this._regularLaneRemaining[lane];
+            if (cursor <= 0) {
+                return lane;
+            }
+        }
+
+        return candidates[candidates.length - 1] ?? 'mid';
     }
 
     private pickRandomUnlockedLane(): RouteLane {
@@ -663,6 +703,77 @@ export class WaveManager {
         if (lanes.length <= 0) return 'mid';
         const idx = randomInt(0, Math.max(0, lanes.length - 1));
         return lanes[idx] ?? 'mid';
+    }
+
+    private initializeRegularLaneAllocation(entries: PlannedSpawnEntry[]): void {
+        this.resetRegularLaneAllocation();
+        const regularCount = entries.filter(entry => entry.spawnType !== 'boss').length;
+        if (regularCount <= 0) return;
+
+        const unlocked = ROUTE_LANE_SEQUENCE.filter(lane => this._unlockedLanes.has(lane));
+        if (unlocked.length <= 0) {
+            this._regularLaneRemaining.mid = regularCount;
+            return;
+        }
+
+        if (unlocked.length === 1) {
+            this._regularLaneRemaining[unlocked[0]] = regularCount;
+            return;
+        }
+
+        const shareByLane: Record<RouteLane, number> = {
+            top: 0,
+            mid: 0,
+            bottom: 0,
+        };
+
+        if (unlocked.includes('mid')) {
+            shareByLane.mid = 0.6;
+            const sideLanes = unlocked.filter(lane => lane !== 'mid');
+            if (sideLanes.length <= 0) {
+                shareByLane.mid = 1;
+            } else {
+                const perSideShare = 0.4 / sideLanes.length;
+                for (const lane of sideLanes) {
+                    shareByLane[lane] = perSideShare;
+                }
+            }
+        } else {
+            const evenShare = 1 / unlocked.length;
+            for (const lane of unlocked) {
+                shareByLane[lane] = evenShare;
+            }
+        }
+
+        let assigned = 0;
+        const laneFractions: Array<{ lane: RouteLane; frac: number }> = [];
+        for (const lane of unlocked) {
+            const raw = regularCount * shareByLane[lane];
+            const floorCount = Math.floor(raw);
+            this._regularLaneRemaining[lane] = floorCount;
+            assigned += floorCount;
+            laneFractions.push({ lane, frac: raw - floorCount });
+        }
+
+        laneFractions.sort((a, b) => b.frac - a.frac);
+        let cursor = 0;
+        while (assigned < regularCount && laneFractions.length > 0) {
+            const lane = laneFractions[cursor % laneFractions.length].lane;
+            this._regularLaneRemaining[lane] += 1;
+            assigned += 1;
+            cursor += 1;
+        }
+    }
+
+    private consumeRegularLaneAllocation(lane: RouteLane): void {
+        if (!this._unlockedLanes.has(lane)) return;
+        this._regularLaneRemaining[lane] = Math.max(0, this._regularLaneRemaining[lane] - 1);
+    }
+
+    private resetRegularLaneAllocation(): void {
+        this._regularLaneRemaining.top = 0;
+        this._regularLaneRemaining.mid = 0;
+        this._regularLaneRemaining.bottom = 0;
     }
 
     private onBossKilled(_lane: RouteLane): void {
@@ -1355,6 +1466,7 @@ export class WaveManager {
         this._waveConfig = null;
         this._waveActive = false;
         this._pendingLaneUnlock = null;
+        this.resetRegularLaneAllocation();
         this._spawnedEnemyMeta.clear();
         this._laneFogController.cleanup();
     }

@@ -9,9 +9,9 @@ export const BUILDING_CONFIG = {
     /** 兵营最大产兵数（legacy fallback） */
     MAX_SOLDIERS_PER_BARRACKS: BALANCE.building.barracks.maxUnits,
     /** 建筑血量（legacy fallback） */
-    BASE_HP: 500,
+    BASE_HP: 650,
     /** 基地初始血量（与建筑默认 HP 区分，避免误改） */
-    BASE_START_HP: 100,
+    BASE_START_HP: 140,
     /** 全局默认升级上限 */
     DEFAULT_MAX_LEVEL: 5,
     /** 全局默认升级成本倍率 */

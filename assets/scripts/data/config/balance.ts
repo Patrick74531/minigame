@@ -400,8 +400,8 @@ const BASE = {
             bossCooldownWaves: 12,
             bossOnlyWave: true,
             additionalEnemyCount: 0,
-            bossHpMultiplier: 19,
-            bossAttackMultiplier: 2.4,
+            bossHpMultiplier: 24,
+            bossAttackMultiplier: 3.1,
             bossSpeedMultiplier: 1,
             bossScaleMultiplier: 1.75,
             bossCoinMultiplier: 10,
@@ -464,7 +464,7 @@ const BASE = {
         baseUpgrade: {
             startCost: 45,
             costMultiplier: 1.85,
-            hpMultiplier: 1.8,
+            hpMultiplier: 1.92,
             collectRadius: 3.0,
             collectRate: 2,
             collectInterval: 0.1,
@@ -481,20 +481,20 @@ const BASE = {
             },
         },
         barracks: {
-            hp: 180,
+            hp: 240,
             spawnInterval: 4.5,
-            maxUnits: 3,
-            spawnBatchPerLevel: 1,
-            statMultiplier: 1.18,
+            maxUnits: 6,
+            spawnBatchPerLevel: 2,
+            statMultiplier: 1.22,
             spawnIntervalMultiplier: 0.92,
-            maxUnitsPerLevel: 1,
+            maxUnitsPerLevel: 2,
         },
         tower: {
-            hp: 300,
+            hp: 390,
             attackRange: 12.5,
             attackDamage: 18,
             attackInterval: 0.36,
-            statMultiplier: 1.2,
+            statMultiplier: 1.24,
             attackMultiplier: 1.12,
             rangeMultiplier: 1.02,
             intervalMultiplier: 0.96,
@@ -514,36 +514,36 @@ const BASE = {
             },
         },
         frostTower: {
-            hp: 280,
+            hp: 360,
             attackRange: 10.5,
             attackDamage: 8,
             attackInterval: 0.9,
             bulletExplosionRadius: 2.8,
             bulletSlowPercent: 0.45,
             bulletSlowDuration: 2.2,
-            statMultiplier: 1.18,
+            statMultiplier: 1.22,
             attackMultiplier: 1.08,
             rangeMultiplier: 1.01,
             intervalMultiplier: 0.97,
         },
         lightningTower: {
-            hp: 260,
+            hp: 340,
             attackRange: 10.8,
             attackDamage: 26,
             attackInterval: 0.9,
             chainCount: 3,
             chainRange: 5.2,
-            statMultiplier: 1.2,
+            statMultiplier: 1.24,
             attackMultiplier: 1.1,
             rangeMultiplier: 1.01,
             intervalMultiplier: 0.96,
             chainRangePerLevel: 0.35,
         },
         farm: {
-            hp: 150,
+            hp: 210,
             incomePerTick: 3,
             incomeInterval: 4,
-            statMultiplier: 1.18,
+            statMultiplier: 1.22,
             incomeMultiplier: 1.35,
             stack: {
                 baseY: 0.09,
@@ -552,16 +552,16 @@ const BASE = {
             },
         },
         spa: {
-            hp: 800,
+            hp: 1040,
             healRadius: 5,
             healPercentPerSecond: 0.1,
             healInterval: 1,
-            statMultiplier: 1.2,
+            statMultiplier: 1.24,
         },
         wall: {
-            hp: 1100,
+            hp: 1450,
             tauntRange: 15,
-            statMultiplier: 1.5,
+            statMultiplier: 1.52,
         },
     },
     soldier: {
@@ -702,6 +702,14 @@ function clamp(value: number, min: number, max: number): number {
 
 function scaleMultiply(base: number, assumptionScale: number, center = 1): number {
     return round2(center + (base - center) * assumptionScale);
+}
+
+const BUILDING_GROWTH_MARGIN_OVER_ENEMY_ATTACK = 0.03;
+
+function ensureBuildingGrowthFloor(multiplier: number): number {
+    const enemyAttackStep = Math.max(0, BASE.waveInfinite.attackMultPerWave);
+    const floor = 1 + enemyAttackStep + BUILDING_GROWTH_MARGIN_OVER_ENEMY_ATTACK;
+    return round2(Math.max(multiplier, floor));
 }
 
 type LanePoint = { x: number; z: number };
@@ -1037,10 +1045,12 @@ function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): Bal
                         (BASE.building.baseUpgrade.costMultiplier - 1) *
                             assumptions.upgradeCostScale
                 ),
-                hpMultiplier: round2(
-                    1 +
-                        (BASE.building.baseUpgrade.hpMultiplier - 1) *
-                            (0.94 + assumptions.playerPowerScale * 0.06)
+                hpMultiplier: ensureBuildingGrowthFloor(
+                    round2(
+                        1 +
+                            (BASE.building.baseUpgrade.hpMultiplier - 1) *
+                                (0.94 + assumptions.playerPowerScale * 0.06)
+                    )
                 ),
                 collectRadius: round2(
                     BASE.building.baseUpgrade.collectRadius *
@@ -1105,8 +1115,12 @@ function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): Bal
                     BASE.building.barracks.spawnBatchPerLevel *
                         (0.9 + assumptions.playerPowerScale * 0.1)
                 ),
-                statMultiplier: round2(
-                    1 + (BASE.building.barracks.statMultiplier - 1) * assumptions.playerPowerScale
+                statMultiplier: ensureBuildingGrowthFloor(
+                    round2(
+                        1 +
+                            (BASE.building.barracks.statMultiplier - 1) *
+                                assumptions.playerPowerScale
+                    )
                 ),
                 spawnIntervalMultiplier: round2(
                     1 -
@@ -1125,8 +1139,10 @@ function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): Bal
                     BASE.building.tower.attackInterval /
                         (0.92 + assumptions.playerPowerScale * 0.08)
                 ),
-                statMultiplier: round2(
-                    1 + (BASE.building.tower.statMultiplier - 1) * assumptions.playerPowerScale
+                statMultiplier: ensureBuildingGrowthFloor(
+                    round2(
+                        1 + (BASE.building.tower.statMultiplier - 1) * assumptions.playerPowerScale
+                    )
                 ),
                 attackMultiplier: round2(
                     1 + (BASE.building.tower.attackMultiplier - 1) * assumptions.playerPowerScale
@@ -1164,8 +1180,12 @@ function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): Bal
                 bulletSlowDuration: round2(
                     BASE.building.frostTower.bulletSlowDuration * assumptions.playerPowerScale
                 ),
-                statMultiplier: round2(
-                    1 + (BASE.building.frostTower.statMultiplier - 1) * assumptions.playerPowerScale
+                statMultiplier: ensureBuildingGrowthFloor(
+                    round2(
+                        1 +
+                            (BASE.building.frostTower.statMultiplier - 1) *
+                                assumptions.playerPowerScale
+                    )
                 ),
                 attackMultiplier: round2(
                     1 +
@@ -1202,10 +1222,12 @@ function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): Bal
                 chainRange: round2(
                     BASE.building.lightningTower.chainRange * assumptions.playerPowerScale
                 ),
-                statMultiplier: round2(
-                    1 +
-                        (BASE.building.lightningTower.statMultiplier - 1) *
-                            assumptions.playerPowerScale
+                statMultiplier: ensureBuildingGrowthFloor(
+                    round2(
+                        1 +
+                            (BASE.building.lightningTower.statMultiplier - 1) *
+                                assumptions.playerPowerScale
+                    )
                 ),
                 attackMultiplier: round2(
                     1 +
@@ -1237,8 +1259,10 @@ function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): Bal
                     BASE.building.farm.incomeInterval /
                         (0.9 + assumptions.farmIncomeScale * assumptions.economyScale * 0.1)
                 ),
-                statMultiplier: round2(
-                    1 + (BASE.building.farm.statMultiplier - 1) * assumptions.playerPowerScale
+                statMultiplier: ensureBuildingGrowthFloor(
+                    round2(
+                        1 + (BASE.building.farm.statMultiplier - 1) * assumptions.playerPowerScale
+                    )
                 ),
                 incomeMultiplier: round2(
                     1 + (BASE.building.farm.incomeMultiplier - 1) * assumptions.farmIncomeScale
@@ -1256,15 +1280,19 @@ function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): Bal
                 healInterval: round2(
                     BASE.building.spa.healInterval / (0.95 + assumptions.playerPowerScale * 0.05)
                 ),
-                statMultiplier: round2(
-                    1 + (BASE.building.spa.statMultiplier - 1) * assumptions.playerPowerScale
+                statMultiplier: ensureBuildingGrowthFloor(
+                    round2(
+                        1 + (BASE.building.spa.statMultiplier - 1) * assumptions.playerPowerScale
+                    )
                 ),
             },
             wall: {
                 hp: roundInt(BASE.building.wall.hp * assumptions.playerPowerScale),
                 tauntRange: round2(BASE.building.wall.tauntRange),
-                statMultiplier: round2(
-                    1 + (BASE.building.wall.statMultiplier - 1) * assumptions.playerPowerScale
+                statMultiplier: ensureBuildingGrowthFloor(
+                    round2(
+                        1 + (BASE.building.wall.statMultiplier - 1) * assumptions.playerPowerScale
+                    )
                 ),
             },
         },

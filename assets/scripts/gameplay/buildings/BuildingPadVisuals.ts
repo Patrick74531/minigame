@@ -16,7 +16,6 @@ export type BuildingPadVisualRefs = {
     costLabelNode: Node;
     coinIconNode: Node;
     functionIconNode: Node | null;
-    tempLabelNode?: Node;
 };
 
 type BuildingPadDisplayState = {
@@ -33,8 +32,7 @@ export class BuildingPadVisuals {
     public static createVisuals(
         hostNode: Node,
         buildingTypeId: string,
-        requiredCoins: number,
-        padIndex?: number
+        requiredCoins: number
     ): BuildingPadVisualRefs {
         const visualRoot = new Node('VisualRoot');
         hostNode.addChild(visualRoot);
@@ -45,44 +43,6 @@ export class BuildingPadVisuals {
         flatRoot.setRotationFromEuler(-90, 0, 0);
         flatRoot.addComponent(RenderRoot2D);
         flatRoot.setScale(0.009, 0.009, 0.009);
-
-        let tempLabelNode: Node | undefined;
-        if (padIndex !== undefined && padIndex >= 0) {
-            tempLabelNode = new Node('TempLabelRoot');
-            hostNode.addChild(tempLabelNode);
-            tempLabelNode.setPosition(0, 2.5, 0);
-
-            tempLabelNode.addComponent(RenderRoot2D);
-            const billboard = tempLabelNode.addComponent('cc.Billboard') as any;
-            if (!billboard) {
-                // simple fallback if Billboard not imported
-                const bb = tempLabelNode.addComponent('cc.Billboard');
-            }
-            tempLabelNode.setScale(0.015, 0.015, 0.015);
-
-            const tNode = new Node('Text');
-            tempLabelNode.addChild(tNode);
-            const uiTransform = tNode.addComponent(UITransform);
-            uiTransform.setContentSize(400, 100);
-
-            const tempLabel = tNode.addComponent(Label);
-            tempLabel.string = `${padIndex}`; // Use simple number or #number
-            tempLabel.fontSize = 80;
-            tempLabel.lineHeight = 84;
-            tempLabel.color = new Color(255, 50, 50, 255);
-            tempLabel.isBold = true;
-            tempLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
-            tempLabel.verticalAlign = Label.VerticalAlign.CENTER;
-
-            const tOutline = tNode.addComponent(LabelOutline);
-            tOutline.color = new Color(0, 0, 0, 255);
-            tOutline.width = 4;
-            
-            const tShadow = tNode.addComponent(LabelShadow);
-            tShadow.color = new Color(0, 0, 0, 180);
-            tShadow.offset.set(4, -4);
-            tShadow.blur = 3;
-        }
 
         const ctx = flatRoot.addComponent(Graphics);
         ctx.lineWidth = 5;
@@ -151,7 +111,6 @@ export class BuildingPadVisuals {
             costLabelNode: labelNode,
             coinIconNode: coinNode,
             functionIconNode,
-            tempLabelNode,
         };
     }
 
