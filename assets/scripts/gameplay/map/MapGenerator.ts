@@ -1522,7 +1522,7 @@ export class MapGenerator extends Component {
             if (!node || !node.isValid) return null;
             node.name = `${model.modelName}_${index}`;
             this.applyLayerRecursive(node, parent.layer);
-            this.applyNatureShadowSettingsRecursive(node);
+            this.applyNatureShadowSettingsRecursive(node, model.category);
             parent.addChild(node);
             return node;
         } catch (e) {
@@ -1531,12 +1531,19 @@ export class MapGenerator extends Component {
         }
     }
 
-    private applyNatureShadowSettingsRecursive(root: Node): void {
+    private applyNatureShadowSettingsRecursive(root: Node, category: NatureCategory): void {
+        const castShadowEnabled = this.shouldNatureCastShadow(category);
         const renderers = root.getComponentsInChildren(MeshRenderer);
         for (const renderer of renderers) {
-            renderer.shadowCastingMode = 1;
+            renderer.shadowCastingMode = castShadowEnabled ? 1 : 0;
             renderer.receiveShadow = 1;
         }
+    }
+
+    private shouldNatureCastShadow(_category: NatureCategory): boolean {
+        // Keep nature shadows off for runtime parity across local/remote webviews and
+        // to prevent alpha-card vegetation from producing stray silhouettes.
+        return false;
     }
 
     private placeGrassPatchGroups(opts: {

@@ -10,6 +10,15 @@ import { EventManager } from '../../core/managers/EventManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import type { RouteLane } from '../wave/WaveLaneRouting';
 
+type PadPlacement = {
+    type: string;
+    x: number;
+    z: number;
+    angle?: number;
+    prebuild?: boolean;
+    overrideCost?: number;
+};
+
 /**
  * BuildingPadSpawner
  * 负责根据配置生成建造点，减少 GameController 胶水逻辑
@@ -30,6 +39,12 @@ export class BuildingPadSpawner {
         'lightning_tower',
         'wall',
     ]);
+    private static readonly TOWER_PAD_TYPES = new Set(['tower', 'frost_tower', 'lightning_tower']);
+    private static readonly WALL_FRONT_DISTANCE_FROM_TOWER = 5.6;
+    private static readonly WALL_MIN_PAD_CLEARANCE = 1.6;
+    private static readonly WALL_FORWARD_STEP = 1.25;
+    private static readonly WALL_MAX_OVERLAP_FORWARD_STEPS = 10;
+    private static readonly WALL_POSITION_CLAMP_MARGIN = 0.6;
     private static _hiddenPadNodesByLane: Record<RouteLane, Node[]> = {
         top: [],
         mid: [],
@@ -45,15 +60,8 @@ export class BuildingPadSpawner {
             bottom: [],
         };
 
-        const padPositions =
-            (GameConfig.BUILDING.PADS as ReadonlyArray<{
-                type: string;
-                x: number;
-                z: number;
-                angle?: number;
-                prebuild?: boolean;
-                overrideCost?: number;
-            }>) ?? [];
+        const rawPadPositions = (GameConfig.BUILDING.PADS as ReadonlyArray<PadPlacement>) ?? [];
+        const padPositions = this.resolveWallPadPlacements(rawPadPositions);
         const fallbackPrebuildTowerIndex = this.resolveFallbackPrebuildTowerIndex(padPositions);
         const initialPrebuiltPadIndex = this.resolveInitialPrebuiltPadIndex(
             padPositions,
@@ -193,6 +201,162 @@ export class BuildingPadSpawner {
         this.ensureLaneUnlockListener();
     }
 
+    private static resolveWallPadPlacements(
+        pads: ReadonlyArray<PadPlacement>
+    ): Array<PadPlacement> {
+        const resolved = pads.map(pad => ({ ...pad }));
+        const halfW =
+            Math.max(1, GameConfig.MAP.LIMITS.x) - BuildingPadSpawner.WALL_POSITION_CLAMP_MARGIN;
+        const halfH =
+            Math.max(1, GameConfig.MAP.LIMITS.z) - BuildingPadSpawner.WALL_POSITION_CLAMP_MARGIN;
+
+        for (let index = 0; index < resolved.length; index++) {
+            const wallPad = resolved[index];
+            if (wallPad.type !== 'wall') continue;
+
+            const lane = this.resolveLaneByNearestPath(wallPad.x, wallPad.z);
+            const nearestTower = this.findNearestTowerPadOnLane(
+                resolved,
+                lane,
+                wallPad.x,
+                wallPad.z
+            );
+            if (!nearestTower) continue;
+
+            const forward = this.resolveLaneForwardDirection(lane, wallPad.x, wallPad.z);
+            if (!forward) continue;
+
+            const toWallX = wallPad.x - nearestTower.x;
+            const toWallZ = wallPad.z - nearestTower.z;
+            const aheadDistance = toWallX * forward.x + toWallZ * forward.z;
+            const shiftDistance = Math.max(0, this.WALL_FRONT_DISTANCE_FROM_TOWER - aheadDistance);
+
+            let targetX = wallPad.x + forward.x * shiftDistance;
+            let targetZ = wallPad.z + forward.z * shiftDistance;
+
+            let guard = 0;
+            while (
+                guard < this.WALL_MAX_OVERLAP_FORWARD_STEPS &&
+                this.hasPadOverlap(resolved, index, targetX, targetZ, this.WALL_MIN_PAD_CLEARANCE)
+            ) {
+                targetX += forward.x * this.WALL_FORWARD_STEP;
+                targetZ += forward.z * this.WALL_FORWARD_STEP;
+                guard += 1;
+            }
+
+            targetX = Math.max(-halfW, Math.min(halfW, targetX));
+            targetZ = Math.max(-halfH, Math.min(halfH, targetZ));
+
+            const movedDistance = Math.hypot(targetX - wallPad.x, targetZ - wallPad.z);
+            if (movedDistance <= 0.01) continue;
+
+            const source = pads[index];
+            wallPad.x = this.round2(targetX);
+            wallPad.z = this.round2(targetZ);
+
+            console.log(
+                `[BuildingPadSpawner] Shifted wall pad index=${index}, lane=${lane}, ` +
+                    `from=(${source?.x ?? wallPad.x}, ${source?.z ?? wallPad.z}), ` +
+                    `to=(${wallPad.x}, ${wallPad.z})`
+            );
+        }
+
+        return resolved;
+    }
+
+    private static findNearestTowerPadOnLane(
+        pads: ReadonlyArray<PadPlacement>,
+        lane: RouteLane,
+        x: number,
+        z: number
+    ): { x: number; z: number } | null {
+        let nearest: { x: number; z: number } | null = null;
+        let nearestDistSq = Number.POSITIVE_INFINITY;
+
+        for (const pad of pads) {
+            if (!this.TOWER_PAD_TYPES.has(pad.type)) continue;
+            if (this.resolveLaneByNearestPath(pad.x, pad.z) !== lane) continue;
+
+            const dx = pad.x - x;
+            const dz = pad.z - z;
+            const distSq = dx * dx + dz * dz;
+            if (distSq >= nearestDistSq) continue;
+
+            nearestDistSq = distSq;
+            nearest = { x: pad.x, z: pad.z };
+        }
+
+        return nearest;
+    }
+
+    private static resolveLaneForwardDirection(
+        lane: RouteLane,
+        x: number,
+        z: number
+    ): { x: number; z: number } | null {
+        const polyline = this.getLanePolylinesWorld()[lane];
+        if (!polyline || polyline.length < 2) return null;
+
+        let bestDirection: { x: number; z: number } | null = null;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < polyline.length - 1; i++) {
+            const a = polyline[i];
+            const b = polyline[i + 1];
+            const segmentDx = b.x - a.x;
+            const segmentDz = b.z - a.z;
+            const segmentLen = Math.hypot(segmentDx, segmentDz);
+            if (segmentLen <= 0.0001) continue;
+
+            const distance = this.pointToSegmentDistance(x, z, a, b);
+            if (distance >= bestDistance) continue;
+
+            bestDistance = distance;
+            bestDirection = {
+                x: segmentDx / segmentLen,
+                z: segmentDz / segmentLen,
+            };
+        }
+
+        if (bestDirection) {
+            return bestDirection;
+        }
+
+        const start = polyline[0];
+        const end = polyline[polyline.length - 1];
+        const dx = end.x - start.x;
+        const dz = end.z - start.z;
+        const len = Math.hypot(dx, dz);
+        if (len <= 0.0001) return null;
+
+        return {
+            x: dx / len,
+            z: dz / len,
+        };
+    }
+
+    private static hasPadOverlap(
+        pads: ReadonlyArray<PadPlacement>,
+        ignoreIndex: number,
+        x: number,
+        z: number,
+        minDistance: number
+    ): boolean {
+        const minDistSq = minDistance * minDistance;
+        for (let i = 0; i < pads.length; i++) {
+            if (i === ignoreIndex) continue;
+            const dx = pads[i].x - x;
+            const dz = pads[i].z - z;
+            if (dx * dx + dz * dz < minDistSq) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static round2(value: number): number {
+        return Math.round(value * 100) / 100;
+    }
+
     private static get buildingRegistry(): BuildingRegistry {
         return BuildingRegistry.instance;
     }
@@ -246,14 +410,7 @@ export class BuildingPadSpawner {
         return bestLane;
     }
 
-    private static resolveFallbackPrebuildTowerIndex(
-        pads: ReadonlyArray<{
-            type: string;
-            x: number;
-            z: number;
-            prebuild?: boolean;
-        }>
-    ): number {
+    private static resolveFallbackPrebuildTowerIndex(pads: ReadonlyArray<PadPlacement>): number {
         const hasExplicitTowerPrebuild = pads.some(
             pad => pad.type === 'tower' && pad.prebuild === true
         );
@@ -303,12 +460,7 @@ export class BuildingPadSpawner {
     }
 
     private static resolveInitialPrebuiltPadIndex(
-        pads: ReadonlyArray<{
-            type: string;
-            x: number;
-            z: number;
-            prebuild?: boolean;
-        }>,
+        pads: ReadonlyArray<PadPlacement>,
         fallbackPrebuildTowerIndex: number
     ): number {
         const hintedIndex = this.INITIAL_PREBUILT_PAD_INDEX_HINT;
