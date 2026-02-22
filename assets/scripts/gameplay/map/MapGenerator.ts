@@ -69,6 +69,12 @@ export enum TileType {
 export class MapGenerator extends Component {
     private static readonly GENERATED_ROOT_NAME = '__GeneratedMap';
     private static readonly PHYSICS_GROUP_PROJECTILE_BLOCKER = 1 << 6;
+    private static readonly NATURE_BLOCKER_TREE_RADIUS_SCALE = 0.28;
+    private static readonly NATURE_BLOCKER_ROCK_RADIUS_SCALE = 0.42;
+    private static readonly NATURE_BLOCKER_MIN_RADIUS = 0.16;
+    private static readonly NATURE_BLOCKER_FOOTPRINT_SCALE = 0.65;
+    private static readonly NATURE_BLOCKER_HEIGHT = 3.6;
+    private static readonly NATURE_BLOCKER_CENTER_Y = 1.55;
 
     // Texture paths (with Cocos sub-asset fallbacks)
     private static readonly GRASS_TEX_PATHS: ReadonlyArray<string> = [
@@ -1543,24 +1549,33 @@ export class MapGenerator extends Component {
     ): void {
         if (category !== 'tree' && category !== 'rock') return;
 
-        const tunedBaseRadius =
+        const radiusScale =
             category === 'tree'
-                ? Math.max(0.45, modelBaseRadius * 0.78)
-                : Math.max(0.45, modelBaseRadius * 0.92);
+                ? MapGenerator.NATURE_BLOCKER_TREE_RADIUS_SCALE
+                : MapGenerator.NATURE_BLOCKER_ROCK_RADIUS_SCALE;
+        const tunedBaseRadius = Math.max(
+            MapGenerator.NATURE_BLOCKER_MIN_RADIUS,
+            modelBaseRadius * radiusScale
+        );
+        const blockerRadius = tunedBaseRadius * MapGenerator.NATURE_BLOCKER_FOOTPRINT_SCALE;
 
         let blocker = root.getComponent(ProjectileBlocker);
         if (!blocker) {
             blocker = root.addComponent(ProjectileBlocker);
         }
-        blocker.baseRadius = tunedBaseRadius;
+        blocker.baseRadius = blockerRadius;
 
         let collider = root.getComponent(BoxCollider);
         if (!collider) {
             collider = root.addComponent(BoxCollider);
         }
-        collider.isTrigger = true;
-        collider.size = new Vec3(tunedBaseRadius * 2, 4.8, tunedBaseRadius * 2);
-        collider.center = new Vec3(0, 2.0, 0);
+        collider.isTrigger = false;
+        collider.size = new Vec3(
+            blockerRadius * 2,
+            MapGenerator.NATURE_BLOCKER_HEIGHT,
+            blockerRadius * 2
+        );
+        collider.center = new Vec3(0, MapGenerator.NATURE_BLOCKER_CENTER_Y, 0);
         collider.setGroup(MapGenerator.PHYSICS_GROUP_PROJECTILE_BLOCKER);
         collider.setMask(0xffffffff);
     }

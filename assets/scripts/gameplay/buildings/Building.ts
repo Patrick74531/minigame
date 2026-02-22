@@ -338,6 +338,18 @@ export class Building extends BaseComponent implements IAttackable {
         this._healthBarResyncTimer = 0;
     }
 
+    public heal(amount: number): void {
+        if (!this.isAlive) return;
+        if (!Number.isFinite(amount) || amount <= 0) return;
+
+        this.currentHp = Math.min(this.maxHp, this.currentHp + amount);
+        if (this._healthBar) {
+            this._healthBar.updateHealth(this.currentHp, this.maxHp);
+            this.updateHealthBarName();
+        }
+        this._healthBarResyncTimer = 0;
+    }
+
     public grantDamageImmunity(seconds: number): void {
         if (!Number.isFinite(seconds) || seconds <= 0) return;
         this._upgradeDamageImmunityTimer = Math.max(this._upgradeDamageImmunityTimer, seconds);

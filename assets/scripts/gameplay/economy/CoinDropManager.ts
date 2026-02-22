@@ -11,9 +11,10 @@ import { Enemy } from '../units/Enemy';
  * 监听敌人死亡并生成金币掉落
  */
 export class CoinDropManager {
-    private static readonly REGULAR_DROP_COINS = 1;
-    private static readonly ELITE_DROP_COINS = 5;
+    private static readonly REGULAR_DROP_COINS = 3;
+    private static readonly ELITE_DROP_COINS = 15;
     private static readonly BOSS_DROP_COINS_STEP = 50;
+    private static readonly BOSS_DROP_MULTIPLIER = 3;
     private static readonly DROP_SPREAD_RADIUS = 0.42;
 
     private static _instance: CoinDropManager | null = null;
@@ -82,7 +83,8 @@ export class CoinDropManager {
 
         if (spawnType === 'boss') {
             this._bossKillCount += 1;
-            return this._bossKillCount * CoinDropManager.BOSS_DROP_COINS_STEP;
+            const baseBossDrop = this._bossKillCount * CoinDropManager.BOSS_DROP_COINS_STEP;
+            return Math.max(1, Math.floor(baseBossDrop * CoinDropManager.BOSS_DROP_MULTIPLIER));
         }
 
         if (spawnType === 'elite' || isElite) {

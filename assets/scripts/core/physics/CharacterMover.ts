@@ -1,8 +1,12 @@
 import { _decorator, Component, Vec3, PhysicsSystem, geometry, Vec2 } from 'cc';
 import { GameConfig } from '../../data/GameConfig';
+import { ProjectileBlocker } from '../../gameplay/combat/ProjectileBlocker';
 
 const { ccclass, property } = _decorator;
 const PHYSICS_GROUP_WALL = 1 << 5;
+const PROJECTILE_BLOCKER_EXTRA_RADIUS = 0.1;
+const PROJECTILE_BLOCKER_STOP_EPSILON = 0.02;
+const PROJECTILE_BLOCKER_PUSHOUT_EPSILON = 0.04;
 
 @ccclass('CharacterMover')
 export class CharacterMover extends Component {
@@ -59,20 +63,23 @@ export class CharacterMover extends Component {
 
         if (PhysicsSystem.instance.sweepSphereClosest(ray, this.radius, mask, maxDist, false)) {
             const result = PhysicsSystem.instance.sweepSphereClosestResult;
+            const hitNormal = result?.hitNormal;
 
-            // If we hit something (Physical Obstacle, since queryTrigger is false)
-            if (result.collider) {
+            // Defensive guard:
+            // Some runtime states can report "closest hit exists" while result payload is not fully populated.
+            // In that case we keep targetPos and skip slide logic for this frame.
+            if (result?.collider && hitNormal) {
                 // Determine if it's a wall or floor
                 // Floor normal is usually (0, 1, 0)
-                if (Math.abs(result.hitNormal.y) < 0.5) {
+                if (Math.abs(hitNormal.y) < 0.5) {
                     // It's a wall/obstacle (normal is mostly horizontal)
 
                     // Simple slide: Remove velocity component along normal
                     // V_new = V - (V . N) * N
-                    const dot = Vec3.dot(moveVec, result.hitNormal);
+                    const dot = Vec3.dot(moveVec, hitNormal);
                     const slideVec = moveVec
                         .clone()
-                        .subtract(result.hitNormal.clone().multiplyScalar(dot));
+                        .subtract(hitNormal.clone().multiplyScalar(dot));
 
                     // Apply slide
                     finalX = currentPos.x + slideVec.x;
@@ -80,6 +87,13 @@ export class CharacterMover extends Component {
                 }
             }
         }
+
+        const blockerLimited = this.limitByProjectileBlockers(
+            currentPos,
+            new Vec3(finalX, currentPos.y, finalZ)
+        );
+        finalX = blockerLimited.x;
+        finalZ = blockerLimited.z;
 
         // Apply Position
         this.node.setPosition(finalX, currentPos.y, finalZ); // Keep Y strictly constant
@@ -95,6 +109,16 @@ export class CharacterMover extends Component {
         }
 
         this.clampPosition();
+    }
+
+    private limitByProjectileBlockers(start: Vec3, target: Vec3): Vec3 {
+        return ProjectileBlocker.resolveMovement(
+            start,
+            target,
+            PROJECTILE_BLOCKER_EXTRA_RADIUS,
+            PROJECTILE_BLOCKER_STOP_EPSILON,
+            PROJECTILE_BLOCKER_PUSHOUT_EPSILON
+        );
     }
 
     private clampPosition(): void {

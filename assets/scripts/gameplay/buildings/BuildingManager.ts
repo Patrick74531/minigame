@@ -1,7 +1,7 @@
 import { _decorator, Node, Vec3, tween } from 'cc';
 import { BuildingPad, BuildingPadState } from './BuildingPad';
 import { BuildingFactory } from './BuildingFactory';
-import { Building } from './Building';
+import { Building, BuildingType } from './Building';
 import { BuildingPadPlacement } from './BuildingPadPlacement';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
@@ -30,6 +30,7 @@ export class BuildingManager {
     ];
     private static readonly MID_SUPPORT_REVEAL_INTERVAL_SECONDS = 1;
     private static readonly MID_SUPPORT_CINEMATIC_HOLD_SECONDS = 3;
+    private static readonly INTER_WAVE_WALL_HEAL_PERCENT_PER_SECOND = 0.05;
 
     private _pads: BuildingPad[] = [];
     private _activeBuildings: Building[] = [];
@@ -123,6 +124,7 @@ export class BuildingManager {
      */
     public update(_dt: number): void {
         // Logic moved to BuildingPad.onTriggerStay (Physics System)
+        this.healWallsDuringInterWave(_dt);
     }
 
     /**
@@ -341,6 +343,24 @@ export class BuildingManager {
     private onWaveComplete(): void {
         this._isInterWaveWaiting = true;
         this.tryTriggerMidSupportRevealSequence();
+    }
+
+    private healWallsDuringInterWave(dt: number): void {
+        if (!this._isInterWaveWaiting) return;
+        if (!Number.isFinite(dt) || dt <= 0) return;
+
+        const healPercentPerSecond = BuildingManager.INTER_WAVE_WALL_HEAL_PERCENT_PER_SECOND;
+        if (healPercentPerSecond <= 0) return;
+
+        for (const pad of this._pads) {
+            const building = pad?.getAssociatedBuilding();
+            if (!building || !building.node || !building.node.isValid) continue;
+            if (!building.isAlive) continue;
+            if (building.buildingType !== BuildingType.WALL) continue;
+            if (building.currentHp >= building.maxHp) continue;
+
+            building.heal(building.maxHp * healPercentPerSecond * dt);
+        }
     }
 
     private tryTriggerMidSupportRevealSequence(): void {

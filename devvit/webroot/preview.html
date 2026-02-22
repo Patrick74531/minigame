@@ -11,31 +11,32 @@
     </head>
     <body>
         <div class="root">
-            <div class="nebula nebula-top"></div>
-            <div class="nebula nebula-bottom"></div>
-            <div class="grid-overlay"></div>
+            <div class="sun-glow"></div>
+            <div class="cloud cloud-a"></div>
+            <div class="cloud cloud-b"></div>
+            <div class="meadow-back"></div>
+            <div class="meadow-front"></div>
 
             <div class="content" id="launch-root">
                 <div class="status-row">
-                    <span class="tag">TOWER DEFENSE</span>
-                    <span class="live-pill"><span class="live-dot"></span>LIVE EVENT</span>
+                    <span class="tag">COUNTRYSIDE DEFENSE</span>
+                    <span class="live-pill"><span class="live-dot"></span>HARVEST SEASON</span>
                 </div>
                 <h1 class="title">🏰 Granny vs Robot</h1>
                 <p class="desc">Build towers · Hire soldiers · Survive infinite waves</p>
-                <div class="meta-row">
-                    <span class="meta-chip">⚡ Fast Rounds</span>
-                    <span class="meta-chip">🎯 Score Chase</span>
-                    <span class="meta-chip">🛡️ Upgrade Build</span>
-                </div>
 
                 <div class="char-row" aria-label="Tap to start game">
-                    <img class="char-img char-left" src="granny.webp" alt="Granny" />
+                    <div class="char-slot char-slot-left">
+                        <img class="char-img char-left" src="granny.webp" alt="Granny" />
+                    </div>
                     <button class="play-btn" id="play-btn" type="button">
                         <span class="play-icon">▶</span>
                         <span class="play-label">Play Now</span>
                         <span class="play-sub">Tap To Launch</span>
                     </button>
-                    <img class="char-img char-right" src="robot.webp" alt="Robot" />
+                    <div class="char-slot char-slot-right">
+                        <img class="char-img char-right" src="robot.webp" alt="Robot" />
+                    </div>
                 </div>
             </div>
         </div>

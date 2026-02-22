@@ -64,6 +64,7 @@ export class UnitFactory {
     private static readonly GROUP_ENEMY = 1 << 3;
     private static readonly GROUP_BULLET = 1 << 4;
     private static readonly GROUP_WALL = 1 << 5;
+    private static readonly GROUP_PROJECTILE_BLOCKER = 1 << 6;
     private static readonly HERO_RUN_SPEED = 1.0;
     private static readonly HERO_IDLE_SPEED = 0.25;
     private static readonly HERO_WEAPON_SOCKET_NAME = 'HeroWeaponSocket';
@@ -166,7 +167,8 @@ export class UnitFactory {
             UnitFactory.GROUP_DEFAULT |
                 UnitFactory.GROUP_ENEMY |
                 UnitFactory.GROUP_BULLET |
-                UnitFactory.GROUP_WALL
+                UnitFactory.GROUP_WALL |
+                UnitFactory.GROUP_PROJECTILE_BLOCKER
         );
 
         const hpMultiplier = options.hpMultiplier ?? 1;
@@ -446,6 +448,13 @@ export class UnitFactory {
                     anim.defaultClip = runClip;
                     anim.playOnLoad = true;
                     anim.play(runState);
+
+                    // Always try to upgrade to configured run clip path (if available).
+                    // Some imported prefabs include a placeholder/default clip that can
+                    // fall back to bind-pose on certain targets.
+                    if (config.runClipPath) {
+                        this.ensureRunClip(anim, controller);
+                    }
                 } else {
                     this.ensureRunClip(anim, controller);
                 }
