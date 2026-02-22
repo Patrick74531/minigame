@@ -35,7 +35,7 @@ export class HUDStatusModule implements HUDModule {
     public initialize(uiCanvas: Node): void {
         this._coinLabel = UIFactory.createCoinDisplay(uiCanvas);
         this._coinLabel.overflow = Label.Overflow.SHRINK;
-        this._coinLabel.node.active = false;
+        this._coinLabel.node.active = true;
 
         this._baseHpLabel = UIFactory.createLabel(
             uiCanvas,
@@ -118,7 +118,7 @@ export class HUDStatusModule implements HUDModule {
 
         // Keep these two hidden in gameplay as requested.
         if (this._coinLabel?.node?.isValid) {
-            this._coinLabel.node.active = false;
+            this._coinLabel.node.active = visible;
         }
         if (this._baseHpLabel?.node?.isValid) {
             this._baseHpLabel.node.active = false;
@@ -171,7 +171,7 @@ export class HUDStatusModule implements HUDModule {
     public updateCoinDisplay(count: number): void {
         if (!this._coinLabel) return;
         this._coinLabel.string = Localization.instance.t('ui.hud.coins', { count });
-        this._coinLabel.node.active = false;
+        this._coinLabel.node.active = true;
     }
 
     public updateBaseHp(current: number, max: number): void {
@@ -357,11 +357,24 @@ export class HUDStatusModule implements HUDModule {
             coinNode
                 .getComponent(UITransform)
                 ?.setContentSize(
-                    Math.round(UIResponsive.clamp(size.width * 0.32, 220, 360)),
+                    Math.round(UIResponsive.clamp(size.width * 0.34, 240, 420)),
                     Math.round(UIResponsive.clamp(size.height * 0.09, 50, 72))
                 );
+            this._coinLabel.horizontalAlign = Label.HorizontalAlign.LEFT;
             this._coinLabel.fontSize = compact ? 36 : 44;
             this._coinLabel.lineHeight = this._coinLabel.fontSize + 8;
+            const coinWidget = coinNode.getComponent(Widget);
+            if (coinWidget) {
+                coinWidget.isAlignTop = true;
+                coinWidget.isAlignLeft = true;
+                coinWidget.isAlignRight = false;
+                coinWidget.isAlignBottom = false;
+                coinWidget.isAlignHorizontalCenter = false;
+                coinWidget.isAlignVerticalCenter = false;
+                coinWidget.top = topInset;
+                coinWidget.left = Math.max(12, Math.round(padding.left * 0.72));
+                coinWidget.updateAlignment();
+            }
         }
 
         if (this._waveWidget) {

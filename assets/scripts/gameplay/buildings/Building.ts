@@ -63,6 +63,8 @@ export class Building extends BaseComponent implements IAttackable {
     private static _latestBaseLevel: number = 1;
     private static readonly PHYSICS_GROUP_ENEMY = 1 << 3;
     private static readonly PHYSICS_GROUP_WALL = 1 << 5;
+    private static readonly UPGRADE_DAMAGE_IMMUNITY_SECONDS = 2.2;
+    private static readonly HEALTH_BAR_RESYNC_INTERVAL = 0.1;
     private static readonly FARM_STACK_BASE_POS: ReadonlyArray<{ x: number; z: number }> =
         GameConfig.BUILDING.FARM_STACK.BASE_POS;
     private static readonly FARM_STACK_BASE_Y = GameConfig.BUILDING.FARM_STACK.BASE_Y;
@@ -126,6 +128,9 @@ export class Building extends BaseComponent implements IAttackable {
 
     /** 血条组件 */
     private _healthBar: HealthBar | null = null;
+    /** 升级完成后的短暂无敌，避免被瞬间连击覆盖“满血恢复”观感 */
+    private _upgradeDamageImmunityTimer: number = 0;
+    private _healthBarResyncTimer: number = 0;
 
     // === 访问器 ===
 
@@ -330,6 +335,12 @@ export class Building extends BaseComponent implements IAttackable {
             this._healthBar.updateHealth(this.currentHp, this.maxHp);
             this.updateHealthBarName();
         }
+        this._healthBarResyncTimer = 0;
+    }
+
+    public grantDamageImmunity(seconds: number): void {
+        if (!Number.isFinite(seconds) || seconds <= 0) return;
+        this._upgradeDamageImmunityTimer = Math.max(this._upgradeDamageImmunityTimer, seconds);
     }
 
     /**
@@ -358,6 +369,7 @@ export class Building extends BaseComponent implements IAttackable {
 
         // Heal to full (bonus)
         this.restoreToFullHealth();
+        this._upgradeDamageImmunityTimer = Building.UPGRADE_DAMAGE_IMMUNITY_SECONDS;
 
         console.log(`[Building] Upgraded to Level ${this.level}. HP: ${oldHp} -> ${this.maxHp}`);
 
@@ -382,6 +394,18 @@ export class Building extends BaseComponent implements IAttackable {
     protected update(dt: number): void {
         if (!this.isAlive) return;
         if (!this.gameManager.isPlaying) return;
+
+        if (this._upgradeDamageImmunityTimer > 0) {
+            this._upgradeDamageImmunityTimer = Math.max(0, this._upgradeDamageImmunityTimer - dt);
+        }
+
+        if (this._healthBar) {
+            this._healthBarResyncTimer += dt;
+            if (this._healthBarResyncTimer >= Building.HEALTH_BAR_RESYNC_INTERVAL) {
+                this._healthBarResyncTimer = 0;
+                this._healthBar.updateHealth(this.currentHp, this.maxHp);
+            }
+        }
 
         if (this.buildingType === BuildingType.FARM) {
             this.updateFarmIncome(dt);
@@ -586,6 +610,7 @@ export class Building extends BaseComponent implements IAttackable {
      */
     public takeDamage(damage: number, _attacker?: any, isCrit: boolean = false): void {
         if (!this.isAlive) return;
+        if (this._upgradeDamageImmunityTimer > 0) return;
         damage = Math.floor(damage);
         if (damage <= 0) return;
 
@@ -609,6 +634,7 @@ export class Building extends BaseComponent implements IAttackable {
         if (this._healthBar) {
             this._healthBar.updateHealth(this.currentHp, this.maxHp);
         }
+        this._healthBarResyncTimer = 0;
 
         if (this.currentHp <= 0) {
             this.onDestroyed();

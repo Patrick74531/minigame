@@ -12,12 +12,14 @@ import {
     resources,
     Texture2D,
     ImageAsset,
+    Vec3,
     Vec4,
     EffectAsset,
     Prefab,
     instantiate,
 } from 'cc';
 import { GameConfig } from '../../data/GameConfig';
+import { ProjectileBlocker } from '../combat/ProjectileBlocker';
 
 const { ccclass, property } = _decorator;
 
@@ -66,6 +68,7 @@ export enum TileType {
 @ccclass('MapGenerator')
 export class MapGenerator extends Component {
     private static readonly GENERATED_ROOT_NAME = '__GeneratedMap';
+    private static readonly PHYSICS_GROUP_PROJECTILE_BLOCKER = 1 << 6;
 
     // Texture paths (with Cocos sub-asset fallbacks)
     private static readonly GRASS_TEX_PATHS: ReadonlyArray<string> = [
@@ -1524,12 +1527,42 @@ export class MapGenerator extends Component {
             node.name = `${model.modelName}_${index}`;
             this.applyLayerRecursive(node, parent.layer);
             this.applyNatureShadowSettingsRecursive(node, model.category);
+            this.applyNatureProjectileBlocker(node, model.category, model.radius);
             parent.addChild(node);
             return node;
         } catch (e) {
             console.warn('[MapGenerator] instantiate nature prefab failed', model.basePath, e);
             return null;
         }
+    }
+
+    private applyNatureProjectileBlocker(
+        root: Node,
+        category: NatureCategory,
+        modelBaseRadius: number
+    ): void {
+        if (category !== 'tree' && category !== 'rock') return;
+
+        const tunedBaseRadius =
+            category === 'tree'
+                ? Math.max(0.45, modelBaseRadius * 0.78)
+                : Math.max(0.45, modelBaseRadius * 0.92);
+
+        let blocker = root.getComponent(ProjectileBlocker);
+        if (!blocker) {
+            blocker = root.addComponent(ProjectileBlocker);
+        }
+        blocker.baseRadius = tunedBaseRadius;
+
+        let collider = root.getComponent(BoxCollider);
+        if (!collider) {
+            collider = root.addComponent(BoxCollider);
+        }
+        collider.isTrigger = true;
+        collider.size = new Vec3(tunedBaseRadius * 2, 4.8, tunedBaseRadius * 2);
+        collider.center = new Vec3(0, 2.0, 0);
+        collider.setGroup(MapGenerator.PHYSICS_GROUP_PROJECTILE_BLOCKER);
+        collider.setMask(0xffffffff);
     }
 
     private applyNatureShadowSettingsRecursive(root: Node, category: NatureCategory): void {

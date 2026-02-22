@@ -10,6 +10,7 @@ import { ProjectilePool } from '../weapons/vfx/ProjectilePool';
 import { WeaponVFX } from '../weapons/WeaponVFX';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import { ProjectileBlocker } from './ProjectileBlocker';
 
 const { ccclass, property } = _decorator;
 type RouteLane = 'top' | 'mid' | 'bottom';
@@ -73,6 +74,8 @@ export class Bullet extends BaseComponent implements IPoolable {
     private _manualHitAccum: number = 0;
     /** 手动碰撞检测间隔（秒）— 高频子弹无需每帧检测 */
     private static readonly MANUAL_HIT_INTERVAL = 1 / 30;
+    private static readonly PHYSICS_GROUP_ENEMY = 1 << 3;
+    private static readonly PHYSICS_GROUP_PROJECTILE_BLOCKER = 1 << 6;
 
     // === Pool Recycling ===
     /** 若非空，销毁时回收到 ProjectilePool 而非 destroy */
@@ -184,7 +187,7 @@ export class Bullet extends BaseComponent implements IPoolable {
         this.scheduleOnce(() => {
             if (_col && _col.isValid) {
                 _col.setGroup(1 << 4);
-                _col.setMask(1 << 3);
+                _col.setMask(Bullet.PHYSICS_GROUP_ENEMY | Bullet.PHYSICS_GROUP_PROJECTILE_BLOCKER);
             }
         }, 0);
     }
@@ -264,6 +267,13 @@ export class Bullet extends BaseComponent implements IPoolable {
         // 穿透模式：跳过已命中的敌人
         if (this.pierce && this._hitNodes.has(other)) return;
 
+        const blocker = ProjectileBlocker.findFromNode(other);
+        if (blocker) {
+            this.createHitEffect();
+            this.recycle();
+            return;
+        }
+
         // Check if unit (Direct Hit)
         const unit = other.getComponent(Unit);
 
@@ -300,6 +310,8 @@ export class Bullet extends BaseComponent implements IPoolable {
             abz = curPos.z - az;
         const abLenSq = abx * abx + abz * abz;
 
+        const hitCandidates: Array<{ unit: Unit; node: Node; t: number }> = [];
+
         for (let i = 0, len = enemies.length; i < len; i++) {
             const enemy = enemies[i];
             if (!enemy || !enemy.isValid) continue;
@@ -311,11 +323,13 @@ export class Bullet extends BaseComponent implements IPoolable {
             const apx = ex - ax;
             const apz = ez - az;
 
+            let t = 0;
             let distSq: number;
             if (abLenSq < 0.0001) {
+                t = 0;
                 distSq = apx * apx + apz * apz;
             } else {
-                let t = (apx * abx + apz * abz) / abLenSq;
+                t = (apx * abx + apz * abz) / abLenSq;
                 if (t < 0) t = 0;
                 else if (t > 1) t = 1;
                 const cx = ax + abx * t - ex;
@@ -327,9 +341,37 @@ export class Bullet extends BaseComponent implements IPoolable {
             const unit = Bullet.getCachedUnit(enemy);
             if (!unit || !unit.isAlive || unit.unitType !== UnitType.ENEMY) continue;
 
-            this.handleHit(unit);
-            // 非穿透模式命中后立即退出
-            if (!this.pierce) return;
+            hitCandidates.push({ unit, node: enemy, t });
+        }
+
+        if (hitCandidates.length > 1) {
+            hitCandidates.sort((a, b) => a.t - b.t);
+        }
+
+        const blockerT = ProjectileBlocker.findClosestHitT(this._prevPos, curPos, this.hitRadius);
+
+        if (!this.pierce) {
+            const nearestEnemy = hitCandidates.length > 0 ? hitCandidates[0] : null;
+            if (blockerT >= 0 && (!nearestEnemy || blockerT <= nearestEnemy.t)) {
+                this.createHitEffect();
+                this.recycle();
+                return;
+            }
+            if (!nearestEnemy) return;
+            this.handleHit(nearestEnemy.unit);
+            return;
+        }
+
+        for (const candidate of hitCandidates) {
+            if (blockerT >= 0 && candidate.t > blockerT) break;
+            if (this._hitNodes.has(candidate.node)) continue;
+            this.handleHit(candidate.unit);
+            if (!this.node || !this.node.isValid) return;
+        }
+
+        if (blockerT >= 0) {
+            this.createHitEffect();
+            this.recycle();
         }
     }
 

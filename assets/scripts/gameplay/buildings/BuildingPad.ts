@@ -24,6 +24,7 @@ import { BuildingText } from './BuildingText';
 import { GameManager } from '../../core/managers/GameManager';
 import { BuildingPadVisuals } from './BuildingPadVisuals';
 import { BuildingPadPlacement } from './BuildingPadPlacement';
+import { Localization } from '../../core/i18n/Localization';
 
 const { ccclass, property } = _decorator;
 
@@ -47,6 +48,7 @@ export class BuildingPad extends BaseComponent {
     private static readonly BUILD_CONFIRM_DELAY = 0.25;
     private static readonly BUILD_MAX_RETRY = 3;
     private static readonly BUILD_AUTO_RETRY_ROUNDS = 2;
+    private static readonly UPGRADE_HEAL_STABILIZE_IMMUNITY_SECONDS = 2.6;
     private static readonly _activePads: Set<BuildingPad> = new Set();
 
     /** 每次收集金币数量 */
@@ -607,6 +609,10 @@ export class BuildingPad extends BaseComponent {
         if (this._isAnimating) return;
         this._isAnimating = true;
 
+        this._associatedBuilding.grantDamageImmunity(
+            BuildingPad.UPGRADE_HEAL_STABILIZE_IMMUNITY_SECONDS
+        );
+
         // Hide building during animation
         this._associatedBuilding.node.active = false;
 
@@ -628,6 +634,11 @@ export class BuildingPad extends BaseComponent {
             }
 
             this._associatedBuilding.restoreToFullHealth();
+            this.scheduleOnce(() => {
+                if (!this.node || !this.node.isValid) return;
+                if (!this._associatedBuilding || !this._associatedBuilding.node?.isValid) return;
+                this._associatedBuilding.restoreToFullHealth();
+            }, 0);
 
             // Use unified curve, fallback to legacy multipliers.
             const costMult = this.resolveUpgradeCostMultiplier();
@@ -764,11 +775,20 @@ export class BuildingPad extends BaseComponent {
     }
 
     private getHudTitle(): string {
+        const hudName = this.resolveHudBuildingName();
         if (this._state === BuildingPadState.UPGRADING) {
             const level = this._associatedBuilding?.level || 1;
-            return BuildingText.upgradeTitle(this.buildingName, level);
+            return BuildingText.upgradeTitle(hudName, level);
         }
-        return BuildingText.buildTitle(this.buildingName);
+        return BuildingText.buildTitle(hudName);
+    }
+
+    private resolveHudBuildingName(): string {
+        const typeId = this._associatedBuilding?.buildingTypeId ?? this.buildingTypeId;
+        if (BuildingPadPlacement.isTowerType(typeId)) {
+            return Localization.instance.t('building.tower.generic.name');
+        }
+        return this.buildingName;
     }
 
     private get hudManager(): HUDManager {

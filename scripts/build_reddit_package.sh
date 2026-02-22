@@ -750,8 +750,8 @@ ORIENTEOF
   # Post card background uses the already bundled Cocos resource:
   # assets/resources/native/43/43df4bfb-9353-4896-bd99-3c6cda36e111.webp
 
-  # Inject splash markup so loading UI is visible before large JS bundles finish downloading.
-  perl -0pi -e 's#(<body[^>]*>)#$1\n  <div id="boot-splash">\n    <div class="boot-splash__panel">\n      <div class="boot-splash__title">Tower Defense</div>\n      <div class="boot-splash__sub">Loading game assets...</div>\n      <div class="boot-splash__bar"><div id="boot-splash-fill" class="boot-splash__fill"></div></div>\n      <div id="boot-splash-pct" class="boot-splash__pct">0%</div>\n      <button id="boot-splash-retry" class="boot-splash__retry">Reload</button>\n    </div>\n  </div>#i' "$index_file"
+  # Inject splash markup inside GameDiv so it follows forced-landscape transform on mobile webviews.
+  perl -0pi -e 's#(<div\s+id="GameDiv"[^>]*>)#$1\n  <div id="boot-splash">\n    <div class="boot-splash__panel">\n      <div class="boot-splash__title">Tower Defense</div>\n      <div class="boot-splash__sub">Loading game assets...</div>\n      <div class="boot-splash__bar"><div id="boot-splash-fill" class="boot-splash__fill"></div></div>\n      <div id="boot-splash-pct" class="boot-splash__pct">0%</div>\n      <button id="boot-splash-retry" class="boot-splash__retry">Reload</button>\n    </div>\n  </div>#i' "$index_file"
 
   # Replace the Cocos inline boot script with an external boot.js reference.
   perl -0pi -e 's#<script>\s*System\.import\(\s*["\047]\./index\.js["\047]\s*\).*?</script>#<script src="boot.js" charset="utf-8"></script>#gs' "$index_file"

@@ -17,6 +17,7 @@ import { Building } from '../buildings/Building';
 import { Enemy } from '../units/Enemy';
 import { Unit, UnitType } from '../units/Unit';
 import { WeaponVFX } from '../weapons/WeaponVFX';
+import { ProjectileBlocker } from './ProjectileBlocker';
 
 const { ccclass, property } = _decorator;
 
@@ -36,6 +37,11 @@ interface EnemyProjectileVisualProfile {
     length: number;
     tint: Color;
 }
+
+type EnemyProjectileHitResult = {
+    target: Unit | Building;
+    t: number;
+};
 
 @ccclass('EnemyProjectile')
 export class EnemyProjectile extends Component {
@@ -181,14 +187,19 @@ export class EnemyProjectile extends Component {
             this.node.lookAt(lookAt);
         }
 
-        const hitTarget = this.findFirstHit(start, end);
-        if (!hitTarget) return;
+        const blockerT = ProjectileBlocker.findClosestHitT(start, end, this.hitRadius);
+        const targetHit = this.findFirstHit(start, end);
+        if (blockerT >= 0 && (!targetHit || blockerT <= targetHit.t)) {
+            this.destroySelf();
+            return;
+        }
+        if (!targetHit) return;
 
-        hitTarget.takeDamage(this.damage, this._owner ?? undefined);
+        targetHit.target.takeDamage(this.damage, this._owner ?? undefined);
         this.destroySelf();
     }
 
-    private findFirstHit(start: Vec3, end: Vec3): Unit | Building | null {
+    private findFirstHit(start: Vec3, end: Vec3): EnemyProjectileHitResult | null {
         let bestTarget: Unit | Building | null = null;
         let bestT = Number.POSITIVE_INFINITY;
 
@@ -220,7 +231,11 @@ export class EnemyProjectile extends Component {
             bestTarget = building;
         }
 
-        return bestTarget;
+        if (!bestTarget) return null;
+        return {
+            target: bestTarget,
+            t: bestT,
+        };
     }
 
     private segmentHitT(start: Vec3, end: Vec3, point: Vec3, radius: number): number {

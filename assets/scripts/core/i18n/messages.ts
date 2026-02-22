@@ -6,6 +6,7 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
     zh: {
         'building.barracks.name': '鹅棚',
         'building.tower.name': '机炮塔',
+        'building.tower.generic.name': '防御塔',
         'building.frost_tower.name': '冰霜塔',
         'building.lightning_tower.name': '闪电塔',
         'building.wall.name': '路障',
@@ -171,6 +172,7 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
     en: {
         'building.barracks.name': 'Goose Shed',
         'building.tower.name': 'Gatling Tower',
+        'building.tower.generic.name': 'Defense Tower',
         'building.frost_tower.name': 'Frost Tower',
         'building.lightning_tower.name': 'Tesla Tower',
         'building.wall.name': 'Barricade',
