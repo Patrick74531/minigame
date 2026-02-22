@@ -64,21 +64,12 @@ export class ResourcePreloader {
     private static preloadWeaponVFXTextures(): void {
         resources.preload('textures/bullet/texture', Texture2D);
         resources.preload('textures/bullet', Texture2D);
-        resources.preload('floor/tileable_grass_01/texture', Texture2D);
-        resources.preload('floor/tileable_grass_01', Texture2D);
-        resources.preload('floor/tileable_grass_01.webp', Texture2D);
-        resources.preload('floor/tileable_grass_02/texture', Texture2D);
-        resources.preload('floor/tileable_grass_02', Texture2D);
-        resources.preload('floor/tileable_grass_02.webp', Texture2D);
-        resources.preload('floor/tileable_grass_03/texture', Texture2D);
-        resources.preload('floor/tileable_grass_03', Texture2D);
-        resources.preload('floor/tileable_grass_03.webp', Texture2D);
-        resources.preload('floor/tileable_grass_04/texture', Texture2D);
-        resources.preload('floor/tileable_grass_04', Texture2D);
-        resources.preload('floor/tileable_grass_04.webp', Texture2D);
-        resources.preload('floor/Dirt_01/texture', Texture2D);
-        resources.preload('floor/Dirt_01', Texture2D);
-        resources.preload('floor/Dirt_01.webp', Texture2D);
+        resources.preload('floor/grass/texture', Texture2D);
+        resources.preload('floor/grass', Texture2D);
+        resources.preload('floor/grass.webp', Texture2D);
+        resources.preload('floor/Dirt_02/texture', Texture2D);
+        resources.preload('floor/Dirt_02', Texture2D);
+        resources.preload('floor/Dirt_02.webp', Texture2D);
         resources.preload('textures/droplet/texture', Texture2D);
         resources.preload('textures/droplet', Texture2D);
         resources.preload('textures/droplet.webp', Texture2D);

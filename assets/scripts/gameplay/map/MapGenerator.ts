@@ -69,12 +69,9 @@ export class MapGenerator extends Component {
 
     // Texture paths (with Cocos sub-asset fallbacks)
     private static readonly GRASS_TEX_PATHS: ReadonlyArray<string> = [
-        'floor/tileable_grass_02/texture',
-        'floor/tileable_grass_02',
-        'floor/tileable_grass_02.webp',
-        'floor/tileable_grass_01/texture',
-        'floor/tileable_grass_01',
-        'floor/tileable_grass_01.webp',
+        'floor/grass/texture',
+        'floor/grass',
+        'floor/grass.webp',
     ];
     private static readonly DIRT_TEX_PATHS: ReadonlyArray<string> = [
         'floor/Dirt_02/texture',
@@ -583,6 +580,10 @@ export class MapGenerator extends Component {
         const renderer = node.addComponent(MeshRenderer);
         renderer.mesh = this.getSharedTileMesh();
         renderer.material = this.getColorMaterial(color);
+        // Boundary mountains are outside the playable area. Letting them cast shadows
+        // causes remote-webview-only stray silhouettes when shadow frustum differs.
+        renderer.shadowCastingMode = 0;
+        renderer.receiveShadow = 0;
 
         const collider = node.addComponent(BoxCollider);
         collider.setGroup(1);
@@ -1541,9 +1542,7 @@ export class MapGenerator extends Component {
     }
 
     private shouldNatureCastShadow(_category: NatureCategory): boolean {
-        // Keep nature shadows off for runtime parity across local/remote webviews and
-        // to prevent alpha-card vegetation from producing stray silhouettes.
-        return false;
+        return true;
     }
 
     private placeGrassPatchGroups(opts: {
