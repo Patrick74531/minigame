@@ -24,10 +24,6 @@ import { CoinFactory } from './gameplay/economy/CoinFactory';
 import { SystemReset } from './core/bootstrap/SystemReset';
 import { applyCanvasOnDisableSafetyPatch } from './core/engine/CanvasSafetyPatch';
 import { AudioSettingsManager } from './core/managers/AudioSettingsManager';
-import { GameSaveManager } from './core/managers/GameSaveManager';
-import type { GameSaveData } from './core/managers/GameSaveManager';
-import { Base } from './gameplay/buildings/Base';
-import { GameState } from './core/managers/GameManager';
 
 const { ccclass, property } = _decorator;
 
@@ -58,13 +54,7 @@ export class GameController extends Component {
     private _pausedByVisibility: boolean = false;
     private _visibilityHandler: (() => void) | null = null;
 
-    // === 存档 ===
-
-    private _autoSaveTimer: ReturnType<typeof setInterval> | null = null;
-    private static readonly AUTO_SAVE_INTERVAL_MS = 10_000;
-
     // === 实体 ===
-    private _base: Node | null = null;
     private _hero: Node | null = null;
     private _joystick: Joystick | null = null;
     private _inputAdapter: PlayerInputAdapter | null = null;
@@ -135,14 +125,10 @@ export class GameController extends Component {
         // Bind ScreenShake to camera (will find camera in scene)
         ScreenShake.bind(this.node);
 
-        // 切Tab/息屏时暂停游戏+保存状态，回来时自动恢复
+        // 切Tab/息屏时暂停游戏，回来时自动恢复
         this._visibilityHandler = () => {
             if (document.hidden) {
                 const gm = this._services.gameManager;
-                if (gm.isPlaying || gm.gameState === GameState.PAUSED) {
-                    const snap = this.collectSnapshot();
-                    if (snap) GameSaveManager.instance.save(snap);
-                }
                 director.pause();
                 if (gm.isPlaying) {
                     gm.pauseGame();
@@ -157,11 +143,6 @@ export class GameController extends Component {
             }
         };
         document.addEventListener('visibilitychange', this._visibilityHandler);
-
-        // 游戏开始时启动定时存档
-        this.evtMgr.on(GameEvents.GAME_START, this.onGameStartSave, this);
-        // 游戏结束时清除存档（基地被摧毁 = 正常死亡，不应继续）
-        this.evtMgr.on(GameEvents.GAME_OVER, this.onGameOverClearSave, this);
     }
 
     protected onDestroy(): void {
@@ -190,12 +171,6 @@ export class GameController extends Component {
             document.removeEventListener('visibilitychange', this._visibilityHandler);
             this._visibilityHandler = null;
         }
-        this.evtMgr.off(GameEvents.GAME_START, this.onGameStartSave, this);
-        this.evtMgr.off(GameEvents.GAME_OVER, this.onGameOverClearSave, this);
-        if (this._autoSaveTimer !== null) {
-            clearInterval(this._autoSaveTimer);
-            this._autoSaveTimer = null;
-        }
         SystemReset.shutdown();
     }
 
@@ -209,24 +184,13 @@ export class GameController extends Component {
                 building: this._buildingContainer!,
                 ui: this._uiCanvas!,
             },
-            onSpawned: (base: Node, hero: Node) => {
-                this._base = base;
+            onSpawned: (_base: Node, hero: Node) => {
                 this._hero = hero;
                 if (this._inputAdapter) {
                     this._inputAdapter.setTarget(this._hero, this._joystick);
                 }
                 HeroLevelSystem.instance.initialize(hero);
                 this.evtMgr.on(GameEvents.HERO_LEVEL_UP, this.onHeroLevelUp, this);
-                // Restore base HP from save data (ctx.saveData is set before onSpawned fires)
-                if (ctx.saveData) {
-                    const baseComp = base.getComponent(Base);
-                    if (baseComp) {
-                        baseComp.currentHp = Math.max(
-                            1,
-                            Math.floor(ctx.saveData.baseHpRatio * baseComp.maxHp)
-                        );
-                    }
-                }
             },
         };
         GameStartFlow.run(ctx);
@@ -252,48 +216,9 @@ export class GameController extends Component {
 
     // === 升级 VFX ===
 
-    private onHeroLevelUp(data: { level: number; heroNode: Node; quiet?: boolean }): void {
-        if (!data.quiet && this._uiCanvas) {
+    private onHeroLevelUp(data: { level: number; heroNode: Node }): void {
+        if (this._uiCanvas) {
             LevelUpVFX.play(this._uiCanvas, data.heroNode, data.level);
-        }
-    }
-
-    // === 存档逻辑 ===
-
-    private collectSnapshot(): GameSaveData | null {
-        const gm = this._services.gameManager;
-        if (gm.currentWave < 1) return null;
-        const baseComp = this._base?.getComponent(Base);
-        const hls = HeroLevelSystem.instance;
-        return {
-            version: 1,
-            savedAt: Date.now(),
-            waveNumber: gm.currentWave,
-            baseHpRatio: baseComp
-                ? Math.max(0, baseComp.currentHp / Math.max(1, baseComp.maxHp))
-                : 1,
-            coins: gm.coins,
-            score: gm.score,
-            heroLevel: hls.level,
-            heroXp: hls.currentXp,
-        };
-    }
-
-    private onGameStartSave(): void {
-        if (this._autoSaveTimer !== null) return;
-        this._autoSaveTimer = setInterval(() => {
-            const gm = this._services.gameManager;
-            if (!gm.isPlaying) return;
-            const snap = this.collectSnapshot();
-            if (snap) GameSaveManager.instance.save(snap);
-        }, GameController.AUTO_SAVE_INTERVAL_MS);
-    }
-
-    private onGameOverClearSave(): void {
-        GameSaveManager.instance.clear();
-        if (this._autoSaveTimer !== null) {
-            clearInterval(this._autoSaveTimer);
-            this._autoSaveTimer = null;
         }
     }
 

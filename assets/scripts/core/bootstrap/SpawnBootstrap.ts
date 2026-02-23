@@ -49,16 +49,10 @@ export class SpawnBootstrap {
 
     public static startWaves(
         waveLoop: WaveLoop | null,
-        delaySeconds: number = GameConfig.WAVE.FIRST_WAVE_DELAY,
-        startingWave: number = 1
+        delaySeconds: number = GameConfig.WAVE.FIRST_WAVE_DELAY
     ): void {
         if (!waveLoop) return;
-        waveLoop.initialize(
-            SpawnBootstrap.waveManager,
-            SpawnBootstrap.gameManager,
-            delaySeconds,
-            startingWave
-        );
+        waveLoop.initialize(SpawnBootstrap.waveManager, SpawnBootstrap.gameManager, delaySeconds);
     }
 
     private static get gameManager(): GameManager {

@@ -9,8 +9,6 @@ import { HomePage } from '../../ui/home/HomePage';
 import { HUDManager } from '../../ui/HUDManager';
 import { LoadingScreen } from '../../ui/LoadingScreen';
 import { GameResourceLoader } from './GameResourceLoader';
-import { HeroLevelSystem } from '../../gameplay/units/HeroLevelSystem';
-import { GameSaveManager, GameSaveData } from '../managers/GameSaveManager';
 
 export type StartContext = {
     mapGenerator: MapGenerator | null;
@@ -23,7 +21,6 @@ export type StartContext = {
     };
     onSpawned?: (base: Node, hero: Node) => void;
     showHomePage?: boolean;
-    saveData?: GameSaveData | null;
 };
 
 /**
@@ -54,14 +51,6 @@ export class GameStartFlow {
 
         homePage.setOnStartRequested(() => {
             homeNode.destroy();
-            ctx.saveData = null;
-            this._showLoadingScreen(ctx);
-        });
-
-        homePage.setOnContinueRequested(() => {
-            const save = GameSaveManager.instance.load();
-            homeNode.destroy();
-            ctx.saveData = save;
             this._showLoadingScreen(ctx);
         });
     }
@@ -80,7 +69,6 @@ export class GameStartFlow {
                 // The 3D scene renders behind the loading screen, uploading GPU textures.
                 this.startGame(ctx);
                 this.gameManager.startGame();
-                this.applyPostStartRestore(ctx.saveData);
                 // GPU warmup: wait 0.5 s (~30 frames) for textures to upload before revealing scene.
                 if (screen.isValid) {
                     screen.scheduleOnce(() => {
@@ -92,7 +80,6 @@ export class GameStartFlow {
                 // On any load error still enter game
                 this.startGame(ctx);
                 this.gameManager.startGame();
-                this.applyPostStartRestore(ctx.saveData);
                 if (screen.isValid) screen.signalReadyToClose();
             });
     }
@@ -109,15 +96,7 @@ export class GameStartFlow {
         const spawned = SpawnBootstrap.spawn(ctx.containers);
         ctx.onSpawned?.(spawned.base, spawned.hero);
 
-        const startingWave = ctx.saveData?.waveNumber ?? 1;
-        SpawnBootstrap.startWaves(ctx.waveLoop, GameConfig.WAVE.FIRST_WAVE_DELAY, startingWave);
-    }
-
-    private static applyPostStartRestore(saveData?: GameSaveData | null): void {
-        if (!saveData) return;
-        this.gameManager.setCoins(saveData.coins);
-        this.gameManager.setScore(saveData.score);
-        HeroLevelSystem.instance.restoreState(saveData.heroLevel, saveData.heroXp);
+        SpawnBootstrap.startWaves(ctx.waveLoop, GameConfig.WAVE.FIRST_WAVE_DELAY);
     }
 
     private static get gameManager(): GameManager {
