@@ -220,6 +220,24 @@ export class GameManager extends Singleton<GameManager>() {
         this._score += points;
     }
 
+    /**
+     * 直接设置金币（用于存档恢复）
+     */
+    public setCoins(amount: number): void {
+        this._coins = Math.max(0, Math.floor(amount));
+        this.eventManager.emit(GameEvents.COIN_CHANGED, {
+            current: this._coins,
+            delta: 0,
+        });
+    }
+
+    /**
+     * 直接设置分数（用于存档恢复）
+     */
+    public setScore(amount: number): void {
+        this._score = Math.max(0, Math.floor(amount));
+    }
+
     // === 事件处理 ===
 
     private registerEvents(): void {

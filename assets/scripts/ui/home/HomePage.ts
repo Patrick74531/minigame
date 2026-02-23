@@ -26,6 +26,7 @@ import { LocalizationComp } from '../LocalizationComp';
 import { UIResponsive } from '../UIResponsive';
 import { RedditBridge, type RedditBridgeCallback } from '../../core/reddit/RedditBridge';
 import { LeaderboardPanel } from './LeaderboardPanel';
+import { GameSaveManager } from '../../core/managers/GameSaveManager';
 
 const { ccclass } = _decorator;
 
@@ -39,13 +40,14 @@ export class HomePage extends Component {
 
     private _titleNode: Node | null = null;
     private _subtitleNode: Node | null = null;
-    private _noticeNode: Node | null = null;
+    private _continueBtn: Node | null = null;
     private _startBtn: Node | null = null;
     private _leaderboardBtn: Node | null = null;
     private _subscribeBtn: Node | null = null;
     private _leaderboardPanel: LeaderboardPanel | null = null;
     private _bridgeListener: ((e: RedditBridgeCallback) => void) | null = null;
     private _onStartRequested: (() => void) | null = null;
+    private _onContinueRequested: (() => void) | null = null;
 
     public onLoad() {
         this._uiLayer = this.node.parent?.layer ?? Layers.Enum.UI_2D;
@@ -139,16 +141,21 @@ export class HomePage extends Component {
             outlineColor: new Color(0, 0, 0, 180),
             outlineWidth: 3,
         });
-        this._noticeNode = this.createLocalizedTextNode('LoadNotice', 'ui.home.first_load_notice', {
-            fontSize: 20,
-            bold: false,
-            color: new Color(200, 200, 200, 180),
-            outlineColor: new Color(0, 0, 0, 160),
-            outlineWidth: 2,
-        });
         this._contentNode.addChild(this._titleNode);
         this._contentNode.addChild(this._subtitleNode);
-        this._contentNode.addChild(this._noticeNode);
+
+        if (GameSaveManager.instance.hasSave()) {
+            this._continueBtn = this.createGameButton(
+                'ContinueButton',
+                'ui.home.continue',
+                0,
+                0,
+                () => this.onContinueClick(),
+                new Color(80, 200, 100, 255),
+                new Color(255, 255, 255, 200)
+            );
+            this._contentNode.addChild(this._continueBtn);
+        }
 
         this._startBtn = this.createGameButton('StartButton', 'ui.home.start', 0, 120, () =>
             this.onStartClick()
@@ -172,6 +179,10 @@ export class HomePage extends Component {
         this._contentNode.addChild(this._leaderboardBtn);
         this._contentNode.addChild(this._subscribeBtn);
         this.updateContentLayout();
+    }
+
+    public setOnContinueRequested(cb: () => void): void {
+        this._onContinueRequested = cb;
     }
 
     private loadBackgroundTexture() {
@@ -228,7 +239,9 @@ export class HomePage extends Component {
         locKey: string,
         x: number,
         y: number,
-        onClick: () => void
+        onClick: () => void,
+        fillColor?: Color,
+        strokeColor?: Color
     ): Node {
         const btnNode = new Node(name);
         btnNode.layer = this._uiLayer;
@@ -241,7 +254,7 @@ export class HomePage extends Component {
         btn.zoomScale = 0.95;
 
         const bg = btnNode.addComponent(Graphics);
-        this.drawButton(bg);
+        this.drawButton(bg, fillColor, strokeColor);
 
         const labelNode = new Node('Label');
         labelNode.layer = this._uiLayer;
@@ -264,16 +277,16 @@ export class HomePage extends Component {
         return btnNode;
     }
 
-    private drawButton(g: Graphics) {
+    private drawButton(g: Graphics, fillColor?: Color, strokeColor?: Color) {
         const tf = g.node.getComponent(UITransform);
         const width = Math.round(tf?.contentSize.width ?? 240);
         const height = Math.round(tf?.contentSize.height ?? 80);
         const radius = Math.max(12, Math.round(height * 0.22));
         g.clear();
-        g.fillColor = new Color(255, 198, 88, 255);
+        g.fillColor = fillColor ?? new Color(255, 198, 88, 255);
         g.roundRect(-width / 2, -height / 2, width, height, radius);
         g.fill();
-        g.strokeColor = new Color(255, 255, 255, 200);
+        g.strokeColor = strokeColor ?? new Color(255, 255, 255, 200);
         g.lineWidth = Math.max(2, Math.round(height * 0.05));
         g.roundRect(-width / 2, -height / 2, width, height, radius);
         g.stroke();
@@ -353,36 +366,36 @@ export class HomePage extends Component {
         const gap = Math.round(UIResponsive.clamp(shortSide * 0.045, 24, 42));
         const step = buttonH + gap;
         const centerY = 0;
+        const hasContinue = this._continueBtn !== null;
 
-        this.layoutButton(this._startBtn, buttonW, buttonH, centerY + step);
+        if (hasContinue) {
+            this.layoutButton(this._continueBtn, buttonW, buttonH, centerY + step * 2);
+            this.layoutButton(this._startBtn, buttonW, buttonH, centerY + step);
+        } else {
+            this.layoutButton(this._startBtn, buttonW, buttonH, centerY + step);
+        }
         this.layoutButton(this._leaderboardBtn, buttonW, buttonH, centerY);
         this.layoutButton(this._subscribeBtn, buttonW, buttonH, centerY - step);
 
         const titleFontSize = Math.round(UIResponsive.clamp(shortSide * 0.072, 36, 60));
         const subtitleFontSize = Math.round(UIResponsive.clamp(shortSide * 0.034, 20, 30));
-        const noticeFontSize = Math.round(UIResponsive.clamp(shortSide * 0.026, 16, 22));
         const titleW = Math.round(Math.min(size.width - 40, 600));
+        const titleBaseY = hasContinue ? step * 3.3 : step * 2.6;
+        const subtitleBaseY = hasContinue ? step * 2.8 : step * 2.1;
 
         this.layoutTextNode(
             this._titleNode,
             titleW,
             titleFontSize + 16,
-            centerY + step * 2.6,
+            centerY + titleBaseY,
             titleFontSize
         );
         this.layoutTextNode(
             this._subtitleNode,
             titleW,
             subtitleFontSize + 12,
-            centerY + step * 2.1,
+            centerY + subtitleBaseY,
             subtitleFontSize
-        );
-        this.layoutTextNode(
-            this._noticeNode,
-            titleW,
-            noticeFontSize + 10,
-            centerY - step * 2.1,
-            noticeFontSize
         );
     }
 
@@ -393,8 +406,13 @@ export class HomePage extends Component {
         btnNode.getComponent(Widget)?.updateAlignment();
 
         const bg = btnNode.getComponent(Graphics);
+        const isContinue = btnNode.name === 'ContinueButton';
         if (bg) {
-            this.drawButton(bg);
+            this.drawButton(
+                bg,
+                isContinue ? new Color(80, 200, 100, 255) : undefined,
+                isContinue ? new Color(255, 255, 255, 200) : undefined
+            );
         }
 
         const labelNode = btnNode.getChildByName('Label');
@@ -408,11 +426,11 @@ export class HomePage extends Component {
 
     private refreshText() {
         this._settingsModule?.onLanguageChanged();
-        const noticeComp = this._noticeNode
-            ?.getChildByName('Label')
-            ?.getComponent(LocalizationComp);
-        noticeComp?.refresh();
 
+        if (this._continueBtn) {
+            const comp = this._continueBtn.getChildByName('Label')?.getComponent(LocalizationComp);
+            comp?.refresh();
+        }
         if (this._startBtn) {
             const comp = this._startBtn.getChildByName('Label')?.getComponent(LocalizationComp);
             comp?.refresh();
@@ -479,6 +497,12 @@ export class HomePage extends Component {
 
     public setOnStartRequested(cb: () => void): void {
         this._onStartRequested = cb;
+    }
+
+    private onContinueClick() {
+        if (this._onContinueRequested) {
+            this._onContinueRequested();
+        }
     }
 
     private createTextNode(

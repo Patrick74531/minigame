@@ -173,7 +173,7 @@ export type GameEventPayloads = {
     [GameEvents.HERO_ATTACK]: { target: Node };
     [GameEvents.HERO_SKILL_USED]: { skillId: string };
     [GameEvents.HERO_XP_GAINED]: { xp: number; currentXp: number; maxXp: number; level: number };
-    [GameEvents.HERO_LEVEL_UP]: { level: number; heroNode: Node };
+    [GameEvents.HERO_LEVEL_UP]: { level: number; heroNode: Node; quiet?: boolean };
     [GameEvents.BUILDING_CONSTRUCTED]: {
         padNode: Node;
         buildingTypeId?: string;

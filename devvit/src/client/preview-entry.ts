@@ -4,45 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const playBtn = document.getElementById('play-btn');
     const bgVideo = document.getElementById('bg-video') as HTMLVideoElement | null;
 
-    // Inject first-load notice below play button
-    const savedLang = (() => {
-        try {
-            return localStorage.getItem('kingshit.lang');
-        } catch {
-            return null;
-        }
-    })();
-    const browserLang = (navigator.language || '').toLowerCase();
-    const lang =
-        savedLang === 'zh' || savedLang === 'en'
-            ? savedLang
-            : browserLang.startsWith('zh')
-            ? 'zh'
-            : 'en';
-    const noticeText =
-        lang === 'zh'
-            ? '首次加载可能需要较长时间，请耐心等待'
-            : 'First load may take a while — please be patient';
-    const root = document.getElementById('launch-root');
-    if (root && playBtn) {
-        const notice = document.createElement('p');
-        notice.textContent = noticeText;
-        notice.style.cssText = [
-            'position:absolute',
-            'bottom:14%',
-            'left:0',
-            'right:0',
-            'margin:0',
-            'text-align:center',
-            'font-family:sans-serif',
-            'font-size:13px',
-            'color:rgba(255,255,255,0.75)',
-            'text-shadow:0 1px 4px rgba(0,0,0,0.8)',
-            'pointer-events:none',
-        ].join(';');
-        root.appendChild(notice);
-    }
-
     const tryPlayPreview = (): void => {
         if (!bgVideo) return;
         bgVideo.muted = true;

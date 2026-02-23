@@ -154,10 +154,11 @@
     wrap.id = 'boot-splash';
     wrap.innerHTML =
       '<div class="boot-splash__panel">' +
-      '  <div class="boot-splash__title">Tower Defense</div>' +
+      '  <div class="boot-splash__title">Granny vs Robot</div>' +
       '  <div class="boot-splash__sub">加载游戏资源中，请稍候...</div>' +
       '  <div class="boot-splash__bar"><div id="boot-splash-fill" class="boot-splash__fill"></div></div>' +
       '  <div id="boot-splash-pct" class="boot-splash__pct">0%</div>' +
+      '  <div id="boot-splash-notice" class="boot-splash__notice"></div>' +
       '</div>';
     var host = byId('GameDiv') || document.body;
     host.appendChild(wrap);
@@ -257,6 +258,14 @@
   });
 
   mountSplash();
+  try {
+    var _slg = localStorage.getItem('kingshit.lang');
+    var _blg = (navigator.language || '').toLowerCase();
+    var _lng = (_slg === 'zh' || _slg === 'en') ? _slg : (_blg.indexOf('zh') === 0 ? 'zh' : 'en');
+    var _ntc = _lng === 'zh' ? '\u9996\u6b21\u52a0\u8f7d\u53ef\u80fd\u9700\u8981\u8f83\u957f\u65f6\u95f4\uff0c\u8bf7\u8010\u5fc3\u7b49\u5f85' : 'First load may take a while \u2014 please be patient';
+    var _nel = document.getElementById('boot-splash-notice');
+    if (_nel) _nel.textContent = _ntc;
+  } catch (_e) {}
   startSplashProgress();
 
   var gameCanvas = document.getElementById('GameCanvas');

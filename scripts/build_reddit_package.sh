@@ -382,10 +382,11 @@ rewrite_index_for_reddit() {
     wrap.id = 'boot-splash';
     wrap.innerHTML =
       '<div class="boot-splash__panel">' +
-      '  <div class="boot-splash__title">Tower Defense</div>' +
+      '  <div class="boot-splash__title">Granny vs Robot</div>' +
       '  <div class="boot-splash__sub">加载游戏资源中，请稍候...</div>' +
       '  <div class="boot-splash__bar"><div id="boot-splash-fill" class="boot-splash__fill"></div></div>' +
       '  <div id="boot-splash-pct" class="boot-splash__pct">0%</div>' +
+      '  <div id="boot-splash-notice" class="boot-splash__notice"></div>' +
       '</div>';
     var host = byId('GameDiv') || document.body;
     host.appendChild(wrap);
@@ -485,6 +486,14 @@ rewrite_index_for_reddit() {
   });
 
   mountSplash();
+  try {
+    var _slg = localStorage.getItem('kingshit.lang');
+    var _blg = (navigator.language || '').toLowerCase();
+    var _lng = (_slg === 'zh' || _slg === 'en') ? _slg : (_blg.indexOf('zh') === 0 ? 'zh' : 'en');
+    var _ntc = _lng === 'zh' ? '\u9996\u6b21\u52a0\u8f7d\u53ef\u80fd\u9700\u8981\u8f83\u957f\u65f6\u95f4\uff0c\u8bf7\u8010\u5fc3\u7b49\u5f85' : 'First load may take a while \u2014 please be patient';
+    var _nel = document.getElementById('boot-splash-notice');
+    if (_nel) _nel.textContent = _ntc;
+  } catch (_e) {}
   startSplashProgress();
 
   var gameCanvas = document.getElementById('GameCanvas');
@@ -578,6 +587,14 @@ EOF
   margin-bottom: 14px;
   font-size: 12px;
   color: rgba(240, 244, 255, 0.85);
+}
+
+.boot-splash__notice {
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(240, 244, 255, 0.65);
+  text-align: center;
+  min-height: 16px;
 }
 
 .boot-splash__retry {
@@ -751,7 +768,7 @@ ORIENTEOF
   # assets/resources/native/43/43df4bfb-9353-4896-bd99-3c6cda36e111.webp
 
   # Inject splash markup inside GameDiv so it follows forced-landscape transform on mobile webviews.
-  perl -0pi -e 's#(<div\s+id="GameDiv"[^>]*>)#$1\n  <div id="boot-splash">\n    <div class="boot-splash__panel">\n      <div class="boot-splash__title">Tower Defense</div>\n      <div class="boot-splash__sub">Loading game assets...</div>\n      <div class="boot-splash__bar"><div id="boot-splash-fill" class="boot-splash__fill"></div></div>\n      <div id="boot-splash-pct" class="boot-splash__pct">0%</div>\n      <button id="boot-splash-retry" class="boot-splash__retry">Reload</button>\n    </div>\n  </div>#i' "$index_file"
+  perl -0pi -e 's#(<div\s+id="GameDiv"[^>]*>)#$1\n  <div id="boot-splash">\n    <div class="boot-splash__panel">\n      <div class="boot-splash__title">Granny vs Robot</div>\n      <div class="boot-splash__sub">Loading game assets...</div>\n      <div class="boot-splash__bar"><div id="boot-splash-fill" class="boot-splash__fill"></div></div>\n      <div id="boot-splash-pct" class="boot-splash__pct">0%</div>\n      <div id="boot-splash-notice" class="boot-splash__notice"></div>\n      <button id="boot-splash-retry" class="boot-splash__retry">Reload</button>\n    </div>\n  </div>#i' "$index_file"
 
   # Replace the Cocos inline boot script with an external boot.js reference.
   perl -0pi -e 's#<script>\s*System\.import\(\s*["\047]\./index\.js["\047]\s*\).*?</script>#<script src="boot.js" charset="utf-8"></script>#gs' "$index_file"
