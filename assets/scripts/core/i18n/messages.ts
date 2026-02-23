@@ -35,8 +35,8 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'weapon.flamethrower.description': '喷射烈焰覆盖前方扇形区域，造成持续范围伤害',
         'weapon.cannon.name': '激光加农炮',
         'weapon.cannon.description': '发射高能光束，对直线上敌人造成毁灭性打击',
-        'weapon.glitch_wave.name': '信号干扰器',
-        'weapon.glitch_wave.description': '释放强力干扰波，大幅减速周围敌人',
+        'weapon.glitch_wave.name': '电锯风暴',
+        'weapon.glitch_wave.description': '发动持续旋风斩击，对周围所有敌人造成范围伤害并大幅减速',
 
         'buff.card.blue_attack.name': '锋刃磨砺',
         'buff.card.blue_speed.name': '迅捷之风',
@@ -203,9 +203,9 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
             'Spews flames over a wide cone, dealing continuous area damage.',
         'weapon.cannon.name': 'Laser Cannon',
         'weapon.cannon.description': 'Fires a high-energy beam that obliterates enemies in a line.',
-        'weapon.glitch_wave.name': 'Signal Jammer',
+        'weapon.glitch_wave.name': 'Chainsaw Storm',
         'weapon.glitch_wave.description':
-            'Emits a powerful jamming wave that significantly slows nearby enemies.',
+            'Unleashes a continuous whirlwind that deals area damage and heavily slows all nearby enemies.',
 
         'buff.card.blue_attack.name': 'Edge Honing',
         'buff.card.blue_speed.name': 'Swift Wind',

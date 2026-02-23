@@ -58,6 +58,12 @@ export class Hero extends Unit {
     private _customWeaponTimer: number = 0;
     /** 上一帧 dt（供持续型武器使用） */
     private _lastDt: number = 0;
+    /** 电锯风暴自旋累积角度（度） */
+    private _spinYAngle: number = 0;
+    /** 上一帧是否处于自旋状态（用于首帧初始化） */
+    private _wasSpinning: boolean = false;
+    /** 上一帧激活的武器类型，用于检测切换并停止旧 behavior */
+    private _prevWeaponType: string | null = null;
 
     /** 基础属性快照（用于成长计算） */
     private _baseStats = {
@@ -77,10 +83,11 @@ export class Hero extends Unit {
 
     // --- Hit Feedback Component ---
     private _hitFeedback: HitFeedback | null = null;
-    
+
     public onDespawn(): void {
         this.unschedule(this.tickRespawnCountdown);
         this.unschedule(this.finishRespawn);
+        this._stopCurrentWeapon();
         WeaponSFXManager.stopAllLoops(this.node);
         this._respawning = false;
         this._respawnRemainingSeconds = 0;
@@ -262,7 +269,7 @@ export class Hero extends Unit {
                 }
             }
         }
-        
+
         if (this._hitFeedback) {
             this._hitFeedback.playHitFeedback();
         }
@@ -302,6 +309,15 @@ export class Hero extends Unit {
         // 只要有目标 + 武器就绪，无论移动还是静止都开火
         // 持续型武器每帧触发，离散型武器按冷却间隔
         const manager = HeroWeaponManager.instance;
+        // 武器切换检测：停止旧 behavior 的持续特效，防止残留
+        const curWeaponType = manager.activeWeapon?.type ?? null;
+        if (curWeaponType !== this._prevWeaponType) {
+            if (this._prevWeaponType) {
+                const oldBehavior = WeaponBehaviorFactory.get(this._prevWeaponType as any);
+                oldBehavior?.stopFire?.();
+            }
+            this._prevWeaponType = curWeaponType;
+        }
         if (manager.activeWeapon) {
             const behavior = WeaponBehaviorFactory.get(manager.activeWeapon.type);
             const shouldFire =
@@ -455,6 +471,24 @@ export class Hero extends Unit {
     }
 
     private applyFacingDirection(): void {
+        const manager = HeroWeaponManager.instance;
+        const behavior = manager.activeWeapon
+            ? WeaponBehaviorFactory.get(manager.activeWeapon.type)
+            : null;
+        const spinDps = behavior?.heroSpinDegreesPerSec ?? 0;
+
+        if (spinDps > 0 && this._target) {
+            if (!this._wasSpinning) {
+                // 首帧：从当前朝向角度起旋，避免跳变
+                this._spinYAngle = this.node.eulerAngles.y;
+                this._wasSpinning = true;
+            }
+            this._spinYAngle += spinDps * this._lastDt;
+            this.node.setRotationFromEuler(0, this._spinYAngle, 0);
+            return;
+        }
+
+        this._wasSpinning = false;
         if (!this._hasFacingDir) return;
         const pos = this.node.position;
         const lookAt = Hero._tmpLookAt;

@@ -1,4 +1,4 @@
-import { Node, Vec3 } from 'cc';
+import { Node } from 'cc';
 import { WeaponType, WeaponLevelStats } from './WeaponTypes';
 
 /**
@@ -37,5 +37,13 @@ export abstract class WeaponBehavior {
     /** 是否为持续型武器（每帧调用 fire 而非按冷却间隔） */
     public get isContinuous(): boolean {
         return false;
+    }
+
+    /**
+     * 英雄旋转速度（度/秒）。非零时 Hero 会在攻击期间持续自旋而非朝向目标。
+     * 默认 0（不旋转），持续型武器可覆盖。
+     */
+    public get heroSpinDegreesPerSec(): number {
+        return 0;
     }
 }
