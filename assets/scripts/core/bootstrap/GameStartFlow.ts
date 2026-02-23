@@ -9,6 +9,14 @@ import { HomePage } from '../../ui/home/HomePage';
 import { HUDManager } from '../../ui/HUDManager';
 import { LoadingScreen } from '../../ui/LoadingScreen';
 import { GameResourceLoader } from './GameResourceLoader';
+import { GameSaveManager } from '../managers/GameSaveManager';
+import type { GameSaveDataV2 } from '../managers/GameSaveManager';
+import { HeroLevelSystem } from '../../gameplay/units/HeroLevelSystem';
+import { HeroWeaponManager } from '../../gameplay/weapons/HeroWeaponManager';
+import { AirdropService } from '../../gameplay/airdrop/AirdropService';
+import { BuffCardService } from '../../gameplay/roguelike/BuffCardService';
+import { BuildingManager } from '../../gameplay/buildings/BuildingManager';
+import { Base } from '../../gameplay/buildings/Base';
 
 export type StartContext = {
     mapGenerator: MapGenerator | null;
@@ -21,6 +29,7 @@ export type StartContext = {
     };
     onSpawned?: (base: Node, hero: Node) => void;
     showHomePage?: boolean;
+    saveData?: GameSaveDataV2 | null;
 };
 
 /**
@@ -51,7 +60,15 @@ export class GameStartFlow {
 
         homePage.setOnStartRequested(() => {
             homeNode.destroy();
-            this._showLoadingScreen(ctx);
+            const freshCtx = { ...ctx, saveData: null };
+            this._showLoadingScreen(freshCtx);
+        });
+
+        homePage.setOnContinueRequested(() => {
+            const saveData = GameSaveManager.instance.load();
+            homeNode.destroy();
+            const continueCtx = { ...ctx, saveData };
+            this._showLoadingScreen(continueCtx);
         });
     }
 
@@ -69,6 +86,11 @@ export class GameStartFlow {
                 // The 3D scene renders behind the loading screen, uploading GPU textures.
                 this.startGame(ctx);
                 this.gameManager.startGame();
+                // Restore coins/score AFTER gameManager.startGame() which resets them to INITIAL_COINS.
+                if (ctx.saveData) {
+                    this.gameManager.setCoins(ctx.saveData.coins);
+                    this.gameManager.setScore(ctx.saveData.score);
+                }
                 // GPU warmup: wait 0.5 s (~30 frames) for textures to upload before revealing scene.
                 if (screen.isValid) {
                     screen.scheduleOnce(() => {
@@ -80,6 +102,10 @@ export class GameStartFlow {
                 // On any load error still enter game
                 this.startGame(ctx);
                 this.gameManager.startGame();
+                if (ctx.saveData) {
+                    this.gameManager.setCoins(ctx.saveData.coins);
+                    this.gameManager.setScore(ctx.saveData.score);
+                }
                 if (screen.isValid) screen.signalReadyToClose();
             });
     }
@@ -96,7 +122,47 @@ export class GameStartFlow {
         const spawned = SpawnBootstrap.spawn(ctx.containers);
         ctx.onSpawned?.(spawned.base, spawned.hero);
 
-        SpawnBootstrap.startWaves(ctx.waveLoop, GameConfig.WAVE.FIRST_WAVE_DELAY);
+        const startingWave = ctx.saveData?.waveNumber ?? 1;
+        SpawnBootstrap.startWaves(ctx.waveLoop, GameConfig.WAVE.FIRST_WAVE_DELAY, startingWave);
+
+        if (ctx.saveData) {
+            this.applyPostStartRestore(ctx.saveData, spawned.base, spawned.hero);
+        }
+    }
+
+    private static applyPostStartRestore(save: GameSaveDataV2, base: Node, _hero: Node): void {
+        // NOTE: coins/score are intentionally NOT set here — gameManager.startGame() resets them
+        // to INITIAL_COINS after this method runs. They are applied in _showLoadingScreen instead.
+
+        // Suppress the unconditional GAME_START weapon offer — player already has weapons.
+        AirdropService.instance.suppressInitialOffer();
+
+        HeroLevelSystem.instance.restoreState(save.heroLevel, save.heroXp);
+
+        if (save.weapons && save.weapons.length > 0) {
+            HeroWeaponManager.instance.restoreInventory(save.weapons, save.activeWeaponType);
+        }
+
+        if (save.buildings && save.buildings.length > 0) {
+            BuildingManager.instance.restoreFromSave(save.buildings);
+        }
+
+        const baseComp = base.getComponent(Base);
+        if (baseComp && typeof save.baseHpRatio === 'number') {
+            baseComp.currentHp = Math.max(1, Math.floor(save.baseHpRatio * baseComp.maxHp));
+        }
+
+        if (save.buffCardIds && save.buffCardIds.length > 0) {
+            BuffCardService.instance.restorePickedHistory(save.buffCardIds);
+        }
+
+        if (typeof save.nextOfferWave === 'number' && save.nextOfferWave > 1) {
+            AirdropService.instance.setNextOfferWave(save.nextOfferWave);
+        }
+
+        console.log(
+            `[GameStartFlow] Restored save: wave=${save.waveNumber}, coins=${save.coins}, heroLv=${save.heroLevel}, buildings=${save.buildings?.length ?? 0}`
+        );
     }
 
     private static get gameManager(): GameManager {

@@ -26,6 +26,7 @@ import { LocalizationComp } from '../LocalizationComp';
 import { UIResponsive } from '../UIResponsive';
 import { RedditBridge, type RedditBridgeCallback } from '../../core/reddit/RedditBridge';
 import { LeaderboardPanel } from './LeaderboardPanel';
+import { GameSaveManager } from '../../core/managers/GameSaveManager';
 
 const { ccclass } = _decorator;
 
@@ -44,7 +45,9 @@ export class HomePage extends Component {
     private _subscribeBtn: Node | null = null;
     private _leaderboardPanel: LeaderboardPanel | null = null;
     private _bridgeListener: ((e: RedditBridgeCallback) => void) | null = null;
+    private _continueBtn: Node | null = null;
     private _onStartRequested: (() => void) | null = null;
+    private _onContinueRequested: (() => void) | null = null;
 
     public onLoad() {
         this._uiLayer = this.node.parent?.layer ?? Layers.Enum.UI_2D;
@@ -162,6 +165,33 @@ export class HomePage extends Component {
         this._contentNode.addChild(this._startBtn);
         this._contentNode.addChild(this._leaderboardBtn);
         this._contentNode.addChild(this._subscribeBtn);
+
+        if (GameSaveManager.instance.hasSave()) {
+            this._continueBtn = this.createGameButton(
+                'ContinueButton',
+                'ui.home.continue',
+                0,
+                0,
+                () => this.onContinueClick()
+            );
+            const bg = this._continueBtn.getComponent(Graphics);
+            if (bg) {
+                const tf = this._continueBtn.getComponent(UITransform)!;
+                const w = tf.contentSize.width;
+                const h = tf.contentSize.height;
+                const r = Math.max(12, Math.round(h * 0.22));
+                bg.clear();
+                bg.fillColor = new Color(72, 192, 96, 255);
+                bg.roundRect(-w / 2, -h / 2, w, h, r);
+                bg.fill();
+                bg.strokeColor = new Color(255, 255, 255, 200);
+                bg.lineWidth = Math.max(2, Math.round(h * 0.05));
+                bg.roundRect(-w / 2, -h / 2, w, h, r);
+                bg.stroke();
+            }
+            this._contentNode.addChild(this._continueBtn);
+        }
+
         this.updateContentLayout();
     }
 
@@ -343,8 +373,13 @@ export class HomePage extends Component {
         const buttonH = Math.round(UIResponsive.clamp(shortSide * 0.12, 72, 108));
         const gap = Math.round(UIResponsive.clamp(shortSide * 0.045, 24, 42));
         const step = buttonH + gap;
-        const centerY = 0;
+        const hasContinue = !!this._continueBtn;
+        const centerY = hasContinue ? -step * 0.5 : 0;
 
+        if (hasContinue) {
+            this.layoutButton(this._continueBtn, buttonW, buttonH, centerY + step * 2);
+            this.redrawContinueButton(this._continueBtn, buttonW, buttonH);
+        }
         this.layoutButton(this._startBtn, buttonW, buttonH, centerY + step);
         this.layoutButton(this._leaderboardBtn, buttonW, buttonH, centerY);
         this.layoutButton(this._subscribeBtn, buttonW, buttonH, centerY - step);
@@ -353,20 +388,38 @@ export class HomePage extends Component {
         const subtitleFontSize = Math.round(UIResponsive.clamp(shortSide * 0.034, 20, 30));
         const titleW = Math.round(Math.min(size.width - 40, 600));
 
+        const titleYOffset = hasContinue ? step * 3.3 : step * 2.6;
+        const subtitleYOffset = hasContinue ? step * 2.8 : step * 2.1;
+
         this.layoutTextNode(
             this._titleNode,
             titleW,
             titleFontSize + 16,
-            centerY + step * 2.6,
+            centerY + titleYOffset,
             titleFontSize
         );
         this.layoutTextNode(
             this._subtitleNode,
             titleW,
             subtitleFontSize + 12,
-            centerY + step * 2.1,
+            centerY + subtitleYOffset,
             subtitleFontSize
         );
+    }
+
+    private redrawContinueButton(btnNode: Node | null, width: number, height: number): void {
+        if (!btnNode) return;
+        const bg = btnNode.getComponent(Graphics);
+        if (!bg) return;
+        const r = Math.max(12, Math.round(height * 0.22));
+        bg.clear();
+        bg.fillColor = new Color(72, 192, 96, 255);
+        bg.roundRect(-width / 2, -height / 2, width, height, r);
+        bg.fill();
+        bg.strokeColor = new Color(255, 255, 255, 200);
+        bg.lineWidth = Math.max(2, Math.round(height * 0.05));
+        bg.roundRect(-width / 2, -height / 2, width, height, r);
+        bg.stroke();
     }
 
     private layoutButton(btnNode: Node | null, width: number, height: number, y: number) {
@@ -404,6 +457,10 @@ export class HomePage extends Component {
         }
         if (this._subscribeBtn) {
             const comp = this._subscribeBtn.getChildByName('Label')?.getComponent(LocalizationComp);
+            comp?.refresh();
+        }
+        if (this._continueBtn) {
+            const comp = this._continueBtn.getChildByName('Label')?.getComponent(LocalizationComp);
             comp?.refresh();
         }
     }
@@ -458,6 +515,10 @@ export class HomePage extends Component {
 
     public setOnStartRequested(cb: () => void): void {
         this._onStartRequested = cb;
+    }
+
+    public setOnContinueRequested(cb: () => void): void {
+        this._onContinueRequested = cb;
     }
 
     private createTextNode(
@@ -536,6 +597,12 @@ export class HomePage extends Component {
         } else {
             GameManager.instance.startGame();
             this.node.destroy();
+        }
+    }
+
+    private onContinueClick() {
+        if (this._onContinueRequested) {
+            this._onContinueRequested();
         }
     }
 

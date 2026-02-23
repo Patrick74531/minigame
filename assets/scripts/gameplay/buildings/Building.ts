@@ -339,6 +339,28 @@ export class Building extends BaseComponent implements IAttackable {
         }
     }
 
+    /**
+     * 从存档恢复等级（静默应用属性倍增，不发事件不自动恢血）
+     */
+    public restoreToLevel(targetLevel: number): void {
+        const safeLevel = Math.max(1, Math.floor(targetLevel));
+        for (let l = this.level + 1; l <= safeLevel; l++) {
+            this.level = l;
+            this.applyLevelScale();
+            this.maxHp = Math.floor(this.maxHp * this.statMultiplier);
+            if (this.spawnInterval > 0 && this.buildingType === BuildingType.BARRACKS) {
+                this.spawnInterval = this.spawnInterval * this.spawnIntervalMultiplier;
+            }
+            if (this.maxUnitsPerLevel > 0) {
+                this.maxUnits += this.maxUnitsPerLevel;
+            }
+            if (this.buildingType === BuildingType.FARM && this.incomeInterval > 0) {
+                this.incomeInterval = this.incomeInterval / this.incomeMultiplier;
+            }
+        }
+        if (this._healthBar) this._healthBar.updateHealth(this.currentHp, this.maxHp);
+    }
+
     public restoreToFullHealth(): void {
         this.currentHp = this.maxHp;
         if (this._healthBar) {

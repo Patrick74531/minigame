@@ -70,6 +70,16 @@ export class BuffCardService extends Singleton<BuffCardService>() {
         this._pickedHistory = [];
     }
 
+    /**
+     * 从存档恢复履历（幂等：清空历史然后顺序重放卡牌增益。关闭 UI 展示。）
+     */
+    public restorePickedHistory(cardIds: string[]): void {
+        this._pickedHistory = [];
+        for (const id of cardIds) {
+            this.applyCard(id);
+        }
+    }
+
     // === 卡牌抽取 ===
 
     /**

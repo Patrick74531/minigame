@@ -24,6 +24,12 @@ import { CoinFactory } from './gameplay/economy/CoinFactory';
 import { SystemReset } from './core/bootstrap/SystemReset';
 import { applyCanvasOnDisableSafetyPatch } from './core/engine/CanvasSafetyPatch';
 import { AudioSettingsManager } from './core/managers/AudioSettingsManager';
+import { GameSaveManager } from './core/managers/GameSaveManager';
+import { Base } from './gameplay/buildings/Base';
+import { BuildingManager } from './gameplay/buildings/BuildingManager';
+import { AirdropService } from './gameplay/airdrop/AirdropService';
+import { BuffCardService } from './gameplay/roguelike/BuffCardService';
+import { HeroWeaponManager } from './gameplay/weapons/HeroWeaponManager';
 
 const { ccclass, property } = _decorator;
 
@@ -53,6 +59,9 @@ export class GameController extends Component {
 
     private _pausedByVisibility: boolean = false;
     private _visibilityHandler: (() => void) | null = null;
+
+    // === 自动存档 ===
+    private _autosaveIntervalId: ReturnType<typeof setInterval> | null = null;
 
     // === 实体 ===
     private _hero: Node | null = null;
@@ -131,6 +140,10 @@ export class GameController extends Component {
                 const gm = this._services.gameManager;
                 director.pause();
                 if (gm.isPlaying) {
+                    // Snapshot BEFORE pauseGame() — pauseGame changes state to PAUSED,
+                    // which makes isPlaying false and collectSnapshot returns null.
+                    const snap = this.collectSnapshot();
+                    if (snap) GameSaveManager.instance.saveImmediate(snap);
                     gm.pauseGame();
                     this._pausedByVisibility = true;
                 }
@@ -146,6 +159,12 @@ export class GameController extends Component {
     }
 
     protected onDestroy(): void {
+        if (this._autosaveIntervalId !== null) {
+            clearInterval(this._autosaveIntervalId);
+            this._autosaveIntervalId = null;
+        }
+        this.evtMgr.off(GameEvents.GAME_START, this.onGameStart, this);
+        this.evtMgr.off(GameEvents.GAME_OVER, this.onGameOverClearSave, this);
         // 1. Cleanup all services (unregister events, stop timers, etc.)
         this._services.gameManager.cleanup();
         this._services.waveManager.cleanup();
@@ -175,6 +194,9 @@ export class GameController extends Component {
     }
 
     protected start(): void {
+        this.evtMgr.on(GameEvents.GAME_START, this.onGameStart, this);
+        this.evtMgr.on(GameEvents.GAME_OVER, this.onGameOverClearSave, this);
+
         const ctx: StartContext = {
             mapGenerator: this._mapGenerator,
             waveLoop: this._waveLoop,
@@ -214,9 +236,79 @@ export class GameController extends Component {
         this._joystick = ui.joystick;
     }
 
+    // === 自动存档 ===
+
+    private onGameStart(): void {
+        if (this._autosaveIntervalId !== null) clearInterval(this._autosaveIntervalId);
+        this._autosaveIntervalId = setInterval(() => {
+            const snap = this.collectSnapshot();
+            if (snap) GameSaveManager.instance.save(snap);
+        }, 10_000);
+    }
+
+    private onGameOverClearSave(): void {
+        if (this._autosaveIntervalId !== null) {
+            clearInterval(this._autosaveIntervalId);
+            this._autosaveIntervalId = null;
+        }
+        GameSaveManager.instance.clear();
+    }
+
+    private collectSnapshot(): import('./core/managers/GameSaveManager').GameSaveDataV2 | null {
+        const gm = this._services.gameManager;
+        if (!gm.isPlaying) return null;
+
+        // During inter-wave countdown, currentWave is the completed wave (N).
+        // Save nextWaveNumber (N+1) so restore starts at the correct wave.
+        let waveNumber = this._services.waveManager.currentWave;
+        if (this._waveLoop?.isPendingNextWave && this._waveLoop.nextWaveNumber > waveNumber) {
+            waveNumber = this._waveLoop.nextWaveNumber;
+        }
+        if (!waveNumber || waveNumber < 1) return null;
+
+        const base = this._buildingContainer?.children.find(n => n.getComponent(Base));
+        const baseComp = base ? base.getComponent(Base) : null;
+        const baseHpRatio = baseComp
+            ? Math.max(0, baseComp.currentHp / Math.max(1, baseComp.maxHp))
+            : 1;
+
+        const heroLevel = HeroLevelSystem.instance.level;
+        const heroXp = HeroLevelSystem.instance.currentXp;
+
+        const weaponMgr = HeroWeaponManager.instance;
+        const weapons = Array.from(weaponMgr.inventory.values()).map(w => ({
+            type: w.type as string,
+            level: w.level,
+        }));
+        const activeWeaponType = weaponMgr.activeWeaponType as string | null;
+
+        const buildings = BuildingManager.instance.getSnapshot();
+
+        const buffIds = BuffCardService.instance.pickedHistory.map(c => c.id);
+
+        const nextOfferWave = AirdropService.instance.nextOfferWave;
+
+        return {
+            version: 2,
+            savedAt: Date.now(),
+            waveNumber,
+            baseHpRatio,
+            coins: gm.coins,
+            score: gm.score,
+            heroLevel,
+            heroXp,
+            weapons,
+            activeWeaponType,
+            buildings,
+            buffCardIds: buffIds,
+            nextOfferWave,
+        };
+    }
+
     // === 升级 VFX ===
 
-    private onHeroLevelUp(data: { level: number; heroNode: Node }): void {
+    private onHeroLevelUp(data: { level: number; heroNode: Node; quiet?: boolean }): void {
+        if (data.quiet) return;
         if (this._uiCanvas) {
             LevelUpVFX.play(this._uiCanvas, data.heroNode, data.level);
         }

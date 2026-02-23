@@ -75,6 +75,28 @@ export class HeroLevelSystem {
     }
 
     /**
+     * 从存档恢复等级和经验（静默升级，不触发升级特效）
+     */
+    public restoreState(level: number, xp: number): void {
+        const maxLevel = GameConfig.HERO_LEVEL.MAX_LEVEL ?? 50;
+        const targetLevel = Math.max(1, Math.min(Math.floor(level), maxLevel));
+        this._currentXp = Math.max(0, Math.floor(xp));
+        this._level = 1;
+        this.buildXpTable();
+        for (let l = 2; l <= targetLevel; l++) {
+            this._level = l;
+            if (this._heroNode) {
+                this.eventManager.emit(GameEvents.HERO_LEVEL_UP, {
+                    level: l,
+                    heroNode: this._heroNode,
+                    quiet: true,
+                });
+            }
+        }
+        this._level = targetLevel;
+    }
+
+    /**
      * 手动增加经验（供外部调用，如任务奖励）
      */
     public addXp(amount: number): void {

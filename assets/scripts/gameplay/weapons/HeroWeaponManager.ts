@@ -132,6 +132,32 @@ export class HeroWeaponManager extends Singleton<HeroWeaponManager>() {
         return Object.keys(GameConfig.WEAPON_SYSTEM.WEAPONS) as WeaponType[];
     }
 
+    /**
+     * 从存档恢复武器背包（幂等：先清空再重建，不发 WEAPON_INVENTORY_CHANGED 事件）
+     */
+    public restoreInventory(
+        weapons: { type: string; level: number }[],
+        activeType: string | null
+    ): void {
+        this._inventory.clear();
+        this._activeWeaponType = null;
+        for (const w of weapons) {
+            const type = w.type as WeaponType;
+            this._inventory.set(type, { type, level: Math.max(1, Math.floor(w.level)) });
+            if (!this._activeWeaponType) this._activeWeaponType = type;
+        }
+        if (activeType && this._inventory.has(activeType as WeaponType)) {
+            this._activeWeaponType = activeType as WeaponType;
+        }
+        this.eventManager.emit(GameEvents.WEAPON_INVENTORY_CHANGED, {
+            weaponId: this._activeWeaponType ?? '',
+            level: this._activeWeaponType
+                ? (this._inventory.get(this._activeWeaponType)?.level ?? 1)
+                : 1,
+            isNew: false,
+        });
+    }
+
     /** 随机抽取 N 把不重复武器 */
     public drawWeapons(count: number): WeaponType[] {
         const allIds = this.getAllWeaponIds();

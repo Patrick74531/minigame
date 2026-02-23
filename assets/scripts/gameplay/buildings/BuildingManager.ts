@@ -1,4 +1,5 @@
 import { _decorator, Node, Vec3, tween } from 'cc';
+import type { BuildingPadSaveState } from '../../core/managers/GameSaveManager';
 import { BuildingPad, BuildingPadState } from './BuildingPad';
 import { BuildingFactory } from './BuildingFactory';
 import { Building, BuildingType } from './Building';
@@ -497,6 +498,81 @@ export class BuildingManager {
         );
         if (towerPads.length <= 0) return true;
         return towerPads.every(pad => pad.state === BuildingPadState.UPGRADING);
+    }
+
+    // ── 存档快照 ─────────────────────────────────────────────────
+
+    /**
+     * 收集所有已建建筑的存档状态（用于快照保存）
+     */
+    public getSnapshot(): BuildingPadSaveState[] {
+        const states: BuildingPadSaveState[] = [];
+        for (const pad of this._pads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            const building = pad.getAssociatedBuilding();
+            if (!building) continue;
+            const padIndex = this._padNodeToIndex.get(pad.node.uuid);
+            if (padIndex === undefined) continue;
+            states.push({
+                padIndex,
+                buildingTypeId: building.buildingTypeId,
+                level: building.level,
+                hpRatio: Math.max(0, building.currentHp / Math.max(1, building.maxHp)),
+                nextUpgradeCost: pad.nextUpgradeCost,
+            });
+        }
+        return states;
+    }
+
+    /**
+     * 从存档恢复所有建筑（在 SpawnBootstrap.spawnPads 之后调用）
+     */
+    public restoreFromSave(states: BuildingPadSaveState[]): void {
+        if (!states || states.length === 0) return;
+
+        const indexToPad = new Map<number, BuildingPad>();
+        for (const pad of this._pads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            const idx = this._padNodeToIndex.get(pad.node.uuid);
+            if (idx !== undefined) indexToPad.set(idx, pad);
+        }
+
+        for (const state of states) {
+            const pad = indexToPad.get(state.padIndex);
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            if (pad.getAssociatedBuilding()) continue;
+
+            const pos = pad.node.worldPosition;
+            const angle = pad.node.eulerAngles.y;
+
+            const buildingNode = BuildingFactory.createBuilding(
+                this._buildingContainer!,
+                pos.x,
+                pos.z,
+                state.buildingTypeId,
+                this._unitContainer ?? undefined,
+                angle
+            );
+            if (!buildingNode) continue;
+
+            const building = buildingNode.getComponent(Building);
+            if (!building) {
+                buildingNode.destroy();
+                continue;
+            }
+
+            if (state.level > 1) building.restoreToLevel(state.level);
+            building.currentHp = Math.max(1, Math.floor(state.hpRatio * building.maxHp));
+
+            this._activeBuildings.push(building);
+            pad.initForExistingBuilding(building, state.nextUpgradeCost);
+            pad.placeUpgradeZoneInFront(buildingNode, true);
+            pad.node.active = false;
+
+            this.tryUnlockPadsAfterTriggerBuild(pad.node);
+        }
+
+        this.refreshUpgradePadVisibilityGate();
     }
 
     private get eventManager(): EventManager {

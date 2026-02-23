@@ -32,22 +32,38 @@ export class WaveLoop extends Component {
     private _awaitLaneUnlockBeforeCountdown: boolean = false;
     private _laneUnlockResolvedForCountdown: boolean = false;
 
-    public initialize(wave: WaveRuntime, game: GameManager, firstWaveDelay: number = 2): void {
+    /** True while counting down between waves (current wave complete, next not started). */
+    public get isPendingNextWave(): boolean {
+        return this._pendingNextWave;
+    }
+
+    /** The wave number that will start after the countdown. Valid when isPendingNextWave=true. */
+    public get nextWaveNumber(): number {
+        return this._nextWaveNumber;
+    }
+
+    public initialize(
+        wave: WaveRuntime,
+        game: GameManager,
+        firstWaveDelay: number = 2,
+        startingWave: number = 1
+    ): void {
         this._wave = wave;
         this._game = game;
         this._active = true;
         this._pendingNextWave = false;
         this._countdownTimer = 0;
         this._lastCountdownSeconds = -1;
-        this._nextWaveNumber = 1;
+        this._nextWaveNumber = Math.max(1, Math.floor(startingWave));
         this._awaitLaneUnlockBeforeCountdown = false;
         this._laneUnlockResolvedForCountdown = false;
 
         this.eventManager.on(GameEvents.LANE_UNLOCK_IMMINENT, this.onLaneUnlockImminent, this);
         this.eventManager.on(GameEvents.LANE_UNLOCKED, this.onLaneUnlocked, this);
 
+        const safeStart = Math.max(1, Math.floor(startingWave));
         this.scheduleOnce(() => {
-            this._wave?.startWave(1);
+            this._wave?.startWave(safeStart);
         }, firstWaveDelay);
     }
 

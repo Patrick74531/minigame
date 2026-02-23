@@ -23,9 +23,24 @@ export class AirdropService extends Singleton<AirdropService>() {
     private _waveCounter: number = 0;
     /** 下一次按波次触发空投的目标波次 */
     private _nextOfferWave: number = 1 + AirdropService.WAVES_BETWEEN_OFFERS;
+    /** 从存档恢复时设为 true，跳过 GAME_START 的初始空投 */
+    private _suppressNextGameStartOffer: boolean = false;
 
     public get pendingWeapons(): WeaponType[] {
         return this._pendingWeapons;
+    }
+
+    public get nextOfferWave(): number {
+        return this._nextOfferWave;
+    }
+
+    public setNextOfferWave(wave: number): void {
+        this._nextOfferWave = Math.max(1, Math.floor(wave));
+    }
+
+    /** 从存档恢复时调用，阻止 GAME_START 触发的初始武器选择 */
+    public suppressInitialOffer(): void {
+        this._suppressNextGameStartOffer = true;
     }
 
     // === 生命周期 ===
@@ -46,11 +61,16 @@ export class AirdropService extends Singleton<AirdropService>() {
         this._pendingWeapons = [];
         this._waveCounter = 0;
         this._nextOfferWave = 1 + AirdropService.WAVES_BETWEEN_OFFERS;
+        this._suppressNextGameStartOffer = false;
     }
 
     // === 事件处理 ===
 
     private onGameStart(): void {
+        if (this._suppressNextGameStartOffer) {
+            this._suppressNextGameStartOffer = false;
+            return;
+        }
         // 开局立即给一次武器选择
         this.spawnAirdrop();
     }
