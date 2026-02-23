@@ -134,6 +134,7 @@ export class Building extends BaseComponent implements IAttackable {
     /** 建筑基础节点缩放（用于按等级线性插值缩放） */
     private _baseNodeScale: Vec3 | null = null;
     private static readonly BUILDING_SCALE_INITIAL = 0.8;
+    private static readonly TOWER_SCALE_INITIAL = 0.4;
     private static readonly BUILDING_SCALE_MAX = 1.2;
     private static readonly BUILDING_SCALE_LEVELS_TO_MAX = 10;
 
@@ -317,6 +318,7 @@ export class Building extends BaseComponent implements IAttackable {
             if (typeChanged) {
                 this.setupPhysics();
                 this.updateHealthBarOffset();
+                this.applyLevelScale();
             }
             this.updateHealthBarName();
         }
@@ -405,14 +407,15 @@ export class Building extends BaseComponent implements IAttackable {
 
     private applyLevelScale(): void {
         if (!this._baseNodeScale) return;
+        const isTower =
+            this.buildingType === BuildingType.TOWER ||
+            this.buildingType === BuildingType.FROST_TOWER ||
+            this.buildingType === BuildingType.LIGHTNING_TOWER;
+        const initial = isTower ? Building.TOWER_SCALE_INITIAL : Building.BUILDING_SCALE_INITIAL;
         const n = Math.max(0, this.level - 1);
         const stepPerLevel =
-            (Building.BUILDING_SCALE_MAX - Building.BUILDING_SCALE_INITIAL) /
-            Building.BUILDING_SCALE_LEVELS_TO_MAX;
-        const factor = Math.min(
-            Building.BUILDING_SCALE_MAX,
-            Building.BUILDING_SCALE_INITIAL + n * stepPerLevel
-        );
+            (Building.BUILDING_SCALE_MAX - initial) / Building.BUILDING_SCALE_LEVELS_TO_MAX;
+        const factor = Math.min(Building.BUILDING_SCALE_MAX, initial + n * stepPerLevel);
         this.node.setScale(
             this._baseNodeScale.x * factor,
             this._baseNodeScale.y * factor,

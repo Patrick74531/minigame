@@ -1,0 +1,194 @@
+{
+  "ver": "2.3.14",
+  "importer": "fbx",
+  "imported": true,
+  "uuid": "24ab98a7-67e2-4df5-aede-14234593f0b1",
+  "files": [],
+  "subMetas": {
+    "21987": {
+      "importer": "gltf-mesh",
+      "uuid": "24ab98a7-67e2-4df5-aede-14234593f0b1@21987",
+      "displayName": "",
+      "id": "21987",
+      "name": "penjian1.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 12
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "02bd5": {
+      "importer": "gltf-mesh",
+      "uuid": "24ab98a7-67e2-4df5-aede-14234593f0b1@02bd5",
+      "displayName": "",
+      "id": "02bd5",
+      "name": "penjian2.mesh",
+      "userData": {
+        "gltfIndex": 1,
+        "triangleCount": 4
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "79a55": {
+      "importer": "gltf-mesh",
+      "uuid": "24ab98a7-67e2-4df5-aede-14234593f0b1@79a55",
+      "displayName": "",
+      "id": "79a55",
+      "name": "chongjibo_blue.mesh",
+      "userData": {
+        "gltfIndex": 2,
+        "triangleCount": 32
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "f22db": {
+      "importer": "gltf-mesh",
+      "uuid": "24ab98a7-67e2-4df5-aede-14234593f0b1@f22db",
+      "displayName": "",
+      "id": "f22db",
+      "name": "chongjibo_white.mesh",
+      "userData": {
+        "gltfIndex": 3,
+        "triangleCount": 32
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "cce44": {
+      "importer": "gltf-mesh",
+      "uuid": "24ab98a7-67e2-4df5-aede-14234593f0b1@cce44",
+      "displayName": "",
+      "id": "cce44",
+      "name": "daoguang_red.mesh",
+      "userData": {
+        "gltfIndex": 4,
+        "triangleCount": 26
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "c9654": {
+      "importer": "gltf-mesh",
+      "uuid": "24ab98a7-67e2-4df5-aede-14234593f0b1@c9654",
+      "displayName": "",
+      "id": "c9654",
+      "name": "daoguang_red001.mesh",
+      "userData": {
+        "gltfIndex": 5,
+        "triangleCount": 22
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "db4d2": {
+      "importer": "gltf-material",
+      "uuid": "24ab98a7-67e2-4df5-aede-14234593f0b1@db4d2",
+      "displayName": "",
+      "id": "db4d2",
+      "name": "02 - Default.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "0fad7": {
+      "importer": "gltf-scene",
+      "uuid": "24ab98a7-67e2-4df5-aede-14234593f0b1@0fad7",
+      "displayName": "",
+      "id": "0fad7",
+      "name": "skill_zadi.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [],
+    "assetFinder": {
+      "meshes": [
+        "24ab98a7-67e2-4df5-aede-14234593f0b1@21987",
+        "24ab98a7-67e2-4df5-aede-14234593f0b1@02bd5",
+        "24ab98a7-67e2-4df5-aede-14234593f0b1@79a55",
+        "24ab98a7-67e2-4df5-aede-14234593f0b1@f22db",
+        "24ab98a7-67e2-4df5-aede-14234593f0b1@cce44",
+        "24ab98a7-67e2-4df5-aede-14234593f0b1@c9654"
+      ],
+      "skeletons": [],
+      "textures": [],
+      "materials": [
+        "24ab98a7-67e2-4df5-aede-14234593f0b1@db4d2"
+      ],
+      "scenes": [
+        "24ab98a7-67e2-4df5-aede-14234593f0b1@0fad7"
+      ]
+    },
+    "useVertexColors": true,
+    "legacyFbxImporter": true,
+    "fbx": {
+      "smartMaterialEnabled": false,
+      "matchMeshNames": false
+    },
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    }
+  }
+}

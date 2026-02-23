@@ -1,0 +1,117 @@
+{
+  "ver": "2.3.14",
+  "importer": "fbx",
+  "imported": true,
+  "uuid": "8059c68b-fade-4f3d-855b-e80c26435bc3",
+  "files": [],
+  "subMetas": {
+    "e868e": {
+      "importer": "gltf-mesh",
+      "uuid": "8059c68b-fade-4f3d-855b-e80c26435bc3@e868e",
+      "displayName": "",
+      "id": "e868e",
+      "name": "daoguang_01.mesh",
+      "userData": {
+        "gltfIndex": 0,
+        "triangleCount": 32
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "0fa43": {
+      "importer": "gltf-mesh",
+      "uuid": "8059c68b-fade-4f3d-855b-e80c26435bc3@0fa43",
+      "displayName": "",
+      "id": "0fa43",
+      "name": "daoguang_02.mesh",
+      "userData": {
+        "gltfIndex": 1,
+        "triangleCount": 32
+      },
+      "ver": "1.1.1",
+      "imported": true,
+      "files": [
+        ".bin",
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "db4d2": {
+      "importer": "gltf-material",
+      "uuid": "8059c68b-fade-4f3d-855b-e80c26435bc3@db4d2",
+      "displayName": "",
+      "id": "db4d2",
+      "name": "02 - Default.material",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "89d48": {
+      "importer": "gltf-scene",
+      "uuid": "8059c68b-fade-4f3d-855b-e80c26435bc3@89d48",
+      "displayName": "",
+      "id": "89d48",
+      "name": "daoguang.prefab",
+      "userData": {
+        "gltfIndex": 0
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "imageMetas": [],
+    "assetFinder": {
+      "meshes": [
+        "8059c68b-fade-4f3d-855b-e80c26435bc3@e868e",
+        "8059c68b-fade-4f3d-855b-e80c26435bc3@0fa43"
+      ],
+      "skeletons": [],
+      "textures": [],
+      "materials": [
+        "8059c68b-fade-4f3d-855b-e80c26435bc3@db4d2"
+      ],
+      "scenes": [
+        "8059c68b-fade-4f3d-855b-e80c26435bc3@89d48"
+      ]
+    },
+    "legacyFbxImporter": true,
+    "fbx": {
+      "smartMaterialEnabled": false,
+      "matchMeshNames": false
+    },
+    "lods": {
+      "enable": false,
+      "hasBuiltinLOD": false,
+      "options": [
+        {
+          "screenRatio": 0.25,
+          "faceCount": 1
+        },
+        {
+          "screenRatio": 0.125,
+          "faceCount": 0.25
+        },
+        {
+          "screenRatio": 0.01,
+          "faceCount": 0.1
+        }
+      ]
+    }
+  }
+}

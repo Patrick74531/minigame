@@ -1,6 +1,6 @@
 import { FrostExplosionEffect } from '../modules/FrostExplosionEffect';
 import { GooseExplosionEffect } from '../modules/GooseExplosionEffect';
-import { GlitchInterferenceEffect } from '../modules/GlitchInterferenceEffect';
+import { WhirlwindSlashEffect } from '../modules/WhirlwindSlashEffect';
 import { LightningBoltEffect } from '../modules/LightningBoltEffect';
 import { EffectRuntime } from './EffectRuntime';
 
@@ -18,7 +18,7 @@ export function ensureEffectModulesRegistered(): void {
     );
     EffectRuntime.register(
         'glitchInterference',
-        GlitchInterferenceEffect.play.bind(GlitchInterferenceEffect)
+        WhirlwindSlashEffect.play.bind(WhirlwindSlashEffect)
     );
     EffectRuntime.register('lightningBolt', LightningBoltEffect.play.bind(LightningBoltEffect));
 }

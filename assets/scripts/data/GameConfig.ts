@@ -462,7 +462,7 @@ export const GameConfig = {
                 iconPath: 'icon/gannon',
                 levels: [
                     {
-                        damage: 34,
+                        damage: 60,
                         attackInterval: 1.2,
                         range: 6.9,
                         projectileSpeed: 18,
@@ -470,7 +470,7 @@ export const GameConfig = {
                         spinSpeed: 15,
                     },
                     {
-                        damage: 51,
+                        damage: 92,
                         attackInterval: 1.1,
                         range: 7.2,
                         projectileSpeed: 19,
@@ -478,7 +478,7 @@ export const GameConfig = {
                         spinSpeed: 18,
                     },
                     {
-                        damage: 70,
+                        damage: 130,
                         attackInterval: 1.0,
                         range: 7.5,
                         projectileSpeed: 20,
@@ -486,7 +486,7 @@ export const GameConfig = {
                         spinSpeed: 20,
                     },
                     {
-                        damage: 94,
+                        damage: 176,
                         attackInterval: 0.9,
                         range: 7.8,
                         projectileSpeed: 21,
@@ -494,7 +494,7 @@ export const GameConfig = {
                         spinSpeed: 22,
                     },
                     {
-                        damage: 121,
+                        damage: 240,
                         attackInterval: 0.8,
                         range: 8.1,
                         projectileSpeed: 22,
@@ -511,7 +511,7 @@ export const GameConfig = {
                 iconPath: 'icon/signal',
                 levels: [
                     {
-                        damage: 14,
+                        damage: 80,
                         attackInterval: 2.0,
                         range: 5.4,
                         waveSpeed: 8,
@@ -520,7 +520,7 @@ export const GameConfig = {
                         slowDuration: 1.6,
                     },
                     {
-                        damage: 22,
+                        damage: 118,
                         attackInterval: 1.8,
                         range: 5.9,
                         waveSpeed: 9,
@@ -529,7 +529,7 @@ export const GameConfig = {
                         slowDuration: 1.9,
                     },
                     {
-                        damage: 31,
+                        damage: 160,
                         attackInterval: 1.6,
                         range: 6.4,
                         waveSpeed: 10,
@@ -538,7 +538,7 @@ export const GameConfig = {
                         slowDuration: 2.2,
                     },
                     {
-                        damage: 41,
+                        damage: 204,
                         attackInterval: 1.4,
                         range: 6.9,
                         waveSpeed: 11,
@@ -547,7 +547,7 @@ export const GameConfig = {
                         slowDuration: 2.5,
                     },
                     {
-                        damage: 53,
+                        damage: 250,
                         attackInterval: 1.2,
                         range: 7.4,
                         waveSpeed: 12,
