@@ -7,38 +7,31 @@
             content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
         />
         <title>Tower Defense</title>
+        <link rel="preload" href="launch-poster.webp" as="image" fetchpriority="high" />
+        <link rel="preload" href="launch-preview.mp4" as="video" type="video/mp4" />
         <link rel="stylesheet" href="preview.css" />
     </head>
     <body>
-        <div class="root">
-            <div class="sun-glow"></div>
-            <div class="cloud cloud-a"></div>
-            <div class="cloud cloud-b"></div>
-            <div class="meadow-back"></div>
-            <div class="meadow-front"></div>
+        <div class="root" id="launch-root">
+            <video
+                class="bg-video"
+                id="bg-video"
+                autoplay
+                muted
+                loop
+                playsinline
+                preload="auto"
+                poster="launch-poster.webp"
+                aria-hidden="true"
+            >
+                <source src="launch-preview.mp4" type="video/mp4" />
+            </video>
+            <div class="bg-fallback" aria-hidden="true"></div>
 
-            <div class="content" id="launch-root">
-                <div class="status-row">
-                    <span class="tag">COUNTRYSIDE DEFENSE</span>
-                    <span class="live-pill"><span class="live-dot"></span>HARVEST SEASON</span>
-                </div>
-                <h1 class="title">🏰 Granny vs Robot</h1>
-                <p class="desc">Build towers · Hire soldiers · Survive infinite waves</p>
-
-                <div class="char-row" aria-label="Tap to start game">
-                    <div class="char-slot char-slot-left">
-                        <img class="char-img char-left" src="granny.webp" alt="Granny" />
-                    </div>
-                    <button class="play-btn" id="play-btn" type="button">
-                        <span class="play-icon">▶</span>
-                        <span class="play-label">Play Now</span>
-                        <span class="play-sub">Tap To Launch</span>
-                    </button>
-                    <div class="char-slot char-slot-right">
-                        <img class="char-img char-right" src="robot.webp" alt="Robot" />
-                    </div>
-                </div>
-            </div>
+            <button class="play-btn" id="play-btn" type="button" aria-label="Play Granny vs Robot">
+                <span class="play-icon" aria-hidden="true"></span>
+                <span class="play-text">Play</span>
+            </button>
         </div>
         <script src="preview.js" charset="utf-8"></script>
     </body>

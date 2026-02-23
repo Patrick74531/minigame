@@ -82,21 +82,30 @@ if (cc.includes(TCF_ORIGINAL)) {
 // graceful fallback is used instead of crashing.
 
 // C1 – property defaults: `return Function("o",l)` → try/catch + fallback
-cc = cc.replace(
-    /return Function\("o",l\)/g,
-    'return (function(){try{return Function("o",l);}catch(_csp){' +
-        'var _lines=l.split(";\\n").filter(Boolean);' +
-        'var _pairs=_lines.map(function(_ln){' +
-        'var _m=_ln.trim().match(/^o\\[("[^"]*")\\]=(.+)$/);' +
-        'if(!_m)return null;' +
-        'var _key=JSON.parse(_m[1]),_raw=_m[2];' +
-        'var _val;try{_val=JSON.parse(_raw);}catch(e){_val=undefined;}' +
-        'return[_key,_val];' +
-        '}).filter(Boolean);' +
-        'return function(o){_pairs.forEach(function(p){o[p[0]]=p[1];});};' +
-        '}})()'
-);
-console.log('[patch-csp]   ✓ Patched property-defaults Function("o",l)');
+const C1_MARK = '/*__CSP_C1__*/';
+if (cc.includes(C1_MARK)) {
+    console.log('[patch-csp]   ~ C1 already patched (skipping)');
+} else if (/return Function\("o",l\)/.test(cc)) {
+    cc = cc.replace(
+        /return Function\("o",l\)/g,
+        'return (function(){' +
+            C1_MARK +
+            'try{return Function("o",l);}catch(_csp){' +
+            'var _lines=l.split(";\\n").filter(Boolean);' +
+            'var _pairs=_lines.map(function(_ln){' +
+            'var _m=_ln.trim().match(/^o\\[("[^"]*")\\]=(.+)$/);' +
+            'if(!_m)return null;' +
+            'var _key=JSON.parse(_m[1]),_raw=_m[2];' +
+            'var _val;try{_val=JSON.parse(_raw);}catch(e){_val=undefined;}' +
+            'return[_key,_val];' +
+            '}).filter(Boolean);' +
+            'return function(o){_pairs.forEach(function(p){o[p[0]]=p[1];});};' +
+            '}})()'
+    );
+    console.log('[patch-csp]   ✓ Patched property-defaults Function("o",l)');
+} else {
+    console.warn('[patch-csp]   ~ C1 pattern not found (skipping)');
+}
 
 // C2 – serialiser builder: Function("s","o","d","k", ...)
 // Call signature: n(this=deserializer, targetObj, srcData, classSchema)
@@ -152,13 +161,22 @@ const C2_REFLECT_FN =
     'if(d._id!==undefined&&o._id!==undefined)o._id=d._id;' +
     '}catch(_e){}}';
 
-cc = cc.replace(
-    /Function\("s","o","d","k",r\.join\(""\)\)/g,
-    '(function(){try{return Function("s","o","d","k",r.join(""));}catch(_csp){return ' +
-        C2_REFLECT_FN +
-        ';}})()'
-);
-console.log('[patch-csp]   ✓ Patched serialiser Function("s","o","d","k",...)');
+const C2_MARK = '/*__CSP_C2__*/';
+if (cc.includes(C2_MARK)) {
+    console.log('[patch-csp]   ~ C2 already patched (skipping)');
+} else if (/Function\("s","o","d","k",r\.join\(""\)\)/.test(cc)) {
+    cc = cc.replace(
+        /Function\("s","o","d","k",r\.join\(""\)\)/g,
+        '(function(){' +
+            C2_MARK +
+            'try{return Function("s","o","d","k",r.join(""));}catch(_csp){return ' +
+            C2_REFLECT_FN +
+            ';}})()'
+    );
+    console.log('[patch-csp]   ✓ Patched serialiser Function("s","o","d","k",...)');
+} else {
+    console.warn('[patch-csp]   ~ C2 pattern not found (skipping)');
+}
 
 // C2-upgrade: if the file already has the OLD reflect fallback (skips __id__ refs),
 // replace it with the NEW one that resolves them via s._deserializeAndAssignField.
@@ -254,19 +272,37 @@ if (cc.includes('_af=true')) {
 }
 
 // C3 – instantiation builder: Function("O","F",n)(this.objs,this.funcs)
-cc = cc.replace(
-    /Function\("O","F",n\)\(this\.objs,this\.funcs\)/g,
-    '(function(){try{return Function("O","F",n)(this.objs,this.funcs);}catch(_csp){console.warn("[CSP] instantiation JIT skipped");return null;}}).call(this)'
-);
-console.log('[patch-csp]   ✓ Patched instantiation Function("O","F",n)');
+const C3_MARK = '/*__CSP_C3__*/';
+if (cc.includes(C3_MARK)) {
+    console.log('[patch-csp]   ~ C3 already patched (skipping)');
+} else if (/Function\("O","F",n\)\(this\.objs,this\.funcs\)/.test(cc)) {
+    cc = cc.replace(
+        /Function\("O","F",n\)\(this\.objs,this\.funcs\)/g,
+        '(function(){' +
+            C3_MARK +
+            'try{return Function("O","F",n)(this.objs,this.funcs);}catch(_csp){console.warn("[CSP] instantiation JIT skipped");return null;}}).call(this)'
+    );
+    console.log('[patch-csp]   ✓ Patched instantiation Function("O","F",n)');
+} else {
+    console.warn('[patch-csp]   ~ C3 pattern not found (skipping)');
+}
 
 // C4 – funcModule cache: Function("return "+i)() – already has try/catch,
 //       just ensure it's wrapped if not
-cc = cc.replace(
-    /(?<!try\{if\(r=t===)Function\("return "\+i\)\(\)/g,
-    '(function(){try{return Function("return "+i)();}catch(_csp){return undefined;}})()'
-);
-console.log('[patch-csp]   ✓ Patched funcModule Function("return "+i)');
+const C4_MARK = '/*__CSP_C4__*/';
+if (cc.includes(C4_MARK)) {
+    console.log('[patch-csp]   ~ C4 already patched (skipping)');
+} else if (/Function\("return "\+i\)\(\)/.test(cc)) {
+    cc = cc.replace(
+        /Function\("return "\+i\)\(\)/g,
+        '(function(){' +
+            C4_MARK +
+            'try{return Function("return "+i)();}catch(_csp){return undefined;}})()'
+    );
+    console.log('[patch-csp]   ✓ Patched funcModule Function("return "+i)');
+} else {
+    console.warn('[patch-csp]   ~ C4 pattern not found (skipping)');
+}
 
 // ── Patch E: compileCreateFunction – fall back to data._instantiate() when JIT fails ──
 // After Patch C3, new EE(t,e).result is null on CSP, so this._createFunction stays null
@@ -451,12 +487,21 @@ console.log('[patch-csp] Saved', ccPath);
 const sysPath = path.join(WEBROOT, 'src', 'system.bundle.js');
 let sys = fs.readFileSync(sysPath, 'utf8');
 
-sys = sys.replace(
-    '(0,eval)(e)',
-    '(function(){try{return(0,eval)(e);}catch(_csp){console.warn("[CSP] system.bundle eval blocked");}})()'
-);
-fs.writeFileSync(sysPath, sys, 'utf8');
-console.log('[patch-csp] Saved', sysPath);
+const SYS_MARK = '/*__CSP_SYS_EVAL__*/';
+if (sys.includes(SYS_MARK)) {
+    console.log('[patch-csp]   ~ system.bundle eval guard already patched (skipping)');
+} else if (sys.includes('(0,eval)(e)')) {
+    sys = sys.replace(
+        '(0,eval)(e)',
+        '(function(){' +
+            SYS_MARK +
+            'try{return(0,eval)(e);}catch(_csp){console.warn("[CSP] system.bundle eval blocked");}})()'
+    );
+    fs.writeFileSync(sysPath, sys, 'utf8');
+    console.log('[patch-csp] Saved', sysPath);
+} else {
+    console.warn('[patch-csp]   ~ system.bundle eval pattern not found (skipping)');
+}
 
 // ─── 2b. Patch src/polyfills.bundle.js ───────────────────────────────────────
 // Regenerator-runtime's fallback for setting regeneratorRuntime as a global uses
@@ -1583,14 +1628,18 @@ console.log('[patch-csp] All patches applied successfully.');
     console.log('[patch-csp]   ✓ Copied preview.html + preview.css into webroot');
 
     var PROJECT_ROOT = path.resolve(DEVVIT_DIR, '..');
-    var previewAssets = ['granny.webp', 'robot.webp'];
-    previewAssets.forEach(function (fname) {
-        var src = path.join(PROJECT_ROOT, 'assets', 'resources', 'preview', fname);
+    var previewAssets = [
+        path.join(PROJECT_ROOT, 'assets', 'resources', 'preview', 'granny.webp'),
+        path.join(PROJECT_ROOT, 'assets', 'resources', 'preview', 'robot.webp'),
+        path.join(clientDir, 'launch-preview.mp4'),
+        path.join(clientDir, 'launch-poster.webp'),
+    ];
+    previewAssets.forEach(function (src) {
         if (fs.existsSync(src)) {
-            fs.copyFileSync(src, path.join(WEBROOT, fname));
+            fs.copyFileSync(src, path.join(WEBROOT, path.basename(src)));
         }
     });
-    console.log('[patch-csp]   ✓ Copied character preview images into webroot');
+    console.log('[patch-csp]   ✓ Copied preview media assets into webroot');
 
     var esbuildBin = path.join(DEVVIT_DIR, 'node_modules', 'esbuild', 'bin', 'esbuild');
     if (!fs.existsSync(esbuildBin)) {
