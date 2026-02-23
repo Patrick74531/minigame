@@ -22,6 +22,7 @@ export interface GameSaveDataV2 {
     waveNumber: number;
     baseHpRatio: number;
     coins: number;
+    heroCoinCount: number;
     score: number;
     heroLevel: number;
     heroXp: number;
@@ -116,6 +117,10 @@ export class GameSaveManager {
             const v2 = parsed as GameSaveDataV2;
             if (v2.version !== SAVE_VERSION) return null;
             if (!v2.waveNumber || v2.waveNumber < 1) return null;
+            if (!Number.isFinite(v2.heroCoinCount)) {
+                // Backward-compatible default for earlier V2 saves.
+                v2.heroCoinCount = Math.max(0, Math.floor(v2.coins ?? 0));
+            }
             return v2;
         } catch {
             return null;
@@ -153,6 +158,7 @@ export class GameSaveManager {
             waveNumber: v1.waveNumber,
             baseHpRatio: v1.baseHpRatio,
             coins: v1.coins,
+            heroCoinCount: Math.max(0, Math.floor(v1.coins)),
             score: v1.score,
             heroLevel: v1.heroLevel,
             heroXp: v1.heroXp,

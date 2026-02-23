@@ -16,6 +16,7 @@ import { GameManager } from '../../core/managers/GameManager';
 import { CombatService } from '../../core/managers/CombatService';
 import { GameConfig } from '../../data/GameConfig';
 import { Coin } from '../economy/Coin';
+import { CoinFactory } from '../economy/CoinFactory';
 import { HUDManager } from '../../ui/HUDManager';
 import { RangedWeapon } from '../combat/weapons/RangedWeapon';
 import { CharacterMover } from '../../core/physics/CharacterMover';
@@ -245,6 +246,39 @@ export class Hero extends Unit {
 
     public get coinCount(): number {
         return this._stackVisualizer ? this._stackVisualizer.count : 0;
+    }
+
+    /**
+     * 从存档恢复英雄手持金币（用于建造消耗）。
+     */
+    public restoreCoinCount(targetCount: number): void {
+        const safeCount = Math.max(0, Math.floor(targetCount));
+
+        if (!this._stackVisualizer) {
+            this.hudManager.updateCoinDisplay(0);
+            return;
+        }
+
+        // Clear existing carried coins first to avoid duplication on repeated restore calls.
+        while (this._stackVisualizer.count > 0) {
+            const existing = this._stackVisualizer.popFromStack();
+            if (existing && existing.isValid) {
+                existing.destroy();
+            }
+        }
+
+        const parent = this.node.parent ?? this.node;
+        const p = this.node.position;
+        for (let i = 0; i < safeCount; i++) {
+            const coinNode = CoinFactory.createCoin(parent, p.x, p.z, 1);
+            const coinComp = coinNode.getComponent(Coin);
+            if (coinComp) {
+                coinComp.onPickup();
+            }
+            this.addCoin(coinNode);
+        }
+
+        this.hudManager.updateCoinDisplay(this.coinCount);
     }
 
     // === Hit Feedback ===

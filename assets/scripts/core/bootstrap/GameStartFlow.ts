@@ -17,6 +17,7 @@ import { AirdropService } from '../../gameplay/airdrop/AirdropService';
 import { BuffCardService } from '../../gameplay/roguelike/BuffCardService';
 import { BuildingManager } from '../../gameplay/buildings/BuildingManager';
 import { Base } from '../../gameplay/buildings/Base';
+import { Hero } from '../../gameplay/units/Hero';
 
 export type StartContext = {
     mapGenerator: MapGenerator | null;
@@ -130,7 +131,7 @@ export class GameStartFlow {
         }
     }
 
-    private static applyPostStartRestore(save: GameSaveDataV2, base: Node, _hero: Node): void {
+    private static applyPostStartRestore(save: GameSaveDataV2, base: Node, hero: Node): void {
         // NOTE: coins/score are intentionally NOT set here — gameManager.startGame() resets them
         // to INITIAL_COINS after this method runs. They are applied in _showLoadingScreen instead.
 
@@ -160,8 +161,13 @@ export class GameStartFlow {
             AirdropService.instance.setNextOfferWave(save.nextOfferWave);
         }
 
+        const heroComp = hero.getComponent(Hero);
+        if (heroComp) {
+            heroComp.restoreCoinCount(save.heroCoinCount);
+        }
+
         console.log(
-            `[GameStartFlow] Restored save: wave=${save.waveNumber}, coins=${save.coins}, heroLv=${save.heroLevel}, buildings=${save.buildings?.length ?? 0}`
+            `[GameStartFlow] Restored save: wave=${save.waveNumber}, gmCoins=${save.coins}, heroCoins=${save.heroCoinCount}, heroLv=${save.heroLevel}, buildings=${save.buildings?.length ?? 0}`
         );
     }
 

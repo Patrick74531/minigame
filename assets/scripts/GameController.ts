@@ -30,6 +30,8 @@ import { BuildingManager } from './gameplay/buildings/BuildingManager';
 import { AirdropService } from './gameplay/airdrop/AirdropService';
 import { BuffCardService } from './gameplay/roguelike/BuffCardService';
 import { HeroWeaponManager } from './gameplay/weapons/HeroWeaponManager';
+import { Hero } from './gameplay/units/Hero';
+import { GameState } from './core/managers/GameManager';
 
 const { ccclass, property } = _decorator;
 
@@ -138,12 +140,12 @@ export class GameController extends Component {
         this._visibilityHandler = () => {
             if (document.hidden) {
                 const gm = this._services.gameManager;
-                director.pause();
-                if (gm.isPlaying) {
-                    // Snapshot BEFORE pauseGame() — pauseGame changes state to PAUSED,
-                    // which makes isPlaying false and collectSnapshot returns null.
+                if (gm.isPlaying || gm.gameState === GameState.PAUSED) {
                     const snap = this.collectSnapshot();
                     if (snap) GameSaveManager.instance.saveImmediate(snap);
+                }
+                director.pause();
+                if (gm.isPlaying) {
                     gm.pauseGame();
                     this._pausedByVisibility = true;
                 }
@@ -256,7 +258,7 @@ export class GameController extends Component {
 
     private collectSnapshot(): import('./core/managers/GameSaveManager').GameSaveDataV2 | null {
         const gm = this._services.gameManager;
-        if (!gm.isPlaying) return null;
+        if (!gm.isPlaying && gm.gameState !== GameState.PAUSED) return null;
 
         // During inter-wave countdown, currentWave is the completed wave (N).
         // Save nextWaveNumber (N+1) so restore starts at the correct wave.
@@ -274,6 +276,9 @@ export class GameController extends Component {
 
         const heroLevel = HeroLevelSystem.instance.level;
         const heroXp = HeroLevelSystem.instance.currentXp;
+        const heroNode = this._hero && this._hero.isValid ? this._hero : gm.hero;
+        const heroComp = heroNode?.getComponent(Hero) ?? null;
+        const heroCoinCount = heroComp ? heroComp.coinCount : 0;
 
         const weaponMgr = HeroWeaponManager.instance;
         const weapons = Array.from(weaponMgr.inventory.values()).map(w => ({
@@ -294,6 +299,7 @@ export class GameController extends Component {
             waveNumber,
             baseHpRatio,
             coins: gm.coins,
+            heroCoinCount,
             score: gm.score,
             heroLevel,
             heroXp,
