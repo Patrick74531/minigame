@@ -223,37 +223,37 @@ export const GameConfig = {
                 id: 'blue_attack',
                 nameKey: 'buff.card.blue_attack.name',
                 rarity: 'blue',
-                effects: { attack: { multiply: 1.1 } },
+                effects: { attack: { multiply: 1.08 } },
             },
             {
                 id: 'blue_speed',
                 nameKey: 'buff.card.blue_speed.name',
                 rarity: 'blue',
-                effects: { moveSpeed: { multiply: 1.08 } },
+                effects: { moveSpeed: { multiply: 1.06 } },
             },
             {
                 id: 'blue_range',
                 nameKey: 'buff.card.blue_range.name',
                 rarity: 'blue',
-                effects: { attackRange: { add: 0.15 } },
+                effects: { attackRange: { multiply: 1.06 } },
             },
             {
                 id: 'blue_rapid',
                 nameKey: 'buff.card.blue_rapid.name',
                 rarity: 'blue',
-                effects: { attackInterval: { multiply: 0.95 } },
+                effects: { attackInterval: { multiply: 0.96 } },
             },
             {
                 id: 'blue_crit_chance',
                 nameKey: 'buff.card.blue_crit_chance.name',
                 rarity: 'blue',
-                effects: { critRate: { add: 0.05 } },
+                effects: { critRate: { add: 0.04 } },
             },
             {
                 id: 'blue_crit_power',
                 nameKey: 'buff.card.blue_crit_power.name',
                 rarity: 'blue',
-                effects: { critDamage: { add: 0.2 } },
+                effects: { critDamage: { add: 0.15 } },
             },
 
             // ========== 紫色卡牌 (Purple) — 2~3 词条，数值适中 ==========
@@ -262,8 +262,8 @@ export const GameConfig = {
                 nameKey: 'buff.card.purple_warrior.name',
                 rarity: 'purple',
                 effects: {
-                    attack: { multiply: 1.15 },
-                    critRate: { add: 0.05 },
+                    attack: { multiply: 1.1 },
+                    critRate: { add: 0.04 },
                 },
             },
             {
@@ -271,8 +271,8 @@ export const GameConfig = {
                 nameKey: 'buff.card.purple_hunter.name',
                 rarity: 'purple',
                 effects: {
-                    moveSpeed: { multiply: 1.12 },
-                    attackInterval: { multiply: 0.92 },
+                    moveSpeed: { multiply: 1.08 },
+                    attackInterval: { multiply: 0.94 },
                 },
             },
             {
@@ -280,8 +280,8 @@ export const GameConfig = {
                 nameKey: 'buff.card.purple_assassin.name',
                 rarity: 'purple',
                 effects: {
-                    critRate: { add: 0.08 },
-                    critDamage: { add: 0.3 },
+                    critRate: { add: 0.06 },
+                    critDamage: { add: 0.2 },
                 },
             },
             {
@@ -289,8 +289,8 @@ export const GameConfig = {
                 nameKey: 'buff.card.purple_sniper.name',
                 rarity: 'purple',
                 effects: {
-                    attackRange: { add: 0.25 },
-                    attack: { multiply: 1.1 },
+                    attackRange: { multiply: 1.08 },
+                    attack: { multiply: 1.08 },
                 },
             },
             {
@@ -298,8 +298,8 @@ export const GameConfig = {
                 nameKey: 'buff.card.purple_training.name',
                 rarity: 'purple',
                 effects: {
-                    attack: { multiply: 1.08 },
-                    moveSpeed: { multiply: 1.05 },
+                    attack: { multiply: 1.06 },
+                    moveSpeed: { multiply: 1.04 },
                     critRate: { add: 0.03 },
                 },
             },
@@ -310,9 +310,9 @@ export const GameConfig = {
                 nameKey: 'buff.card.gold_wargod.name',
                 rarity: 'gold',
                 effects: {
-                    attack: { multiply: 1.25 },
-                    attackInterval: { multiply: 0.9 },
-                    attackRange: { add: 0.2 },
+                    attack: { multiply: 1.15 },
+                    attackInterval: { multiply: 0.93 },
+                    attackRange: { multiply: 1.06 },
                 },
             },
             {
@@ -320,9 +320,9 @@ export const GameConfig = {
                 nameKey: 'buff.card.gold_deathblow.name',
                 rarity: 'gold',
                 effects: {
-                    critRate: { add: 0.12 },
-                    critDamage: { add: 0.5 },
-                    attack: { multiply: 1.1 },
+                    critRate: { add: 0.08 },
+                    critDamage: { add: 0.3 },
+                    attack: { multiply: 1.08 },
                 },
             },
             {
@@ -330,10 +330,10 @@ export const GameConfig = {
                 nameKey: 'buff.card.gold_berserker.name',
                 rarity: 'gold',
                 effects: {
-                    attack: { multiply: 1.2 },
-                    attackInterval: { multiply: 0.92 },
-                    moveSpeed: { multiply: 1.08 },
-                    critRate: { add: 0.05 },
+                    attack: { multiply: 1.12 },
+                    attackInterval: { multiply: 0.94 },
+                    moveSpeed: { multiply: 1.06 },
+                    critRate: { add: 0.04 },
                 },
             },
             {
@@ -341,12 +341,12 @@ export const GameConfig = {
                 nameKey: 'buff.card.gold_perfection.name',
                 rarity: 'gold',
                 effects: {
-                    attack: { multiply: 1.12 },
-                    attackInterval: { multiply: 0.95 },
-                    moveSpeed: { multiply: 1.06 },
-                    attackRange: { add: 0.1 },
-                    critRate: { add: 0.06 },
-                    critDamage: { add: 0.25 },
+                    attack: { multiply: 1.08 },
+                    attackInterval: { multiply: 0.96 },
+                    moveSpeed: { multiply: 1.04 },
+                    attackRange: { multiply: 1.04 },
+                    critRate: { add: 0.05 },
+                    critDamage: { add: 0.15 },
                 },
             },
         ],

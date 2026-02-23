@@ -260,6 +260,8 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
             statsText += `HP: ${statsConfig.stats.hp}\n`;
             if (statsConfig.stats.attackDamage)
                 statsText += `DMG: ${statsConfig.stats.attackDamage}\n`;
+            if (statsConfig.stats.attackRange)
+                statsText += `RANGE: ${Math.round(statsConfig.stats.attackRange)}\n`;
             // if (statsConfig.stats.attackInterval) statsText += `SPD: ${statsConfig.stats.attackInterval}s\n`;
         }
 

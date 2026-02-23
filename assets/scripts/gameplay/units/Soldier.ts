@@ -36,8 +36,8 @@ export class Soldier extends Unit {
     private static readonly EXPLOSION_TRIGGER_DISTANCE = 0.95;
     private static readonly CHARGE_TRIGGER_DISTANCE = 3.2;
     private static readonly CHARGE_SPEED_MULTIPLIER = 1.85;
-    private static readonly EXPLOSION_DAMAGE_MULTIPLIER = 2.7;
-    private static readonly EXPLOSION_TOWER_DAMAGE_FACTOR = 4.0;
+    private static readonly EXPLOSION_DAMAGE_MULTIPLIER = 1.5;
+    private static readonly EXPLOSION_TOWER_DAMAGE_FACTOR = 1.5;
     private static readonly EXPLOSION_RADIUS_BASE = 1.25;
     private static readonly EXPLOSION_RADIUS_FROM_ATTACK_RANGE = 1.15;
     private static readonly EXPLOSION_RADIUS_LEVEL_LINEAR = 0.44;

@@ -13,6 +13,10 @@ export const WAVE_INFINITE_CONFIG = {
     HP_MULT_PER_WAVE: BALANCE.waveInfinite.hpMultPerWave,
     BASE_ATTACK_MULT: 1,
     ATTACK_MULT_PER_WAVE: BALANCE.waveInfinite.attackMultPerWave,
+    /** 下路开放（第3刷怪口解锁）后，每波额外追加的HP增长倍率 */
+    POST_LANE3_HP_EXTRA_PER_WAVE: 0.24,
+    /** 下路开放后，每波额外追加的攻击增长倍率 */
+    POST_LANE3_ATTACK_EXTRA_PER_WAVE: 0.1,
     BASE_SPEED_MULT: 1,
     SPEED_MULT_PER_WAVE: BALANCE.waveInfinite.speedMultPerWave,
     MAX_SPEED_MULT: BALANCE.waveInfinite.maxSpeedMult,
