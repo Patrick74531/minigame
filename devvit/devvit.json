@@ -28,8 +28,8 @@
     "menu": {
         "items": [
             {
-                "label": "🏰 New Tower Defense Post",
-                "description": "Create a new Tower Defense game post",
+                "label": "🤖 New Granny vs Robot Post",
+                "description": "Create a new Granny vs Robot game post",
                 "location": "subreddit",
                 "endpoint": "/internal/menu/create-post"
             }

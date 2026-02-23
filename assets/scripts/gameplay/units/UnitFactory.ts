@@ -203,17 +203,29 @@ export class UnitFactory {
             attackType: options.attackType,
         });
 
-        // 血条（敌人使用 paper-doll，无骨骼头节点，关闭锚点探测避免浪费 CPU）
-        // 仅在受伤时显示，避免大量敌人血条堆叠
+        // 血条：boss 常驻显示在头顶，普通敌人仅受伤时显示
         const hb = node.addComponent(HealthBar);
-        hb.width = 60;
-        hb.height = 6;
-        hb.yOffset = 1.8;
-        hb.baseWorldScale = 0.015;
-        hb.autoDetectHeadAnchor = false;
-        hb.inheritOwnerScaleInWorldSpace = false;
-        hb.showOnlyWhenDamaged = true;
-        hb.damagedShowDuration = 3.0;
+        if (isBoss) {
+            hb.width = 120;
+            hb.height = 10;
+            hb.yOffset = 5.5;
+            hb.baseWorldScale = 0.02;
+            hb.autoDetectHeadAnchor = true;
+            hb.headPadding = 0.4;
+            hb.anchorProbeDuration = 30.0;
+            hb.anchorProbeInterval = 0.25;
+            hb.inheritOwnerScaleInWorldSpace = false;
+            hb.showOnlyWhenDamaged = false;
+        } else {
+            hb.width = 60;
+            hb.height = 6;
+            hb.yOffset = 1.8;
+            hb.baseWorldScale = 0.015;
+            hb.autoDetectHeadAnchor = false;
+            hb.inheritOwnerScaleInWorldSpace = false;
+            hb.showOnlyWhenDamaged = true;
+            hb.damagedShowDuration = 3.0;
+        }
 
         return node;
     }

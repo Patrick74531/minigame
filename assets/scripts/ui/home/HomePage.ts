@@ -37,6 +37,9 @@ export class HomePage extends Component {
     private _settingsModule: HUDSettingsModule | null = null;
     private _uiLayer: number = Layers.Enum.UI_2D;
 
+    private _titleNode: Node | null = null;
+    private _subtitleNode: Node | null = null;
+    private _noticeNode: Node | null = null;
     private _startBtn: Node | null = null;
     private _leaderboardBtn: Node | null = null;
     private _subscribeBtn: Node | null = null;
@@ -121,6 +124,31 @@ export class HomePage extends Component {
         contentWidget.isAlignHorizontalCenter = true;
         contentWidget.verticalCenter = 0;
         contentWidget.horizontalCenter = 0;
+
+        this._titleNode = this.createTextNode('GameTitle', 'Granny vs Robot', {
+            fontSize: 52,
+            bold: true,
+            color: new Color(255, 230, 80, 255),
+            outlineColor: new Color(40, 18, 4, 255),
+            outlineWidth: 5,
+        });
+        this._subtitleNode = this.createTextNode('GameSubtitle', 'Tower Defence', {
+            fontSize: 26,
+            bold: false,
+            color: new Color(220, 220, 220, 230),
+            outlineColor: new Color(0, 0, 0, 180),
+            outlineWidth: 3,
+        });
+        this._noticeNode = this.createLocalizedTextNode('LoadNotice', 'ui.home.first_load_notice', {
+            fontSize: 20,
+            bold: false,
+            color: new Color(200, 200, 200, 180),
+            outlineColor: new Color(0, 0, 0, 160),
+            outlineWidth: 2,
+        });
+        this._contentNode.addChild(this._titleNode);
+        this._contentNode.addChild(this._subtitleNode);
+        this._contentNode.addChild(this._noticeNode);
 
         this._startBtn = this.createGameButton('StartButton', 'ui.home.start', 0, 120, () =>
             this.onStartClick()
@@ -329,6 +357,33 @@ export class HomePage extends Component {
         this.layoutButton(this._startBtn, buttonW, buttonH, centerY + step);
         this.layoutButton(this._leaderboardBtn, buttonW, buttonH, centerY);
         this.layoutButton(this._subscribeBtn, buttonW, buttonH, centerY - step);
+
+        const titleFontSize = Math.round(UIResponsive.clamp(shortSide * 0.072, 36, 60));
+        const subtitleFontSize = Math.round(UIResponsive.clamp(shortSide * 0.034, 20, 30));
+        const noticeFontSize = Math.round(UIResponsive.clamp(shortSide * 0.026, 16, 22));
+        const titleW = Math.round(Math.min(size.width - 40, 600));
+
+        this.layoutTextNode(
+            this._titleNode,
+            titleW,
+            titleFontSize + 16,
+            centerY + step * 2.6,
+            titleFontSize
+        );
+        this.layoutTextNode(
+            this._subtitleNode,
+            titleW,
+            subtitleFontSize + 12,
+            centerY + step * 2.1,
+            subtitleFontSize
+        );
+        this.layoutTextNode(
+            this._noticeNode,
+            titleW,
+            noticeFontSize + 10,
+            centerY - step * 2.1,
+            noticeFontSize
+        );
     }
 
     private layoutButton(btnNode: Node | null, width: number, height: number, y: number) {
@@ -353,6 +408,10 @@ export class HomePage extends Component {
 
     private refreshText() {
         this._settingsModule?.onLanguageChanged();
+        const noticeComp = this._noticeNode
+            ?.getChildByName('Label')
+            ?.getComponent(LocalizationComp);
+        noticeComp?.refresh();
 
         if (this._startBtn) {
             const comp = this._startBtn.getChildByName('Label')?.getComponent(LocalizationComp);
@@ -420,6 +479,76 @@ export class HomePage extends Component {
 
     public setOnStartRequested(cb: () => void): void {
         this._onStartRequested = cb;
+    }
+
+    private createTextNode(
+        name: string,
+        text: string,
+        style: {
+            fontSize: number;
+            bold: boolean;
+            color: Color;
+            outlineColor: Color;
+            outlineWidth: number;
+        }
+    ): Node {
+        const node = new Node(name);
+        node.layer = this._uiLayer;
+        node.addComponent(UITransform).setContentSize(400, style.fontSize + 16);
+        const labelNode = new Node('Label');
+        labelNode.layer = this._uiLayer;
+        node.addChild(labelNode);
+        labelNode.addComponent(UITransform);
+        const label = labelNode.addComponent(Label);
+        label.string = text;
+        label.fontSize = style.fontSize;
+        label.isBold = style.bold;
+        label.color = style.color;
+        label.horizontalAlign = Label.HorizontalAlign.CENTER;
+        label.verticalAlign = Label.VerticalAlign.CENTER;
+        label.overflow = Label.Overflow.SHRINK;
+        applyGameLabelStyle(label, {
+            outlineWidth: style.outlineWidth,
+            outlineColor: style.outlineColor,
+        });
+        return node;
+    }
+
+    private createLocalizedTextNode(
+        name: string,
+        locKey: string,
+        style: {
+            fontSize: number;
+            bold: boolean;
+            color: Color;
+            outlineColor: Color;
+            outlineWidth: number;
+        }
+    ): Node {
+        const node = this.createTextNode(name, Localization.instance.t(locKey), style);
+        const locComp = node.getChildByName('Label')!.addComponent(LocalizationComp);
+        locComp.key = locKey;
+        return node;
+    }
+
+    private layoutTextNode(
+        node: Node | null,
+        width: number,
+        height: number,
+        y: number,
+        fontSize: number
+    ) {
+        if (!node) return;
+        node.getComponent(UITransform)?.setContentSize(width, height);
+        node.setPosition(0, y, 0);
+        const label = node.getChildByName('Label')?.getComponent(Label);
+        if (label) {
+            label.fontSize = fontSize;
+            label.lineHeight = fontSize + 6;
+            node.getChildByName('Label')
+                ?.getComponent(UITransform)
+                ?.setContentSize(width - 20, height);
+        }
     }
 
     private onStartClick() {

@@ -6,7 +6,7 @@ export const menu = new Hono();
 menu.post('/create-post', async c => {
     try {
         const post = await reddit.submitCustomPost({
-            title: '🏰 Tower Defense — How Far Can You Go?',
+            title: '🤖 Granny vs Robot — How Far Can You Go?',
         });
 
         return c.json(

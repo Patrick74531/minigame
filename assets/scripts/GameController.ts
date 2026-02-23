@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, PhysicsSystem } from 'cc';
+import { _decorator, Component, Node, PhysicsSystem, director } from 'cc';
 import { MapGenerator } from './gameplay/map/MapGenerator';
 import { WaveLoop } from './gameplay/wave/WaveLoop';
 import { Joystick } from './ui/Joystick';
@@ -48,6 +48,11 @@ export class GameController extends Component {
     private _coinContainer: Node | null = null;
     private _effectContainer: Node | null = null;
     private _uiCanvas: Node | null = null;
+
+    // === 可见性暂停 ===
+
+    private _pausedByVisibility: boolean = false;
+    private _visibilityHandler: (() => void) | null = null;
 
     // === 实体 ===
     private _base: Node | null = null;
@@ -120,6 +125,24 @@ export class GameController extends Component {
 
         // Bind ScreenShake to camera (will find camera in scene)
         ScreenShake.bind(this.node);
+
+        // 切Tab/息屏时暂停游戏，回来时自动恢复
+        this._visibilityHandler = () => {
+            if (document.hidden) {
+                director.pause();
+                if (this._services.gameManager.isPlaying) {
+                    this._services.gameManager.pauseGame();
+                    this._pausedByVisibility = true;
+                }
+            } else {
+                director.resume();
+                if (this._pausedByVisibility) {
+                    this._pausedByVisibility = false;
+                    this._services.gameManager.resumeGame();
+                }
+            }
+        };
+        document.addEventListener('visibilitychange', this._visibilityHandler);
     }
 
     protected onDestroy(): void {
@@ -144,6 +167,10 @@ export class GameController extends Component {
         ServiceRegistry.clear();
 
         // 2. Destroy ALL singleton instances so scene reload creates fresh ones.
+        if (this._visibilityHandler) {
+            document.removeEventListener('visibilitychange', this._visibilityHandler);
+            this._visibilityHandler = null;
+        }
         SystemReset.shutdown();
     }
 

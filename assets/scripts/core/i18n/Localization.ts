@@ -1,9 +1,11 @@
 import { _decorator } from 'cc';
 import { EventManager } from '../managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
-import { DEFAULT_LANGUAGE, DEFAULT_MESSAGES } from './messages';
+import { DEFAULT_MESSAGES } from './messages';
 import type { LanguageCode, LocalizationDictionary, LocalizationParams } from './types';
 const { ccclass } = _decorator;
+
+export const DEFAULT_LANGUAGE: LanguageCode = 'en';
 
 @ccclass('Localization')
 export class Localization {
@@ -30,10 +32,17 @@ export class Localization {
             this._messages.set(lang, { ...dictionary });
         }
 
-        // Load persisted language
+        // Load persisted language, else auto-detect from browser
         const savedLang = localStorage.getItem(this.STORAGE_KEY) as LanguageCode;
         if (savedLang && this._messages.has(savedLang)) {
             this._currentLang = savedLang;
+        } else {
+            const navLang = (
+                navigator.language ||
+                (navigator as unknown as { userLanguage?: string }).userLanguage ||
+                ''
+            ).toLowerCase();
+            this._currentLang = navLang.startsWith('zh') ? 'zh' : 'en';
         }
     }
 
@@ -47,7 +56,7 @@ export class Localization {
 
         this._currentLang = lang;
         localStorage.setItem(this.STORAGE_KEY, lang);
-        
+
         // Emit language changed event
         EventManager.instance.emit(GameEvents.LANGUAGE_CHANGED, { lang });
     }
