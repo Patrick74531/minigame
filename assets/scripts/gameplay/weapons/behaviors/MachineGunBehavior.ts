@@ -54,9 +54,9 @@ export class MachineGunBehavior extends WeaponBehavior {
     // 每几发弹壳抛一次（0 = 不抛）
     private static readonly CASING_INTERVAL = [0, 3, 2, 2, 1];
 
-    // 固定弱击退参数：不随等级增长
-    private static readonly KNOCKBACK_FORCE = 2.0;
-    private static readonly KNOCKBACK_STUN = 0.06;
+    // 机枪只保留轻微僵直，不产生位移击退
+    private static readonly KNOCKBACK_FORCE = 0;
+    private static readonly KNOCKBACK_STUN = 0.04;
 
     // 连射计数器（用于弹壳节奏、交替偏移等）
     private _shotCount: number = 0;
@@ -100,8 +100,8 @@ export class MachineGunBehavior extends WeaponBehavior {
         const rightOffset = 0.35;
         const muzzlePos = MachineGunBehavior._tmpMuzzle;
         muzzlePos.set(
-            spawnPos.x + dirX * 1.2 + rightX * rightOffset, 
-            spawnPos.y, 
+            spawnPos.x + dirX * 1.2 + rightX * rightOffset,
+            spawnPos.y,
             spawnPos.z + dirZ * 1.2 + rightZ * rightOffset
         );
 
@@ -123,8 +123,8 @@ export class MachineGunBehavior extends WeaponBehavior {
         if (flameNode) {
             // 将火焰移动到枪口位置 (比子弹生成点稍微靠后一点，贴近枪管，同时向右偏移)
             flameNode.setPosition(
-                spawnPos.x + dirX * 0.6 + rightX * rightOffset, 
-                spawnPos.y, 
+                spawnPos.x + dirX * 0.6 + rightX * rightOffset,
+                spawnPos.y,
                 spawnPos.z + dirZ * 0.6 + rightZ * rightOffset
             );
             WeaponVFX.pulseMuzzleFlame(flameNode, 1.0 + level * 0.1);
@@ -153,6 +153,7 @@ export class MachineGunBehavior extends WeaponBehavior {
         bullet.disablePhysics(); // 禁用 RigidBody/BoxCollider
         bullet.knockbackForce = MachineGunBehavior.KNOCKBACK_FORCE;
         bullet.knockbackStun = MachineGunBehavior.KNOCKBACK_STUN;
+        bullet.stunOnlyWhenNoKnockback = true;
         bullet.knockbackDirX = dirX;
         bullet.knockbackDirZ = dirZ;
         bullet.damage = stats.damage;

@@ -55,6 +55,8 @@ export class Bullet extends BaseComponent implements IPoolable {
     public knockbackForce: number = 0;
     /** 击退硬直时长（秒） */
     public knockbackStun: number = 0.1;
+    /** 无位移时是否仍施加僵直（默认关闭，避免影响其它武器） */
+    public stunOnlyWhenNoKnockback: boolean = false;
     /** 可选：显式击退方向（XZ），优先于速度向量 */
     public knockbackDirX: number = 0;
     public knockbackDirZ: number = 0;
@@ -129,6 +131,7 @@ export class Bullet extends BaseComponent implements IPoolable {
         this.pierce = false;
         this.knockbackForce = 0;
         this.knockbackStun = 0.1;
+        this.stunOnlyWhenNoKnockback = false;
         this.knockbackDirX = 0;
         this.knockbackDirZ = 0;
         this._hitNodes.clear();
@@ -424,7 +427,7 @@ export class Bullet extends BaseComponent implements IPoolable {
             this.applyDamage(unit);
         }
 
-        // 击退效果（boss 免疫击退与硬直）
+        // 击退/僵直（boss 免疫击退与硬直）
         const enemyComp = unit.node.getComponent(Enemy);
         const isBossUnit = enemyComp?.spawnType === 'boss';
         if (this.knockbackForce > 0 && !isBossUnit) {
@@ -454,6 +457,9 @@ export class Bullet extends BaseComponent implements IPoolable {
                     this.knockbackStun
                 );
             }
+        } else if (this.stunOnlyWhenNoKnockback && this.knockbackStun > 0 && !isBossUnit) {
+            // 机枪等武器可配置为“无位移，仅短硬直”
+            unit.applyStun(this.knockbackStun);
         }
 
         this.createHitEffect();

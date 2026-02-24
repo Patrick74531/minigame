@@ -361,15 +361,24 @@ export class BuildingManager {
 
         const healPercentPerSecond = BuildingManager.INTER_WAVE_WALL_HEAL_PERCENT_PER_SECOND;
         if (healPercentPerSecond <= 0) return;
+        const wallSet = new Map<string, Building>();
 
         for (const pad of this._pads) {
             const building = pad?.getAssociatedBuilding();
             if (!building || !building.node || !building.node.isValid) continue;
-            if (!building.isAlive) continue;
             if (building.buildingType !== BuildingType.WALL) continue;
-            if (building.currentHp >= building.maxHp) continue;
+            wallSet.set(building.node.uuid, building);
+        }
+        for (const building of this._activeBuildings) {
+            if (!building || !building.node || !building.node.isValid) continue;
+            if (building.buildingType !== BuildingType.WALL) continue;
+            wallSet.set(building.node.uuid, building);
+        }
 
-            building.heal(building.maxHp * healPercentPerSecond * dt);
+        for (const wall of wallSet.values()) {
+            if (!wall.isAlive) continue;
+            if (wall.currentHp >= wall.maxHp) continue;
+            wall.heal(wall.maxHp * healPercentPerSecond * dt);
         }
     }
 
@@ -461,6 +470,11 @@ export class BuildingManager {
             const building = pad.getAssociatedBuilding();
             if (building?.node?.isValid) {
                 building.node.active = visible;
+                if (visible && pad.state === BuildingPadState.UPGRADING) {
+                    // Mid-support prebuilt buildings are hidden until reveal;
+                    // resnap once when shown so new-game layout matches continue-game restore.
+                    pad.placeUpgradeZoneInFront(building.node, true);
+                }
             }
 
             if (

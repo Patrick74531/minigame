@@ -366,6 +366,13 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
         }
     }
 
+    /** 仅施加硬直，不产生位移（用于轻微受击停顿） */
+    public applyStun(duration: number): void {
+        if (!this.isAlive) return;
+        if (!Number.isFinite(duration) || duration <= 0) return;
+        this._stunTimer = Math.max(this._stunTimer, duration);
+    }
+
     private updateStatusEffects(dt: number): void {
         if (this._stunTimer > 0) {
             this._stunTimer -= dt;

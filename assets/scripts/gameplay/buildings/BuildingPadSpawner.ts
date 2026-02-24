@@ -191,7 +191,8 @@ export class BuildingPadSpawner {
 
             const nextUpgradeCost = this.resolveInitialUpgradeCost();
             pad.initForExistingBuilding(building, nextUpgradeCost);
-            // 所有预建建筑类型都需要将升级 pad 移到建筑前方，避免 pad 与建筑重叠
+            // Keep new-game prebuilt layout consistent with continue-game restore:
+            // all existing buildings should place their upgrade pad in front.
             pad.placeUpgradeZoneInFront(buildingNode, true);
 
             // Globally hide all upgrade pads initially for prebuilt buildings

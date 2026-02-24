@@ -205,8 +205,9 @@ export class UnitFactory {
             attackType: options.attackType,
         });
 
-        // 血条样式由 spawnType 决定（而非 modelPath），确保复用 boss 模型的普通怪使用普通血条
+        // 血条样式由 spawnType 决定（而非 modelPath），确保复用 boss 模型的普通怪不使用 boss 大血条
         const isBossHealthBar = resolvedSpawnType === 'boss';
+        const isBossModelMinion = !isBossHealthBar && modelPath.includes('boss/');
         const hb = node.addComponent(HealthBar);
         if (isBossHealthBar) {
             hb.width = 120;
@@ -219,6 +220,15 @@ export class UnitFactory {
             hb.anchorProbeInterval = 0.25;
             hb.inheritOwnerScaleInWorldSpace = false;
             hb.showOnlyWhenDamaged = false;
+        } else if (isBossModelMinion) {
+            hb.width = 58;
+            hb.height = 6;
+            hb.yOffset = 1.25;
+            hb.baseWorldScale = 0.013;
+            hb.autoDetectHeadAnchor = false;
+            hb.inheritOwnerScaleInWorldSpace = false;
+            hb.showOnlyWhenDamaged = true;
+            hb.damagedShowDuration = 3.0;
         } else {
             hb.width = 60;
             hb.height = 6;

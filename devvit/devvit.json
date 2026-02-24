@@ -6,7 +6,7 @@
         "entrypoints": {
             "default": {
                 "entry": "preview.html",
-                "height": "regular",
+                "height": "tall",
                 "inline": true
             },
             "game": {
