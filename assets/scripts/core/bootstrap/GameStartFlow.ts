@@ -19,6 +19,8 @@ import { BuildingManager } from '../../gameplay/buildings/BuildingManager';
 import { WaveManager } from '../../gameplay/wave/WaveManager';
 import { Base } from '../../gameplay/buildings/Base';
 import { Hero } from '../../gameplay/units/Hero';
+import { EventManager } from '../managers/EventManager';
+import { GameEvents } from '../../data/GameEvents';
 
 export type StartContext = {
     mapGenerator: MapGenerator | null;
@@ -155,8 +157,21 @@ export class GameStartFlow {
         }
 
         const baseComp = base.getComponent(Base);
+        if (baseComp) {
+            const targetBaseLevel = Math.max(1, Math.floor(save.baseLevel ?? 1));
+            if (targetBaseLevel > baseComp.level) {
+                baseComp.restoreToLevel(targetBaseLevel);
+            }
+            baseComp.syncUpgradePadForCurrentLevel();
+            // Replay base-upgrade side effects (hero/barracks scaling) without opening buff-card UI.
+            this.eventManager.emit(GameEvents.BASE_UPGRADE_READY, {
+                baseLevel: targetBaseLevel,
+                suppressCardDraw: true,
+            });
+        }
         if (baseComp && typeof save.baseHpRatio === 'number') {
             baseComp.currentHp = Math.max(1, Math.floor(save.baseHpRatio * baseComp.maxHp));
+            baseComp.refreshHudHp();
         }
 
         if (save.buffCardIds && save.buffCardIds.length > 0) {
@@ -173,11 +188,15 @@ export class GameStartFlow {
         }
 
         console.log(
-            `[GameStartFlow] Restored save: wave=${save.waveNumber}, gmCoins=${save.coins}, heroCoins=${save.heroCoinCount}, heroLv=${save.heroLevel}, buildings=${save.buildings?.length ?? 0}`
+            `[GameStartFlow] Restored save: wave=${save.waveNumber}, baseLv=${Math.max(1, Math.floor(save.baseLevel ?? 1))}, gmCoins=${save.coins}, heroCoins=${save.heroCoinCount}, heroLv=${save.heroLevel}, buildings=${save.buildings?.length ?? 0}`
         );
     }
 
     private static get gameManager(): GameManager {
         return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+    }
+
+    private static get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }
 }

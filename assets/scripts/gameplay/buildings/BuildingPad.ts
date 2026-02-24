@@ -11,7 +11,7 @@ import {
     resources,
     instantiate,
 } from 'cc';
-import { Building } from './Building';
+import { Building, BuildingType } from './Building';
 import { BaseComponent } from '../../core/base/BaseComponent';
 import { BuildingRegistry, BuildingTypeConfig } from './BuildingRegistry';
 import { EventManager } from '../../core/managers/EventManager';
@@ -632,8 +632,12 @@ export class BuildingPad extends BaseComponent {
             BuildingPad.UPGRADE_HEAL_STABILIZE_IMMUNITY_SECONDS
         );
 
-        // Hide building during animation
-        this._associatedBuilding.node.active = false;
+        // Wall must remain active during upgrade; disabling it breaks collision continuity and
+        // can cause combat-time HP/regen inconsistencies under heavy attacks.
+        const shouldHideDuringUpgrade = this._associatedBuilding.buildingType !== BuildingType.WALL;
+        if (shouldHideDuringUpgrade) {
+            this._associatedBuilding.node.active = false;
+        }
 
         // Play visual effect first
         this.playConstructionEffect(() => {
@@ -642,8 +646,9 @@ export class BuildingPad extends BaseComponent {
                 return;
             }
 
-            // Show building again
-            this._associatedBuilding.node.active = true;
+            if (shouldHideDuringUpgrade) {
+                this._associatedBuilding.node.active = true;
+            }
 
             // Perform Upgrade
             const upgraded = this._associatedBuilding.upgrade();
@@ -652,12 +657,10 @@ export class BuildingPad extends BaseComponent {
                 return;
             }
 
-            this._associatedBuilding.restoreToFullHealth();
-            this.scheduleOnce(() => {
-                if (!this.node || !this.node.isValid) return;
-                if (!this._associatedBuilding || !this._associatedBuilding.node?.isValid) return;
-                this._associatedBuilding.restoreToFullHealth();
-            }, 0);
+            this._associatedBuilding.grantDamageImmunity(
+                BuildingPad.UPGRADE_HEAL_STABILIZE_IMMUNITY_SECONDS
+            );
+            this.forceUpgradeHealthBarResync();
 
             // Use unified curve, fallback to legacy multipliers.
             const costMult = this.resolveUpgradeCostMultiplier();
@@ -669,6 +672,24 @@ export class BuildingPad extends BaseComponent {
 
             this._isAnimating = false;
         });
+    }
+
+    /**
+     * 某些升级帧序下（尤其是被持续攻击时）血条可视更新可能滞后一帧以上。
+     * 这里在升级后的多个短延迟帧强制同步，确保展示为满血。
+     */
+    private forceUpgradeHealthBarResync(): void {
+        if (!this._associatedBuilding) return;
+        this._associatedBuilding.restoreToFullHealth();
+
+        const delays = [0, 0.08, 0.2];
+        for (const delay of delays) {
+            this.scheduleOnce(() => {
+                if (!this.node || !this.node.isValid) return;
+                if (!this._associatedBuilding || !this._associatedBuilding.node?.isValid) return;
+                this._associatedBuilding.restoreToFullHealth();
+            }, delay);
+        }
     }
 
     /**

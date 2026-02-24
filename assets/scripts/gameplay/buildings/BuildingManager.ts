@@ -7,6 +7,7 @@ import { BuildingPadPlacement } from './BuildingPadPlacement';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import { GameManager } from '../../core/managers/GameManager';
 
 const { ccclass } = _decorator;
 
@@ -374,6 +375,13 @@ export class BuildingManager {
             if (building.buildingType !== BuildingType.WALL) continue;
             wallSet.set(building.node.uuid, building);
         }
+        for (const node of this.gameManager.activeBuildings) {
+            if (!node || !node.isValid) continue;
+            const building = node.getComponent(Building);
+            if (!building || !building.node || !building.node.isValid) continue;
+            if (building.buildingType !== BuildingType.WALL) continue;
+            wallSet.set(building.node.uuid, building);
+        }
 
         for (const wall of wallSet.values()) {
             if (!wall.isAlive) continue;
@@ -626,5 +634,9 @@ export class BuildingManager {
 
     private get eventManager(): EventManager {
         return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
+    }
+
+    private get gameManager(): GameManager {
+        return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
     }
 }

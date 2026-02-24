@@ -124,7 +124,8 @@ export class BuffCardService extends Singleton<BuffCardService>() {
 
     // === 事件处理 ===
 
-    private onBaseUpgradeReady(_data: { baseLevel: number }): void {
+    private onBaseUpgradeReady(data: { baseLevel: number; suppressCardDraw?: boolean }): void {
+        if (data?.suppressCardDraw) return;
         this._pendingCards = this.drawCards();
         // 通知 UI 层卡牌已就绪，可展示选择界面
         this.eventManager.emit(GameEvents.BUFF_CARDS_DRAWN, { count: this._pendingCards.length });

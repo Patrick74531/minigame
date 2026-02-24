@@ -80,7 +80,7 @@ export const GameEvents = {
     BUILDING_CONSTRUCTED: 'BUILDING_CONSTRUCTED',
 
     // === 肉鸽卡牌系统 ===
-    /** 基地升级完成，请求展示卡牌选择 { baseLevel: number } */
+    /** 基地升级完成，请求展示卡牌选择 { baseLevel: number, suppressCardDraw?: boolean } */
     BASE_UPGRADE_READY: 'BASE_UPGRADE_READY',
     /** 卡牌已抽取完毕，可展示选择界面 { count: number } */
     BUFF_CARDS_DRAWN: 'BUFF_CARDS_DRAWN',
@@ -179,7 +179,7 @@ export type GameEventPayloads = {
         buildingTypeId?: string;
         position?: Vec3;
     };
-    [GameEvents.BASE_UPGRADE_READY]: { baseLevel: number };
+    [GameEvents.BASE_UPGRADE_READY]: { baseLevel: number; suppressCardDraw?: boolean };
     [GameEvents.BUFF_CARDS_DRAWN]: { count: number };
     [GameEvents.BUFF_CARD_PICKED]: { cardId: string };
     [GameEvents.AIRDROP_SPAWNED]: { wave: number; position: Vec3 };

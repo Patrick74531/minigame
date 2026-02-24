@@ -69,6 +69,33 @@ export class Base extends Building {
         this._upgradePad = pad;
     }
 
+    public syncUpgradePadForCurrentLevel(): void {
+        if (!this._upgradePad || !this._upgradePad.node || !this._upgradePad.node.isValid) return;
+
+        const nextCost = this.resolveNextUpgradeCostForLevel(this.level);
+        this._upgradePad.initForExistingBuilding(this, nextCost);
+        this._upgradePad.placeUpgradeZoneInFront(this.node, true);
+    }
+
+    private resolveNextUpgradeCostForLevel(level: number): number {
+        const startCost =
+            GameConfig.BUILDING.UPGRADE_COST?.START_COST ??
+            GameConfig.BUILDING.BASE_UPGRADE.START_COST ??
+            20;
+        const costMultiplier =
+            GameConfig.BUILDING.UPGRADE_COST?.COST_MULTIPLIER ??
+            GameConfig.BUILDING.BASE_UPGRADE.COST_MULTIPLIER ??
+            GameConfig.BUILDING.DEFAULT_COST_MULTIPLIER ??
+            1.35;
+
+        let cost = Math.max(1, Math.floor(startCost));
+        const steps = Math.max(0, Math.floor(level) - 1);
+        for (let i = 0; i < steps; i++) {
+            cost = Math.max(1, Math.ceil(cost * costMultiplier));
+        }
+        return cost;
+    }
+
     public takeDamage(damage: number, attacker?: any, isCrit: boolean = false): void {
         super.takeDamage(damage, attacker, isCrit);
 
@@ -80,6 +107,10 @@ export class Base extends Building {
         const damage = data?.damage ?? GameConfig.ENEMY.BASE_REACH_DAMAGE;
         if (!this.isAlive) return;
         this.takeDamage(damage);
+    }
+
+    public refreshHudHp(): void {
+        this.hudManager.updateBaseHp(this.currentHp, this.maxHp);
     }
 
     protected update(dt: number): void {
@@ -96,6 +127,7 @@ export class Base extends Building {
         if (!upgraded) return false;
 
         this.hudManager.updateBaseHp(this.currentHp, this.maxHp);
+        this.syncUpgradePadForCurrentLevel();
 
         // Trigger Roguelike card selection
         this.eventManager.emit(GameEvents.BASE_UPGRADE_READY, { baseLevel: this.level });
