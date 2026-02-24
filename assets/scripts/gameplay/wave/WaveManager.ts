@@ -394,8 +394,9 @@ export class WaveManager {
             ? 1
             : 0;
         const isBossWave = bossCount > 0;
-        const adjustedRegularCount = isBossWave ? 0 : regularCountBase;
-        const adjustedEliteCount = isBossWave ? 0 : eliteCountBase;
+        const bossOnly = isBossWave && this._bossEventConfig?.BOSS_ONLY_WAVE !== false;
+        const adjustedRegularCount = bossOnly ? 0 : regularCountBase;
+        const adjustedEliteCount = bossOnly ? 0 : eliteCountBase;
         const openWave3 = infinite.SPAWN_PORTALS?.OPEN_WAVE_3 ?? 8;
         const lane3ExtraWaves = Math.max(0, waveNumber - openWave3);
         const hpMult =
@@ -1128,7 +1129,35 @@ export class WaveManager {
             return this.buildBossOnlyWaveSpawnPlan(waveNumber);
         }
 
-        return this.buildRegularWaveSpawnPlan(waveNumber, regularCount, eliteCount);
+        const plan = this.buildRegularWaveSpawnPlan(waveNumber, regularCount, eliteCount);
+
+        // BOSS_ONLY_WAVE === false: mix boss into regular wave
+        if (bossCount > 0) {
+            const boss = selectBossArchetype({
+                bossEventConfig: this._bossEventConfig,
+                bossState: this._bossState,
+            });
+            if (boss) {
+                plan.entries.push({
+                    archetypeId: boss.id,
+                    spawnType: 'boss',
+                    intervalMultiplier: 1,
+                });
+                if (!plan.selectedArchetypeIds.includes(boss.id)) {
+                    plan.selectedArchetypeIds.push(boss.id);
+                }
+                applyBossEchoForWave({
+                    boss,
+                    waveNumber,
+                    bossEventConfig: this._bossEventConfig,
+                    archetypeById: this._archetypeById,
+                    bossEchoes: this._bossEchoes,
+                });
+            }
+            this._nextBossWave = rollNextBossWave(waveNumber + 1, this._bossEventConfig);
+        }
+
+        return plan;
     }
 
     private buildRegularWaveSpawnPlan(

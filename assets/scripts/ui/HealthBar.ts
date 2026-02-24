@@ -112,6 +112,16 @@ export class HealthBar extends Component {
     private _offscreenTimer: number = 0;
     private _cachedOnScreen: boolean = true;
     private _nameLabel: Label | null = null;
+    /** 节点重新启用后强制重绘一次 Graphics（避免 detach/reattach 后渲染数据陈旧） */
+    private _needsFullRedraw: boolean = false;
+    /** 缓存上次绘制状态，避免每次 updateHealth 都重绘 */
+    private _lastRenderedRatio: number = -1;
+    private _lastRenderedBand: number = -1;
+    /** 缓存上次应用的条尺寸，支持运行时改 width/height 后自动重建几何 */
+    private _lastGeometryWidth: number = -1;
+    private _lastGeometryHeight: number = -1;
+    /** 是否已收到过有效血量数据（避免开局短暂显示空条） */
+    private _hasHealthSnapshot: boolean = false;
 
     private static readonly _tmpWorldPos = new Vec3();
     private static readonly _tmpWorldScale = new Vec3();
@@ -135,19 +145,24 @@ export class HealthBar extends Component {
     protected onEnable(): void {
         this._cachedOnScreen = true;
         this._offscreenTimer = 0;
+        // 复用节点时重置渲染缓存，避免沿用旧血量视觉状态。
+        this._lastRenderedRatio = -1;
+        this._lastRenderedBand = -1;
+        this._needsFullRedraw = true;
         if (this._root && this._root.isValid) {
             // 重新挂载到 owner 的父节点（可能被 onDisable 移除过）
             if (!this._root.parent && this.node.parent) {
                 this.node.parent.addChild(this._root);
+                this._needsFullRedraw = true;
             }
             // showOnlyWhenDamaged 模式下重新启用时保持隐藏
             if (this.showOnlyWhenDamaged) {
                 this._hiddenByDamageRule = true;
                 this._root.active = false;
             } else {
-                // 先对齐位置，再激活，避免闪烁到旧位置
+                // 先对齐位置；若尚未收到血量快照，则先隐藏，等待 updateHealth 再显示。
                 this.snapRootToOwner();
-                this._root.active = true;
+                this._root.active = this._hasHealthSnapshot;
             }
         }
     }
@@ -256,42 +271,17 @@ export class HealthBar extends Component {
         const bgNode = new Node('Background');
         root.addChild(bgNode);
         this._bgGraphics = bgNode.addComponent(Graphics);
-        const barRadius = Math.max(2, this.height * 0.5);
-        this._bgGraphics.fillColor = new Color(18, 16, 22, 245);
-        this._bgGraphics.roundRect(
-            -this.width / 2,
-            -this.height / 2,
-            this.width,
-            this.height,
-            barRadius
-        );
-        this._bgGraphics.fill();
-        this._bgGraphics.strokeColor = new Color(60, 82, 104, 210);
-        this._bgGraphics.lineWidth = 1.6;
-        this._bgGraphics.roundRect(
-            -this.width / 2,
-            -this.height / 2,
-            this.width,
-            this.height,
-            barRadius
-        );
-        this._bgGraphics.stroke();
 
         // Foreground (Green)
         const fgNode = new Node('Foreground');
         root.addChild(fgNode);
+        fgNode.setScale(1, 1, 1);
         this._fgGraphics = fgNode.addComponent(Graphics);
         this._fgGraphics.fillColor = new Color(0, 255, 0, 255);
-        this._fgGraphics.roundRect(0, 0, this.width, this.height, barRadius);
-        this._fgGraphics.fill();
-
-        fgNode.setPosition(-this.width / 2, -this.height / 2, 0);
 
         // Name Label
         const labelNode = new Node('NameLabel');
         root.addChild(labelNode);
-        // Position above the bar
-        labelNode.setPosition(0, this.height + 8, 0);
         this._nameLabel = labelNode.addComponent(Label);
         this._nameLabel.fontSize = 30;
         this._nameLabel.lineHeight = 34;
@@ -309,6 +299,9 @@ export class HealthBar extends Component {
         shadow.color = new Color(0, 0, 0, 200);
         shadow.offset.set(2, -1);
         shadow.blur = 2;
+
+        // 统一按当前 width/height 重建静态几何，避免运行时改尺寸后前后景不一致。
+        this.syncStaticGeometry(true);
     }
 
     public setName(name: string, level: number): void {
@@ -319,6 +312,13 @@ export class HealthBar extends Component {
 
     public updateHealth(current: number, max: number): void {
         if (!this._fgGraphics) return;
+        this.syncStaticGeometry();
+        this._hasHealthSnapshot = true;
+        // 防止旧实现遗留的 scaleX 影响当前宽度渲染（例如对象复用/热更新后）。
+        if (Math.abs(this._fgGraphics.node.scale.x - 1) > 0.0001) {
+            this._fgGraphics.node.setScale(1, 1, 1);
+            this._needsFullRedraw = true;
+        }
 
         const safeMax = max > 0 ? max : 1;
         const ratio = Math.max(0, Math.min(1, current / safeMax));
@@ -341,33 +341,82 @@ export class HealthBar extends Component {
                     this._hiddenByDamageRule = false;
                 }
             }
+        } else if (this._root && !this._root.active) {
+            // 非“受伤才显示”模式下，拿到首个血量快照后再激活。
+            this.snapRootToOwner();
+            this._root.active = true;
         }
-        this._fgGraphics.node.setScale(ratio, 1, 1);
+        const band = this.resolveHealthBand(ratio);
+        const ratioChanged = Math.abs(ratio - this._lastRenderedRatio) > 0.001;
+        const bandChanged = band !== this._lastRenderedBand;
+        if (!this._needsFullRedraw && !ratioChanged && !bandChanged) {
+            return;
+        }
 
-        // Foreground geometry is static; redraw only when color band changes.
         const targetColor =
-            ratio > 0.5
+            band === 2
                 ? HealthBar._fgColorGreen
-                : ratio > 0.2
+                : band === 1
                   ? HealthBar._fgColorYellow
                   : HealthBar._fgColorRed;
         const currentColor = this._fgGraphics.fillColor;
-        if (
+        const colorChanged =
             currentColor.r !== targetColor.r ||
             currentColor.g !== targetColor.g ||
             currentColor.b !== targetColor.b ||
-            currentColor.a !== targetColor.a
-        ) {
+            currentColor.a !== targetColor.a;
+
+        this._needsFullRedraw = false;
+        if (colorChanged) {
             this._fgGraphics.fillColor = targetColor;
-            this._fgGraphics.clear();
-            this._fgGraphics.roundRect(
-                0,
-                0,
-                this.width,
-                this.height,
-                Math.max(2, this.height * 0.5)
-            );
+        }
+
+        this._fgGraphics.clear();
+        const fillWidth = this.width * ratio;
+        if (fillWidth > 0.001) {
+            const radius = Math.max(2, this.height * 0.5);
+            const fillRadius = Math.min(radius, fillWidth * 0.5);
+            this._fgGraphics.roundRect(0, 0, fillWidth, this.height, fillRadius);
             this._fgGraphics.fill();
+        }
+
+        this._lastRenderedRatio = ratio;
+        this._lastRenderedBand = band;
+    }
+
+    private resolveHealthBand(ratio: number): number {
+        if (ratio > 0.5) return 2;
+        if (ratio > 0.2) return 1;
+        return 0;
+    }
+
+    private syncStaticGeometry(force: boolean = false): void {
+        if (!this._bgGraphics || !this._fgGraphics) return;
+        const w = Math.max(1, this.width);
+        const h = Math.max(1, this.height);
+        const changed =
+            Math.abs(w - this._lastGeometryWidth) > 0.001 ||
+            Math.abs(h - this._lastGeometryHeight) > 0.001;
+        if (!force && !changed) return;
+
+        this._lastGeometryWidth = w;
+        this._lastGeometryHeight = h;
+        this._needsFullRedraw = true;
+
+        const radius = Math.max(2, h * 0.5);
+        this._bgGraphics.clear();
+        this._bgGraphics.fillColor = new Color(18, 16, 22, 245);
+        this._bgGraphics.roundRect(-w / 2, -h / 2, w, h, radius);
+        this._bgGraphics.fill();
+        this._bgGraphics.strokeColor = new Color(60, 82, 104, 210);
+        this._bgGraphics.lineWidth = 1.6;
+        this._bgGraphics.roundRect(-w / 2, -h / 2, w, h, radius);
+        this._bgGraphics.stroke();
+
+        this._fgGraphics.node.setPosition(-w / 2, -h / 2, 0);
+        if (this._nameLabel && this._nameLabel.node?.isValid) {
+            // 提升名字与血条间距，避免字体描边与血条重叠。
+            this._nameLabel.node.setPosition(0, h + 14, 0);
         }
     }
 

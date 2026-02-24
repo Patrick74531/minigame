@@ -197,17 +197,51 @@ export class Building extends BaseComponent implements IAttackable {
         // or just let updateHealth handle it.
         // We want to set the name.
         this.updateHealthBarName();
+        this._healthBar.updateHealth(this.currentHp, this.maxHp);
 
         this.updateHealthBarOffset();
     }
 
     private updateHealthBarOffset(): void {
         if (!this._healthBar) return;
+        const growthRatio = this.resolveVisualGrowthRatioFromLevel1();
         if (this.buildingType === BuildingType.WALL) {
-            this._healthBar.yOffset = 1.6;
+            // 栅栏本体较矮，升级只做轻量抬升，避免名字遮挡木桩。
+            this._healthBar.yOffset = 1.2 + Math.min(0.35, (growthRatio - 1) * 0.22);
             return;
         }
-        this._healthBar.yOffset = 2.2;
+        // 建筑升级会放大模型：同步抬高血条与名字，保证始终悬浮在模型上方。
+        this._healthBar.yOffset = 1.75 + Math.min(0.9, (growthRatio - 1) * 0.35);
+    }
+
+    private resolveVisualGrowthRatioFromLevel1(): number {
+        if (!this._baseNodeScale) return 1;
+
+        const isTower =
+            this.buildingType === BuildingType.TOWER ||
+            this.buildingType === BuildingType.FROST_TOWER ||
+            this.buildingType === BuildingType.LIGHTNING_TOWER;
+        const level1Factor = isTower
+            ? Building.TOWER_SCALE_INITIAL
+            : Building.BUILDING_SCALE_INITIAL;
+
+        const baseAvg =
+            (Math.abs(this._baseNodeScale.x) +
+                Math.abs(this._baseNodeScale.y) +
+                Math.abs(this._baseNodeScale.z)) /
+            3;
+        if (!Number.isFinite(baseAvg) || baseAvg <= 0.0001) return 1;
+
+        const currentAvg =
+            (Math.abs(this.node.scale.x) +
+                Math.abs(this.node.scale.y) +
+                Math.abs(this.node.scale.z)) /
+            3;
+        if (!Number.isFinite(currentAvg) || currentAvg <= 0) return 1;
+
+        const currentFactor = currentAvg / baseAvg;
+        const ratio = currentFactor / Math.max(0.0001, level1Factor);
+        return Math.max(1, ratio);
     }
 
     private updateHealthBarName(): void {
@@ -446,6 +480,7 @@ export class Building extends BaseComponent implements IAttackable {
             this._baseNodeScale.y * factor,
             this._baseNodeScale.z * factor
         );
+        this.updateHealthBarOffset();
     }
 
     /**

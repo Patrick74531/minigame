@@ -398,7 +398,7 @@ const BASE = {
             intervalMinWaves: 6,
             intervalMaxWaves: 8,
             bossCooldownWaves: 12,
-            bossOnlyWave: true,
+            bossOnlyWave: false,
             additionalEnemyCount: 0,
             bossHpMultiplier: 24,
             bossAttackMultiplier: 3.1,

@@ -83,8 +83,8 @@ export class CoinDropManager {
 
         if (spawnType === 'boss') {
             this._bossKillCount += 1;
-            const baseBossDrop = this._bossKillCount * CoinDropManager.BOSS_DROP_COINS_STEP;
-            return Math.max(1, Math.floor(baseBossDrop * CoinDropManager.BOSS_DROP_MULTIPLIER));
+            // Linear progression: 50 → 100 → 150 …
+            return Math.max(1, this._bossKillCount * CoinDropManager.BOSS_DROP_COINS_STEP);
         }
 
         if (spawnType === 'elite' || isElite) {

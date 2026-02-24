@@ -337,9 +337,12 @@ export class UnitFactory {
         const hb = node.addComponent(HealthBar);
         hb.width = 100;
         hb.height = 10;
-        hb.yOffset = 2.0;
-        hb.autoDetectHeadAnchor = true;
-        hb.headPadding = 0.18;
+        // Hero 使用稳定头顶偏移，避免自动探测被挂件/子节点拉高。
+        hb.yOffset = 1.2;
+        hb.autoDetectHeadAnchor = false;
+        hb.headPadding = 0.12;
+        // Hero 先 initStats 再挂血条，需手动推送一次当前血量，避免首帧空条。
+        hb.updateHealth(hero.stats.currentHp, hero.stats.maxHp);
 
         this.attachHeroModel(node);
 
