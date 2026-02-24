@@ -33,6 +33,13 @@ export class BuildingManager {
     private static readonly MID_SUPPORT_REVEAL_INTERVAL_SECONDS = 1;
     private static readonly MID_SUPPORT_CINEMATIC_HOLD_SECONDS = 3;
     private static readonly INTER_WAVE_WALL_HEAL_PERCENT_PER_SECOND = 0.05;
+    private static readonly INTER_WAVE_TOWER_HEAL_PERCENT_PER_SECOND =
+        BuildingManager.INTER_WAVE_WALL_HEAL_PERCENT_PER_SECOND * 0.5;
+    private static readonly TOWER_BUILDING_TYPES = new Set<BuildingType>([
+        BuildingType.TOWER,
+        BuildingType.FROST_TOWER,
+        BuildingType.LIGHTNING_TOWER,
+    ]);
 
     private _pads: BuildingPad[] = [];
     private _activeBuildings: Building[] = [];
@@ -127,7 +134,7 @@ export class BuildingManager {
 
     /** 仅执行波间回血（供 BuildingSystemTick 在 isPlaying=false 时调用） */
     public tickInterWaveHeal(dt: number): void {
-        this.healWallsDuringInterWave(dt);
+        this.healStructuresDuringInterWave(dt);
     }
 
     /**
@@ -135,7 +142,7 @@ export class BuildingManager {
      */
     public update(_dt: number): void {
         // Logic moved to BuildingPad.onTriggerStay (Physics System)
-        this.healWallsDuringInterWave(_dt);
+        this.healStructuresDuringInterWave(_dt);
     }
 
     /**
@@ -356,37 +363,54 @@ export class BuildingManager {
         this.tryTriggerMidSupportRevealSequence();
     }
 
-    private healWallsDuringInterWave(dt: number): void {
+    private healStructuresDuringInterWave(dt: number): void {
         if (!this._isInterWaveWaiting) return;
         if (!Number.isFinite(dt) || dt <= 0) return;
 
-        const healPercentPerSecond = BuildingManager.INTER_WAVE_WALL_HEAL_PERCENT_PER_SECOND;
-        if (healPercentPerSecond <= 0) return;
-        const wallSet = new Map<string, Building>();
+        const wallHealPercentPerSecond = BuildingManager.INTER_WAVE_WALL_HEAL_PERCENT_PER_SECOND;
+        const towerHealPercentPerSecond = BuildingManager.INTER_WAVE_TOWER_HEAL_PERCENT_PER_SECOND;
+        if (wallHealPercentPerSecond <= 0 && towerHealPercentPerSecond <= 0) return;
+        const targetTypes = new Set<BuildingType>([
+            BuildingType.WALL,
+            ...BuildingManager.TOWER_BUILDING_TYPES,
+        ]);
+        const buildingSet = new Map<string, Building>();
 
         for (const pad of this._pads) {
             const building = pad?.getAssociatedBuilding();
             if (!building || !building.node || !building.node.isValid) continue;
-            if (building.buildingType !== BuildingType.WALL) continue;
-            wallSet.set(building.node.uuid, building);
+            if (!targetTypes.has(building.buildingType)) continue;
+            buildingSet.set(building.node.uuid, building);
         }
         for (const building of this._activeBuildings) {
             if (!building || !building.node || !building.node.isValid) continue;
-            if (building.buildingType !== BuildingType.WALL) continue;
-            wallSet.set(building.node.uuid, building);
+            if (!targetTypes.has(building.buildingType)) continue;
+            buildingSet.set(building.node.uuid, building);
         }
         for (const node of this.gameManager.activeBuildings) {
             if (!node || !node.isValid) continue;
             const building = node.getComponent(Building);
             if (!building || !building.node || !building.node.isValid) continue;
-            if (building.buildingType !== BuildingType.WALL) continue;
-            wallSet.set(building.node.uuid, building);
+            if (!targetTypes.has(building.buildingType)) continue;
+            buildingSet.set(building.node.uuid, building);
         }
 
-        for (const wall of wallSet.values()) {
-            if (!wall.isAlive) continue;
-            if (wall.currentHp >= wall.maxHp) continue;
-            wall.heal(wall.maxHp * healPercentPerSecond * dt);
+        for (const building of buildingSet.values()) {
+            if (!building.isAlive) continue;
+            if (building.currentHp >= building.maxHp) continue;
+
+            if (building.buildingType === BuildingType.WALL) {
+                if (wallHealPercentPerSecond > 0) {
+                    building.heal(building.maxHp * wallHealPercentPerSecond * dt);
+                }
+                continue;
+            }
+
+            if (BuildingManager.TOWER_BUILDING_TYPES.has(building.buildingType)) {
+                if (towerHealPercentPerSecond > 0) {
+                    building.heal(building.maxHp * towerHealPercentPerSecond * dt);
+                }
+            }
         }
     }
 

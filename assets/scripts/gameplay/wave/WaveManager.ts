@@ -399,16 +399,10 @@ export class WaveManager {
         const adjustedEliteCount = bossOnly ? 0 : eliteCountBase;
         const openWave3 = infinite.SPAWN_PORTALS?.OPEN_WAVE_3 ?? 8;
         const lane3ExtraWaves = Math.max(0, waveNumber - openWave3);
-        const accelThreshold = infinite.HP_ACCEL_WAVE_THRESHOLD ?? 15;
-        const accelExtra =
-            waveNumber > accelThreshold
-                ? Math.pow(waveNumber - accelThreshold, 2) * (infinite.HP_ACCEL_PER_WAVE ?? 0)
-                : 0;
         const hpMult =
             infinite.BASE_HP_MULT +
             waveIndex * infinite.HP_MULT_PER_WAVE +
-            lane3ExtraWaves * infinite.POST_LANE3_HP_EXTRA_PER_WAVE +
-            accelExtra;
+            lane3ExtraWaves * infinite.POST_LANE3_HP_EXTRA_PER_WAVE;
         const atkMult =
             infinite.BASE_ATTACK_MULT +
             waveIndex * infinite.ATTACK_MULT_PER_WAVE +
@@ -583,8 +577,12 @@ export class WaveManager {
         const powerAttackMultiplier = 0.72 + power * 0.78;
         const powerSpeedMultiplier = 0.85 + power * 0.2;
         const visualScale = this.resolveSpawnVisualScale(archetype, entry.spawnType);
-        const defaultHpMultiplier =
-            waveConfig.hpMultiplier * spawnCombat.hpMultiplier * powerHpMultiplier;
+        const regularHpAccel =
+            entry.spawnType === 'regular'
+                ? this.resolveRegularHpAccelForWave(waveConfig.waveNumber)
+                : 0;
+        const waveHpMultiplier = waveConfig.hpMultiplier + regularHpAccel;
+        const defaultHpMultiplier = waveHpMultiplier * spawnCombat.hpMultiplier * powerHpMultiplier;
         const finalHpMultiplier =
             entry.spawnType === 'boss'
                 ? this.resolveBossHpMultiplierFloor(waveConfig.waveNumber, defaultHpMultiplier)
@@ -946,6 +944,16 @@ export class WaveManager {
             scaleMultiplier: 1,
             isElite: false,
         };
+    }
+
+    /**
+     * 15关后仅普通怪额外抬升血量（Boss/Elite 不参与该段加速）。
+     */
+    private resolveRegularHpAccelForWave(waveNumber: number): number {
+        const infinite = GameConfig.WAVE.INFINITE;
+        const accelThreshold = infinite.HP_ACCEL_WAVE_THRESHOLD ?? 15;
+        if (waveNumber <= accelThreshold) return 0;
+        return Math.pow(waveNumber - accelThreshold, 2) * (infinite.HP_ACCEL_PER_WAVE ?? 0);
     }
 
     private resolveSpawnVisualScale(
