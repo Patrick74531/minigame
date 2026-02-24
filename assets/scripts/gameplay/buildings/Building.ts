@@ -358,7 +358,10 @@ export class Building extends BaseComponent implements IAttackable {
                 this.incomeInterval = this.incomeInterval / this.incomeMultiplier;
             }
         }
-        if (this._healthBar) this._healthBar.updateHealth(this.currentHp, this.maxHp);
+        if (this._healthBar) {
+            this._healthBar.updateHealth(this.currentHp, this.maxHp);
+            this.updateHealthBarName();
+        }
     }
 
     public restoreToFullHealth(): void {

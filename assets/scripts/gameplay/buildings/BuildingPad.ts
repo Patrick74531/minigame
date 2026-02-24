@@ -111,6 +111,13 @@ export class BuildingPad extends BaseComponent {
         return this._collectedCoins / this.requiredCoins;
     }
 
+    /**
+     * Construction anchor position (world-space), used for build/restore placement.
+     */
+    public getBuildWorldPosition(): Vec3 {
+        return this._originalPosition.clone();
+    }
+
     public get isComplete(): boolean {
         return this._collectedCoins >= this.requiredCoins;
     }
@@ -125,7 +132,8 @@ export class BuildingPad extends BaseComponent {
     // === 生命周期 ===
 
     protected initialize(): void {
-        // 初始化逻辑保留为空，延迟到 start 执行，确保属性已被赋值
+        // Capture initial anchor early so restore path can use it even before start().
+        this._originalPosition.set(this.node.worldPosition);
     }
 
     // === Physics Implementation ===
@@ -141,8 +149,15 @@ export class BuildingPad extends BaseComponent {
     private _originalPosition: Vec3 = new Vec3();
 
     protected start(): void {
+        // If pad was already restored with a building (via restoreFromSave),
+        // skip the normal offset logic — position was already placed correctly.
+        const alreadyRestored = !!this._associatedBuilding;
+
         // 1. Store Original Position (Where the building should be)
-        this._originalPosition.set(this.node.worldPosition);
+        // Only overwrite if not already captured by initialize() or restore path.
+        if (!alreadyRestored) {
+            this._originalPosition.set(this.node.worldPosition);
+        }
 
         this.setupPhysics();
 
@@ -165,7 +180,7 @@ export class BuildingPad extends BaseComponent {
         }
 
         this.createVisuals();
-        if (this.lockWorldPosition) {
+        if (this.lockWorldPosition && !alreadyRestored) {
             BuildingPadPlacement.applyFixedOffsetFromSpawn(
                 this.node,
                 this._originalPosition,

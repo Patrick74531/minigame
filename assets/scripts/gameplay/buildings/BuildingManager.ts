@@ -540,36 +540,62 @@ export class BuildingManager {
         for (const state of states) {
             const pad = indexToPad.get(state.padIndex);
             if (!pad || !pad.node || !pad.node.isValid) continue;
-            if (pad.getAssociatedBuilding()) continue;
+            let building = pad.getAssociatedBuilding();
 
-            const pos = pad.node.worldPosition;
-            const angle = pad.node.eulerAngles.y;
-
-            const buildingNode = BuildingFactory.createBuilding(
-                this._buildingContainer!,
-                pos.x,
-                pos.z,
-                state.buildingTypeId,
-                this._unitContainer ?? undefined,
-                angle
-            );
-            if (!buildingNode) continue;
-
-            const building = buildingNode.getComponent(Building);
+            // For prebuilt pads (wall/barracks/farm), building may already exist.
+            // For regular pads, create from save if missing.
             if (!building) {
-                buildingNode.destroy();
-                continue;
+                const pos = pad.getBuildWorldPosition();
+                const angle = pad.node.eulerAngles.y;
+
+                const buildingNode = BuildingFactory.createBuilding(
+                    this._buildingContainer!,
+                    pos.x,
+                    pos.z,
+                    state.buildingTypeId,
+                    this._unitContainer ?? undefined,
+                    angle
+                );
+                if (!buildingNode) continue;
+
+                building = buildingNode.getComponent(Building);
+                if (!building) {
+                    buildingNode.destroy();
+                    continue;
+                }
             }
 
             if (state.level > 1) building.restoreToLevel(state.level);
             building.currentHp = Math.max(1, Math.floor(state.hpRatio * building.maxHp));
+            building.node.active = true;
 
-            this._activeBuildings.push(building);
+            if (!this._activeBuildings.includes(building)) {
+                this._activeBuildings.push(building);
+            }
             pad.initForExistingBuilding(building, state.nextUpgradeCost);
-            pad.placeUpgradeZoneInFront(buildingNode, true);
+            pad.placeUpgradeZoneInFront(building.node, true);
             pad.node.active = false;
 
             this.tryUnlockPadsAfterTriggerBuild(pad.node);
+        }
+
+        // If mid-support buildings were already present in save, keep them visible after restore
+        // instead of waiting for another inter-wave cinematic cycle.
+        const hasMidSupportInSave = states.some(
+            s => s.buildingTypeId === 'farm' || s.buildingTypeId === 'barracks'
+        );
+        if (hasMidSupportInSave) {
+            this._midSupportBuildingsRevealed = true;
+            this._midUpgradePadsUnlockedAfterCinematic = true;
+            this._stage3SequenceTriggered = true;
+            for (const pad of this._pads) {
+                if (!pad || !pad.node || !pad.node.isValid) continue;
+                if (!BuildingManager.MID_SUPPORT_BUILDING_TYPES.has(pad.buildingTypeId)) continue;
+                const support = pad.getAssociatedBuilding();
+                if (support?.node?.isValid) {
+                    support.node.active = true;
+                }
+            }
         }
 
         this.refreshUpgradePadVisibilityGate();

@@ -16,6 +16,7 @@ import { HeroWeaponManager } from '../../gameplay/weapons/HeroWeaponManager';
 import { AirdropService } from '../../gameplay/airdrop/AirdropService';
 import { BuffCardService } from '../../gameplay/roguelike/BuffCardService';
 import { BuildingManager } from '../../gameplay/buildings/BuildingManager';
+import { WaveManager } from '../../gameplay/wave/WaveManager';
 import { Base } from '../../gameplay/buildings/Base';
 import { Hero } from '../../gameplay/units/Hero';
 
@@ -146,6 +147,11 @@ export class GameStartFlow {
 
         if (save.buildings && save.buildings.length > 0) {
             BuildingManager.instance.restoreFromSave(save.buildings);
+        }
+
+        // Fast-forward WaveManager boss schedule & lane unlocks to match restored wave.
+        if (save.waveNumber > 1) {
+            WaveManager.instance.restoreToWave(save.waveNumber);
         }
 
         const baseComp = base.getComponent(Base);

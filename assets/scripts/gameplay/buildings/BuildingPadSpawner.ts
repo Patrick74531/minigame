@@ -191,6 +191,10 @@ export class BuildingPadSpawner {
 
             const nextUpgradeCost = this.resolveInitialUpgradeCost();
             pad.initForExistingBuilding(building, nextUpgradeCost);
+            if (pos.type === 'wall') {
+                // Keep prebuilt wall upgrade-pad distance consistent with runtime-built walls.
+                pad.placeUpgradeZoneInFront(buildingNode, true);
+            }
 
             // Globally hide all upgrade pads initially for prebuilt buildings
             padNode.active = false;

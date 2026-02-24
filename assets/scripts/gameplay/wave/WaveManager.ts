@@ -238,6 +238,49 @@ export class WaveManager {
         console.log('[WaveManager] 初始化完成 (Infinite Mode)');
     }
 
+    /**
+     * 从存档恢复时调用：将 boss 调度和路线解锁状态快进到目标波次，
+     * 避免恢复后错误触发 boss-only 或路线未解锁。
+     */
+    public restoreToWave(targetWave: number): void {
+        if (targetWave <= 1) return;
+
+        // 1. Fast-forward _nextBossWave so it won't trigger on non-boss waves.
+        //    Walk boss schedule forward: every boss interval, advance past targetWave.
+        if (this._bossEventConfig) {
+            let bossWave = rollNextBossWave(1, this._bossEventConfig);
+            while (bossWave < targetWave) {
+                bossWave = rollNextBossWave(bossWave + 1, this._bossEventConfig);
+            }
+            this._nextBossWave = bossWave;
+        }
+
+        // 2. Fast-forward lane unlocks: each boss kill unlocks a lane.
+        //    Count how many boss waves occurred before targetWave and replay lane unlocks.
+        if (this._bossEventConfig) {
+            let bw = rollNextBossWave(1, this._bossEventConfig);
+            while (bw < targetWave) {
+                // Simulate boss kill → lane unlock
+                const nextState = advanceBossLaneState({
+                    nextUnlockLaneCursor: this._nextUnlockLaneCursor,
+                    nextBossLaneCursor: this._nextBossLaneCursor,
+                    routeLaneSequence: ROUTE_LANE_SEQUENCE,
+                });
+                this._nextUnlockLaneCursor = nextState.nextUnlockLaneCursor;
+                this._nextBossLaneCursor = nextState.nextBossLaneCursor;
+                if (nextState.laneToUnlock) {
+                    this.unlockLane(nextState.laneToUnlock);
+                }
+                bw = rollNextBossWave(bw + 1, this._bossEventConfig);
+            }
+        }
+
+        console.log(
+            `[WaveManager] restoreToWave(${targetWave}): nextBossWave=${this._nextBossWave}, ` +
+                `unlockedLanes=[${Array.from(this._unlockedLanes).join(',')}]`
+        );
+    }
+
     private onUnitDied(data: { unitType: string; node?: Node }): void {
         if (data.unitType !== UnitType.ENEMY || !data.node) return;
         const meta = this._spawnedEnemyMeta.get(data.node);
@@ -313,6 +356,12 @@ export class WaveManager {
      * 开始新波次
      */
     public startWave(waveNumber: number): void {
+        // Safety net for continue-game restore:
+        // if boss schedule is still behind restored wave, fast-forward before plan generation.
+        if (waveNumber > 1 && this._bossEventConfig && this._nextBossWave < waveNumber) {
+            this.restoreToWave(waveNumber);
+        }
+
         this._currentWave = waveNumber;
         this._waveActive = true;
         this._regularSpawned = 0;
