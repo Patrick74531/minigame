@@ -50,8 +50,14 @@ export class BuildingPadSpawner {
         mid: [],
         bottom: [],
     };
+    private static _midSectionBarricadePadNodes: Node[] = [];
     private static _laneUnlockListening: boolean = false;
     private static _lanePolylines: Record<RouteLane, Array<{ x: number; z: number }>> | null = null;
+    private static readonly MID_SECTION_BARRICADE_PAD_INDEX_BY_LANE: Record<RouteLane, number> = {
+        top: 9000,
+        mid: 9001,
+        bottom: 9002,
+    };
 
     public static spawnPads(buildingContainer: Node, buildingManager: BuildingManager): void {
         this._hiddenPadNodesByLane = {
@@ -59,6 +65,7 @@ export class BuildingPadSpawner {
             mid: [],
             bottom: [],
         };
+        this._midSectionBarricadePadNodes = [];
 
         const rawPadPositions = (GameConfig.BUILDING.PADS as ReadonlyArray<PadPlacement>) ?? [];
         const padPositions = this.resolveWallPadPlacements(rawPadPositions);
@@ -197,8 +204,145 @@ export class BuildingPadSpawner {
             `[BuildingPadSpawner] 创建了 ${padPositions.length} 个建造点, 父节点: ${buildingContainer.name}`
         );
 
+        // Mid-section barricades now use build pads and are revealed together
+        // only after bottom lane unlocks.
+        this.spawnMidSectionBarricadePads(buildingContainer, buildingManager, padPositions);
+
         buildingManager.refreshUpgradePadVisibilityGate();
         this.ensureLaneUnlockListener();
+    }
+
+    private static spawnMidSectionBarricadePads(
+        buildingContainer: Node,
+        buildingManager: BuildingManager,
+        pads: ReadonlyArray<PadPlacement>
+    ): void {
+        for (const lane of ['top', 'mid', 'bottom'] as const) {
+            const placement = this.resolveMidSectionBarricadePlacement(pads, lane);
+            if (!placement) continue;
+
+            const padNode = new Node(`BuildingPad_wall_mid_section_${lane}`);
+            buildingContainer.addChild(padNode);
+            padNode.setPosition(placement.x, 0, placement.z);
+            if (Math.abs(placement.angle) > 0.001) {
+                padNode.setRotationFromEuler(0, placement.angle, 0);
+            }
+
+            const pad = padNode.addComponent(BuildingPad);
+            pad.buildingTypeId = 'wall';
+            const runtimeIndex = this.MID_SECTION_BARRICADE_PAD_INDEX_BY_LANE[lane];
+            buildingManager.registerPad(pad, runtimeIndex);
+
+            // Reveal all three pads together only when bottom lane unlocks.
+            padNode.active = false;
+            this._midSectionBarricadePadNodes.push(padNode);
+
+            console.log(
+                `[BuildingPadSpawner] ${lane.toUpperCase()} MID-SECTION BARRICADE PAD prepared at ` +
+                    `(${placement.x}, 0, ${placement.z}), angle=${placement.angle}, runtimeIndex=${runtimeIndex}`
+            );
+        }
+    }
+
+    private static resolveMidSectionBarricadePlacement(
+        pads: ReadonlyArray<PadPlacement>,
+        lane: RouteLane
+    ): { x: number; z: number; angle: number } | null {
+        let anchorX = 0;
+        let anchorZ = 0;
+        let row2CenterX = 0;
+        let row2CenterZ = 0;
+        let row3CenterX = 0;
+        let row3CenterZ = 0;
+
+        if (lane === 'mid') {
+            // Collect mid-lane towers split by side (upper = angle ≈ -45, lower = angle ≈ 135).
+            const upperTowers: Array<{ x: number; z: number }> = [];
+            const lowerTowers: Array<{ x: number; z: number }> = [];
+            for (const pad of pads) {
+                if (!this.TOWER_PAD_TYPES.has(pad.type)) continue;
+                if (this.resolveLaneByNearestPath(pad.x, pad.z) !== 'mid') continue;
+
+                const angle = pad.angle ?? 0;
+                if (Math.abs(angle - -45) < 1) {
+                    upperTowers.push({ x: pad.x, z: pad.z });
+                } else if (Math.abs(angle - 135) < 1) {
+                    lowerTowers.push({ x: pad.x, z: pad.z });
+                }
+            }
+
+            // Sort by lane progress (x+z ascending = closer to base on the 45° diagonal).
+            const byLaneProgress = (a: { x: number; z: number }, b: { x: number; z: number }) =>
+                a.x + a.z - (b.x + b.z);
+            upperTowers.sort(byLaneProgress);
+            lowerTowers.sort(byLaneProgress);
+
+            if (upperTowers.length < 3 || lowerTowers.length < 3) {
+                console.warn(
+                    '[BuildingPadSpawner] Not enough mid-lane towers for mid-section barricade pad'
+                );
+                return null;
+            }
+
+            // Row 2/3 center = midpoint of upper/lower towers on the same row.
+            row2CenterX = (upperTowers[1].x + lowerTowers[1].x) / 2;
+            row2CenterZ = (upperTowers[1].z + lowerTowers[1].z) / 2;
+            row3CenterX = (upperTowers[2].x + lowerTowers[2].x) / 2;
+            row3CenterZ = (upperTowers[2].z + lowerTowers[2].z) / 2;
+            anchorX = this.round2((row2CenterX + row3CenterX) / 2);
+            anchorZ = this.round2((row2CenterZ + row3CenterZ) / 2);
+        } else {
+            // Top/Bottom lane: use row-2 & row-3 tower midpoint directly.
+            const laneTowers: Array<{ x: number; z: number }> = [];
+            for (const pad of pads) {
+                if (!this.TOWER_PAD_TYPES.has(pad.type)) continue;
+                if (this.resolveLaneByNearestPath(pad.x, pad.z) !== lane) continue;
+                laneTowers.push({ x: pad.x, z: pad.z });
+            }
+
+            // Keep the same progression rule as mid-lane (x+z ascending = closer to base).
+            laneTowers.sort((a, b) => a.x + a.z - (b.x + b.z));
+            if (laneTowers.length < 3) {
+                console.warn(
+                    `[BuildingPadSpawner] Not enough ${lane}-lane towers for mid-section barricade pad`
+                );
+                return null;
+            }
+
+            row2CenterX = laneTowers[1].x;
+            row2CenterZ = laneTowers[1].z;
+            row3CenterX = laneTowers[2].x;
+            row3CenterZ = laneTowers[2].z;
+            anchorX = this.round2((row2CenterX + row3CenterX) / 2);
+            anchorZ = this.round2((row2CenterZ + row3CenterZ) / 2);
+        }
+
+        const laneFrontWall = pads.find(
+            p => p.type === 'wall' && this.resolveLaneByNearestPath(p.x, p.z) === lane
+        );
+        // Top/Bottom lanes should share the same boundary alignment as the original front wall.
+        // Keep progress-center anchor, only snap the boundary-facing axis to the lane front wall.
+        if (laneFrontWall) {
+            if (lane === 'top') {
+                anchorZ = this.round2(laneFrontWall.z);
+            } else if (lane === 'bottom') {
+                anchorX = this.round2(laneFrontWall.x);
+            }
+        }
+        const fallbackAngleByLane: Record<RouteLane, number> = {
+            top: 90,
+            mid: 45,
+            bottom: 0,
+        };
+        const angle =
+            typeof laneFrontWall?.angle === 'number' ? laneFrontWall.angle : fallbackAngleByLane[lane];
+        console.log(
+            `[BuildingPadSpawner] ${lane.toUpperCase()} MID-SECTION BARRICADE anchor resolved: ` +
+                `(${anchorX}, 0, ${anchorZ}), angle=${angle}` +
+                ` | row2Center=(${this.round2(row2CenterX)}, ${this.round2(row2CenterZ)})` +
+                ` | row3Center=(${this.round2(row3CenterX)}, ${this.round2(row3CenterZ)})`
+        );
+        return { x: anchorX, z: anchorZ, angle };
     }
 
     private static resolveWallPadPlacements(
@@ -384,13 +528,23 @@ export class BuildingPadSpawner {
 
     private static onLaneUnlocked(data: { lane: 'top' | 'mid' | 'bottom' }): void {
         const nodes = this._hiddenPadNodesByLane[data.lane];
-        if (!nodes || nodes.length <= 0) return;
-
-        for (const node of nodes) {
-            if (!node || !node.isValid) continue;
-            node.active = true;
+        if (nodes && nodes.length > 0) {
+            for (const node of nodes) {
+                if (!node || !node.isValid) continue;
+                node.active = true;
+            }
+            this._hiddenPadNodesByLane[data.lane] = [];
         }
-        this._hiddenPadNodesByLane[data.lane] = [];
+
+        // Bottom lane unlock is the reveal timing for all 3 mid-section barricade pads.
+        if (data.lane === 'bottom' && this._midSectionBarricadePadNodes.length > 0) {
+            for (const padNode of this._midSectionBarricadePadNodes) {
+                if (!padNode || !padNode.isValid) continue;
+                padNode.active = true;
+            }
+            this._midSectionBarricadePadNodes = [];
+        }
+
         BuildingManager.instance.refreshUpgradePadVisibilityGate();
     }
 
