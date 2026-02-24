@@ -30,7 +30,7 @@ export class CoinFactory {
         // Try loading 'effects/star_coin'
         resources.load('effects/star_coin', Prefab, (err, prefab) => {
             if (!err && prefab) {
-                console.log(
+                console.debug(
                     '[CoinFactory] Successfully loaded star_coin prefab (path: effects/star_coin)'
                 );
                 this._starCoinPrefab = prefab;
@@ -43,7 +43,7 @@ export class CoinFactory {
             // Try loading 'effects/star_coin/star_coin' (common GLTF import issue)
             resources.load('effects/star_coin/star_coin', Prefab, (err2, prefab2) => {
                 if (!err2 && prefab2) {
-                    console.log(
+                    console.debug(
                         '[CoinFactory] Successfully loaded star_coin prefab (path: effects/star_coin/star_coin)'
                     );
                     this._starCoinPrefab = prefab2;

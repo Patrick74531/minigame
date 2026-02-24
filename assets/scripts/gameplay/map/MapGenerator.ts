@@ -925,7 +925,7 @@ export class MapGenerator extends Component {
                 startIndex: placedCount,
             });
             placedCount += roadsideMiniTrees;
-            console.log(`[MapGenerator] Roadside mini trees placed: ${roadsideMiniTrees}`);
+            console.debug(`[MapGenerator] Roadside mini trees placed: ${roadsideMiniTrees}`);
         }
 
         const categories: NatureCategory[] = ['tree', 'rock', 'bush'];
@@ -1053,7 +1053,7 @@ export class MapGenerator extends Component {
             }
         }
 
-        console.log(`[MapGenerator] Nature placed: ${placedCount} instances.`);
+        console.debug(`[MapGenerator] Nature placed: ${placedCount} instances.`);
     }
 
     private placeRoadsideMiniTrees(opts: {

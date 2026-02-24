@@ -1,11 +1,18 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { context, redis, reddit } from '@devvit/web/server';
 
 const RANK_KEY = 'leaderboard:scores';
 const META_KEY = 'leaderboard:meta';
 const FOLLOW_KEY = 'leaderboard:followers';
+const RATE_LIMIT_PREFIX = 'ratelimit:submit:';
 const LEADERBOARD_SIZE = 10;
+
+// ── Validation constants ─────────────────────────────────────────────────────
+const MAX_SCORE = 999_999_999;
+const MAX_WAVE = 9_999;
+const RATE_LIMIT_WINDOW_SEC = 10;
 
 interface LeaderboardEntry {
     rank: number;
@@ -45,7 +52,27 @@ function jsonNoCache(c: Context, payload: unknown, status: number = 200) {
     c.header('Cache-Control', 'no-store, no-cache, must-revalidate');
     c.header('Pragma', 'no-cache');
     c.header('Expires', '0');
-    return c.json(payload, status);
+    return c.json(payload, status as ContentfulStatusCode);
+}
+
+function jsonError(c: Context, code: number, message: string) {
+    return jsonNoCache(c, { status: 'error', code, message }, code);
+}
+
+function isValidInt(v: unknown): v is number {
+    return typeof v === 'number' && Number.isFinite(v) && Number.isInteger(v) && v >= 0;
+}
+
+async function checkRateLimit(username: string): Promise<boolean> {
+    const key = `${RATE_LIMIT_PREFIX}${username}`;
+    try {
+        const expiration = new Date(Date.now() + RATE_LIMIT_WINDOW_SEC * 1000);
+        const result = await redis.set(key, '1', { nx: true, expiration });
+        return result === 'OK';
+    } catch {
+        // Redis failure → allow the request (fail-open)
+        return true;
+    }
 }
 
 api.get('/init', async c => {
@@ -69,7 +96,7 @@ api.get('/init', async c => {
         });
     } catch (error) {
         console.error('[api/init] error:', error);
-        return jsonNoCache(c, { status: 'error', message: String(error) }, 400);
+        return jsonError(c, 500, 'Internal server error');
     }
 });
 
@@ -77,12 +104,34 @@ api.post('/submit-score', async c => {
     try {
         const username = await reddit.getCurrentUsername();
         if (!username) {
-            return jsonNoCache(c, { status: 'error', message: 'Not logged in' }, 401);
+            return jsonError(c, 401, 'Not logged in');
         }
 
-        const body = (await c.req.json()) as { score?: number; wave?: number };
-        const score = Number(body.score ?? 0);
-        const wave = Number(body.wave ?? 0);
+        let body: unknown;
+        try {
+            body = await c.req.json();
+        } catch {
+            return jsonError(c, 400, 'Invalid JSON body');
+        }
+
+        const payload = body as { score?: unknown; wave?: unknown };
+        const score = payload.score;
+        const wave = payload.wave;
+
+        // ── Input validation ─────────────────────────────────────────────
+        if (!isValidInt(score) || score > MAX_SCORE) {
+            return jsonError(c, 400, `Invalid score: must be integer 0–${MAX_SCORE}`);
+        }
+        if (!isValidInt(wave) || wave > MAX_WAVE) {
+            return jsonError(c, 400, `Invalid wave: must be integer 0–${MAX_WAVE}`);
+        }
+
+        // ── Rate limiting ────────────────────────────────────────────────
+        const allowed = await checkRateLimit(username);
+        if (!allowed) {
+            c.header('Retry-After', String(RATE_LIMIT_WINDOW_SEC));
+            return jsonError(c, 429, 'Too many requests. Try again later.');
+        }
 
         const existing = await redis.zScore(RANK_KEY, username);
         const isNewBest = existing == null || score > existing;
@@ -105,7 +154,7 @@ api.post('/submit-score', async c => {
         });
     } catch (error) {
         console.error('[api/submit-score] error:', error);
-        return jsonNoCache(c, { status: 'error', message: String(error) }, 400);
+        return jsonError(c, 500, 'Internal server error');
     }
 });
 
@@ -131,6 +180,6 @@ api.post('/subscribe', async c => {
         return jsonNoCache(c, { success: true });
     } catch (error) {
         console.error('[api/subscribe] error:', error);
-        return jsonNoCache(c, { success: false, message: String(error) }, 400);
+        return jsonError(c, 500, 'Internal server error');
     }
 });

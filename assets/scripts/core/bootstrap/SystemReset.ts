@@ -30,7 +30,7 @@ export class SystemReset {
      * 必须保证之后立即进行场景重载或重新初始化，否则会报错。
      */
     public static shutdown(): void {
-        console.log('[SystemReset] Shutting down all singletons...');
+        console.debug('[SystemReset] Shutting down all singletons...');
 
         // 核心管理
         GameManager.destroyInstance();
@@ -56,6 +56,6 @@ export class SystemReset {
         WeaponSelectUI.destroyInstance();
         WeaponBarUI.destroyInstance();
 
-        console.log('[SystemReset] All singletons destroyed.');
+        console.debug('[SystemReset] All singletons destroyed.');
     }
 }

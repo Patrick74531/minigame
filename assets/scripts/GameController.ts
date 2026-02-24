@@ -83,9 +83,9 @@ export class GameController extends Component {
         ResourcePreloader.preloadAll();
         CoinFactory.loadResources();
 
-        console.log('╔════════════════════════════════════════════════════╗');
-        console.log('║       KingShit MVP - Modular Version               ║');
-        console.log('╚════════════════════════════════════════════════════╝');
+        console.debug('╔════════════════════════════════════════════════════╗');
+        console.debug('║       KingShit MVP - Modular Version               ║');
+        console.debug('╚════════════════════════════════════════════════════╝');
 
         this.setupContainers();
         this.setupUI();

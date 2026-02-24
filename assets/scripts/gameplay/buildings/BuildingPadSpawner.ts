@@ -78,13 +78,13 @@ export class BuildingPadSpawner {
             this.resolveInitialVisiblePadIndexes(initialPrebuiltPadIndex);
         if (fallbackPrebuildTowerIndex >= 0) {
             const fallback = padPositions[fallbackPrebuildTowerIndex];
-            console.log(
+            console.debug(
                 `[BuildingPadSpawner] Fallback prebuild tower selected at (${fallback.x}, 0, ${fallback.z})`
             );
         }
         if (initialPrebuiltPadIndex >= 0) {
             const initial = padPositions[initialPrebuiltPadIndex];
-            console.log(
+            console.debug(
                 `[BuildingPadSpawner] Initial prebuilt tower index=${initialPrebuiltPadIndex}, pos=(${initial.x}, 0, ${initial.z})`
             );
         } else {
@@ -105,7 +105,7 @@ export class BuildingPadSpawner {
                     undefined,
                     angle
                 );
-                console.log(
+                console.debug(
                     `[BuildingPadSpawner] Pre-spawned Static Spa at (${pos.x}, 0, ${pos.z}), angle=${angle}`
                 );
                 // No pad, no upgrade zone.
@@ -119,7 +119,7 @@ export class BuildingPadSpawner {
                 padNode.setRotationFromEuler(0, angle, 0);
             }
 
-            console.log(
+            console.debug(
                 `[BuildingPadSpawner] 创建建造点: type=${pos.type}, pos=(${pos.x}, 0, ${pos.z})`
             );
 
@@ -198,12 +198,12 @@ export class BuildingPadSpawner {
             // Globally hide all upgrade pads initially for prebuilt buildings
             padNode.active = false;
 
-            console.log(
+            console.debug(
                 `[BuildingPadSpawner] Prebuilt level-1 ${pos.type} at (${pos.x}, 0, ${pos.z}), next upgrade cost=${nextUpgradeCost}`
             );
         }
 
-        console.log(
+        console.debug(
             `[BuildingPadSpawner] 创建了 ${padPositions.length} 个建造点, 父节点: ${buildingContainer.name}`
         );
 
@@ -240,7 +240,7 @@ export class BuildingPadSpawner {
             padNode.active = false;
             this._midSectionBarricadePadNodes.push(padNode);
 
-            console.log(
+            console.debug(
                 `[BuildingPadSpawner] ${lane.toUpperCase()} MID-SECTION BARRICADE PAD prepared at ` +
                     `(${placement.x}, 0, ${placement.z}), angle=${placement.angle}, runtimeIndex=${runtimeIndex}`
             );
@@ -341,7 +341,7 @@ export class BuildingPadSpawner {
             typeof laneFrontWall?.angle === 'number'
                 ? laneFrontWall.angle
                 : fallbackAngleByLane[lane];
-        console.log(
+        console.debug(
             `[BuildingPadSpawner] ${lane.toUpperCase()} MID-SECTION BARRICADE anchor resolved: ` +
                 `(${anchorX}, 0, ${anchorZ}), angle=${angle}` +
                 ` | row2Center=(${this.round2(row2CenterX)}, ${this.round2(row2CenterZ)})` +
@@ -403,7 +403,7 @@ export class BuildingPadSpawner {
             wallPad.x = this.round2(targetX);
             wallPad.z = this.round2(targetZ);
 
-            console.log(
+            console.debug(
                 `[BuildingPadSpawner] Shifted wall pad index=${index}, lane=${lane}, ` +
                     `from=(${source?.x ?? wallPad.x}, ${source?.z ?? wallPad.z}), ` +
                     `to=(${wallPad.x}, ${wallPad.z})`

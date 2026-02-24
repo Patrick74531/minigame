@@ -43,7 +43,7 @@ export class HeroWeaponManager extends Singleton<HeroWeaponManager>() {
 
     public initialize(): void {
         this.eventManager.on(GameEvents.WEAPON_PICKED, this.onWeaponPicked, this);
-        console.log('[HeroWeaponManager] 初始化完成');
+        console.debug('[HeroWeaponManager] 初始化完成');
     }
 
     public cleanup(): void {
@@ -64,7 +64,7 @@ export class HeroWeaponManager extends Singleton<HeroWeaponManager>() {
         if (existing) {
             // 已有此武器 → 升级
             existing.level++;
-            console.log(`[HeroWeaponManager] ${type} 升级到 Lv.${existing.level}`);
+            console.debug(`[HeroWeaponManager] ${type} 升级到 Lv.${existing.level}`);
             this.eventManager.emit(GameEvents.WEAPON_INVENTORY_CHANGED, {
                 weaponId: type,
                 level: existing.level,
@@ -82,7 +82,7 @@ export class HeroWeaponManager extends Singleton<HeroWeaponManager>() {
             this._activeWeaponType = type;
         }
 
-        console.log(`[HeroWeaponManager] 获得新武器: ${type} Lv.1`);
+        console.debug(`[HeroWeaponManager] 获得新武器: ${type} Lv.1`);
         this.eventManager.emit(GameEvents.WEAPON_INVENTORY_CHANGED, {
             weaponId: type,
             level: 1,
@@ -98,7 +98,7 @@ export class HeroWeaponManager extends Singleton<HeroWeaponManager>() {
 
         this._activeWeaponType = type;
         this.eventManager.emit(GameEvents.WEAPON_SWITCHED, { weaponId: type });
-        console.log(`[HeroWeaponManager] 切换武器: ${type}`);
+        console.debug(`[HeroWeaponManager] 切换武器: ${type}`);
         return true;
     }
 

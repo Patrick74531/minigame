@@ -162,7 +162,7 @@ export class BuildingPad extends BaseComponent {
         this.setupPhysics();
 
         // Previous start logic
-        console.log(
+        console.debug(
             `[BuildingPad] start() \u88ab\u8c03\u7528, buildingTypeId=${this.buildingTypeId}`
         );
 
@@ -193,7 +193,9 @@ export class BuildingPad extends BaseComponent {
 
         this.eventManager.on(GameEvents.TOWER_SELECTED, this.onTowerSelected, this);
 
-        console.log(`[BuildingPad] 初始化: ${this.buildingName}, 需要 ${this.requiredCoins} 金币`);
+        console.debug(
+            `[BuildingPad] 初始化: ${this.buildingName}, 需要 ${this.requiredCoins} 金币`
+        );
     }
 
     protected onDestroy(): void {
@@ -224,7 +226,7 @@ export class BuildingPad extends BaseComponent {
         col.on('onTriggerEnter', this.onTriggerEnter, this);
         col.on('onTriggerExit', this.onTriggerExit, this);
 
-        console.log(
+        console.debug(
             `[BuildingPad] Physics Setup Complete. BoxCollider Size: ${col.size}, Trigger: ${col.isTrigger}`
         );
     }
@@ -363,7 +365,7 @@ export class BuildingPad extends BaseComponent {
 
         this.updateDisplay();
 
-        console.log(
+        console.debug(
             `[BuildingPad] Init for existing building: ${this.buildingName}, Next Cost: ${this._nextUpgradeCost}`
         );
     }
@@ -402,7 +404,7 @@ export class BuildingPad extends BaseComponent {
         // Recompute with real built footprint even if pad was initially world-locked.
         this.placeUpgradeZoneInFront(building.node, true);
 
-        console.log(`[BuildingPad] Entered Upgrade Mode. Next Cost: ${this._nextUpgradeCost}`);
+        console.debug(`[BuildingPad] Entered Upgrade Mode. Next Cost: ${this._nextUpgradeCost}`);
     }
 
     public onAssociatedBuildingDestroyed(buildingId: string): boolean {
@@ -505,14 +507,14 @@ export class BuildingPad extends BaseComponent {
 
     private enterTowerSelection(): void {
         this._state = BuildingPadState.SELECTING;
-        console.log(`[BuildingPad] Coins collected for Tower Slot. Requesting Selection...`);
+        console.debug(`[BuildingPad] Coins collected for Tower Slot. Requesting Selection...`);
         this.eventManager.emit(GameEvents.REQUEST_TOWER_SELECTION, { padNode: this.node });
     }
 
     private onTowerSelected(data: { padNode: Node; buildingTypeId: string }): void {
         if (data.padNode !== this.node) return;
 
-        console.log(`[BuildingPad] Tower Selected: ${data.buildingTypeId}`);
+        console.debug(`[BuildingPad] Tower Selected: ${data.buildingTypeId}`);
 
         // Update type and config
         this.buildingTypeId = data.buildingTypeId;
@@ -528,7 +530,7 @@ export class BuildingPad extends BaseComponent {
         if (this.isComplete) {
             this.onBuildComplete();
         } else {
-            console.log(
+            console.debug(
                 `[BuildingPad] Selected tower is more expensive. improved collection needed.`
             );
             // Update HUD if hero is in area
@@ -547,7 +549,7 @@ export class BuildingPad extends BaseComponent {
         this._state = BuildingPadState.BUILDING;
         this._buildEmitAttempts = 0;
 
-        console.log(`[BuildingPad] 建造完成: ${this.buildingName}`);
+        console.debug(`[BuildingPad] 建造完成: ${this.buildingName}`);
 
         // 首次建造：烟雾播放完毕后才真正创建模型，避免建筑“抢跑”。
         this.playConstructionEffect(() => {

@@ -101,7 +101,7 @@ export class BuildingManager {
             this
         );
 
-        console.log('[BuildingManager] 初始化完成');
+        console.debug('[BuildingManager] 初始化完成');
     }
 
     /**
@@ -161,7 +161,7 @@ export class BuildingManager {
             return;
         }
 
-        console.log(`[BuildingManager] 建造完成: ${data.buildingTypeId}`);
+        console.debug(`[BuildingManager] 建造完成: ${data.buildingTypeId}`);
 
         // Find the Pad Component
         if (!pad) {
@@ -536,7 +536,7 @@ export class BuildingManager {
     public refreshUpgradePadVisibilityGate(): void {
         if (!this._upgradePadsUnlocked && this.areAllTowerPadsBuilt()) {
             this._upgradePadsUnlocked = true;
-            console.log('[BuildingManager] 全部塔位建成，开放所有已建建筑升级 pad');
+            console.debug('[BuildingManager] 全部塔位建成，开放所有已建建筑升级 pad');
         }
 
         for (const pad of this._pads) {

@@ -67,7 +67,7 @@ export class EnemyFlyingAnimator extends Component {
             defaultMesh.enabled = false;
         }
 
-        console.log(`[EnemyFlyingAnimator] Starting load for: ${this.modelPath}`);
+        console.debug(`[EnemyFlyingAnimator] Starting load for: ${this.modelPath}`);
         this.loadModel();
     }
 
@@ -101,7 +101,7 @@ export class EnemyFlyingAnimator extends Component {
     }
 
     private onModelLoaded(prefab: Prefab): void {
-        console.log(`[EnemyFlyingAnimator] Successfully loaded model.`);
+        console.debug(`[EnemyFlyingAnimator] Successfully loaded model.`);
         const owner = this.node as Node | null;
         if (!owner || !owner.isValid) return;
 

@@ -100,7 +100,7 @@ export class WeaponVFX {
             if (!err && texture) {
                 this._bulletTexLoading = false;
                 this._bulletTex = texture;
-                console.log('[WeaponVFX] Bullet texture loaded (Texture2D)');
+                console.debug('[WeaponVFX] Bullet texture loaded (Texture2D)');
                 return;
             }
             // 回退：尝试直接加载 Texture2D（不带 /texture 后缀）
@@ -108,7 +108,7 @@ export class WeaponVFX {
                 if (!err2 && tex2) {
                     this._bulletTexLoading = false;
                     this._bulletTex = tex2;
-                    console.log('[WeaponVFX] Bullet texture loaded (Texture2D direct)');
+                    console.debug('[WeaponVFX] Bullet texture loaded (Texture2D direct)');
                     return;
                 }
                 // 再回退：加载为 ImageAsset，手动创建 Texture2D
@@ -124,7 +124,7 @@ export class WeaponVFX {
                     const tex = new Texture2D();
                     tex.image = imgAsset;
                     this._bulletTex = tex;
-                    console.log('[WeaponVFX] Bullet texture loaded (ImageAsset → Texture2D)');
+                    console.debug('[WeaponVFX] Bullet texture loaded (ImageAsset → Texture2D)');
                 });
             });
         });
@@ -138,14 +138,14 @@ export class WeaponVFX {
             if (!err && texture) {
                 this._towerBulletTexLoading = false;
                 this._towerBulletTex = texture;
-                console.log('[WeaponVFX] Tower bullet texture loaded (Texture2D)');
+                console.debug('[WeaponVFX] Tower bullet texture loaded (Texture2D)');
                 return;
             }
             resources.load('textures/tower_bullet', Texture2D, (err2, tex2) => {
                 if (!err2 && tex2) {
                     this._towerBulletTexLoading = false;
                     this._towerBulletTex = tex2;
-                    console.log('[WeaponVFX] Tower bullet texture loaded (Texture2D direct)');
+                    console.debug('[WeaponVFX] Tower bullet texture loaded (Texture2D direct)');
                     return;
                 }
                 resources.load('textures/tower_bullet', ImageAsset, (err3, imgAsset) => {
@@ -160,7 +160,9 @@ export class WeaponVFX {
                     const tex = new Texture2D();
                     tex.image = imgAsset;
                     this._towerBulletTex = tex;
-                    console.log('[WeaponVFX] Tower bullet texture loaded (ImageAsset → Texture2D)');
+                    console.debug(
+                        '[WeaponVFX] Tower bullet texture loaded (ImageAsset → Texture2D)'
+                    );
                 });
             });
         });

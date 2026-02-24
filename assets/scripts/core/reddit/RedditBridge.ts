@@ -31,6 +31,8 @@ export class RedditBridge {
     private _isSubscribed: boolean = false;
     private _subredditName: string = '';
     private _cachedLeaderboard: LeaderboardEntry[] = [];
+    private _submitInFlight: boolean = false;
+    private _leaderboardInFlight: boolean = false;
 
     private constructor() {
         this._isRedditEnvironment = this._detectRedditEnvironment();
@@ -101,6 +103,13 @@ export class RedditBridge {
     }
 
     public submitScore(score: number, wave: number): void {
+        // Concurrent protection: drop duplicate calls while one is in-flight
+        if (this._submitInFlight) {
+            console.warn('[RedditBridge] submitScore skipped — request already in flight');
+            return;
+        }
+        this._submitInFlight = true;
+
         // Always attempt — by game-over time, requestInit has confirmed the environment.
         // On non-Devvit environments fetch will fail and be caught gracefully.
         this._fetchJson('/api/submit-score', {
@@ -130,11 +139,19 @@ export class RedditBridge {
                 });
             })
             .catch((e: unknown) => {
+                console.warn('[RedditBridge] submitScore failed:', e);
                 this._emit({ type: 'error', message: String(e) });
+            })
+            .finally(() => {
+                this._submitInFlight = false;
             });
     }
 
     public requestLeaderboard(): void {
+        // Dedup: skip if already loading
+        if (this._leaderboardInFlight) return;
+        this._leaderboardInFlight = true;
+
         // Always attempt — same reason as requestInit: mobile may have hostname='localhost'
         // causing _isRedditEnvironment=false even though the server is reachable.
         // Fall back to cache only if the fetch actually fails.
@@ -146,7 +163,11 @@ export class RedditBridge {
                 this._emit({ type: 'leaderboard', entries });
             })
             .catch(() => {
+                // Graceful degradation: emit cached data so UI never stays on "loading"
                 this._emit({ type: 'leaderboard', entries: this._cachedLeaderboard });
+            })
+            .finally(() => {
+                this._leaderboardInFlight = false;
             });
     }
 

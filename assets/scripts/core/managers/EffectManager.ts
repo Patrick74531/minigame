@@ -29,7 +29,7 @@ export class EffectManager {
     public initialize(container: Node): void {
         this._container = container;
         this.setupListeners();
-        console.log('[EffectManager] Initialized');
+        console.debug('[EffectManager] Initialized');
     }
 
     public cleanup(): void {
@@ -59,7 +59,7 @@ export class EffectManager {
         // Backward-compatible fallback: slow AOE defaults to frost rain
         if (data.effectType === 'frost_rain' || data.slowPercent > 0) {
             EffectFactory.createFrostExplosion(this._container, data.center, data.radius);
-            console.log(`[EffectManager] Playing Frost Explosion at ${data.center}`);
+            console.debug(`[EffectManager] Playing Frost Explosion at ${data.center}`);
         } else {
             // Default Explosion
             // EffectFactory.createExplosion(...)

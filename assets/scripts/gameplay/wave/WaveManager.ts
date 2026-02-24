@@ -235,7 +235,7 @@ export class WaveManager {
             }),
         });
 
-        console.log('[WaveManager] 初始化完成 (Infinite Mode)');
+        console.debug('[WaveManager] 初始化完成 (Infinite Mode)');
     }
 
     /**
@@ -275,7 +275,7 @@ export class WaveManager {
             }
         }
 
-        console.log(
+        console.debug(
             `[WaveManager] restoreToWave(${targetWave}): nextBossWave=${this._nextBossWave}, ` +
                 `unlockedLanes=[${Array.from(this._unlockedLanes).join(',')}]`
         );
@@ -448,16 +448,16 @@ export class WaveManager {
 
         const waveConfig = this._waveConfig;
 
-        console.log('═══════════════════════════════════════');
-        console.log(
+        console.debug('═══════════════════════════════════════');
+        console.debug(
             `🌊 第 ${waveNumber} 波! 敌人: ${waveConfig.enemyCount} ` +
                 `(普通:${waveConfig.regularCount} 精英:${waveConfig.eliteCount} Boss:${waveConfig.bossCount})`
         );
-        console.log(
+        console.debug(
             `[WaveManager] 组合=${wavePlan.comboKey} 模板=${wavePlan.compositionTemplateId} ` +
                 `节奏=${wavePlan.rhythmTemplateId}`
         );
-        console.log('═══════════════════════════════════════');
+        console.debug('═══════════════════════════════════════');
 
         this.emitWaveForecast(waveNumber, wavePlan);
 
@@ -528,7 +528,7 @@ export class WaveManager {
 
         // 当前版本金币仅来自击杀掉落，波次完成不再追加金币奖励。
         const bonus = 0;
-        console.log(`✅ 第 ${this._currentWave} 波完成`);
+        console.debug(`✅ 第 ${this._currentWave} 波完成`);
 
         this.eventManager.emit(GameEvents.WAVE_COMPLETE, {
             wave: this._currentWave,

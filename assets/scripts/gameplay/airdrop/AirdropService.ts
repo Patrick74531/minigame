@@ -51,7 +51,7 @@ export class AirdropService extends Singleton<AirdropService>() {
         this.eventManager.on(GameEvents.GAME_START, this.onGameStart, this);
         this.eventManager.on(GameEvents.WAVE_START, this.onWaveStart, this);
         this.eventManager.on(GameEvents.WEAPON_PICKED, this.onWeaponPicked, this);
-        console.log('[AirdropService] 初始化完成');
+        console.debug('[AirdropService] 初始化完成');
     }
 
     public cleanup(): void {
@@ -102,7 +102,7 @@ export class AirdropService extends Singleton<AirdropService>() {
             return;
         }
 
-        console.log(`[AirdropService] 空投武器: ${this._pendingWeapons.join(', ')}`);
+        console.debug(`[AirdropService] 空投武器: ${this._pendingWeapons.join(', ')}`);
 
         // 暂停游戏
         this.gameManager.pauseGame();
@@ -114,7 +114,7 @@ export class AirdropService extends Singleton<AirdropService>() {
     }
 
     private onWeaponPicked(data: { weaponId: string }): void {
-        console.log(`[AirdropService] 玩家选择武器: ${data.weaponId}`);
+        console.debug(`[AirdropService] 玩家选择武器: ${data.weaponId}`);
         this._pendingWeapons = [];
 
         // 恢复游戏（UI 层处理隐藏）
