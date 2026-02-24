@@ -65,6 +65,9 @@ export class HomePage extends Component {
         this.onCanvasResize();
         this.scheduleOnce(() => this.onCanvasResize(), 0);
 
+        // Show buttons immediately — don't wait for background texture
+        this._revealContent();
+
         this._initRedditBridge();
     }
 
@@ -116,7 +119,6 @@ export class HomePage extends Component {
 
         this._contentNode = new Node('HomeContent');
         this._contentNode.layer = this._uiLayer;
-        this._contentNode.active = false;
         this.node.addChild(this._contentNode);
 
         this._contentNode.addComponent(UITransform);
@@ -199,7 +201,6 @@ export class HomePage extends Component {
         resources.load('ui/homepage', Texture2D, (textureErr, texture) => {
             if (!textureErr && texture) {
                 this.applyBackgroundTexture(texture);
-                this._revealContent();
                 return;
             }
 
@@ -211,7 +212,6 @@ export class HomePage extends Component {
                 } else {
                     console.warn('Failed to load homepage background', imageErr ?? textureErr);
                 }
-                this._revealContent();
             });
         });
     }
@@ -394,27 +394,16 @@ export class HomePage extends Component {
         const desiredSubtitleY = centerY + (hasContinue ? step * 2.8 : step * 2.1);
         const padding = UIResponsive.getControlPadding();
         const halfHeight = size.height * 0.5;
-        const topSafeMargin = padding.top + Math.round(UIResponsive.clamp(shortSide * 0.04, 14, 28));
+        const topSafeMargin =
+            padding.top + Math.round(UIResponsive.clamp(shortSide * 0.04, 14, 28));
         const maxTitleY = halfHeight - topSafeMargin - titleH * 0.5;
         const titleY = Math.min(desiredTitleY, maxTitleY);
         const titleSubtitleGap = Math.round(UIResponsive.clamp(shortSide * 0.03, 14, 24));
         const maxSubtitleY = titleY - titleH * 0.5 - titleSubtitleGap - subtitleH * 0.5;
         const subtitleY = Math.min(desiredSubtitleY, maxSubtitleY);
 
-        this.layoutTextNode(
-            this._titleNode,
-            titleW,
-            titleH,
-            titleY,
-            titleFontSize
-        );
-        this.layoutTextNode(
-            this._subtitleNode,
-            titleW,
-            subtitleH,
-            subtitleY,
-            subtitleFontSize
-        );
+        this.layoutTextNode(this._titleNode, titleW, titleH, titleY, titleFontSize);
+        this.layoutTextNode(this._subtitleNode, titleW, subtitleH, subtitleY, subtitleFontSize);
     }
 
     private redrawContinueButton(btnNode: Node | null, width: number, height: number): void {

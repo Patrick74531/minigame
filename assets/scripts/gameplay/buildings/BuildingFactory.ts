@@ -145,6 +145,9 @@ export class BuildingFactory {
             intervalMultiplier: towerConfig.upgrades?.intervalMultiplier ?? 0.92,
             chainRangePerLevel: towerConfig.upgrades?.chainRangePerLevel ?? 0,
         });
+        const towerHealPct = towerConfig.features?.healPercentPerSecond ?? 0;
+        const towerHealInt = towerConfig.features?.healInterval ?? 2;
+        if (towerHealPct > 0) tower.setTowerHealConfig(towerHealPct, towerHealInt);
 
         return node;
     }
@@ -196,6 +199,9 @@ export class BuildingFactory {
             intervalMultiplier: frostConfig.upgrades?.intervalMultiplier ?? 0.96,
             chainRangePerLevel: frostConfig.upgrades?.chainRangePerLevel ?? 0,
         });
+        const frostHealPct = frostConfig.features?.healPercentPerSecond ?? 0;
+        const frostHealInt = frostConfig.features?.healInterval ?? 2;
+        if (frostHealPct > 0) tower.setTowerHealConfig(frostHealPct, frostHealInt);
 
         return node;
     }
@@ -362,6 +368,12 @@ export class BuildingFactory {
 
                 if (config.features.useLaserVisual !== undefined)
                     tower.useLaserVisual = config.features.useLaserVisual;
+
+                const healPct = config.features.healPercentPerSecond;
+                const healInt = config.features.healInterval;
+                if (typeof healPct === 'number' && healPct > 0) {
+                    tower.setTowerHealConfig(healPct, typeof healInt === 'number' ? healInt : 2);
+                }
             }
         }
 

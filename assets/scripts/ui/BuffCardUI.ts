@@ -305,6 +305,7 @@ export class BuffCardUI {
 
     private static readonly STAT_NAME_KEYS: Record<string, string> = {
         attack: 'ui.buff.stat.attack',
+        maxHp: 'ui.buff.stat.maxHp',
         attackInterval: 'ui.buff.stat.attackInterval',
         moveSpeed: 'ui.buff.stat.moveSpeed',
         attackRange: 'ui.buff.stat.attackRange',
@@ -320,6 +321,7 @@ export class BuffCardUI {
 
         const statKeys: (keyof BuffCardEffect)[] = [
             'attack',
+            'maxHp',
             'attackInterval',
             'moveSpeed',
             'attackRange',

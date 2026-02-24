@@ -152,6 +152,10 @@ export const BUILDING_CONFIG = {
                 attackDamage: BALANCE.building.tower.attackDamage,
                 attackInterval: BALANCE.building.tower.attackInterval,
             },
+            features: {
+                healPercentPerSecond: BALANCE.building.tower.healPercentPerSecond,
+                healInterval: BALANCE.building.tower.healInterval,
+            },
             upgrades: {
                 maxLevel: 5,
                 costMultiplier: BALANCE.building.upgradeCostMultiplier.tower,
@@ -184,6 +188,8 @@ export const BUILDING_CONFIG = {
                 bulletSlowDuration: BALANCE.building.frostTower.bulletSlowDuration,
                 directRainCast: true,
                 rainRadiusPerLevel: 0.22,
+                healPercentPerSecond: BALANCE.building.frostTower.healPercentPerSecond,
+                healInterval: BALANCE.building.frostTower.healInterval,
             },
             upgrades: {
                 maxLevel: 5,
@@ -216,6 +222,8 @@ export const BUILDING_CONFIG = {
                 chainRange: BALANCE.building.lightningTower.chainRange,
                 bulletColorHex: '#A020F0',
                 useLaserVisual: true,
+                healPercentPerSecond: BALANCE.building.lightningTower.healPercentPerSecond,
+                healInterval: BALANCE.building.lightningTower.healInterval,
             },
             upgrades: {
                 maxLevel: 5,

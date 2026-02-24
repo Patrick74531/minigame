@@ -11,6 +11,8 @@ export const WAVE_INFINITE_CONFIG = {
     COUNT_GROWTH_STEP_BONUS: BALANCE.waveInfinite.countGrowthStepBonus,
     BASE_HP_MULT: 1,
     HP_MULT_PER_WAVE: BALANCE.waveInfinite.hpMultPerWave,
+    HP_ACCEL_WAVE_THRESHOLD: BALANCE.waveInfinite.hpAccelWaveThreshold,
+    HP_ACCEL_PER_WAVE: BALANCE.waveInfinite.hpAccelPerWave,
     BASE_ATTACK_MULT: 1,
     ATTACK_MULT_PER_WAVE: BALANCE.waveInfinite.attackMultPerWave,
     /** 下路开放（第3刷怪口解锁）后，每波额外追加的HP增长倍率 */

@@ -95,6 +95,10 @@ export class Tower extends Building {
     public chainRangePerLevel: number = 0;
     public chainCountPerLevel: number = 0;
 
+    private _healPercentPerSecond: number = 0;
+    private _healInterval: number = 2;
+    private _healTimer: number = 0;
+
     private _attackTimer: number = 0;
     private _target: Node | null = null;
     private _cachedMachineGunMuzzleY: number | null = null;
@@ -105,10 +109,29 @@ export class Tower extends Building {
     @property
     public rotationSpeed: number = 5;
 
+    public setTowerHealConfig(healPercent: number, healInterval: number): void {
+        this._healPercentPerSecond = Math.max(0, healPercent);
+        this._healInterval = Math.max(0.1, healInterval);
+    }
+
     protected update(dt: number): void {
-        super.update(dt); // Handles HP?
+        super.update(dt);
 
         if (!this.isAlive) return;
+
+        if (this._healPercentPerSecond > 0 && this.currentHp < this.maxHp) {
+            this._healTimer += dt;
+            while (this._healTimer >= this._healInterval) {
+                this._healTimer -= this._healInterval;
+                const healAmount = Math.max(
+                    1,
+                    Math.ceil(this.maxHp * this._healPercentPerSecond * this._healInterval)
+                );
+                this.heal(healAmount);
+            }
+        } else {
+            this._healTimer = 0;
+        }
 
         this._attackTimer += dt;
 

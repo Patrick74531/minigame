@@ -223,7 +223,13 @@ export const GameConfig = {
                 id: 'blue_attack',
                 nameKey: 'buff.card.blue_attack.name',
                 rarity: 'blue',
-                effects: { attack: { multiply: 1.08 } },
+                effects: { attack: { multiply: 1.05 } },
+            },
+            {
+                id: 'blue_hp',
+                nameKey: 'buff.card.blue_hp.name',
+                rarity: 'blue',
+                effects: { maxHp: { multiply: 1.12 } },
             },
             {
                 id: 'blue_speed',
@@ -262,8 +268,8 @@ export const GameConfig = {
                 nameKey: 'buff.card.purple_warrior.name',
                 rarity: 'purple',
                 effects: {
-                    attack: { multiply: 1.1 },
-                    critRate: { add: 0.04 },
+                    attack: { multiply: 1.06 },
+                    maxHp: { multiply: 1.1 },
                 },
             },
             {
@@ -290,7 +296,16 @@ export const GameConfig = {
                 rarity: 'purple',
                 effects: {
                     attackRange: { multiply: 1.08 },
-                    attack: { multiply: 1.08 },
+                    attack: { multiply: 1.05 },
+                },
+            },
+            {
+                id: 'purple_fortify',
+                nameKey: 'buff.card.purple_fortify.name',
+                rarity: 'purple',
+                effects: {
+                    maxHp: { multiply: 1.15 },
+                    moveSpeed: { multiply: 1.04 },
                 },
             },
             {
@@ -298,7 +313,7 @@ export const GameConfig = {
                 nameKey: 'buff.card.purple_training.name',
                 rarity: 'purple',
                 effects: {
-                    attack: { multiply: 1.06 },
+                    attack: { multiply: 1.04 },
                     moveSpeed: { multiply: 1.04 },
                     critRate: { add: 0.03 },
                 },
@@ -310,7 +325,8 @@ export const GameConfig = {
                 nameKey: 'buff.card.gold_wargod.name',
                 rarity: 'gold',
                 effects: {
-                    attack: { multiply: 1.15 },
+                    attack: { multiply: 1.08 },
+                    maxHp: { multiply: 1.15 },
                     attackInterval: { multiply: 0.93 },
                     attackRange: { multiply: 1.06 },
                 },
@@ -322,7 +338,7 @@ export const GameConfig = {
                 effects: {
                     critRate: { add: 0.08 },
                     critDamage: { add: 0.3 },
-                    attack: { multiply: 1.08 },
+                    attack: { multiply: 1.05 },
                 },
             },
             {
@@ -330,7 +346,8 @@ export const GameConfig = {
                 nameKey: 'buff.card.gold_berserker.name',
                 rarity: 'gold',
                 effects: {
-                    attack: { multiply: 1.12 },
+                    attack: { multiply: 1.06 },
+                    maxHp: { multiply: 1.12 },
                     attackInterval: { multiply: 0.94 },
                     moveSpeed: { multiply: 1.06 },
                     critRate: { add: 0.04 },
@@ -341,7 +358,8 @@ export const GameConfig = {
                 nameKey: 'buff.card.gold_perfection.name',
                 rarity: 'gold',
                 effects: {
-                    attack: { multiply: 1.08 },
+                    attack: { multiply: 1.05 },
+                    maxHp: { multiply: 1.1 },
                     attackInterval: { multiply: 0.96 },
                     moveSpeed: { multiply: 1.04 },
                     attackRange: { multiply: 1.04 },
@@ -462,7 +480,7 @@ export const GameConfig = {
                 iconPath: 'icon/gannon',
                 levels: [
                     {
-                        damage: 60,
+                        damage: 50,
                         attackInterval: 1.2,
                         range: 6.9,
                         projectileSpeed: 18,
@@ -470,7 +488,7 @@ export const GameConfig = {
                         spinSpeed: 15,
                     },
                     {
-                        damage: 92,
+                        damage: 78,
                         attackInterval: 1.1,
                         range: 7.2,
                         projectileSpeed: 19,
@@ -478,7 +496,7 @@ export const GameConfig = {
                         spinSpeed: 18,
                     },
                     {
-                        damage: 130,
+                        damage: 110,
                         attackInterval: 1.0,
                         range: 7.5,
                         projectileSpeed: 20,
@@ -486,7 +504,7 @@ export const GameConfig = {
                         spinSpeed: 20,
                     },
                     {
-                        damage: 176,
+                        damage: 150,
                         attackInterval: 0.9,
                         range: 7.8,
                         projectileSpeed: 21,
@@ -494,7 +512,7 @@ export const GameConfig = {
                         spinSpeed: 22,
                     },
                     {
-                        damage: 240,
+                        damage: 205,
                         attackInterval: 0.8,
                         range: 8.1,
                         projectileSpeed: 22,
@@ -511,7 +529,7 @@ export const GameConfig = {
                 iconPath: 'icon/signal',
                 levels: [
                     {
-                        damage: 80,
+                        damage: 55,
                         attackInterval: 2.0,
                         range: 5.4,
                         waveSpeed: 8,
@@ -520,7 +538,7 @@ export const GameConfig = {
                         slowDuration: 1.6,
                     },
                     {
-                        damage: 118,
+                        damage: 82,
                         attackInterval: 1.8,
                         range: 5.9,
                         waveSpeed: 9,
@@ -529,7 +547,7 @@ export const GameConfig = {
                         slowDuration: 1.9,
                     },
                     {
-                        damage: 160,
+                        damage: 112,
                         attackInterval: 1.6,
                         range: 6.4,
                         waveSpeed: 10,
@@ -538,7 +556,7 @@ export const GameConfig = {
                         slowDuration: 2.2,
                     },
                     {
-                        damage: 204,
+                        damage: 145,
                         attackInterval: 1.4,
                         range: 6.9,
                         waveSpeed: 11,
@@ -547,7 +565,7 @@ export const GameConfig = {
                         slowDuration: 2.5,
                     },
                     {
-                        damage: 250,
+                        damage: 180,
                         attackInterval: 1.2,
                         range: 7.4,
                         waveSpeed: 12,

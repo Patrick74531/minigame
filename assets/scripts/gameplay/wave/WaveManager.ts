@@ -399,10 +399,16 @@ export class WaveManager {
         const adjustedEliteCount = bossOnly ? 0 : eliteCountBase;
         const openWave3 = infinite.SPAWN_PORTALS?.OPEN_WAVE_3 ?? 8;
         const lane3ExtraWaves = Math.max(0, waveNumber - openWave3);
+        const accelThreshold = infinite.HP_ACCEL_WAVE_THRESHOLD ?? 15;
+        const accelExtra =
+            waveNumber > accelThreshold
+                ? Math.pow(waveNumber - accelThreshold, 2) * (infinite.HP_ACCEL_PER_WAVE ?? 0)
+                : 0;
         const hpMult =
             infinite.BASE_HP_MULT +
             waveIndex * infinite.HP_MULT_PER_WAVE +
-            lane3ExtraWaves * infinite.POST_LANE3_HP_EXTRA_PER_WAVE;
+            lane3ExtraWaves * infinite.POST_LANE3_HP_EXTRA_PER_WAVE +
+            accelExtra;
         const atkMult =
             infinite.BASE_ATTACK_MULT +
             waveIndex * infinite.ATTACK_MULT_PER_WAVE +

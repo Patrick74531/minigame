@@ -30,6 +30,8 @@ export interface BalanceProfile {
         countGrowthStepWaves: number;
         countGrowthStepBonus: number;
         hpMultPerWave: number;
+        hpAccelWaveThreshold: number;
+        hpAccelPerWave: number;
         attackMultPerWave: number;
         speedMultPerWave: number;
         maxSpeedMult: number;
@@ -168,6 +170,8 @@ export interface BalanceProfile {
             attackDamage: number;
             attackInterval: number;
             statMultiplier: number;
+            healPercentPerSecond: number;
+            healInterval: number;
             attackMultiplier: number;
             rangeMultiplier: number;
             intervalMultiplier: number;
@@ -195,6 +199,8 @@ export interface BalanceProfile {
             bulletSlowPercent: number;
             bulletSlowDuration: number;
             statMultiplier: number;
+            healPercentPerSecond: number;
+            healInterval: number;
             attackMultiplier: number;
             rangeMultiplier: number;
             intervalMultiplier: number;
@@ -207,6 +213,8 @@ export interface BalanceProfile {
             chainCount: number;
             chainRange: number;
             statMultiplier: number;
+            healPercentPerSecond: number;
+            healInterval: number;
             attackMultiplier: number;
             rangeMultiplier: number;
             intervalMultiplier: number;
@@ -357,6 +365,8 @@ const BASE = {
         countGrowthStepWaves: 3,
         countGrowthStepBonus: 4,
         hpMultPerWave: 0.36,
+        hpAccelWaveThreshold: 15,
+        hpAccelPerWave: 0.08,
         attackMultPerWave: 0.11,
         speedMultPerWave: 0.015,
         maxSpeedMult: 1.55,
@@ -494,7 +504,9 @@ const BASE = {
             attackRange: 12.5,
             attackDamage: 18,
             attackInterval: 0.36,
-            statMultiplier: 1.24,
+            statMultiplier: 1.45,
+            healPercentPerSecond: 0.01,
+            healInterval: 2,
             attackMultiplier: 1.12,
             rangeMultiplier: 1.02,
             intervalMultiplier: 0.96,
@@ -521,7 +533,9 @@ const BASE = {
             bulletExplosionRadius: 2.8,
             bulletSlowPercent: 0.45,
             bulletSlowDuration: 2.2,
-            statMultiplier: 1.22,
+            statMultiplier: 1.42,
+            healPercentPerSecond: 0.01,
+            healInterval: 2,
             attackMultiplier: 1.08,
             rangeMultiplier: 1.01,
             intervalMultiplier: 0.97,
@@ -533,7 +547,9 @@ const BASE = {
             attackInterval: 0.9,
             chainCount: 3,
             chainRange: 5.2,
-            statMultiplier: 1.24,
+            statMultiplier: 1.45,
+            healPercentPerSecond: 0.01,
+            healInterval: 2,
             attackMultiplier: 1.1,
             rangeMultiplier: 1.01,
             intervalMultiplier: 0.96,
@@ -561,7 +577,7 @@ const BASE = {
         wall: {
             hp: 1450,
             tauntRange: 15,
-            statMultiplier: 1.52,
+            statMultiplier: 1.35,
         },
     },
     soldier: {
@@ -884,6 +900,8 @@ function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): Bal
                 BASE.waveInfinite.countGrowthStepBonus * assumptions.enemyCountScale
             ),
             hpMultPerWave: round2(BASE.waveInfinite.hpMultPerWave * assumptions.enemyPowerScale),
+            hpAccelWaveThreshold: BASE.waveInfinite.hpAccelWaveThreshold,
+            hpAccelPerWave: round2(BASE.waveInfinite.hpAccelPerWave * assumptions.enemyPowerScale),
             attackMultPerWave: round2(
                 BASE.waveInfinite.attackMultPerWave * assumptions.enemyPowerScale
             ),
@@ -1144,6 +1162,8 @@ function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): Bal
                         1 + (BASE.building.tower.statMultiplier - 1) * assumptions.playerPowerScale
                     )
                 ),
+                healPercentPerSecond: round2(BASE.building.tower.healPercentPerSecond),
+                healInterval: round2(BASE.building.tower.healInterval),
                 attackMultiplier: round2(
                     1 + (BASE.building.tower.attackMultiplier - 1) * assumptions.playerPowerScale
                 ),
@@ -1187,6 +1207,8 @@ function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): Bal
                                 assumptions.playerPowerScale
                     )
                 ),
+                healPercentPerSecond: round2(BASE.building.frostTower.healPercentPerSecond),
+                healInterval: round2(BASE.building.frostTower.healInterval),
                 attackMultiplier: round2(
                     1 +
                         (BASE.building.frostTower.attackMultiplier - 1) *
@@ -1229,6 +1251,8 @@ function buildProfile(id: BalancePresetId, assumptions: BalanceAssumptions): Bal
                                 assumptions.playerPowerScale
                     )
                 ),
+                healPercentPerSecond: round2(BASE.building.lightningTower.healPercentPerSecond),
+                healInterval: round2(BASE.building.lightningTower.healInterval),
                 attackMultiplier: round2(
                     1 +
                         (BASE.building.lightningTower.attackMultiplier - 1) *
@@ -1472,7 +1496,13 @@ export function calculateWaveSnapshot(
         Math.floor(waveIndex / profile.waveInfinite.countGrowthStepWaves) *
             profile.waveInfinite.countGrowthStepBonus;
 
-    const enemyHpMultiplier = 1 + waveIndex * profile.waveInfinite.hpMultPerWave;
+    const linearHp = 1 + waveIndex * profile.waveInfinite.hpMultPerWave;
+    const accelThreshold = profile.waveInfinite.hpAccelWaveThreshold;
+    const accelExtra =
+        wave > accelThreshold
+            ? Math.pow(wave - accelThreshold, 2) * profile.waveInfinite.hpAccelPerWave
+            : 0;
+    const enemyHpMultiplier = linearHp + accelExtra;
     const enemyAttackMultiplier = 1 + waveIndex * profile.waveInfinite.attackMultPerWave;
     const enemySpeedMultiplier = Math.min(
         profile.waveInfinite.maxSpeedMult,

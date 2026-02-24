@@ -659,14 +659,20 @@ export class Hero extends Unit {
      * 支持 multiply（乘算）和 add（加算）两种模式
      */
     public applyBuffCard(effects: BuffCardEffect): void {
+        const prevMaxHp = this._stats.maxHp;
         this.applyBuffStat('attack', effects.attack);
         this.applyBuffStat('attackInterval', effects.attackInterval);
         this.applyBuffStat('moveSpeed', effects.moveSpeed);
         this.applyBuffStat('attackRange', effects.attackRange);
+        this.applyBuffStat('maxHp', effects.maxHp);
         this.applyBuffStat('critRate', effects.critRate);
         this.applyBuffStat('critDamage', effects.critDamage);
 
         this.recalcStats();
+        if (this._stats.maxHp > prevMaxHp) {
+            const hpGain = this._stats.maxHp - prevMaxHp;
+            this.heal(hpGain, false);
+        }
         this.updateHealthBar();
     }
 

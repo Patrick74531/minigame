@@ -15,6 +15,8 @@ export interface BuffCardEffect {
     attackInterval?: { multiply?: number; add?: number };
     moveSpeed?: { multiply?: number; add?: number };
     attackRange?: { multiply?: number; add?: number };
+    /** 最大生命值 (multiply: 1.1 = +10% 血量) */
+    maxHp?: { multiply?: number; add?: number };
     /** 暴击率增量 (add: 0.05 = +5% 暴击率) */
     critRate?: { multiply?: number; add?: number };
     /** 暴击伤害增量 (add: 0.3 = +30% 暴击伤害) */
@@ -170,6 +172,7 @@ export class BuffCardService extends Singleton<BuffCardService>() {
             attackInterval: this.scaleStatModifier(effects.attackInterval, multiplyScale, addScale),
             moveSpeed: this.scaleStatModifier(effects.moveSpeed, multiplyScale, addScale),
             attackRange: this.scaleStatModifier(effects.attackRange, multiplyScale, addScale),
+            maxHp: this.scaleStatModifier(effects.maxHp, multiplyScale, addScale),
             critRate: this.scaleStatModifier(effects.critRate, multiplyScale, addScale),
             critDamage: this.scaleStatModifier(effects.critDamage, multiplyScale, addScale),
         };
