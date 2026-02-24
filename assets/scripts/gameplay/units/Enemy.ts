@@ -274,6 +274,19 @@ export class Enemy extends Unit {
             );
         }
 
+        // 边界反推：防止敌人嵌入上下路边界山体后卡死
+        const mapLimitX = GameConfig.MAP.LIMITS.x - 1.0;
+        const mapLimitZ = GameConfig.MAP.LIMITS.z - 1.0;
+        const curPos = this.node.position;
+        const clampedX = Math.max(-mapLimitX, Math.min(mapLimitX, curPos.x));
+        const clampedZ = Math.max(-mapLimitZ, Math.min(mapLimitZ, curPos.z));
+        if (clampedX !== curPos.x || clampedZ !== curPos.z) {
+            this.node.setPosition(clampedX, GameConfig.PHYSICS.ENEMY_Y, clampedZ);
+            if (this._rbCachedEnemy && this._rbCachedEnemy.type === RigidBody.Type.DYNAMIC) {
+                this._rbCachedEnemy.setLinearVelocity(Vec3.ZERO);
+            }
+        }
+
         // Face target (paper-doll enemy uses billboard visuals, so root rotation is unnecessary).
         if (!this.isPaperDoll()) {
             Enemy._tmpLookAt.set(moveTargetX, GameConfig.PHYSICS.ENEMY_Y, moveTargetZ);
@@ -649,9 +662,7 @@ export class Enemy extends Unit {
 
         const pos = this.node.position.clone();
         pos.y += isCrit ? 1.2 : 0.95;
-        const sparkColor = isCrit
-            ? new Color(255, 214, 92, 255)
-            : new Color(255, 160, 140, 255);
+        const sparkColor = isCrit ? new Color(255, 214, 92, 255) : new Color(255, 160, 140, 255);
         WeaponVFX.createHitSpark(parent, pos, sparkColor);
     }
 

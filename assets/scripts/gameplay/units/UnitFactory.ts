@@ -131,9 +131,9 @@ export class UnitFactory {
 
         // Apply 0.7 scale to normal enemies (not elite, not boss, not turret)
         const modelPath = options.modelPath ?? '';
-        const isBoss = modelPath.includes('boss/');
+        const isBossSpawn = (options.spawnType ?? '') === 'boss';
         const isTurret = modelPath.includes('vehicle/Enemy_Turret');
-        if (!isElite && !isBoss && !isTurret) {
+        if (!isElite && !isBossSpawn && !isTurret) {
             scaleMultiplier *= 0.7;
         }
 
@@ -175,6 +175,8 @@ export class UnitFactory {
         const attackMultiplier = options.attackMultiplier ?? 1;
         const speedMultiplier = options.speedMultiplier ?? 1;
 
+        const resolvedSpawnType = options.spawnType ?? (isElite ? 'elite' : 'regular');
+
         enemy.initStats({
             maxHp: GameConfig.ENEMY.BASE_HP * hpMultiplier,
             attack: GameConfig.ENEMY.BASE_ATTACK * attackMultiplier,
@@ -184,7 +186,7 @@ export class UnitFactory {
         });
         enemy.setVariant({
             isElite,
-            spawnType: options.spawnType ?? (isElite ? 'elite' : 'regular'),
+            spawnType: resolvedSpawnType,
         });
         enemy.setCombatProfile({
             aggroRange: options.aggroRange ?? GameConfig.ENEMY.AGGRO_RANGE,
@@ -203,9 +205,10 @@ export class UnitFactory {
             attackType: options.attackType,
         });
 
-        // 血条：boss 常驻显示在头顶，普通敌人仅受伤时显示
+        // 血条样式由 spawnType 决定（而非 modelPath），确保复用 boss 模型的普通怪使用普通血条
+        const isBossHealthBar = resolvedSpawnType === 'boss';
         const hb = node.addComponent(HealthBar);
-        if (isBoss) {
+        if (isBossHealthBar) {
             hb.width = 120;
             hb.height = 10;
             hb.yOffset = 5.5;

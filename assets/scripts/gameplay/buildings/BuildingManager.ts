@@ -120,6 +120,15 @@ export class BuildingManager {
         }
     }
 
+    public get isInterWaveWaiting(): boolean {
+        return this._isInterWaveWaiting;
+    }
+
+    /** 仅执行波间回血（供 BuildingSystemTick 在 isPlaying=false 时调用） */
+    public tickInterWaveHeal(dt: number): void {
+        this.healWallsDuringInterWave(dt);
+    }
+
     /**
      * 每帧更新
      */

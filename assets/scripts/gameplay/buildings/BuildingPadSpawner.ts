@@ -191,10 +191,8 @@ export class BuildingPadSpawner {
 
             const nextUpgradeCost = this.resolveInitialUpgradeCost();
             pad.initForExistingBuilding(building, nextUpgradeCost);
-            if (pos.type === 'wall') {
-                // Keep prebuilt wall upgrade-pad distance consistent with runtime-built walls.
-                pad.placeUpgradeZoneInFront(buildingNode, true);
-            }
+            // 所有预建建筑类型都需要将升级 pad 移到建筑前方，避免 pad 与建筑重叠
+            pad.placeUpgradeZoneInFront(buildingNode, true);
 
             // Globally hide all upgrade pads initially for prebuilt buildings
             padNode.active = false;
@@ -339,7 +337,9 @@ export class BuildingPadSpawner {
             bottom: 0,
         };
         const angle =
-            typeof laneFrontWall?.angle === 'number' ? laneFrontWall.angle : fallbackAngleByLane[lane];
+            typeof laneFrontWall?.angle === 'number'
+                ? laneFrontWall.angle
+                : fallbackAngleByLane[lane];
         console.log(
             `[BuildingPadSpawner] ${lane.toUpperCase()} MID-SECTION BARRICADE anchor resolved: ` +
                 `(${anchorX}, 0, ${anchorZ}), angle=${angle}` +

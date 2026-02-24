@@ -424,8 +424,10 @@ export class Bullet extends BaseComponent implements IPoolable {
             this.applyDamage(unit);
         }
 
-        // 击退效果
-        if (this.knockbackForce > 0) {
+        // 击退效果（boss 免疫击退与硬直）
+        const enemyComp = unit.node.getComponent(Enemy);
+        const isBossUnit = enemyComp?.spawnType === 'boss';
+        if (this.knockbackForce > 0 && !isBossUnit) {
             let dirX = this.knockbackDirX;
             let dirZ = this.knockbackDirZ;
             let lenXZ = Math.sqrt(dirX * dirX + dirZ * dirZ);
