@@ -1,16 +1,59 @@
 import {
+    _decorator,
+    Component,
     Node,
     Vec3,
+    Quat,
     Label,
     Color,
-    Billboard,
+    Camera,
     RenderRoot2D,
+    director,
     UIOpacity,
     tween,
     LabelOutline,
+    LabelShadow,
 } from 'cc';
 
 export type DamageNumberStyle = 'default' | 'enemyHit' | 'heal';
+
+const { ccclass } = _decorator;
+
+@ccclass('DamageNumberFacing')
+class DamageNumberFacing extends Component {
+    private _cameraNode: Node | null = null;
+    private static readonly _lookAtPos = new Vec3();
+    private static readonly _flipY180 = (() => {
+        const q = new Quat();
+        Quat.fromEuler(q, 0, 180, 0);
+        return q;
+    })();
+
+    protected lateUpdate(): void {
+        const cameraNode = this.resolveCameraNode();
+        if (!cameraNode || !cameraNode.isValid || !this.node.isValid) return;
+
+        cameraNode.getWorldPosition(DamageNumberFacing._lookAtPos);
+        this.node.lookAt(DamageNumberFacing._lookAtPos);
+        // Label front-face is opposite to Node.forward in this setup, flip once to avoid mirrored text.
+        this.node.rotate(DamageNumberFacing._flipY180);
+    }
+
+    private resolveCameraNode(): Node | null {
+        if (this._cameraNode && this._cameraNode.isValid && this._cameraNode.activeInHierarchy) {
+            return this._cameraNode;
+        }
+
+        const scene = director.getScene();
+        if (!scene) return null;
+        const cameras = scene.getComponentsInChildren(Camera);
+        if (cameras.length <= 0) return null;
+
+        const activeCamera = cameras.find(cam => cam.enabledInHierarchy && cam.node.activeInHierarchy);
+        this._cameraNode = (activeCamera ?? cameras[0]).node;
+        return this._cameraNode;
+    }
+}
 
 /**
  * 浮动伤害数字工厂
@@ -23,8 +66,10 @@ export class DamageNumberFactory {
     private static readonly COLOR_NORMAL = new Color(255, 255, 255, 255);
     private static readonly COLOR_ENEMY_HIT = new Color(255, 70, 70, 255);
     private static readonly COLOR_HEAL = new Color(80, 255, 120, 255);
-    private static readonly COLOR_CRIT = new Color(255, 60, 30, 255);
-    private static readonly COLOR_CRIT_OUTLINE = new Color(255, 200, 0, 255);
+    private static readonly COLOR_CRIT = new Color(255, 245, 60, 255);
+    private static readonly COLOR_CRIT_OUTLINE = new Color(255, 50, 10, 255);
+    private static readonly COLOR_CRIT_SHADOW = new Color(180, 0, 0, 200);
+    private static readonly FONT_FAMILY = 'Arial Black';
 
     // 每个单位的伤害数字节流（避免高射速武器刷屏）
     private static readonly THROTTLE_INTERVAL = 0.15; // 秒
@@ -103,34 +148,32 @@ export class DamageNumberFactory {
             root = new Node('DmgNum');
             parent.addChild(root);
             root.addComponent(RenderRoot2D);
-            root.addComponent(Billboard);
+            root.addComponent(DamageNumberFacing);
+        }
+        if (!root.getComponent(DamageNumberFacing)) {
+            root.addComponent(DamageNumberFacing);
         }
         DamageNumberFactory._activeCount++;
 
-        // 随机水平偏移，避免数字重叠
-        const offsetX = (Math.random() - 0.5) * 0.6;
-        const offsetZ = (Math.random() - 0.5) * 0.3;
-        const startY = worldPos.y + 1.8;
-        root.setWorldPosition(worldPos.x + offsetX, startY, worldPos.z + offsetZ);
-
         const isEnemyHitStyle = !isCrit && style === 'enemyHit';
         const isHealStyle = !isCrit && style === 'heal';
-        const baseScale = isCrit ? 0.016 : isEnemyHitStyle ? 0.009 : isHealStyle ? 0.01 : 0.011;
+        // 暴击和普通数字使用不同偏移幅度，减少多人群战时的重叠
+        const offsetX = (Math.random() - 0.5) * (isCrit ? 1.0 : 0.8);
+        const offsetZ = (Math.random() - 0.5) * (isCrit ? 0.5 : 0.35);
+        const startY = worldPos.y + 1.72 + Math.random() * 0.14;
+        root.setWorldPosition(worldPos.x + offsetX, startY, worldPos.z + offsetZ);
+
+        const baseScale = isCrit ? 0.016 : isEnemyHitStyle ? 0.009 : isHealStyle ? 0.01 : 0.01;
         root.setScale(baseScale, baseScale, baseScale);
 
-        // 标签节点
-        const labelNode = new Node('Label');
-        root.addChild(labelNode);
+        // 文本根节点
+        const textRoot = new Node('TextRoot');
+        root.addChild(textRoot);
 
-        const label = labelNode.addComponent(Label);
-        label.string = isCrit ? `${damage}!` : isHealStyle ? `+${damage}` : `${damage}`;
-        label.fontSize = isCrit ? 40 : isEnemyHitStyle ? 26 : isHealStyle ? 28 : 30;
-        label.lineHeight = isCrit ? 44 : isEnemyHitStyle ? 30 : isHealStyle ? 32 : 34;
-        label.isBold = true;
-        label.overflow = Label.Overflow.NONE;
-        label.horizontalAlign = Label.HorizontalAlign.CENTER;
-        label.verticalAlign = Label.VerticalAlign.CENTER;
-        label.color = isCrit
+        const text = isCrit ? `${damage}` : isHealStyle ? `+${damage}` : `${damage}`;
+        const fontSize = isCrit ? 42 : isEnemyHitStyle ? 26 : isHealStyle ? 28 : 30;
+        const lineHeight = isCrit ? 46 : isEnemyHitStyle ? 30 : isHealStyle ? 32 : 34;
+        const color = isCrit
             ? DamageNumberFactory.COLOR_CRIT
             : isEnemyHitStyle
               ? DamageNumberFactory.COLOR_ENEMY_HIT
@@ -138,21 +181,12 @@ export class DamageNumberFactory {
                 ? DamageNumberFactory.COLOR_HEAL
                 : DamageNumberFactory.COLOR_NORMAL;
 
-        // 所有伤害数字加描边，提高可读性
-        const outline = labelNode.addComponent(LabelOutline);
-        if (isCrit) {
-            outline.color = DamageNumberFactory.COLOR_CRIT_OUTLINE;
-            outline.width = 3;
-        } else if (isHealStyle) {
-            outline.color = new Color(0, 80, 0, 180);
-            outline.width = 2;
-        } else {
-            outline.color = new Color(0, 0, 0, 180);
-            outline.width = 2;
-        }
+        const labelNode = new Node('Label');
+        textRoot.addChild(labelNode);
+        this.configureLabelNode(labelNode, text, fontSize, lineHeight, color, isCrit, isHealStyle);
 
         // 透明度控制
-        const opacity = labelNode.addComponent(UIOpacity);
+        const opacity = textRoot.addComponent(UIOpacity);
         opacity.opacity = 255;
 
         // ====== 动画 ======
@@ -175,16 +209,40 @@ export class DamageNumberFactory {
         };
 
         if (isCrit) {
-            // 暴击：先放大弹跳再上飘
+            // 暴击：强力弹跳 + 水平抖动 + 浮起
             const peakScale = baseScale * 1.6;
-            root.setScale(0.01, 0.01, 0.01);
+            const settleScale = baseScale * 1.06;
+            root.setScale(0.006, 0.006, 0.006);
+
+            // 主体动画：弹入 → 过冲 → 回弹 → 上飘
             tween(root)
-                .to(0.08, { scale: new Vec3(peakScale, peakScale, peakScale) })
-                .to(0.1, { scale: new Vec3(baseScale, baseScale, baseScale) })
-                .to(duration - 0.18, {
+                .to(
+                    0.06,
+                    { scale: new Vec3(peakScale, peakScale, peakScale) },
+                    { easing: 'quadOut' }
+                )
+                .to(0.06, { scale: new Vec3(baseScale * 0.85, baseScale * 0.85, baseScale * 0.85) })
+                .to(0.05, { scale: new Vec3(settleScale, settleScale, settleScale) })
+                .to(duration - 0.17, {
                     position: new Vec3(worldPos.x + offsetX, endY, worldPos.z + offsetZ),
+                    scale: new Vec3(baseScale * 0.7, baseScale * 0.7, baseScale * 0.7),
                 })
                 .call(recycleFn)
+                .start();
+
+            // 水平快速抖动增强冲击感
+            const shakeAmplitude = 0.08;
+            tween(textRoot)
+                .to(0.03, { position: new Vec3(shakeAmplitude, 0, 0) })
+                .to(0.03, { position: new Vec3(-shakeAmplitude, 0, 0) })
+                .to(0.03, { position: new Vec3(shakeAmplitude * 0.5, 0, 0) })
+                .to(0.03, { position: new Vec3(0, 0, 0) })
+                .start();
+
+            // 暴击渐隐稍晚开始，保持冲击显示时间
+            tween(opacity)
+                .delay(duration * 0.6)
+                .to(duration * 0.4, { opacity: 0 })
                 .start();
         } else {
             // 普通：直接上飘
@@ -194,12 +252,51 @@ export class DamageNumberFactory {
                 })
                 .call(recycleFn)
                 .start();
-        }
 
-        // 渐隐
-        tween(opacity)
-            .delay(duration * 0.5)
-            .to(duration * 0.5, { opacity: 0 })
-            .start();
+            // 渐隐
+            tween(opacity)
+                .delay(duration * 0.5)
+                .to(duration * 0.5, { opacity: 0 })
+                .start();
+        }
+    }
+
+    private static configureLabelNode(
+        labelNode: Node,
+        text: string,
+        fontSize: number,
+        lineHeight: number,
+        color: Color,
+        isCrit: boolean,
+        isHealStyle: boolean
+    ): void {
+        const label = labelNode.addComponent(Label);
+        label.string = text;
+        label.fontSize = fontSize;
+        label.lineHeight = lineHeight;
+        label.isBold = true;
+        label.overflow = Label.Overflow.NONE;
+        label.horizontalAlign = Label.HorizontalAlign.CENTER;
+        label.verticalAlign = Label.VerticalAlign.CENTER;
+        label.color = color;
+        label.cacheMode = Label.CacheMode.CHAR;
+        label.useSystemFont = true;
+        label.fontFamily = DamageNumberFactory.FONT_FAMILY;
+
+        const outline = labelNode.addComponent(LabelOutline);
+        if (isCrit) {
+            outline.color = DamageNumberFactory.COLOR_CRIT_OUTLINE;
+            outline.width = 4;
+            const shadow = labelNode.addComponent(LabelShadow);
+            shadow.color = DamageNumberFactory.COLOR_CRIT_SHADOW;
+            shadow.offset.set(3, -3);
+            shadow.blur = 6;
+        } else if (isHealStyle) {
+            outline.color = new Color(0, 80, 0, 180);
+            outline.width = 2;
+        } else {
+            outline.color = new Color(0, 0, 0, 180);
+            outline.width = 2;
+        }
     }
 }

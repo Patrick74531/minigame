@@ -2,8 +2,8 @@ import { AudioClip, AudioSource, Node, director, resources } from 'cc';
 import { WeaponType } from './WeaponTypes';
 import { AudioSettingsManager } from '../../core/managers/AudioSettingsManager';
 
-type WeaponSfxKey = 'fire' | 'gun' | 'laser' | 'disturb';
-type LoopSfxKey = 'fire' | 'gun';
+type WeaponSfxKey = 'fire' | 'gun' | 'laser' | 'disturb' | 'chainsaw';
+type LoopSfxKey = 'fire' | 'gun' | 'chainsaw';
 
 /**
  * WeaponSFXManager
@@ -23,16 +23,17 @@ export class WeaponSFXManager {
         gun: 'sound/gun',
         laser: 'sound/laser',
         disturb: 'sound/disturb',
+        chainsaw: 'sound/chainsaw',
     };
 
     private static readonly LOOP_WEAPON_MAP: Partial<Record<WeaponType, LoopSfxKey>> = {
         [WeaponType.FLAMETHROWER]: 'fire',
         [WeaponType.MACHINE_GUN]: 'gun',
+        [WeaponType.GLITCH_WAVE]: 'chainsaw',
     };
 
     private static readonly ONESHOT_WEAPON_MAP: Partial<Record<WeaponType, WeaponSfxKey>> = {
         [WeaponType.CANNON]: 'laser',
-        [WeaponType.GLITCH_WAVE]: 'disturb',
     };
 
     private static readonly VOLUMES: Record<WeaponSfxKey, number> = {
@@ -40,6 +41,7 @@ export class WeaponSFXManager {
         gun: 0.72,
         laser: 0.88,
         disturb: 0.82,
+        chainsaw: 0.75,
     };
 
     private static _rootNode: Node | null = null;
@@ -52,6 +54,7 @@ export class WeaponSFXManager {
     private static _loopRefCount: Record<LoopSfxKey, number> = {
         fire: 0,
         gun: 0,
+        chainsaw: 0,
     };
 
     // 单发音效在未加载时先记账，加载完成后补播
@@ -60,6 +63,7 @@ export class WeaponSFXManager {
         gun: 0,
         laser: 0,
         disturb: 0,
+        chainsaw: 0,
     };
 
     public static initialize(parent?: Node): void {
@@ -70,7 +74,7 @@ export class WeaponSFXManager {
     }
 
     public static refreshVolumes(): void {
-        const keys: WeaponSfxKey[] = ['fire', 'gun', 'laser', 'disturb'];
+        const keys: WeaponSfxKey[] = ['fire', 'gun', 'laser', 'disturb', 'chainsaw'];
         for (const key of keys) {
             const source = this._sources[key];
             if (!source || !source.isValid) continue;
@@ -81,7 +85,7 @@ export class WeaponSFXManager {
     public static cleanup(): void {
         this.stopAllLoops();
 
-        const keys: WeaponSfxKey[] = ['fire', 'gun', 'laser', 'disturb'];
+        const keys: WeaponSfxKey[] = ['fire', 'gun', 'laser', 'disturb', 'chainsaw'];
         for (const key of keys) {
             const src = this._sources[key];
             if (src && src.isValid) {
@@ -98,6 +102,7 @@ export class WeaponSFXManager {
         this._pendingOneShot.gun = 0;
         this._pendingOneShot.laser = 0;
         this._pendingOneShot.disturb = 0;
+        this._pendingOneShot.chainsaw = 0;
 
         if (this._rootNode && this._rootNode.isValid) {
             this._rootNode.destroy();
@@ -194,6 +199,7 @@ export class WeaponSFXManager {
         this._getOrCreateSource('gun');
         this._getOrCreateSource('laser');
         this._getOrCreateSource('disturb');
+        this._getOrCreateSource('chainsaw');
     }
 
     private static _getOrCreateSource(key: WeaponSfxKey): AudioSource | null {
@@ -216,7 +222,7 @@ export class WeaponSFXManager {
     }
 
     private static _preloadAllClips(): void {
-        const keys: WeaponSfxKey[] = ['fire', 'gun', 'laser', 'disturb'];
+        const keys: WeaponSfxKey[] = ['fire', 'gun', 'laser', 'disturb', 'chainsaw'];
         for (const key of keys) {
             this._ensureClipLoaded(key);
         }
@@ -241,7 +247,7 @@ export class WeaponSFXManager {
 
             // 加载完成后：
             // 1) 如果是循环音效且当前有引用，立即开始播放
-            if (key === 'fire' || key === 'gun') {
+            if (key === 'fire' || key === 'gun' || key === 'chainsaw') {
                 if (this._loopRefCount[key] > 0) {
                     this._ensureLoopPlaying(key);
                 }

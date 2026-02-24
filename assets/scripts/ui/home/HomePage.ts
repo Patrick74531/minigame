@@ -387,22 +387,32 @@ export class HomePage extends Component {
         const titleFontSize = Math.round(UIResponsive.clamp(shortSide * 0.072, 36, 60));
         const subtitleFontSize = Math.round(UIResponsive.clamp(shortSide * 0.034, 20, 30));
         const titleW = Math.round(Math.min(size.width - 40, 600));
+        const titleH = titleFontSize + 16;
+        const subtitleH = subtitleFontSize + 12;
 
-        const titleYOffset = hasContinue ? step * 3.3 : step * 2.6;
-        const subtitleYOffset = hasContinue ? step * 2.8 : step * 2.1;
+        const desiredTitleY = centerY + (hasContinue ? step * 3.3 : step * 2.6);
+        const desiredSubtitleY = centerY + (hasContinue ? step * 2.8 : step * 2.1);
+        const padding = UIResponsive.getControlPadding();
+        const halfHeight = size.height * 0.5;
+        const topSafeMargin = padding.top + Math.round(UIResponsive.clamp(shortSide * 0.04, 14, 28));
+        const maxTitleY = halfHeight - topSafeMargin - titleH * 0.5;
+        const titleY = Math.min(desiredTitleY, maxTitleY);
+        const titleSubtitleGap = Math.round(UIResponsive.clamp(shortSide * 0.03, 14, 24));
+        const maxSubtitleY = titleY - titleH * 0.5 - titleSubtitleGap - subtitleH * 0.5;
+        const subtitleY = Math.min(desiredSubtitleY, maxSubtitleY);
 
         this.layoutTextNode(
             this._titleNode,
             titleW,
-            titleFontSize + 16,
-            centerY + titleYOffset,
+            titleH,
+            titleY,
             titleFontSize
         );
         this.layoutTextNode(
             this._subtitleNode,
             titleW,
-            subtitleFontSize + 12,
-            centerY + subtitleYOffset,
+            subtitleH,
+            subtitleY,
             subtitleFontSize
         );
     }

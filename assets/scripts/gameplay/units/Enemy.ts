@@ -1,4 +1,14 @@
-import { _decorator, Vec3, ICollisionEvent, BoxCollider, RigidBody, Node } from 'cc';
+import {
+    _decorator,
+    Vec3,
+    ICollisionEvent,
+    BoxCollider,
+    RigidBody,
+    Node,
+    Color,
+    MeshRenderer,
+    SkeletalAnimation,
+} from 'cc';
 import { Unit, UnitState, UnitType } from './Unit';
 import { GameConfig } from '../../data/GameConfig';
 import { EventManager } from '../../core/managers/EventManager';
@@ -12,6 +22,9 @@ import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { EnemyVisualEvents } from '../visuals/EnemyVisualEvents';
 import { EnemyProjectile, EnemyProjectileVisualStyle } from '../combat/EnemyProjectile';
 import { EnemyQuery } from '../../core/managers/EnemyQuery';
+import { HitFeedback } from '../visuals/HitFeedback';
+import { WeaponVFX } from '../weapons/WeaponVFX';
+import { ScreenShake } from '../weapons/vfx/ScreenShake';
 
 const { ccclass } = _decorator;
 type RouteLane = 'top' | 'mid' | 'bottom';
@@ -42,6 +55,7 @@ export class Enemy extends Unit {
         GameConfig.ENEMY.FLYING_RANGED.PROJECTILE_SPAWN_OFFSET_Y;
     /** 敌方远程子弹最大飞行距离（约 3 个塔位间距） */
     private static readonly RANGED_PROJECTILE_MAX_DISTANCE = 8.4;
+    private static readonly HIT_SPARK_INTERVAL = 0.06;
 
     // Target position (Base)
     private _targetPos: Vec3 = new Vec3(0, 0, 0);
@@ -53,6 +67,9 @@ export class Enemy extends Unit {
     private _routeLane: RouteLane = 'mid';
     /** 缓存 paper-doll 视觉判断（避免每 tick getChildByName） */
     private _usesPaperDoll: boolean | null = null;
+    /** 缓存受击反馈组件 */
+    private _hitFeedback: HitFeedback | null = null;
+    private _lastHitSparkAt: number = -999;
     /** 缓存 RigidBody（避免每 tick getComponent） */
     private _rbCachedEnemy: RigidBody | null = null;
     private _rbEnemyLookedUp: boolean = false;
@@ -95,6 +112,8 @@ export class Enemy extends Unit {
         this._logicAccum = Math.random() * Enemy.NEAR_LOGIC_STEP;
         this._ramAttackTimer = 0;
         this.rangedProjectileStyle = 'default';
+        this._hitFeedback = null;
+        this._lastHitSparkAt = -999;
         this.resetAttackVisualState();
     }
 
@@ -541,6 +560,100 @@ export class Enemy extends Unit {
 
     // Override setTarget to handle state change?
     // public setTarget(...): void { super.setTarget(...); ... }
+
+    // === Hit Feedback ===
+
+    public override takeDamage(damage: number, attacker?: any, isCrit: boolean = false): void {
+        const hpBefore = this._stats.currentHp;
+        super.takeDamage(damage, attacker, isCrit);
+
+        if (hpBefore > this._stats.currentHp) {
+            this.playEnemyHitFeedback(isCrit);
+        }
+    }
+
+    private playEnemyHitFeedback(isCrit: boolean): void {
+        const feedback = this.resolveHitFeedback();
+        if (feedback) {
+            feedback.flashDuration = isCrit ? 0.1 : 0.08;
+            feedback.flashColor = isCrit
+                ? new Color(255, 180, 120, 255)
+                : new Color(255, 125, 125, 255);
+            feedback.playHitFeedback(true, isCrit ? 1.22 : 0.95);
+        }
+
+        this.spawnHitSpark(isCrit);
+
+        if (isCrit) {
+            ScreenShake.shake(0.05, 0.06);
+        }
+    }
+
+    private resolveHitFeedback(): HitFeedback | null {
+        if (this._hitFeedback && this._hitFeedback.isValid) {
+            return this._hitFeedback;
+        }
+
+        const target = this.findBestHitFeedbackNode();
+        if (!target) return null;
+
+        const feedback = target.getComponent(HitFeedback) ?? target.addComponent(HitFeedback);
+        this._hitFeedback = feedback;
+        return feedback;
+    }
+
+    private findBestHitFeedbackNode(): Node | null {
+        const children = this.node.children;
+        let bestNode: Node | null = null;
+        let bestScore = -1;
+
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            if (!child || !child.isValid) continue;
+
+            const meshCount = child.getComponentsInChildren(MeshRenderer).length;
+            if (meshCount <= 0) continue;
+
+            const hasSkeletal = !!child.getComponentInChildren(SkeletalAnimation);
+            const name = child.name.toLowerCase();
+            const nameBonus =
+                name.indexOf('model') !== -1 ||
+                name.indexOf('enemy') !== -1 ||
+                name.indexOf('visual') !== -1
+                    ? 10
+                    : 0;
+            const score = meshCount + (hasSkeletal ? 100 : 0) + nameBonus;
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestNode = child;
+            }
+        }
+
+        if (bestNode) return bestNode;
+
+        const selfMeshCount = this.node.getComponentsInChildren(MeshRenderer).length;
+        if (selfMeshCount > 0) {
+            return this.node;
+        }
+        return null;
+    }
+
+    private spawnHitSpark(isCrit: boolean): void {
+        const parent = this.node.parent;
+        if (!parent || !parent.isValid) return;
+
+        const now = Date.now() * 0.001;
+        if (!isCrit && now - this._lastHitSparkAt < Enemy.HIT_SPARK_INTERVAL) return;
+        this._lastHitSparkAt = now;
+
+        const pos = this.node.position.clone();
+        pos.y += isCrit ? 1.2 : 0.95;
+        const sparkColor = isCrit
+            ? new Color(255, 214, 92, 255)
+            : new Color(255, 160, 140, 255);
+        WeaponVFX.createHitSpark(parent, pos, sparkColor);
+    }
 
     protected onDeath(): void {
         this.stopMovement();

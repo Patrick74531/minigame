@@ -2,8 +2,8 @@ import { AudioClip, AudioSource, Node, director, resources } from 'cc';
 
 const STORAGE_KEY_BGM = 'kingshit.audio.bgm';
 const STORAGE_KEY_SFX = 'kingshit.audio.sfx';
-const DEFAULT_BGM_VOLUME = 0.55;
-const DEFAULT_SFX_VOLUME = 1;
+const DEFAULT_BGM_VOLUME = 0.3;
+const DEFAULT_SFX_VOLUME = 0.3;
 
 /**
  * AudioSettingsManager
