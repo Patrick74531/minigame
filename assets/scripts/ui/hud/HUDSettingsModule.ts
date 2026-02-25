@@ -60,6 +60,10 @@ export class HUDSettingsModule implements HUDModule {
 
     public constructor(private readonly _onLanguageChanged: () => void) {}
 
+    public get settingsButtonNode(): Node | null {
+        return this._settingsButtonNode;
+    }
+
     public initialize(parent: Node): void {
         this._uiCanvas = parent;
         this.createSettingsUI(parent);

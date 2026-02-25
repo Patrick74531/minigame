@@ -17,6 +17,7 @@ import {
     type BossIntroPayload as HUDBossIntroPayload,
 } from './hud/HUDBossIntroModule';
 import { HUDCameraCinematicService } from './hud/HUDCameraCinematicService';
+import { HUDMinimapModule } from './hud/HUDMinimapModule';
 import { RedditBridge } from '../core/reddit/RedditBridge';
 
 /**
@@ -52,6 +53,7 @@ export class HUDManager {
         this.setJoystickInputEnabled(enabled);
     });
     private readonly _bossIntroModule = new HUDBossIntroModule();
+    private readonly _minimapModule = new HUDMinimapModule();
     private readonly _cameraCinematicService = new HUDCameraCinematicService();
 
     /**
@@ -69,6 +71,8 @@ export class HUDManager {
         this._gameOverModule.initialize(uiCanvas);
         this._settingsModule.initialize(uiCanvas);
         this._settingsModule.show();
+        this._minimapModule.setSettingsButtonRef(this._settingsModule.settingsButtonNode);
+        this._minimapModule.initialize(uiCanvas);
 
         view.on('canvas-resize', this.onCanvasResize, this);
         this.onCanvasResize();
@@ -111,6 +115,7 @@ export class HUDManager {
         uiCanvas.getChildByName('SettingsButton')?.destroy();
         uiCanvas.getChildByName('SettingsPanelRoot')?.destroy();
         uiCanvas.getChildByName('XpBarRoot')?.destroy();
+        uiCanvas.getChildByName('MinimapRoot')?.destroy();
         uiCanvas.getChildByName('UICamera')?.getChildByName('BossIntroModelStage')?.destroy();
     }
 
@@ -289,6 +294,7 @@ export class HUDManager {
         this.eventManager.offAllByTarget(this);
         view.off('canvas-resize', this.onCanvasResize, this);
         this._settingsModule.cleanup();
+        this._minimapModule.cleanup();
         this._gameOverModule.cleanup();
         this._bossIntroModule.cleanup();
         this._waveNoticeModule.cleanup();
@@ -305,6 +311,7 @@ export class HUDManager {
         this._waveNoticeModule.onCanvasResize?.();
         this._bossIntroModule.onCanvasResize?.();
         this._gameOverModule.onCanvasResize?.();
+        this._minimapModule.onCanvasResize?.();
     }
 
     private get eventManager(): EventManager {
