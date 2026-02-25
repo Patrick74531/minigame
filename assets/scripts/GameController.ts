@@ -32,6 +32,7 @@ import { BuffCardService } from './gameplay/roguelike/BuffCardService';
 import { HeroWeaponManager } from './gameplay/weapons/HeroWeaponManager';
 import { Hero } from './gameplay/units/Hero';
 import { GameState } from './core/managers/GameManager';
+import { ItemService } from './gameplay/items/ItemService';
 
 const { ccclass, property } = _decorator;
 
@@ -125,6 +126,10 @@ export class GameController extends Component {
         // Initialize roguelike card system
         this._services.buffCardService.initialize();
 
+        // Initialize item system (boss chest drops)
+        this._services.itemService.initialize();
+        this._services.chestDropManager.initialize(this._coinContainer!, null);
+
         // Initialize weapon system
         WeaponVFX.initialize();
         AudioSettingsManager.instance.initialize(this.node);
@@ -160,6 +165,10 @@ export class GameController extends Component {
         document.addEventListener('visibilitychange', this._visibilityHandler);
     }
 
+    protected update(dt: number): void {
+        this._services.chestDropManager.update(dt);
+    }
+
     protected onDestroy(): void {
         if (this._autosaveIntervalId !== null) {
             clearInterval(this._autosaveIntervalId);
@@ -180,6 +189,10 @@ export class GameController extends Component {
         this._services.airdropService.cleanup();
         this._services.weaponSelectUI.cleanup();
         this._services.weaponBarUI.cleanup();
+        this._services.itemService.cleanup();
+        this._services.chestDropManager.cleanup();
+        this._services.itemCardUI.cleanup();
+        this._services.itemBarUI.cleanup();
         HeroLevelSystem.instance.cleanup();
         this.evtMgr.off(GameEvents.HERO_LEVEL_UP, this.onHeroLevelUp, this);
         AudioSettingsManager.instance.cleanup();
@@ -215,6 +228,11 @@ export class GameController extends Component {
                 }
                 HeroLevelSystem.instance.initialize(hero);
                 this.evtMgr.on(GameEvents.HERO_LEVEL_UP, this.onHeroLevelUp, this);
+
+                // Wire item system with hero reference
+                this._services.chestDropManager.setHeroNode(hero);
+                this._services.itemCardUI.initialize(this._uiCanvas!);
+                this._services.itemBarUI.initialize(this._uiCanvas!);
             },
         };
         GameStartFlow.run(ctx);
@@ -294,6 +312,8 @@ export class GameController extends Component {
 
         const nextOfferWave = AirdropService.instance.nextOfferWave;
 
+        const items = ItemService.instance.getSnapshot();
+
         return {
             version: 2,
             savedAt: Date.now(),
@@ -310,6 +330,7 @@ export class GameController extends Component {
             buildings,
             buffCardIds: buffIds,
             nextOfferWave,
+            items,
         };
     }
 

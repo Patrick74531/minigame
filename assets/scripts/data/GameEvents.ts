@@ -113,6 +113,20 @@ export const GameEvents = {
 
     /** 语言变更 { lang: string } */
     LANGUAGE_CHANGED: 'LANGUAGE_CHANGED',
+
+    // === Boss 宝箱道具系统 ===
+    /** Boss被击杀，请求生成宝箱 { position: Vec3 } */
+    BOSS_CHEST_DROP: 'BOSS_CHEST_DROP',
+    /** 宝箱被拾取，请求展示道具选择 */
+    BOSS_CHEST_PICKED: 'BOSS_CHEST_PICKED',
+    /** 道具卡片已准备好展示 { items: string[] } */
+    ITEM_CARDS_OFFERED: 'ITEM_CARDS_OFFERED',
+    /** 玩家选择了一个道具 { itemId: string } */
+    ITEM_CARD_PICKED: 'ITEM_CARD_PICKED',
+    /** 道具背包变更 { itemId: string, count: number } */
+    ITEM_INVENTORY_CHANGED: 'ITEM_INVENTORY_CHANGED',
+    /** 玩家使用了一个道具 { itemId: string } */
+    ITEM_USED: 'ITEM_USED',
 } as const;
 
 /** 事件名称类型 */
@@ -204,4 +218,12 @@ export type GameEventPayloads = {
     /** 玩家选择了塔防类型 { padNode: Node, buildingTypeId: string } */
     [GameEvents.TOWER_SELECTED]: { padNode: Node; buildingTypeId: string };
     [GameEvents.LANGUAGE_CHANGED]: { lang: string };
+
+    // === Boss 宝箱道具系统 ===
+    [GameEvents.BOSS_CHEST_DROP]: { position: Vec3 };
+    [GameEvents.BOSS_CHEST_PICKED]: void;
+    [GameEvents.ITEM_CARDS_OFFERED]: { items: string[] };
+    [GameEvents.ITEM_CARD_PICKED]: { itemId: string };
+    [GameEvents.ITEM_INVENTORY_CHANGED]: { itemId: string; count: number };
+    [GameEvents.ITEM_USED]: { itemId: string };
 };

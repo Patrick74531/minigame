@@ -32,6 +32,7 @@ export interface GameSaveDataV2 {
     buildings: BuildingPadSaveState[];
     buffCardIds: string[];
     nextOfferWave: number;
+    items: Array<{ id: string; count: number }>;
 }
 
 /** Legacy V1 shape (read-only, for migration) */
@@ -128,6 +129,9 @@ export class GameSaveManager {
                 // Backward-compatible default for earlier V2 saves.
                 v2.heroCoinCount = Math.max(0, Math.floor(v2.coins ?? 0));
             }
+            if (!Array.isArray(v2.items)) {
+                v2.items = [];
+            }
             return v2;
         } catch {
             return null;
@@ -175,6 +179,7 @@ export class GameSaveManager {
             buildings: [],
             buffCardIds: [],
             nextOfferWave: 3,
+            items: [],
         };
     }
 }

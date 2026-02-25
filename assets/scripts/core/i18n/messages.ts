@@ -175,6 +175,22 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'enemy.archetype.fallback_ground': '地面突击单位',
         'enemy.archetype.fallback_air': '空中突击单位',
         'enemy.archetype.fallback_heavy': '重装突破单位',
+
+        'ui.item.select.title': '-- 选择一件战利品 --',
+        'item.restore_buildings.name': '万物复苏',
+        'item.restore_buildings.description':
+            '大地之力涌动，所有建筑瞬间复原如初，以全新姿态迎接下一波浩劫。',
+        'item.restore_buildings.short': '恢复所有建筑满血',
+        'item.kill_all_enemies.name': '天罚之雷',
+        'item.kill_all_enemies.description': '雷延降世，当前波次的所有敌人化为灰烬，战场归于沉寂。',
+        'item.kill_all_enemies.short': '消灭当前所有敌人',
+        'item.hero_level_up.name': '战神觉醒',
+        'item.hero_level_up.description': '远古战神的力量注入英雄体内，瞬间突破5级，实力飞跃提升。',
+        'item.hero_level_up.short': '英雄立刻升5级',
+        'ui.item.confirm.title': '使用道具',
+        'ui.item.confirm.message': '确定要使用 [{name}] 吗？\n\n{description}',
+        'ui.item.confirm.yes': '确认使用',
+        'ui.item.confirm.no': '取消',
     },
     en: {
         'building.barracks.name': 'Goose Shed',
@@ -364,5 +380,23 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'enemy.archetype.fallback_ground': 'Ground Assault Unit',
         'enemy.archetype.fallback_air': 'Air Assault Unit',
         'enemy.archetype.fallback_heavy': 'Heavy Breaker Unit',
+
+        'ui.item.select.title': '-- Choose a War Trophy --',
+        'item.restore_buildings.name': 'Genesis Bloom',
+        'item.restore_buildings.description':
+            'The power of the earth surges forth, restoring all buildings to pristine condition, ready to face the next onslaught.',
+        'item.restore_buildings.short': 'Restore all buildings to full HP',
+        'item.kill_all_enemies.name': 'Divine Thunder',
+        'item.kill_all_enemies.description':
+            'Thunder descends from the heavens, annihilating every enemy on the field. The battlefield falls silent.',
+        'item.kill_all_enemies.short': 'Eliminate all current enemies',
+        'item.hero_level_up.name': 'War God Awakening',
+        'item.hero_level_up.description':
+            'Ancient war god power floods into the hero, instantly gaining 5 levels and a massive power surge.',
+        'item.hero_level_up.short': 'Hero instantly gains 5 levels',
+        'ui.item.confirm.title': 'Use Item',
+        'ui.item.confirm.message': 'Use [{name}]?\n\n{description}',
+        'ui.item.confirm.yes': 'Confirm',
+        'ui.item.confirm.no': 'Cancel',
     },
 };

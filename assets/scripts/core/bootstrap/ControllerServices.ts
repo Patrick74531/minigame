@@ -14,6 +14,10 @@ import { HeroWeaponManager } from '../../gameplay/weapons/HeroWeaponManager';
 import { AirdropService } from '../../gameplay/airdrop/AirdropService';
 import { WeaponSelectUI } from '../../ui/WeaponSelectUI';
 import { WeaponBarUI } from '../../ui/WeaponBarUI';
+import { ItemService } from '../../gameplay/items/ItemService';
+import { ChestDropManager } from '../../gameplay/items/ChestDropManager';
+import { ItemCardUI } from '../../ui/ItemCardUI';
+import { ItemBarUI } from '../../ui/ItemBarUI';
 
 /**
  * ControllerServices
@@ -81,5 +85,23 @@ export class ControllerServices {
 
     public get weaponBarUI(): WeaponBarUI {
         return ServiceRegistry.get<WeaponBarUI>('WeaponBarUI') ?? WeaponBarUI.instance;
+    }
+
+    public get itemService(): ItemService {
+        return ServiceRegistry.get<ItemService>('ItemService') ?? ItemService.instance;
+    }
+
+    public get chestDropManager(): ChestDropManager {
+        return (
+            ServiceRegistry.get<ChestDropManager>('ChestDropManager') ?? ChestDropManager.instance
+        );
+    }
+
+    public get itemCardUI(): ItemCardUI {
+        return ServiceRegistry.get<ItemCardUI>('ItemCardUI') ?? ItemCardUI.instance;
+    }
+
+    public get itemBarUI(): ItemBarUI {
+        return ServiceRegistry.get<ItemBarUI>('ItemBarUI') ?? ItemBarUI.instance;
     }
 }

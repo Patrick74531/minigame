@@ -1,4 +1,4 @@
-import { Node } from 'cc';
+import { Node, Vec3 } from 'cc';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { UnitType } from '../units/Unit';
@@ -53,22 +53,31 @@ export class CoinDropManager {
     }): void {
         if (data.unitType !== UnitType.ENEMY) return;
 
-        if (data.position && this._coinContainer) {
-            const enemyComp = data.node?.getComponent(Enemy);
-            const dropCoins = this.resolveDropCoins({
-                enemyComp,
-                spawnType: data.enemySpawnType,
-                isElite: data.enemyIsElite,
+        if (!data.position || !this._coinContainer) return;
+
+        // Boss → 掉落宝箱而非金币
+        if (data.enemySpawnType === 'boss') {
+            this._bossKillCount += 1;
+            this.eventManager.emit(GameEvents.BOSS_CHEST_DROP, {
+                position: new Vec3(data.position.x, 0.5, data.position.z),
             });
-            for (let i = 0; i < dropCoins; i++) {
-                const jitter = this.resolveDropJitter(i, dropCoins);
-                CoinFactory.createCoin(
-                    this._coinContainer,
-                    data.position.x + jitter.x,
-                    data.position.z + jitter.z,
-                    1
-                );
-            }
+            return;
+        }
+
+        const enemyComp = data.node?.getComponent(Enemy);
+        const dropCoins = this.resolveDropCoins({
+            enemyComp,
+            spawnType: data.enemySpawnType,
+            isElite: data.enemyIsElite,
+        });
+        for (let i = 0; i < dropCoins; i++) {
+            const jitter = this.resolveDropJitter(i, dropCoins);
+            CoinFactory.createCoin(
+                this._coinContainer,
+                data.position.x + jitter.x,
+                data.position.z + jitter.z,
+                1
+            );
         }
     }
 
@@ -81,10 +90,9 @@ export class CoinDropManager {
         const spawnType = input.spawnType ?? enemyComp?.spawnType;
         const isElite = input.isElite ?? enemyComp?.isElite ?? false;
 
+        // Boss drops are now handled as chest drops in onUnitDied
         if (spawnType === 'boss') {
-            this._bossKillCount += 1;
-            // Linear progression: 50 → 100 → 150 …
-            return Math.max(1, this._bossKillCount * CoinDropManager.BOSS_DROP_COINS_STEP);
+            return 0;
         }
 
         if (spawnType === 'elite' || isElite) {

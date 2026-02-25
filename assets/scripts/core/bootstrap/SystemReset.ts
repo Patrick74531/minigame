@@ -16,6 +16,10 @@ import { BuffCardService } from '../../gameplay/roguelike/BuffCardService';
 import { HeroWeaponManager } from '../../gameplay/weapons/HeroWeaponManager';
 import { AirdropService } from '../../gameplay/airdrop/AirdropService';
 import { HeroLevelSystem } from '../../gameplay/units/HeroLevelSystem';
+import { ItemService } from '../../gameplay/items/ItemService';
+import { ChestDropManager } from '../../gameplay/items/ChestDropManager';
+import { ItemCardUI } from '../../ui/ItemCardUI';
+import { ItemBarUI } from '../../ui/ItemBarUI';
 
 /**
  * SystemReset
@@ -49,12 +53,18 @@ export class SystemReset {
         HeroWeaponManager.destroyInstance();
         AirdropService.destroyInstance();
 
+        // 道具系统
+        ItemService.destroyInstance();
+        ChestDropManager.destroyInstance();
+
         // UI
         HUDManager.destroyInstance();
         BuffCardUI.destroyInstance();
         TowerSelectUI.destroyInstance();
         WeaponSelectUI.destroyInstance();
         WeaponBarUI.destroyInstance();
+        ItemCardUI.destroyInstance();
+        ItemBarUI.destroyInstance();
 
         console.debug('[SystemReset] All singletons destroyed.');
     }

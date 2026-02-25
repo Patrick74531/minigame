@@ -18,6 +18,7 @@ import { BuffCardService } from '../../gameplay/roguelike/BuffCardService';
 import { BuildingManager } from '../../gameplay/buildings/BuildingManager';
 import { WaveManager } from '../../gameplay/wave/WaveManager';
 import { Base } from '../../gameplay/buildings/Base';
+import { ItemService } from '../../gameplay/items/ItemService';
 import { Hero } from '../../gameplay/units/Hero';
 import { EventManager } from '../managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
@@ -180,6 +181,10 @@ export class GameStartFlow {
 
         if (typeof save.nextOfferWave === 'number' && save.nextOfferWave > 1) {
             AirdropService.instance.setNextOfferWave(save.nextOfferWave);
+        }
+
+        if (save.items && save.items.length > 0) {
+            ItemService.instance.restoreFromSave(save.items);
         }
 
         const heroComp = hero.getComponent(Hero);
