@@ -83,15 +83,8 @@ export class HUDManager {
 
     public setVisible(visible: boolean): void {
         this._statusModule.setVisible(visible);
-        // We might want to keep settings module accessible or managed separately?
-        // The user says "hide wave and exp bar", so status module is key.
-        // What about wave notice?
         this._waveNoticeModule.setVisible(visible);
-        // Boss intro?
-        // this._bossIntroModule.setVisible(visible); // Usually hidden anyway
-
-        // If other modules have built-in visibility logic, we might not need to force them.
-        // But StatusModule definitely needs to be hidden.
+        this._minimapModule.setVisible(visible);
     }
 
     private refreshAllText(): void {

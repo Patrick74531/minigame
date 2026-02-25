@@ -40,3 +40,6 @@ backups/
 *.jks
 .env
 .env.local
+
+# Local Netlify folder
+.netlify

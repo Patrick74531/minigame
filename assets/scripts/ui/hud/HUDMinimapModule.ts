@@ -116,6 +116,12 @@ export class HUDMinimapModule implements HUDModule {
         this._settingsButtonNode = null;
     }
 
+    public setVisible(visible: boolean): void {
+        if (this._rootNode && this._rootNode.isValid) {
+            this._rootNode.active = visible;
+        }
+    }
+
     public onCanvasResize(): void {
         this.updateLayout();
         this.drawBasemap();

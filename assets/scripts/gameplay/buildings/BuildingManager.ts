@@ -566,6 +566,8 @@ export class BuildingManager {
             if (!pad || !pad.node || !pad.node.isValid) continue;
             const building = pad.getAssociatedBuilding();
             if (!building) continue;
+            // Skip hidden buildings (e.g. farm/barracks not yet revealed by cinematic)
+            if (!building.node.active) continue;
             const padIndex = this._padNodeToIndex.get(pad.node.uuid);
             if (padIndex === undefined) continue;
             states.push({
