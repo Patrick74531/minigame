@@ -10,6 +10,8 @@ import {
     PhysicsSystem,
     geometry,
     Color,
+    MeshRenderer,
+    Material,
 } from 'cc';
 import { Unit, UnitType, UnitState } from './Unit';
 import { GameManager } from '../../core/managers/GameManager';
@@ -84,6 +86,11 @@ export class Hero extends Unit {
 
     // --- Hit Feedback Component ---
     private _hitFeedback: HitFeedback | null = null;
+
+    // --- Invincibility ---
+    private _invincibleTimer: number = 0;
+    private _glowNode: Node | null = null;
+    private _glowMaterial: Material | null = null;
 
     public onDespawn(): void {
         this.unschedule(this.tickRespawnCountdown);
@@ -281,9 +288,75 @@ export class Hero extends Unit {
         this.hudManager.updateCoinDisplay(this.coinCount);
     }
 
+    // === Invincibility ===
+
+    public get isInvincible(): boolean {
+        return this._invincibleTimer > 0;
+    }
+
+    public applyInvincible(duration: number): void {
+        this._invincibleTimer = Math.max(this._invincibleTimer, duration);
+        this.ensureGoldenGlow(true);
+    }
+
+    private updateInvincibility(dt: number): void {
+        if (this._invincibleTimer <= 0) return;
+        this._invincibleTimer -= dt;
+        if (this._invincibleTimer <= 0) {
+            this._invincibleTimer = 0;
+            this.ensureGoldenGlow(false);
+        } else {
+            this.pulseGoldenGlow();
+        }
+    }
+
+    private ensureGoldenGlow(on: boolean): void {
+        if (on) {
+            if (!this._glowNode) {
+                this._glowNode = new Node('HeroGlow');
+                this.node.addChild(this._glowNode);
+                this._glowNode.setPosition(0, 0.8, 0);
+                this._glowNode.setScale(1.2, 1.8, 1.2);
+                const mr = this._glowNode.addComponent(MeshRenderer);
+                const geo = new Float32Array([
+                    -0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0, -0.5, -0.5, 0, 0.5, 0.5,
+                    0,
+                ]);
+                void geo;
+                // Use built-in sphere primitive for glow shell
+                const { primitives, utils } = require('cc');
+                mr.mesh = utils.MeshUtils.createMesh(primitives.sphere(0.5, { segments: 8 }));
+                const mat = new Material();
+                mat.initialize({ effectName: 'builtin-unlit' });
+                mat.setProperty('mainColor', new Color(255, 215, 0, 160));
+                mr.material = mat;
+                mr.shadowCastingMode = MeshRenderer.ShadowCastingMode.OFF;
+                mr.receiveShadow = MeshRenderer.ShadowReceivingMode.OFF;
+                this._glowMaterial = mat;
+            }
+            this._glowNode.active = true;
+        } else {
+            if (this._glowNode) {
+                this._glowNode.active = false;
+            }
+        }
+    }
+
+    private pulseGoldenGlow(): void {
+        if (!this._glowNode || !this._glowMaterial) return;
+        const t = (Date.now() % 1200) / 1200;
+        const pulse = 0.7 + 0.3 * Math.sin(t * Math.PI * 2);
+        const alpha = Math.floor(100 + 60 * pulse);
+        this._glowMaterial.setProperty('mainColor', new Color(255, 215, 0, alpha));
+        const s = 1.1 + 0.15 * pulse;
+        this._glowNode.setScale(s, s * 1.5, s);
+    }
+
     // === Hit Feedback ===
 
     public override takeDamage(damage: number, attacker?: any, isCrit: boolean = false): void {
+        if (this._invincibleTimer > 0) return;
+
         const hpBefore = this._stats.currentHp;
         super.takeDamage(damage, attacker, isCrit);
 
@@ -323,6 +396,7 @@ export class Hero extends Unit {
         if (!this.gameManager.isPlaying) return;
 
         this._lastDt = dt;
+        this.updateInvincibility(dt);
 
         // 空投武器冷却
         if (this._customWeaponTimer > 0) {

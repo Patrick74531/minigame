@@ -4,6 +4,8 @@ import { WaveManager } from '../wave/WaveManager';
 import { HeroLevelSystem } from '../units/HeroLevelSystem';
 import { GameManager } from '../../core/managers/GameManager';
 import { Unit } from '../units/Unit';
+import { Hero } from '../units/Hero';
+import { BuildingType } from '../buildings/Building';
 import { ItemEffectType } from './ItemDefs';
 
 /**
@@ -28,6 +30,7 @@ export class ItemEffectExecutor {
         this.register('freeze_enemies', ItemEffectExecutor.freezeEnemies);
         this.register('upgrade_buildings', ItemEffectExecutor.upgradeBuildings);
         this.register('bonus_coins', ItemEffectExecutor.bonusCoins);
+        this.register('hero_invincible', ItemEffectExecutor.heroInvincible);
     }
 
     /** 注册 / 覆盖某个效果类型的处理器 */
@@ -89,7 +92,8 @@ export class ItemEffectExecutor {
             if (!enemyNode || !enemyNode.isValid) continue;
             const unit = enemyNode.getComponent(Unit);
             if (unit && unit.isAlive) {
-                unit.applySlow(1.0, duration);
+                // applyStun 使敌人完全停止（移动+攻击+扫描全部暂停）
+                unit.applyStun(duration);
             }
         }
     }
@@ -100,6 +104,13 @@ export class ItemEffectExecutor {
         for (const building of bm.activeBuildings) {
             if (!building || !building.node || !building.node.isValid) continue;
             if (!building.isAlive) continue;
+            // 只升级防御塔类型
+            const bt = building.buildingType;
+            const isTower =
+                bt === BuildingType.TOWER ||
+                bt === BuildingType.FROST_TOWER ||
+                bt === BuildingType.LIGHTNING_TOWER;
+            if (!isTower) continue;
             if (building.level < building.maxLevel) {
                 building.upgrade();
             }
@@ -110,5 +121,16 @@ export class ItemEffectExecutor {
         const amount = params.amount ?? 200;
         const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
         gm.addCoins(amount);
+    }
+
+    private static heroInvincible(params: Record<string, number>): void {
+        const duration = params.duration ?? 30;
+        const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+        const heroNode = gm.hero;
+        if (!heroNode || !heroNode.isValid) return;
+        const hero = heroNode.getComponent(Hero);
+        if (hero && hero.isAlive) {
+            hero.applyInvincible(duration);
+        }
     }
 }

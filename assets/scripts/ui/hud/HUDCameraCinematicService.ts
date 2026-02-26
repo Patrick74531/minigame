@@ -1,5 +1,7 @@
 import { Node, Tween, tween, Vec3 } from 'cc';
 import { CameraFollow } from '../../core/camera/CameraFollow';
+import { GameManager } from '../../core/managers/GameManager';
+import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import type { HUDModule } from './HUDModule';
 
 const BOSS_CINEMATIC_MOVE_SECONDS = 0.58;
@@ -258,6 +260,11 @@ export class HUDCameraCinematicService implements HUDModule {
         this._cameraOriginalSmoothSpeed = follow.smoothSpeed;
         follow.enabled = false;
         this._token += 1;
+
+        // 镜头移动期间暂停游戏
+        const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+        gm.pauseGame();
+
         return this._token;
     }
 
@@ -266,6 +273,9 @@ export class HUDCameraCinematicService implements HUDModule {
         if (!follow || !follow.node || !follow.node.isValid) {
             this._cameraFollowRef = null;
             this._cameraOriginalTarget = null;
+            // 即使恢复失败也要取消暂停
+            const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+            gm.resumeGame();
             return;
         }
 
@@ -280,6 +290,10 @@ export class HUDCameraCinematicService implements HUDModule {
 
         this._cameraFollowRef = null;
         this._cameraOriginalTarget = null;
+
+        // 镜头恢复后继续游戏
+        const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+        gm.resumeGame();
     }
 
     private resolveMainCameraFollow(): CameraFollow | null {

@@ -15,7 +15,8 @@ export type ItemId =
     | 'hero_level_up'
     | 'freeze_enemies'
     | 'upgrade_buildings'
-    | 'bonus_coins';
+    | 'bonus_coins'
+    | 'hero_invincible';
 
 /** 效果类型枚举 — 新增效果时在此扩展 */
 export type ItemEffectType =
@@ -24,7 +25,8 @@ export type ItemEffectType =
     | 'hero_level_up'
     | 'freeze_enemies'
     | 'upgrade_buildings'
-    | 'bonus_coins';
+    | 'bonus_coins'
+    | 'hero_invincible';
 
 export interface ItemDef {
     id: ItemId;
@@ -88,7 +90,7 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
         iconColor: '#A78BFA',
         iconSymbol: '⬆',
         effectType: 'upgrade_buildings',
-        effectParams: {},
+        effectParams: { towersOnly: 1 },
     },
     bonus_coins: {
         id: 'bonus_coins',
@@ -99,6 +101,16 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
         iconSymbol: '💰',
         effectType: 'bonus_coins',
         effectParams: { amount: 200 },
+    },
+    hero_invincible: {
+        id: 'hero_invincible',
+        nameKey: 'item.hero_invincible.name',
+        descriptionKey: 'item.hero_invincible.description',
+        shortKey: 'item.hero_invincible.short',
+        iconColor: '#FFD700',
+        iconSymbol: '🛡',
+        effectType: 'hero_invincible',
+        effectParams: { duration: 30 },
     },
 };
 

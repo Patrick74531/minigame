@@ -389,6 +389,9 @@ export class Enemy extends Unit {
         super.update(tickDt);
         if (!this.isAlive) return;
 
+        // 硬直/冰冻期间跳过所有敌人自有逻辑（索敌、攻击、移动）
+        if (this._stunTimer > 0) return;
+
         // Check if current target is dead or invalid
         if (this._target) {
             if (!this._target.isAlive || !this._target.node.isValid) {
