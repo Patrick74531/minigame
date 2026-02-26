@@ -10,6 +10,7 @@ export interface InitData {
     isSubscribed: boolean;
     subredditName: string;
     leaderboard: LeaderboardEntry[];
+    diamonds: number;
 }
 
 export type RedditBridgeCallback =
@@ -82,6 +83,7 @@ export class RedditBridge {
                     isSubscribed?: boolean;
                     subredditName?: string;
                     leaderboard?: LeaderboardEntry[];
+                    diamonds?: number;
                 };
                 this._username = d.username ?? 'Anonymous';
                 this._isSubscribed = !!d.isSubscribed;
@@ -94,6 +96,7 @@ export class RedditBridge {
                         isSubscribed: this._isSubscribed,
                         subredditName: this._subredditName,
                         leaderboard: d.leaderboard ?? [],
+                        diamonds: d.diamonds ?? 0,
                     },
                 });
             })

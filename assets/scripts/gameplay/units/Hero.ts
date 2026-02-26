@@ -12,6 +12,12 @@ import {
     Color,
     MeshRenderer,
     Material,
+    Tween,
+    tween,
+    UIOpacity,
+    UITransform,
+    primitives,
+    utils,
 } from 'cc';
 import { Unit, UnitType, UnitState } from './Unit';
 import { GameManager } from '../../core/managers/GameManager';
@@ -318,13 +324,7 @@ export class Hero extends Unit {
                 this._glowNode.setPosition(0, 0.8, 0);
                 this._glowNode.setScale(1.2, 1.8, 1.2);
                 const mr = this._glowNode.addComponent(MeshRenderer);
-                const geo = new Float32Array([
-                    -0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0, -0.5, -0.5, 0, 0.5, 0.5,
-                    0,
-                ]);
-                void geo;
-                // Use built-in sphere primitive for glow shell
-                const { primitives, utils } = require('cc');
+                // Use ES-module imported primitives and utils (no require)
                 mr.mesh = utils.MeshUtils.createMesh(primitives.sphere(0.5, { segments: 8 }));
                 const mat = new Material();
                 mat.initialize({ effectName: 'builtin-unlit' });

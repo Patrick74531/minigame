@@ -529,8 +529,8 @@ export const GameConfig = {
                 iconPath: 'icon/signal',
                 levels: [
                     {
-                        damage: 55,
-                        attackInterval: 2.0,
+                        damage: 11,
+                        attackInterval: 0.4,
                         range: 5.4,
                         waveSpeed: 8,
                         waveRadius: 4,
@@ -538,8 +538,8 @@ export const GameConfig = {
                         slowDuration: 1.6,
                     },
                     {
-                        damage: 82,
-                        attackInterval: 1.8,
+                        damage: 16.4,
+                        attackInterval: 0.36,
                         range: 5.9,
                         waveSpeed: 9,
                         waveRadius: 4.5,
@@ -547,8 +547,8 @@ export const GameConfig = {
                         slowDuration: 1.9,
                     },
                     {
-                        damage: 112,
-                        attackInterval: 1.6,
+                        damage: 22.4,
+                        attackInterval: 0.32,
                         range: 6.4,
                         waveSpeed: 10,
                         waveRadius: 5,
@@ -556,8 +556,8 @@ export const GameConfig = {
                         slowDuration: 2.2,
                     },
                     {
-                        damage: 145,
-                        attackInterval: 1.4,
+                        damage: 29,
+                        attackInterval: 0.28,
                         range: 6.9,
                         waveSpeed: 11,
                         waveRadius: 5.5,
@@ -565,8 +565,8 @@ export const GameConfig = {
                         slowDuration: 2.5,
                     },
                     {
-                        damage: 180,
-                        attackInterval: 1.2,
+                        damage: 36,
+                        attackInterval: 0.24,
                         range: 7.4,
                         waveSpeed: 12,
                         waveRadius: 6,

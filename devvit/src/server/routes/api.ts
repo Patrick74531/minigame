@@ -9,6 +9,15 @@ const FOLLOW_KEY = 'leaderboard:followers';
 const RATE_LIMIT_PREFIX = 'ratelimit:submit:';
 const LEADERBOARD_SIZE = 10;
 
+// ── Diamond system keys ────────────────────────────────────────────────────────
+const DIAMOND_BALANCE_PREFIX = 'diamond:balance:';
+const DIAMOND_RUN_PREFIX = 'diamond:run:';
+const DIAMOND_INITIAL_GRANT = 300;
+const DIAMOND_PER_WAVE = 10;
+const DIAMOND_ITEM_PRICE = 100;
+const DIAMOND_DAILY_CAP = 5000;
+const DIAMOND_DAILY_PREFIX = 'diamond:daily:';
+
 // ── Validation constants ─────────────────────────────────────────────────────
 const MAX_SCORE = 999_999_999;
 const MAX_WAVE = 9_999;
@@ -88,11 +97,15 @@ api.get('/init', async c => {
                 ? (await redis.hGet(FOLLOW_KEY, resolvedUsername)) === '1'
                 : false;
 
+        const diamonds =
+            resolvedUsername !== 'Anonymous' ? await ensureDiamondBalance(resolvedUsername) : 0;
+
         return jsonNoCache(c, {
             username: resolvedUsername,
             isSubscribed,
             subredditName: context.subredditName ?? '',
             leaderboard,
+            diamonds,
         });
     } catch (error) {
         console.error('[api/init] error:', error);
@@ -165,6 +178,136 @@ api.get('/leaderboard', async c => {
     } catch (error) {
         console.error('[api/leaderboard] error:', error);
         return jsonNoCache(c, { entries: [] });
+    }
+});
+
+// ── Diamond System ──────────────────────────────────────────────────────────────
+
+async function ensureDiamondBalance(username: string): Promise<number> {
+    const key = `${DIAMOND_BALANCE_PREFIX}${username}`;
+    const existing = await redis.get(key);
+    if (existing != null) {
+        return parseInt(existing, 10) || 0;
+    }
+    // First-time user: grant initial diamonds
+    await redis.set(key, String(DIAMOND_INITIAL_GRANT));
+    return DIAMOND_INITIAL_GRANT;
+}
+
+function todayKey(): string {
+    const d = new Date();
+    return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(
+        d.getUTCDate()
+    ).padStart(2, '0')}`;
+}
+
+api.get('/diamond/balance', async c => {
+    try {
+        const username = await reddit.getCurrentUsername();
+        if (!username) return jsonError(c, 401, 'Not logged in');
+        const balance = await ensureDiamondBalance(username);
+        return jsonNoCache(c, { balance });
+    } catch (error) {
+        console.error('[api/diamond/balance] error:', error);
+        return jsonError(c, 500, 'Internal server error');
+    }
+});
+
+api.post('/diamond/settle-run', async c => {
+    try {
+        const username = await reddit.getCurrentUsername();
+        if (!username) return jsonError(c, 401, 'Not logged in');
+
+        let body: unknown;
+        try {
+            body = await c.req.json();
+        } catch {
+            return jsonError(c, 400, 'Invalid JSON');
+        }
+
+        const payload = body as { runId?: string; wave?: unknown };
+        const runId = payload.runId;
+        const wave = payload.wave;
+
+        if (!runId || typeof runId !== 'string' || runId.length < 8 || runId.length > 64) {
+            return jsonError(c, 400, 'Invalid runId');
+        }
+        if (!isValidInt(wave) || (wave as number) > MAX_WAVE) {
+            return jsonError(c, 400, 'Invalid wave');
+        }
+
+        // Idempotency: check if this runId was already settled
+        const runKey = `${DIAMOND_RUN_PREFIX}${username}:${runId}`;
+        const alreadySettled = await redis.get(runKey);
+        if (alreadySettled) {
+            const prev = JSON.parse(alreadySettled) as { earned: number; balance: number };
+            return jsonNoCache(c, { earned: prev.earned, balance: prev.balance, duplicate: true });
+        }
+
+        const earned = Math.max(0, (wave as number) * DIAMOND_PER_WAVE);
+
+        // Daily cap check
+        const dailyKey = `${DIAMOND_DAILY_PREFIX}${username}:${todayKey()}`;
+        const dailyUsedStr = await redis.get(dailyKey);
+        const dailyUsed = dailyUsedStr ? parseInt(dailyUsedStr, 10) || 0 : 0;
+        const actualEarned = Math.min(earned, Math.max(0, DIAMOND_DAILY_CAP - dailyUsed));
+
+        // Credit diamonds
+        const balanceKey = `${DIAMOND_BALANCE_PREFIX}${username}`;
+        const currentBalance = await ensureDiamondBalance(username);
+        const newBalance = currentBalance + actualEarned;
+        await redis.set(balanceKey, String(newBalance));
+
+        // Update daily counter (expire after 48h for safety)
+        await redis.set(dailyKey, String(dailyUsed + actualEarned), {
+            expiration: new Date(Date.now() + 48 * 3600 * 1000),
+        });
+
+        // Mark run as settled (expire after 7 days)
+        await redis.set(runKey, JSON.stringify({ earned: actualEarned, balance: newBalance }), {
+            expiration: new Date(Date.now() + 7 * 24 * 3600 * 1000),
+        });
+
+        return jsonNoCache(c, { earned: actualEarned, balance: newBalance, duplicate: false });
+    } catch (error) {
+        console.error('[api/diamond/settle-run] error:', error);
+        return jsonError(c, 500, 'Internal server error');
+    }
+});
+
+api.post('/diamond/buy-item', async c => {
+    try {
+        const username = await reddit.getCurrentUsername();
+        if (!username) return jsonError(c, 401, 'Not logged in');
+
+        let body: unknown;
+        try {
+            body = await c.req.json();
+        } catch {
+            return jsonError(c, 400, 'Invalid JSON');
+        }
+
+        const payload = body as { itemId?: string };
+        const itemId = payload.itemId;
+        if (!itemId || typeof itemId !== 'string') {
+            return jsonError(c, 400, 'Invalid itemId');
+        }
+
+        const price = DIAMOND_ITEM_PRICE;
+        const balanceKey = `${DIAMOND_BALANCE_PREFIX}${username}`;
+        const currentBalance = await ensureDiamondBalance(username);
+
+        if (currentBalance < price) {
+            return jsonError(c, 400, 'Insufficient diamonds');
+        }
+
+        const newBalance = currentBalance - price;
+        await redis.set(balanceKey, String(newBalance));
+
+        return jsonNoCache(c, { success: true, itemId, price, balance: newBalance });
+    } catch (error) {
+        console.error('[api/diamond/buy-item] error:', error);
+        return jsonError(c, 500, 'Internal server error');
     }
 });
 

@@ -27,6 +27,9 @@ import { UIResponsive } from '../UIResponsive';
 import { RedditBridge, type RedditBridgeCallback } from '../../core/reddit/RedditBridge';
 import { LeaderboardPanel } from './LeaderboardPanel';
 import { GameSaveManager } from '../../core/managers/GameSaveManager';
+import { DiamondService } from '../../core/diamond/DiamondService';
+import { ShopPanel } from './ShopPanel';
+import { UIFactory } from '../UIFactory';
 
 const { ccclass } = _decorator;
 
@@ -48,6 +51,12 @@ export class HomePage extends Component {
     private _continueBtn: Node | null = null;
     private _onStartRequested: (() => void) | null = null;
     private _onContinueRequested: (() => void) | null = null;
+    private _shopBtn: Node | null = null;
+    private _shopPanel: ShopPanel | null = null;
+    private _coinsLabel: Label | null = null;
+    private _diamondLabel: Label | null = null;
+    private _currencyPanelNode: Node | null = null;
+    private _diamondListener: ((balance: number) => void) | null = null;
 
     public onLoad() {
         this._uiLayer = this.node.parent?.layer ?? Layers.Enum.UI_2D;
@@ -76,6 +85,13 @@ export class HomePage extends Component {
         this._settingsModule?.cleanup();
         if (this._bridgeListener) {
             RedditBridge.instance.removeListener(this._bridgeListener);
+        }
+        if (this._diamondListener) {
+            DiamondService.instance.removeListener(this._diamondListener);
+        }
+        if (this._shopPanel) {
+            this._shopPanel.destroy();
+            this._shopPanel = null;
         }
     }
 
@@ -136,15 +152,7 @@ export class HomePage extends Component {
             outlineColor: new Color(40, 18, 4, 255),
             outlineWidth: 5,
         });
-        this._subtitleNode = this.createTextNode('GameSubtitle', 'Tower Defence', {
-            fontSize: 26,
-            bold: false,
-            color: new Color(220, 220, 220, 230),
-            outlineColor: new Color(0, 0, 0, 180),
-            outlineWidth: 3,
-        });
         this._contentNode.addChild(this._titleNode);
-        this._contentNode.addChild(this._subtitleNode);
 
         this._startBtn = this.createGameButton('StartButton', 'ui.home.start', 0, 120, () =>
             this.onStartClick()
@@ -164,8 +172,44 @@ export class HomePage extends Component {
             () => this.onSubscribeClick()
         );
 
+        this._shopBtn = this.createGameButton('ShopButton', 'ui.home.shop', 0, -120, () =>
+            this.onShopClick()
+        );
+        // Shop button: purple theme
+        const shopBg = this._shopBtn.getComponent(Graphics);
+        if (shopBg) {
+            const stf = this._shopBtn.getComponent(UITransform)!;
+            const sw = stf.contentSize.width;
+            const sh = stf.contentSize.height;
+            const sr = Math.max(12, Math.round(sh * 0.22));
+            shopBg.clear();
+            shopBg.fillColor = new Color(138, 92, 246, 255);
+            shopBg.roundRect(-sw / 2, -sh / 2, sw, sh, sr);
+            shopBg.fill();
+            shopBg.strokeColor = new Color(255, 255, 255, 200);
+            shopBg.lineWidth = Math.max(2, Math.round(sh * 0.05));
+            shopBg.roundRect(-sw / 2, -sh / 2, sw, sh, sr);
+            shopBg.stroke();
+        }
+
+        // Currency panel (coins + diamonds) at top-left
+        const cp = UIFactory.createCurrencyPanel(this.node);
+        this._coinsLabel = cp.coinsLabel;
+        this._diamondLabel = cp.diamondsLabel;
+        this._currencyPanelNode = cp.panelNode;
+        const cpWidget = this._currencyPanelNode.addComponent(Widget);
+        cpWidget.isAlignTop = true;
+        cpWidget.isAlignLeft = true;
+        cpWidget.top = 10;
+        cpWidget.left = 10;
+        // Register listener so diamond display auto-updates when balance changes
+        this._diamondListener = () => this._updateDiamondDisplay();
+        DiamondService.instance.addListener(this._diamondListener);
+        this._updateDiamondDisplay();
+
         this._contentNode.addChild(this._startBtn);
         this._contentNode.addChild(this._leaderboardBtn);
+        this._contentNode.addChild(this._shopBtn);
         this._contentNode.addChild(this._subscribeBtn);
 
         if (GameSaveManager.instance.hasSave()) {
@@ -369,41 +413,62 @@ export class HomePage extends Component {
         this._contentNode.getComponent(Widget)?.updateAlignment();
 
         const shortSide = Math.min(size.width, size.height);
-        const buttonW = Math.round(UIResponsive.clamp(shortSide * 0.38, 220, 360));
-        const buttonH = Math.round(UIResponsive.clamp(shortSide * 0.12, 72, 108));
-        const gap = Math.round(UIResponsive.clamp(shortSide * 0.045, 24, 42));
+        const buttonW = Math.round(UIResponsive.clamp(shortSide * 0.34, 130, 300));
+        const buttonH = Math.round(UIResponsive.clamp(shortSide * 0.09, 38, 76));
+        const gap = Math.round(UIResponsive.clamp(shortSide * 0.022, 6, 24));
         const step = buttonH + gap;
         const hasContinue = !!this._continueBtn;
-        const centerY = hasContinue ? -step * 0.5 : 0;
 
+        // Button stack: continue(opt) > start > leaderboard > shop > subscribe
+        const btnCount = hasContinue ? 5 : 4;
+        const stackCenter = -step * 2.0;
+
+        let slot = btnCount - 1;
         if (hasContinue) {
-            this.layoutButton(this._continueBtn, buttonW, buttonH, centerY + step * 2);
+            this.layoutButton(this._continueBtn, buttonW, buttonH, stackCenter + step * slot);
             this.redrawContinueButton(this._continueBtn, buttonW, buttonH);
+            slot--;
         }
-        this.layoutButton(this._startBtn, buttonW, buttonH, centerY + step);
-        this.layoutButton(this._leaderboardBtn, buttonW, buttonH, centerY);
-        this.layoutButton(this._subscribeBtn, buttonW, buttonH, centerY - step);
+        this.layoutButton(this._startBtn, buttonW, buttonH, stackCenter + step * slot);
+        slot--;
+        this.layoutButton(this._leaderboardBtn, buttonW, buttonH, stackCenter + step * slot);
+        slot--;
+        this.layoutButton(this._shopBtn, buttonW, buttonH, stackCenter + step * slot);
+        this.redrawShopButton(this._shopBtn, buttonW, buttonH);
+        slot--;
+        this.layoutButton(this._subscribeBtn, buttonW, buttonH, stackCenter + step * slot);
+
+        const topSlot = btnCount - 1;
+        const topBtnY = stackCenter + step * topSlot;
 
         const titleFontSize = Math.round(UIResponsive.clamp(shortSide * 0.072, 36, 60));
-        const subtitleFontSize = Math.round(UIResponsive.clamp(shortSide * 0.034, 20, 30));
         const titleW = Math.round(Math.min(size.width - 40, 600));
         const titleH = titleFontSize + 16;
-        const subtitleH = subtitleFontSize + 12;
 
-        const desiredTitleY = centerY + (hasContinue ? step * 3.3 : step * 2.6);
-        const desiredSubtitleY = centerY + (hasContinue ? step * 2.8 : step * 2.1);
+        const desiredTitleY = topBtnY + step * 1.3;
         const padding = UIResponsive.getControlPadding();
         const halfHeight = size.height * 0.5;
         const topSafeMargin =
             padding.top + Math.round(UIResponsive.clamp(shortSide * 0.04, 14, 28));
         const maxTitleY = halfHeight - topSafeMargin - titleH * 0.5;
         const titleY = Math.min(desiredTitleY, maxTitleY);
-        const titleSubtitleGap = Math.round(UIResponsive.clamp(shortSide * 0.03, 14, 24));
-        const maxSubtitleY = titleY - titleH * 0.5 - titleSubtitleGap - subtitleH * 0.5;
-        const subtitleY = Math.min(desiredSubtitleY, maxSubtitleY);
 
         this.layoutTextNode(this._titleNode, titleW, titleH, titleY, titleFontSize);
-        this.layoutTextNode(this._subtitleNode, titleW, subtitleH, subtitleY, subtitleFontSize);
+    }
+
+    private redrawShopButton(btnNode: Node | null, width: number, height: number): void {
+        if (!btnNode) return;
+        const bg = btnNode.getComponent(Graphics);
+        if (!bg) return;
+        const r = Math.max(12, Math.round(height * 0.22));
+        bg.clear();
+        bg.fillColor = new Color(138, 92, 246, 255);
+        bg.roundRect(-width / 2, -height / 2, width, height, r);
+        bg.fill();
+        bg.strokeColor = new Color(255, 255, 255, 200);
+        bg.lineWidth = Math.max(2, Math.round(height * 0.05));
+        bg.roundRect(-width / 2, -height / 2, width, height, r);
+        bg.stroke();
     }
 
     private redrawContinueButton(btnNode: Node | null, width: number, height: number): void {
@@ -436,7 +501,7 @@ export class HomePage extends Component {
         labelNode?.getComponent(UITransform)?.setContentSize(Math.max(120, width - 32), height - 8);
         const label = labelNode?.getComponent(Label);
         if (label) {
-            label.fontSize = Math.round(UIResponsive.clamp(height * 0.42, 28, 44));
+            label.fontSize = Math.round(UIResponsive.clamp(height * 0.42, 20, 36));
             label.lineHeight = label.fontSize + 6;
         }
     }
@@ -462,6 +527,10 @@ export class HomePage extends Component {
             const comp = this._continueBtn.getChildByName('Label')?.getComponent(LocalizationComp);
             comp?.refresh();
         }
+        if (this._shopBtn) {
+            const comp = this._shopBtn.getChildByName('Label')?.getComponent(LocalizationComp);
+            comp?.refresh();
+        }
     }
 
     private _initRedditBridge(): void {
@@ -479,6 +548,18 @@ export class HomePage extends Component {
                 this._updateSubscribeButton(event.data.isSubscribed);
                 if (this._leaderboardPanel && event.data.leaderboard) {
                     this._leaderboardPanel.showEntries(event.data.leaderboard);
+                }
+                DiamondService.instance.setInitialBalance(event.data.diamonds);
+                this._updateDiamondDisplay();
+                // Drain any pending settlement that failed to complete last session
+                {
+                    const pending = DiamondService.drainPendingSettlement();
+                    if (pending && pending.wave > 0) {
+                        DiamondService.instance.settleRun(pending.wave, pending.runId, (_earned, _bal) => {
+                            DiamondService.instance.refreshBalance();
+                            this._updateDiamondDisplay();
+                        });
+                    }
                 }
                 break;
             case 'leaderboard':
@@ -625,6 +706,19 @@ export class HomePage extends Component {
         bridge.requestLeaderboard();
     }
 
+    private onShopClick() {
+        if (this._shopPanel) {
+            this._shopPanel.destroy();
+            this._shopPanel = null;
+            return;
+        }
+        this._shopPanel = new ShopPanel(this.node, () => {
+            this._shopPanel?.destroy();
+            this._shopPanel = null;
+            this._updateDiamondDisplay();
+        });
+    }
+
     private onSubscribeClick() {
         const bridge = RedditBridge.instance;
         if (!bridge.isRedditEnvironment) {
@@ -632,6 +726,12 @@ export class HomePage extends Component {
             return;
         }
         bridge.requestSubscribe();
+    }
+
+    private _updateDiamondDisplay(): void {
+        if (!this._diamondLabel) return;
+        const ds = DiamondService.instance;
+        this._diamondLabel.string = String(ds.balance);
     }
 
     private _showToast(text: string): void {

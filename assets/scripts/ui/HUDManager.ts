@@ -19,6 +19,7 @@ import {
 import { HUDCameraCinematicService } from './hud/HUDCameraCinematicService';
 import { HUDMinimapModule } from './hud/HUDMinimapModule';
 import { RedditBridge } from '../core/reddit/RedditBridge';
+import { DiamondService } from '../core/diamond/DiamondService';
 
 /**
  * HUD 管理器
@@ -129,6 +130,7 @@ export class HUDManager {
             this
         );
         this.eventManager.on(GameEvents.GAME_OVER, this.onGameOver, this);
+        this.eventManager.on(GameEvents.COIN_CHANGED, this.onCoinChanged, this);
         this.eventManager.on(GameEvents.LANGUAGE_CHANGED, this.onLanguageChanged, this);
     }
 
@@ -239,10 +241,21 @@ export class HUDManager {
         this.updateXpBar(0, 1, data.level);
     }
 
+    private onCoinChanged(data: { current: number }): void {
+        this._statusModule.updateCoinDisplay(data.current);
+    }
+
     private onGameOver(data: { victory: boolean }): void {
         const wave = WaveService.instance.currentWave;
         this._gameOverModule.showGameOver(Boolean(data?.victory), wave);
         RedditBridge.instance.submitScore(wave * 100, wave);
+        // Settle diamond reward for this run (wave × 10)
+        const runId = DiamondService.generateRunId();
+        DiamondService.instance.settleRun(wave, runId, (earned, _balance) => {
+            if (earned > 0) {
+                this._gameOverModule.showDiamondReward(earned);
+            }
+        });
     }
 
     private onBossIntro(data: HUDBossIntroPayload): void {

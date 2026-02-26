@@ -19,6 +19,8 @@ import { BuildingManager } from '../../gameplay/buildings/BuildingManager';
 import { WaveManager } from '../../gameplay/wave/WaveManager';
 import { Base } from '../../gameplay/buildings/Base';
 import { ItemService } from '../../gameplay/items/ItemService';
+import { ShopInventoryStore } from '../diamond/ShopInventoryStore';
+import type { ItemId } from '../../gameplay/items/ItemDefs';
 import { Hero } from '../../gameplay/units/Hero';
 import { EventManager } from '../managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
@@ -126,6 +128,12 @@ export class GameStartFlow {
 
         const spawned = SpawnBootstrap.spawn(ctx.containers);
         ctx.onSpawned?.(spawned.base, spawned.hero);
+
+        // Load shop purchases from home screen into ItemService for this run
+        const shopItems = ShopInventoryStore.drainItems();
+        for (const entry of shopItems) {
+            ItemService.instance.addItem(entry.id as ItemId, entry.count);
+        }
 
         const startingWave = ctx.saveData?.waveNumber ?? 1;
         SpawnBootstrap.startWaves(ctx.waveLoop, GameConfig.WAVE.FIRST_WAVE_DELAY, startingWave);

@@ -10,8 +10,8 @@
         "format:check": "prettier --check \"assets/scripts/**/*.ts\"",
         "prepare": "husky",
         "patch": "node devvit/scripts/patch-csp.cjs",
-        "upload": "cd devvit && npx devvit upload",
-        "playtest": "cd devvit && npx devvit playtest",
+        "upload": "npm run build && cd devvit && npx devvit upload",
+        "playtest": "npm run build && cd devvit && npx devvit playtest",
         "build": "bash scripts/build_reddit_package.sh --source-build-dir build/reddit-web --output-webroot devvit/webroot --no-optimize-source-assets --cocos-build-opts \"stage=build;buildPath=project://build;outputName=reddit-web\"",
         "deploy": "npm run build && cd devvit && npm install && npx devvit upload && npx devvit install granny_vs_robot_dev"
     },

@@ -29,7 +29,6 @@ export class ItemEffectExecutor {
         this.register('hero_level_up', ItemEffectExecutor.heroLevelUp);
         this.register('freeze_enemies', ItemEffectExecutor.freezeEnemies);
         this.register('upgrade_buildings', ItemEffectExecutor.upgradeBuildings);
-        this.register('bonus_coins', ItemEffectExecutor.bonusCoins);
         this.register('hero_invincible', ItemEffectExecutor.heroInvincible);
     }
 

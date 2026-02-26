@@ -20,9 +20,9 @@ import { applyLayerRecursive, HUD_UI_LAYER } from './HUDCommon';
 import type { HUDModule } from './HUDModule';
 
 const GAME_OVER_DIALOG_MAX_WIDTH = 760;
-const GAME_OVER_DIALOG_MAX_HEIGHT = 350;
+const GAME_OVER_DIALOG_MAX_HEIGHT = 386;
 const GAME_OVER_DIALOG_MIN_WIDTH = 420;
-const GAME_OVER_DIALOG_MIN_HEIGHT = 250;
+const GAME_OVER_DIALOG_MIN_HEIGHT = 286;
 const GAME_OVER_RESTART_BTN_MAX_WIDTH = 280;
 const GAME_OVER_RESTART_BTN_MAX_HEIGHT = 86;
 const GAME_OVER_RESTART_BTN_MIN_WIDTH = 190;
@@ -40,6 +40,7 @@ export class HUDGameOverModule implements HUDModule {
     private _gameOverPanelBg: Graphics | null = null;
     private _gameOverOpacity: UIOpacity | null = null;
     private _gameOverWaveLabel: Label | null = null;
+    private _gameOverDiamondLabel: Label | null = null;
     private _gameOverWave = 0;
     private _gameOverRestarting = false;
     private _gameOverDialogWidth = GAME_OVER_DIALOG_MAX_WIDTH;
@@ -69,6 +70,7 @@ export class HUDGameOverModule implements HUDModule {
         this._gameOverTitleLabel = null;
         this._gameOverMessageLabel = null;
         this._gameOverWaveLabel = null;
+        this._gameOverDiamondLabel = null;
         this._gameOverButtonNode = null;
         this._gameOverButton = null;
         this._gameOverButtonLabel = null;
@@ -91,6 +93,7 @@ export class HUDGameOverModule implements HUDModule {
                 wave: String(this._gameOverWave),
             });
         }
+        // Diamond label text doesn't need re-translation (numeric); keep it as-is.
         if (this._gameOverButtonLabel) {
             this._gameOverButtonLabel.string = Localization.instance.t(
                 this._gameOverRestarting
@@ -99,6 +102,18 @@ export class HUDGameOverModule implements HUDModule {
             );
         }
         this.updateGameOverDialogLayout();
+    }
+
+    /**
+     * Called by HUDManager after DiamondService.settleRun() resolves.
+     * Shows the earned diamond reward row in the game-over dialog.
+     */
+    public showDiamondReward(earned: number): void {
+        if (!this._gameOverDiamondLabel) return;
+        this._gameOverDiamondLabel.string = Localization.instance.t('ui.gameOver.diamonds', {
+            earned: String(earned),
+        });
+        this._gameOverDiamondLabel.node.active = true;
     }
 
     public showGameOver(victory: boolean, wave: number = 0): void {
@@ -117,6 +132,11 @@ export class HUDGameOverModule implements HUDModule {
         this._setInputEnabled(false);
         this._gameOverRestarting = false;
         this.drawGameOverRestartButton(false);
+
+        // Reset diamond label so it's hidden until settleRun callback fires
+        if (this._gameOverDiamondLabel) {
+            this._gameOverDiamondLabel.node.active = false;
+        }
 
         this._gameOverTitleLabel.string = Localization.instance.t(
             victory ? 'ui.gameOver.title.victory' : 'ui.gameOver.title.defeat'
@@ -249,6 +269,21 @@ export class HUDGameOverModule implements HUDModule {
         this._gameOverMessageLabel.enableWrapText = true;
         this._gameOverMessageLabel.overflow = Label.Overflow.SHRINK;
         this._gameOverMessageLabel.color = new Color(234, 245, 255, 255);
+
+        // Diamond reward row (hidden until DiamondService settleRun callback fires)
+        const diamondNode = new Node('GameOverDiamondReward');
+        panel.addChild(diamondNode);
+        diamondNode.addComponent(UITransform).setContentSize(this._gameOverDialogWidth - 80, 38);
+        diamondNode.setPosition(0, -70, 0);
+        this._gameOverDiamondLabel = diamondNode.addComponent(Label);
+        this._gameOverDiamondLabel.fontSize = 26;
+        this._gameOverDiamondLabel.lineHeight = 34;
+        this._gameOverDiamondLabel.isBold = true;
+        this._gameOverDiamondLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this._gameOverDiamondLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._gameOverDiamondLabel.overflow = Label.Overflow.SHRINK;
+        this._gameOverDiamondLabel.color = new Color(160, 230, 255, 255);
+        diamondNode.active = false;
 
         const buttonNode = new Node('GameOverRestartButton');
         panel.addChild(buttonNode);
@@ -509,20 +544,37 @@ export class HUDGameOverModule implements HUDModule {
             ?.getComponent(UITransform)
             ?.setContentSize(
                 dialogW - Math.round(dialogW * 0.24),
-                Math.max(80, Math.round(dialogH * 0.3))
+                Math.max(72, Math.round(dialogH * 0.26))
             );
-        messageNode?.setPosition(0, -Math.round(dialogH * 0.07), 0);
+        messageNode?.setPosition(0, -Math.round(dialogH * 0.06), 0);
         if (this._gameOverMessageLabel) {
             this._gameOverMessageLabel.fontSize = Math.max(
-                20,
-                Math.min(28, Math.round(dialogH * 0.082))
+                18,
+                Math.min(26, Math.round(dialogH * 0.072))
             );
             this._gameOverMessageLabel.lineHeight = this._gameOverMessageLabel.fontSize + 10;
         }
 
+        // Diamond reward row layout
+        const diamondNode = this._gameOverDiamondLabel?.node;
+        diamondNode
+            ?.getComponent(UITransform)
+            ?.setContentSize(
+                dialogW - Math.round(dialogW * 0.14),
+                Math.max(30, Math.round(dialogH * 0.105))
+            );
+        diamondNode?.setPosition(0, -Math.round(dialogH * 0.2), 0);
+        if (this._gameOverDiamondLabel) {
+            this._gameOverDiamondLabel.fontSize = Math.max(
+                18,
+                Math.min(26, Math.round(dialogH * 0.074))
+            );
+            this._gameOverDiamondLabel.lineHeight = this._gameOverDiamondLabel.fontSize + 8;
+        }
+
         if (this._gameOverButtonNode) {
             this._gameOverButtonNode.getComponent(UITransform)?.setContentSize(buttonW, buttonH);
-            this._gameOverButtonNode.setPosition(0, -Math.round(dialogH * 0.33), 0);
+            this._gameOverButtonNode.setPosition(0, -Math.round(dialogH * 0.36), 0);
         }
         this._gameOverButtonLabel?.node
             .getComponent(UITransform)

@@ -1,4 +1,5 @@
 import { Color, Graphics, Label, Node, UITransform, Widget } from 'cc';
+import { DiamondService } from '../../core/diamond/DiamondService';
 import { GameConfig } from '../../data/GameConfig';
 import { WaveService } from '../../core/managers/WaveService';
 import { Localization } from '../../core/i18n/Localization';
@@ -15,7 +16,10 @@ import {
 import type { HUDModule } from './HUDModule';
 
 export class HUDStatusModule implements HUDModule {
-    private _coinLabel: Label | null = null;
+    private _coinsLabel: Label | null = null;
+    private _diamondsLabel: Label | null = null;
+    private _currencyPanelNode: Node | null = null;
+    private _diamondListener: ((balance: number) => void) | null = null;
     private _waveLabel: Label | null = null;
     private _waveWidget: Widget | null = null;
     private _desktopMoveHintWidget: Widget | null = null;
@@ -33,9 +37,28 @@ export class HUDStatusModule implements HUDModule {
     private _currentCountdownSeconds: number = 0;
 
     public initialize(uiCanvas: Node): void {
-        this._coinLabel = UIFactory.createCoinDisplay(uiCanvas);
-        this._coinLabel.overflow = Label.Overflow.SHRINK;
-        this._coinLabel.node.active = true;
+        const currencyPanel = UIFactory.createCurrencyPanel(uiCanvas);
+        this._coinsLabel = currencyPanel.coinsLabel;
+        this._diamondsLabel = currencyPanel.diamondsLabel;
+        this._currencyPanelNode = currencyPanel.panelNode;
+        this._currencyPanelNode.active = true;
+
+        const cpWidget = this._currencyPanelNode.addComponent(Widget);
+        cpWidget.isAlignTop = true;
+        cpWidget.isAlignLeft = true;
+        cpWidget.top = 10;
+        cpWidget.left = 10;
+
+        // Subscribe to diamond balance changes
+        this._diamondListener = (balance: number) => {
+            if (this._diamondsLabel?.isValid) {
+                this._diamondsLabel.string = String(balance);
+            }
+        };
+        DiamondService.instance.addListener(this._diamondListener);
+        if (this._diamondsLabel) {
+            this._diamondsLabel.string = String(DiamondService.instance.balance);
+        }
 
         this._baseHpLabel = UIFactory.createLabel(
             uiCanvas,
@@ -86,7 +109,13 @@ export class HUDStatusModule implements HUDModule {
     }
 
     public cleanup(): void {
-        this._coinLabel = null;
+        if (this._diamondListener) {
+            DiamondService.instance.removeListener(this._diamondListener);
+            this._diamondListener = null;
+        }
+        this._coinsLabel = null;
+        this._diamondsLabel = null;
+        this._currencyPanelNode = null;
         this._waveLabel = null;
         this._waveWidget = null;
         this._desktopMoveHintWidget = null;
@@ -116,9 +145,8 @@ export class HUDStatusModule implements HUDModule {
             }
         });
 
-        // Keep these two hidden in gameplay as requested.
-        if (this._coinLabel?.node?.isValid) {
-            this._coinLabel.node.active = visible;
+        if (this._currencyPanelNode?.isValid) {
+            this._currencyPanelNode.active = visible;
         }
         if (this._baseHpLabel?.node?.isValid) {
             this._baseHpLabel.node.active = false;
@@ -150,10 +178,7 @@ export class HUDStatusModule implements HUDModule {
             });
         }
 
-        if (this._coinLabel) {
-            const coins = this.parseCoinCount(this._coinLabel.string);
-            this._coinLabel.string = Localization.instance.t('ui.hud.coins', { count: coins });
-        }
+        // coinsLabel/diamondsLabel show raw numbers — no re-localization needed.
 
         if (this._levelLabel) {
             const level = this.parseLevel(this._levelLabel.string);
@@ -169,9 +194,9 @@ export class HUDStatusModule implements HUDModule {
     }
 
     public updateCoinDisplay(count: number): void {
-        if (!this._coinLabel) return;
-        this._coinLabel.string = Localization.instance.t('ui.hud.coins', { count });
-        this._coinLabel.node.active = true;
+        if (!this._coinsLabel?.isValid) return;
+        this._coinsLabel.string = String(count);
+        if (this._currencyPanelNode?.isValid) this._currencyPanelNode.active = true;
     }
 
     public updateBaseHp(current: number, max: number): void {
@@ -331,11 +356,6 @@ export class HUDStatusModule implements HUDModule {
         this._xpBarFg.fill();
     }
 
-    private parseCoinCount(text: string): number {
-        const num = Number(text.replace(/[^\d]/g, ''));
-        return Number.isFinite(num) ? num : 0;
-    }
-
     private parseLevel(text: string): number {
         const num = Number(text.replace(/[^\d]/g, ''));
         return Number.isFinite(num) && num > 0 ? num : 1;
@@ -352,28 +372,35 @@ export class HUDStatusModule implements HUDModule {
         const topInset = Math.max(14, Math.round(padding.top * 0.86));
         const bottomInset = Math.max(20, Math.round(padding.bottom * 0.82));
 
-        if (this._coinLabel) {
-            const coinNode = this._coinLabel.node;
-            coinNode
-                .getComponent(UITransform)
-                ?.setContentSize(
-                    Math.round(UIResponsive.clamp(size.width * 0.34, 240, 420)),
-                    Math.round(UIResponsive.clamp(size.height * 0.09, 50, 72))
+        if (this._currencyPanelNode?.isValid) {
+            const panelW = Math.round(UIResponsive.clamp(size.width * 0.155, 130, 188));
+            const panelH = Math.round(UIResponsive.clamp(size.height * 0.116, 62, 88));
+            this._currencyPanelNode.getComponent(UITransform)?.setContentSize(panelW, panelH);
+            const fontSize = compact ? 20 : 24;
+            if (this._coinsLabel?.isValid) {
+                this._coinsLabel.fontSize = fontSize;
+                this._coinsLabel.lineHeight = fontSize + 4;
+            }
+            if (this._diamondsLabel?.isValid) {
+                this._diamondsLabel.fontSize = fontSize;
+                this._diamondsLabel.lineHeight = fontSize + 4;
+            }
+            const panelWidget = this._currencyPanelNode.getComponent(Widget);
+            if (panelWidget) {
+                panelWidget.isAlignTop = true;
+                panelWidget.isAlignLeft = true;
+                panelWidget.isAlignRight = false;
+                panelWidget.isAlignBottom = false;
+                panelWidget.isAlignHorizontalCenter = false;
+                panelWidget.isAlignVerticalCenter = false;
+                // Mirror the settings button's topPad so vertical centers align.
+                const topPad = Math.max(10, Math.round(padding.top * 0.45));
+                const settingsBtnH = Math.round(
+                    UIResponsive.clamp(size.height * (compact ? 0.1 : 0.085), 48, 68)
                 );
-            this._coinLabel.horizontalAlign = Label.HorizontalAlign.LEFT;
-            this._coinLabel.fontSize = compact ? 36 : 44;
-            this._coinLabel.lineHeight = this._coinLabel.fontSize + 8;
-            const coinWidget = coinNode.getComponent(Widget);
-            if (coinWidget) {
-                coinWidget.isAlignTop = true;
-                coinWidget.isAlignLeft = true;
-                coinWidget.isAlignRight = false;
-                coinWidget.isAlignBottom = false;
-                coinWidget.isAlignHorizontalCenter = false;
-                coinWidget.isAlignVerticalCenter = false;
-                coinWidget.top = topInset;
-                coinWidget.left = Math.max(12, Math.round(padding.left * 0.72));
-                coinWidget.updateAlignment();
+                panelWidget.top = Math.max(4, topPad + Math.round((settingsBtnH - panelH) * 0.5));
+                panelWidget.left = Math.max(10, Math.round(padding.left * 0.72));
+                panelWidget.updateAlignment();
             }
         }
 

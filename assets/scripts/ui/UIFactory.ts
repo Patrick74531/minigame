@@ -11,6 +11,11 @@ import {
     Label,
     LabelOutline,
     LabelShadow,
+    Sprite,
+    SpriteFrame,
+    Texture2D,
+    ImageAsset,
+    resources,
 } from 'cc';
 import { Joystick } from './Joystick';
 import { Localization } from '../core/i18n/Localization';
@@ -114,7 +119,133 @@ export class UIFactory {
     }
 
     /**
-     * 创建金币计数 UI
+     * 创建金币 + 錢石单行显示面板
+     * Load icons from resources/icon/coins.webp and resources/icon/diamonds.webp
+     */
+    public static createCurrencyPanel(parent: Node): {
+        coinsLabel: Label;
+        diamondsLabel: Label;
+        panelNode: Node;
+    } {
+        const panelW = 190;
+        const panelH = 38;
+
+        const panelNode = new Node('CurrencyPanel');
+        panelNode.layer = this.UI_LAYER;
+        parent.addChild(panelNode);
+        panelNode.addComponent(UITransform).setContentSize(panelW, panelH);
+
+        const bg = panelNode.addComponent(Graphics);
+        bg.fillColor = new Color(10, 16, 32, 210);
+        bg.roundRect(-panelW / 2, -panelH / 2, panelW, panelH, 10);
+        bg.fill();
+        bg.strokeColor = new Color(255, 200, 60, 110);
+        bg.lineWidth = 1.5;
+        bg.roundRect(-panelW / 2, -panelH / 2, panelW, panelH, 10);
+        bg.stroke();
+
+        const iconSize = 24;
+        const valW = 52;
+        const gap = 4;
+        const sectionGap = 10;
+        const leftPad = 10;
+
+        const coinIconX = -panelW / 2 + leftPad + iconSize / 2;
+        const coinValX = coinIconX + iconSize / 2 + gap + valW / 2;
+        const diamIconX = coinValX + valW / 2 + sectionGap + iconSize / 2;
+        const diamValX = diamIconX + iconSize / 2 + gap + valW / 2;
+
+        this._loadCurrencyIconSprite(panelNode, 'icon/coins', iconSize, coinIconX);
+        const coinsLabel = this._currencyVal(
+            panelNode, '0', new Color(255, 216, 95, 255), new Color(34, 16, 4, 255),
+            valW, panelH, coinValX
+        );
+        this._loadCurrencyIconSprite(panelNode, 'icon/diamonds', iconSize, diamIconX);
+        const diamondsLabel = this._currencyVal(
+            panelNode, '0', new Color(100, 210, 255, 255), new Color(0, 40, 80, 255),
+            valW, panelH, diamValX
+        );
+
+        return { coinsLabel, diamondsLabel, panelNode };
+    }
+
+    /**
+     * Loads a webp icon from resources and applies it as a Sprite.
+     * Falls back to nothing if the asset fails to load.
+     */
+    private static _loadCurrencyIconSprite(
+        parent: Node,
+        resourcePath: string,
+        size: number,
+        x: number
+    ): void {
+        const iconNode = new Node('CIcon');
+        iconNode.layer = this.UI_LAYER;
+        parent.addChild(iconNode);
+        iconNode.addComponent(UITransform).setContentSize(size, size);
+        iconNode.setPosition(x, 0, 0);
+        const sprite = iconNode.addComponent(Sprite);
+        sprite.type = Sprite.Type.SIMPLE;
+        sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+
+        // Try loading as SpriteFrame first, then ImageAsset fallback
+        resources.load(resourcePath, SpriteFrame, (err, sf) => {
+            if (!err && sf && iconNode.isValid) {
+                sprite.spriteFrame = sf;
+                return;
+            }
+            resources.load(resourcePath, Texture2D, (err2, tex) => {
+                if (!err2 && tex && iconNode.isValid) {
+                    const sf2 = new SpriteFrame();
+                    sf2.texture = tex;
+                    sprite.spriteFrame = sf2;
+                    return;
+                }
+                // Final fallback: load as ImageAsset
+                resources.load(resourcePath, ImageAsset, (err3, img) => {
+                    if (!err3 && img && iconNode.isValid) {
+                        const tex2 = new Texture2D();
+                        tex2.image = img;
+                        const sf3 = new SpriteFrame();
+                        sf3.texture = tex2;
+                        sprite.spriteFrame = sf3;
+                    }
+                });
+            });
+        });
+    }
+
+    private static _currencyVal(
+        parent: Node,
+        initial: string,
+        color: Color,
+        outlineColor: Color,
+        w: number,
+        h: number,
+        x: number
+    ): Label {
+        const node = new Node('CVal');
+        node.layer = this.UI_LAYER;
+        parent.addChild(node);
+        node.addComponent(UITransform).setContentSize(w, h);
+        node.setPosition(x, 0, 0);
+        const lbl = node.addComponent(Label);
+        lbl.string = initial;
+        lbl.fontSize = 20;
+        lbl.isBold = true;
+        lbl.color = color;
+        lbl.horizontalAlign = Label.HorizontalAlign.LEFT;
+        lbl.verticalAlign = Label.VerticalAlign.CENTER;
+        lbl.overflow = Label.Overflow.SHRINK;
+        const outline = node.addComponent(LabelOutline);
+        outline.color = outlineColor;
+        outline.width = 2;
+        return lbl;
+    }
+
+    /**
+     * 创建金币计数 UI (legacy — use createCurrencyPanel instead)
+     * @deprecated
      */
     public static createCoinDisplay(parent: Node): Label {
         const node = new Node('CoinDisplay');
