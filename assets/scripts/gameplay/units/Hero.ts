@@ -11,13 +11,6 @@ import {
     geometry,
     Color,
     MeshRenderer,
-    Material,
-    Tween,
-    tween,
-    UIOpacity,
-    UITransform,
-    primitives,
-    utils,
 } from 'cc';
 import { Unit, UnitType, UnitState } from './Unit';
 import { GameManager } from '../../core/managers/GameManager';
@@ -95,8 +88,12 @@ export class Hero extends Unit {
 
     // --- Invincibility ---
     private _invincibleTimer: number = 0;
-    private _glowNode: Node | null = null;
-    private _glowMaterial: Material | null = null;
+    private _glowPhase: number = 0;
+    private _glowActive: boolean = false;
+    /** MeshRenderers collected from hero model subtree for rainbow effect */
+    private _rainbowMRs: MeshRenderer[] = [];
+    /** Original mainColor per MeshRenderer (restored when effect ends) */
+    private _rainbowOrigColors: Color[] = [];
 
     public onDespawn(): void {
         this.unschedule(this.tickRespawnCountdown);
@@ -312,44 +309,115 @@ export class Hero extends Unit {
             this._invincibleTimer = 0;
             this.ensureGoldenGlow(false);
         } else {
-            this.pulseGoldenGlow();
+            this.pulseGoldenGlow(dt);
         }
     }
 
     private ensureGoldenGlow(on: boolean): void {
         if (on) {
-            if (!this._glowNode) {
-                this._glowNode = new Node('HeroGlow');
-                this.node.addChild(this._glowNode);
-                this._glowNode.setPosition(0, 0.8, 0);
-                this._glowNode.setScale(1.2, 1.8, 1.2);
-                const mr = this._glowNode.addComponent(MeshRenderer);
-                // Use ES-module imported primitives and utils (no require)
-                mr.mesh = utils.MeshUtils.createMesh(primitives.sphere(0.5, { segments: 8 }));
-                const mat = new Material();
-                mat.initialize({ effectName: 'builtin-unlit' });
-                mat.setProperty('mainColor', new Color(255, 215, 0, 160));
-                mr.material = mat;
-                mr.shadowCastingMode = MeshRenderer.ShadowCastingMode.OFF;
-                mr.receiveShadow = MeshRenderer.ShadowReceivingMode.OFF;
-                this._glowMaterial = mat;
+            if (!this._glowActive) {
+                this._glowActive = true;
+                this._glowPhase = 0;
+                this._collectRainbowMRs();
             }
-            this._glowNode.active = true;
         } else {
-            if (this._glowNode) {
-                this._glowNode.active = false;
+            if (this._glowActive) {
+                this._glowActive = false;
+                this._restoreOriginalColors();
+                this._rainbowMRs = [];
+                this._rainbowOrigColors = [];
             }
         }
     }
 
-    private pulseGoldenGlow(): void {
-        if (!this._glowNode || !this._glowMaterial) return;
-        const t = (Date.now() % 1200) / 1200;
-        const pulse = 0.7 + 0.3 * Math.sin(t * Math.PI * 2);
-        const alpha = Math.floor(100 + 60 * pulse);
-        this._glowMaterial.setProperty('mainColor', new Color(255, 215, 0, alpha));
-        const s = 1.1 + 0.15 * pulse;
-        this._glowNode.setScale(s, s * 1.5, s);
+    /** Walk hero model subtree and collect all MeshRenderer instances. */
+    private _collectRainbowMRs(): void {
+        this._rainbowMRs = [];
+        this._rainbowOrigColors = [];
+
+        // HeroModel is added asynchronously by UnitFactory — it may not exist yet.
+        // Return empty; pulseGoldenGlow will retry each frame until found.
+        const modelNode = this.node.getChildByName('HeroModel');
+        if (!modelNode) return;
+
+        const collect = (node: Node) => {
+            const mr = node.getComponent(MeshRenderer);
+            if (mr) {
+                let origColor = new Color(255, 255, 255, 255);
+                try {
+                    const prop = mr.material?.getProperty('mainColor');
+                    if (prop instanceof Color) origColor = prop.clone();
+                } catch (_) {}
+                this._rainbowMRs.push(mr);
+                this._rainbowOrigColors.push(origColor);
+            }
+            for (const child of node.children) collect(child);
+        };
+        collect(modelNode);
+    }
+
+    /** Restore each MeshRenderer's material to its pre-effect color. */
+    private _restoreOriginalColors(): void {
+        for (let i = 0; i < this._rainbowMRs.length; i++) {
+            const mr = this._rainbowMRs[i];
+            if (!mr?.isValid || !mr.material) continue;
+            const orig = this._rainbowOrigColors[i] ?? new Color(255, 255, 255, 255);
+            try { mr.material.setProperty('mainColor', orig); } catch (_) {}
+            try { mr.material.setProperty('emissive', new Color(0, 0, 0, 255)); } catch (_) {}
+        }
+    }
+
+    private pulseGoldenGlow(dt: number): void {
+        if (!this._glowActive) return;
+
+        // HeroModel loads async — keep retrying until it's available.
+        if (this._rainbowMRs.length === 0) {
+            this._collectRainbowMRs();
+            if (this._rainbowMRs.length === 0) return; // still not ready
+        }
+
+        this._glowPhase += dt;
+
+        // Full rainbow hue cycle every 0.5 s
+        const hue = (this._glowPhase * 2.0) % 1.0;
+        const [r, g, b] = Hero._hslToRgb(hue, 1.0, 0.65);
+
+        // Flash between vivid rainbow color and white at 8 Hz — classic Mario
+        const showColor = Math.sin(this._glowPhase * Math.PI * 16.0) > 0;
+        const color = showColor ? new Color(r, g, b, 255) : new Color(255, 255, 255, 255);
+
+        for (const mr of this._rainbowMRs) {
+            if (!mr?.isValid || !mr.material) continue;
+            try { mr.material.setProperty('mainColor', color); } catch (_) {}
+            // Emissive boost on standard materials — makes the glow pop
+            const esc = showColor ? 0.35 : 0;
+            try {
+                mr.material.setProperty(
+                    'emissive',
+                    new Color(Math.round(r * esc), Math.round(g * esc), Math.round(b * esc), 255)
+                );
+            } catch (_) {}
+        }
+    }
+
+    /**
+     * Convert HSL (0–1 range each) to RGB (0–255 integers).
+     */
+    private static _hslToRgb(h: number, s: number, l: number): [number, number, number] {
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        const hue2rgb = (t: number): number => {
+            const t1 = ((t % 1) + 1) % 1;
+            if (t1 < 1 / 6) return p + (q - p) * 6 * t1;
+            if (t1 < 1 / 2) return q;
+            if (t1 < 2 / 3) return p + (q - p) * (2 / 3 - t1) * 6;
+            return p;
+        };
+        return [
+            Math.round(hue2rgb(h + 1 / 3) * 255),
+            Math.round(hue2rgb(h) * 255),
+            Math.round(hue2rgb(h - 1 / 3) * 255),
+        ];
     }
 
     // === Hit Feedback ===
