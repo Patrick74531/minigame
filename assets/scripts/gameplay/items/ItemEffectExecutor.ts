@@ -2,7 +2,8 @@ import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { BuildingManager } from '../buildings/BuildingManager';
 import { WaveManager } from '../wave/WaveManager';
 import { HeroLevelSystem } from '../units/HeroLevelSystem';
-import { Enemy } from '../units/Enemy';
+import { GameManager } from '../../core/managers/GameManager';
+import { Unit } from '../units/Unit';
 import { ItemEffectType } from './ItemDefs';
 
 /**
@@ -24,6 +25,9 @@ export class ItemEffectExecutor {
         this.register('restore_buildings', ItemEffectExecutor.restoreBuildings);
         this.register('kill_all_enemies', ItemEffectExecutor.killAllEnemies);
         this.register('hero_level_up', ItemEffectExecutor.heroLevelUp);
+        this.register('freeze_enemies', ItemEffectExecutor.freezeEnemies);
+        this.register('upgrade_buildings', ItemEffectExecutor.upgradeBuildings);
+        this.register('bonus_coins', ItemEffectExecutor.bonusCoins);
     }
 
     /** 注册 / 覆盖某个效果类型的处理器 */
@@ -56,15 +60,15 @@ export class ItemEffectExecutor {
         }
     }
 
-    private static killAllEnemies(params: Record<string, number>): void {
+    private static killAllEnemies(_params: Record<string, number>): void {
         const wm = ServiceRegistry.get<WaveManager>('WaveManager') ?? WaveManager.instance;
-        const damage = params.damage ?? 999999;
+        // 快照当前敌人列表，用 die() 直接击杀以确保不遗漏任何敌人类型
         const enemies = [...wm.enemies];
         for (const enemyNode of enemies) {
             if (!enemyNode || !enemyNode.isValid) continue;
-            const enemyComp = enemyNode.getComponent(Enemy);
-            if (enemyComp) {
-                enemyComp.takeDamage(damage);
+            const unit = enemyNode.getComponent(Unit);
+            if (unit && unit.isAlive) {
+                unit.die();
             }
         }
     }
@@ -76,5 +80,35 @@ export class ItemEffectExecutor {
             const needed = heroLevel.maxXp - heroLevel.currentXp;
             heroLevel.addXp(Math.max(1, needed));
         }
+    }
+
+    private static freezeEnemies(params: Record<string, number>): void {
+        const duration = params.duration ?? 10;
+        const wm = ServiceRegistry.get<WaveManager>('WaveManager') ?? WaveManager.instance;
+        for (const enemyNode of wm.enemies) {
+            if (!enemyNode || !enemyNode.isValid) continue;
+            const unit = enemyNode.getComponent(Unit);
+            if (unit && unit.isAlive) {
+                unit.applySlow(1.0, duration);
+            }
+        }
+    }
+
+    private static upgradeBuildings(_params: Record<string, number>): void {
+        const bm =
+            ServiceRegistry.get<BuildingManager>('BuildingManager') ?? BuildingManager.instance;
+        for (const building of bm.activeBuildings) {
+            if (!building || !building.node || !building.node.isValid) continue;
+            if (!building.isAlive) continue;
+            if (building.level < building.maxLevel) {
+                building.upgrade();
+            }
+        }
+    }
+
+    private static bonusCoins(params: Record<string, number>): void {
+        const amount = params.amount ?? 200;
+        const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+        gm.addCoins(amount);
     }
 }

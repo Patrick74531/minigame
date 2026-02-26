@@ -9,10 +9,22 @@
  * 4. 在 messages.ts 中添加对应 i18n key
  */
 
-export type ItemId = 'restore_buildings' | 'kill_all_enemies' | 'hero_level_up';
+export type ItemId =
+    | 'restore_buildings'
+    | 'kill_all_enemies'
+    | 'hero_level_up'
+    | 'freeze_enemies'
+    | 'upgrade_buildings'
+    | 'bonus_coins';
 
 /** 效果类型枚举 — 新增效果时在此扩展 */
-export type ItemEffectType = 'restore_buildings' | 'kill_all_enemies' | 'hero_level_up';
+export type ItemEffectType =
+    | 'restore_buildings'
+    | 'kill_all_enemies'
+    | 'hero_level_up'
+    | 'freeze_enemies'
+    | 'upgrade_buildings'
+    | 'bonus_coins';
 
 export interface ItemDef {
     id: ItemId;
@@ -46,7 +58,7 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
         iconColor: '#F87171',
         iconSymbol: '⚡',
         effectType: 'kill_all_enemies',
-        effectParams: { damage: 999999 },
+        effectParams: {},
     },
     hero_level_up: {
         id: 'hero_level_up',
@@ -57,6 +69,36 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
         iconSymbol: '★',
         effectType: 'hero_level_up',
         effectParams: { levels: 5 },
+    },
+    freeze_enemies: {
+        id: 'freeze_enemies',
+        nameKey: 'item.freeze_enemies.name',
+        descriptionKey: 'item.freeze_enemies.description',
+        shortKey: 'item.freeze_enemies.short',
+        iconColor: '#38BDF8',
+        iconSymbol: '❄',
+        effectType: 'freeze_enemies',
+        effectParams: { duration: 10 },
+    },
+    upgrade_buildings: {
+        id: 'upgrade_buildings',
+        nameKey: 'item.upgrade_buildings.name',
+        descriptionKey: 'item.upgrade_buildings.description',
+        shortKey: 'item.upgrade_buildings.short',
+        iconColor: '#A78BFA',
+        iconSymbol: '⬆',
+        effectType: 'upgrade_buildings',
+        effectParams: {},
+    },
+    bonus_coins: {
+        id: 'bonus_coins',
+        nameKey: 'item.bonus_coins.name',
+        descriptionKey: 'item.bonus_coins.description',
+        shortKey: 'item.bonus_coins.short',
+        iconColor: '#FCD34D',
+        iconSymbol: '💰',
+        effectType: 'bonus_coins',
+        effectParams: { amount: 200 },
     },
 };
 

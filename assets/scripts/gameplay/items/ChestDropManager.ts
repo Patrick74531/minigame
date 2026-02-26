@@ -5,11 +5,11 @@ import { EventManager } from '../../core/managers/EventManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../data/GameEvents';
 
-const CHEST_COLLECT_RADIUS = 1.2;
-const CHEST_MAGNET_RANGE = 3.5;
+const CHEST_COLLECT_RADIUS = 2.0;
+const CHEST_MAGNET_RANGE = 5.0;
 const CHEST_MAGNET_SPEED = 12;
-const CHEST_FLOAT_SPEED = 2.4;
-const CHEST_FLOAT_AMPLITUDE = 0.18;
+const CHEST_FLOAT_SPEED = 2.0;
+const CHEST_FLOAT_AMPLITUDE = 0.3;
 
 // 复用临时向量，避免每帧 GC
 const _tmpDir = new Vec3();
@@ -113,7 +113,7 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
         let node: Node;
         if (this._chestPrefab) {
             node = instantiate(this._chestPrefab);
-            node.setScale(0.6, 0.6, 0.6);
+            node.setScale(1.8, 1.8, 1.8);
         } else {
             node = this.createFallbackChest();
         }
@@ -152,7 +152,7 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
         material.initialize({ effectName: 'builtin-unlit' });
         material.setProperty('mainColor', new Color(218, 165, 32, 255));
         renderer.material = material;
-        node.setScale(0.8, 0.8, 0.8);
+        node.setScale(2.4, 2.4, 2.4);
         return node;
     }
 
