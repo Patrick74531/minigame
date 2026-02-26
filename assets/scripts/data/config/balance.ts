@@ -364,9 +364,9 @@ const BASE = {
         countPerWave: 3,
         countGrowthStepWaves: 3,
         countGrowthStepBonus: 4,
-        hpMultPerWave: 0.36,
+        hpMultPerWave: 0.44,        // was 0.36 — increased to keep up with weapon scaling
         hpAccelWaveThreshold: 15,
-        hpAccelPerWave: 0.08,
+        hpAccelPerWave: 0.10,       // was 0.08 — steeper late-game acceleration
         attackMultPerWave: 0.11,
         speedMultPerWave: 0.015,
         maxSpeedMult: 1.55,
@@ -431,13 +431,13 @@ const BASE = {
     enemy: {
         moveSpeed: 2.5,
         baseAttack: 7,
-        baseHp: 40,
+        baseHp: 55,                 // was 40 — increased base HP
         attackInterval: 1.2,
         attackRange: 0.85,
         aggroRange: 3.0,
         baseReachDamage: 10,
         elite: {
-            hpMultiplier: 5.4,
+            hpMultiplier: 7.5,          // was 5.4 — elites are more threatening
             attackMultiplier: 1.3,
             speedMultiplier: 1.1,
             scaleMultiplier: 1.5,

@@ -533,8 +533,10 @@ export class Hero extends Unit {
     }
 
     private getEffectiveWeaponStats(base: WeaponLevelStats, weaponType?: string): WeaponLevelStats {
+        const baseAtk = Math.max(0.0001, this._baseStats.attack);
         const baseRange = Math.max(0.0001, this._baseStats.attackRange);
         const baseInterval = Math.max(0.0001, this._baseStats.attackInterval);
+        const attackMultiplier = this._stats.attack / baseAtk;
         const rangeMultiplier = this._stats.attackRange / baseRange;
         const intervalMultiplier = this._stats.attackInterval / baseInterval;
         const heroSkill = GameConfig.BALANCE.HERO_SKILL;
@@ -551,7 +553,11 @@ export class Hero extends Unit {
                       : 1;
         return {
             ...base,
-            damage: Math.max(1, base.damage * heroSkill.WEAPON_DAMAGE_MULTIPLIER * typeDamageScale),
+            // attackMultiplier carries ALL hero attack buffs: level-up, buff cards, base upgrades
+            damage: Math.max(
+                1,
+                base.damage * attackMultiplier * heroSkill.WEAPON_DAMAGE_MULTIPLIER * typeDamageScale
+            ),
             range: Math.max(0.1, base.range * rangeMultiplier * heroSkill.WEAPON_RANGE_MULTIPLIER),
             attackInterval: Math.max(
                 0.05,
