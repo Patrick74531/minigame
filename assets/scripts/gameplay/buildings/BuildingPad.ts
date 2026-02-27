@@ -51,6 +51,7 @@ export class BuildingPad extends BaseComponent {
     private static readonly UPGRADE_HEAL_STABILIZE_IMMUNITY_SECONDS = 2.6;
     private static readonly _activePads: Set<BuildingPad> = new Set();
     private static _coopModeEnabled: boolean = false;
+    private static _coopHostEnabled: boolean = true;
 
     /** 每次收集金币数量 */
     @property
@@ -257,6 +258,9 @@ export class BuildingPad extends BaseComponent {
             this._heroesInArea.add(hero.node);
             this.refreshHeroPresence();
 
+            // Guest in coop mode: no building interaction HUD
+            if (BuildingPad._coopModeEnabled && !BuildingPad._coopHostEnabled) return;
+
             // Show Info
             if (this.hudManager) {
                 const title = this.getHudTitle();
@@ -290,6 +294,8 @@ export class BuildingPad extends BaseComponent {
      */
     protected update(_dt: number): void {
         if (!this.gameManager.isPlaying) return;
+        // Guest in coop mode: no local coin collection
+        if (BuildingPad._coopModeEnabled && !BuildingPad._coopHostEnabled) return;
 
         if (this._heroInArea && this._heroRef) {
             // Check state
@@ -487,6 +493,8 @@ export class BuildingPad extends BaseComponent {
      * @returns 实际收集的金币数
      */
     public tryCollectCoin(heroCoins: number): number {
+        // Guest in coop mode cannot deposit coins
+        if (BuildingPad._coopModeEnabled && !BuildingPad._coopHostEnabled) return 0;
         if (this._isAnimating) return 0; // Block collection during animation
 
         if (this._state !== BuildingPadState.WAITING && this._state !== BuildingPadState.UPGRADING)
@@ -833,6 +841,11 @@ export class BuildingPad extends BaseComponent {
 
     public static setCoopModeEnabled(enabled: boolean): void {
         BuildingPad._coopModeEnabled = enabled;
+    }
+
+    /** In coop mode, only the host can interact with pads for building. */
+    public static setCoopHostEnabled(enabled: boolean): void {
+        BuildingPad._coopHostEnabled = enabled;
     }
 
     private playConstructionEffect(onComplete?: () => void): void {

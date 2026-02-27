@@ -126,6 +126,8 @@ export const GameEvents = {
     COOP_PAD_COIN_DEPOSITED: 'COOP_PAD_COIN_DEPOSITED',
     /** 双人模式：本地拾取金币 { x: number, z: number } */
     COOP_COIN_PICKED: 'COOP_COIN_PICKED',
+    /** 双人模式：房主权威建造状态快照到达 */
+    COOP_BUILD_STATE_SNAPSHOT: 'COOP_BUILD_STATE_SNAPSHOT',
 
     /** 语言变更 { lang: string } */
     LANGUAGE_CHANGED: 'LANGUAGE_CHANGED',
@@ -246,6 +248,7 @@ export type GameEventPayloads = {
         eventType?: 'tower_select';
     };
     [GameEvents.COOP_COIN_PICKED]: { x: number; z: number };
+    [GameEvents.COOP_BUILD_STATE_SNAPSHOT]: { version: number; snapshot: unknown };
     [GameEvents.LANGUAGE_CHANGED]: { lang: string };
 
     // === Boss 宝箱道具系统 ===

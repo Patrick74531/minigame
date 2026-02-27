@@ -43,6 +43,22 @@ interface BuildingDecision {
     seq: number;
 }
 
+interface BuildStatePadSnapshot {
+    padId: string;
+    buildingTypeId: string;
+    level: number;
+    hpRatio: number;
+    nextUpgradeCost: number;
+    collectedCoins: number;
+    state: 'waiting' | 'building' | 'upgrading' | 'selecting' | 'complete';
+}
+
+interface BuildStateSnapshot {
+    version: number;
+    sharedCoins: number;
+    pads: BuildStatePadSnapshot[];
+}
+
 interface MatchState {
     matchId: string;
     postId: string;
@@ -55,6 +71,7 @@ interface MatchState {
     waveNumber: number;
     buildingDecisions: BuildingDecision[];
     seq: number;
+    buildState?: BuildStateSnapshot;
 }
 
 type ServerMessage =
@@ -95,7 +112,8 @@ type ServerMessage =
     | { type: 'PLAYER_RECONNECTED'; playerId: string; state: PlayerSlot }
     | { type: 'GAME_PAUSE'; seq: number }
     | { type: 'GAME_RESUME'; seq: number }
-    | { type: 'MATCH_OVER'; victory: boolean; seq: number };
+    | { type: 'MATCH_OVER'; victory: boolean; seq: number }
+    | { type: 'BUILD_STATE_SNAPSHOT'; snapshot: BuildStateSnapshot; seq: number };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -152,6 +170,17 @@ function parseReplayMembers(rawActions: unknown[]): ServerMessage[] {
         }
     }
     return messages;
+}
+
+/** Returns the host (slot 0) playerId from a match state. */
+function getHostPlayerId(state: MatchState): string | null {
+    const host = state.players.find(p => p.slot === 0);
+    return host?.playerId ?? null;
+}
+
+/** Checks if the given playerId is the host of the match. */
+function isHostPlayer(state: MatchState, playerId: string): boolean {
+    return getHostPlayerId(state) === playerId;
 }
 
 function resolvePlayerId(c: Context): string {
@@ -369,7 +398,9 @@ coop.post('/action', async c => {
         if (!player) return jsonNoCache(c, { error: 'player_not_in_match' }, 403);
 
         const replayMessages: ServerMessage[] = [];
-        const emitWithSeq = async (factory: (seq: number) => ServerMessage): Promise<ServerMessage> => {
+        const emitWithSeq = async (
+            factory: (seq: number) => ServerMessage
+        ): Promise<ServerMessage> => {
             state.seq += 1;
             const msg = factory(state.seq);
             await broadcast(matchId, msg);
@@ -398,6 +429,11 @@ coop.post('/action', async c => {
             }
 
             case 'COIN_DEPOSIT': {
+                // Host-only: only the host can deposit coins for building
+                if (!isHostPlayer(state, playerId)) {
+                    console.warn(`[coop/action] COIN_DEPOSIT rejected: ${playerId} is not host`);
+                    return jsonNoCache(c, { error: 'host_only_action' }, 403);
+                }
                 const { padId, amount } = payload as { padId: string; amount: number };
                 // Validation: reject invalid params
                 if (
@@ -408,7 +444,7 @@ coop.post('/action', async c => {
                     amount <= 0 ||
                     amount > 9999
                 ) {
-                        return jsonNoCache(c, { error: 'invalid_coin_deposit_params' }, 400);
+                    return jsonNoCache(c, { error: 'invalid_coin_deposit_params' }, 400);
                 }
                 const clientSeqRaw = payload.clientSeq;
                 const clientSeq =
@@ -461,6 +497,11 @@ coop.post('/action', async c => {
             }
 
             case 'TOWER_DECISION': {
+                // Host-only: only the host can decide tower type
+                if (!isHostPlayer(state, playerId)) {
+                    console.warn(`[coop/action] TOWER_DECISION rejected: ${playerId} is not host`);
+                    return jsonNoCache(c, { error: 'host_only_action' }, 403);
+                }
                 const { padId, buildingTypeId } = payload as {
                     padId: string;
                     buildingTypeId: string;
@@ -491,6 +532,11 @@ coop.post('/action', async c => {
             }
 
             case 'COIN_PICKUP': {
+                // Host-only: only the host can pick up coins
+                if (!isHostPlayer(state, playerId)) {
+                    console.warn(`[coop/action] COIN_PICKUP rejected: ${playerId} is not host`);
+                    return jsonNoCache(c, { error: 'host_only_action' }, 403);
+                }
                 const { x, z } = payload as { x: number; z: number };
                 if (
                     !Number.isFinite(x) ||
@@ -555,6 +601,29 @@ coop.post('/action', async c => {
                 break;
             }
 
+            case 'BUILD_STATE_SYNC': {
+                // Host-only: only the host can push authoritative build state
+                if (!isHostPlayer(state, playerId)) {
+                    console.warn(
+                        `[coop/action] BUILD_STATE_SYNC rejected: ${playerId} is not host`
+                    );
+                    return jsonNoCache(c, { error: 'host_only_action' }, 403);
+                }
+                const snapshot = payload.snapshot as BuildStateSnapshot | undefined;
+                if (!snapshot || typeof snapshot.version !== 'number') {
+                    return jsonNoCache(c, { error: 'invalid_build_state_sync' }, 400);
+                }
+                // Store authoritative build state
+                state.buildState = snapshot;
+                state.sharedCoins = snapshot.sharedCoins;
+                await emitWithSeq(seq => ({
+                    type: 'BUILD_STATE_SNAPSHOT',
+                    snapshot,
+                    seq,
+                }));
+                break;
+            }
+
             default:
                 return jsonNoCache(c, { error: 'unknown_action_type' }, 400);
         }
@@ -573,7 +642,9 @@ coop.post('/action', async c => {
         }
 
         await saveMatch(state);
-        const lastReplayMsg = replayMessages[replayMessages.length - 1] as { seq?: number } | undefined;
+        const lastReplayMsg = replayMessages[replayMessages.length - 1] as
+            | { seq?: number }
+            | undefined;
         return jsonNoCache(c, { ok: true, seq: lastReplayMsg?.seq ?? state.seq });
     } catch (err) {
         console.error('[coop/action]', err);

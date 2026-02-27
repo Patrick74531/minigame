@@ -459,6 +459,10 @@ export class GameController extends Component {
             throw new Error('remote player missing (players < 2)');
         }
 
+        // Determine host/guest: slot 0 = host (match creator)
+        const isHost = state.players[0]?.playerId === localPlayerId;
+        runtime.setHostMode(isHost);
+
         this._services.hudManager.setVisible(true);
         if (this._mapGenerator) {
             this._mapGenerator.generateProceduralMap();

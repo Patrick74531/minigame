@@ -10,6 +10,24 @@
 
 // ─── Message types (mirrors server definitions) ────────────────────────────────
 
+// ─── Build state snapshot (host-authoritative building) ─────────────────────
+
+export interface BuildStatePadSnapshot {
+    padId: string;
+    buildingTypeId: string;
+    level: number;
+    hpRatio: number;
+    nextUpgradeCost: number;
+    collectedCoins: number;
+    state: 'waiting' | 'building' | 'upgrading' | 'selecting' | 'complete';
+}
+
+export interface BuildStateSnapshot {
+    version: number;
+    sharedCoins: number;
+    pads: BuildStatePadSnapshot[];
+}
+
 export interface CoopMatchState {
     matchId: string;
     postId: string;
@@ -21,6 +39,7 @@ export interface CoopMatchState {
     sharedCoins: number;
     waveNumber: number;
     seq: number;
+    buildState?: BuildStateSnapshot;
 }
 
 export interface CoopPlayerSlot {
@@ -60,7 +79,8 @@ export type ClientAction =
     | { type: 'DISCONNECT' }
     | { type: 'PAUSE_REQUEST' }
     | { type: 'RESUME_REQUEST' }
-    | { type: 'MATCH_OVER'; victory: boolean };
+    | { type: 'MATCH_OVER'; victory: boolean }
+    | { type: 'BUILD_STATE_SYNC'; snapshot: BuildStateSnapshot };
 
 /** Server → Client broadcast message types */
 export type ServerMessage =
@@ -89,7 +109,8 @@ export type ServerMessage =
     | { type: 'PLAYER_RECONNECTED'; playerId: string; state: CoopPlayerSlot }
     | { type: 'GAME_PAUSE'; seq: number }
     | { type: 'GAME_RESUME'; seq: number }
-    | { type: 'MATCH_OVER'; victory: boolean; seq: number };
+    | { type: 'MATCH_OVER'; victory: boolean; seq: number }
+    | { type: 'BUILD_STATE_SNAPSHOT'; snapshot: BuildStateSnapshot; seq: number };
 
 export type CoopMessageListener = (msg: ServerMessage) => void;
 
@@ -160,6 +181,7 @@ export class CoopNetManager {
     private _matchId: string = '';
     private _channel: string = '';
     private _localPlayerId: string = '';
+    private _isHost: boolean = false;
     private _anonPlayerId: string = CoopNetManager.resolveAnonymousPlayerId();
     private _lastSeq: number = 0;
     private _clientSeq: number = 0;
@@ -210,6 +232,12 @@ export class CoopNetManager {
     get isConnected(): boolean {
         return this._connected;
     }
+    get isHost(): boolean {
+        return this._isHost;
+    }
+    get isGuest(): boolean {
+        return !this._isHost;
+    }
     get lastSeq(): number {
         return this._lastSeq;
     }
@@ -230,6 +258,7 @@ export class CoopNetManager {
         this._matchId = res.matchId;
         this._channel = res.channel;
         this._localPlayerId = res.selfPlayerId;
+        this._isHost = true;
         this._lastSeq = res.state?.seq ?? 0;
         this._lastStateSeq = res.state?.seq ?? -1;
         return res;
@@ -243,6 +272,7 @@ export class CoopNetManager {
         this._matchId = res.matchId;
         this._channel = res.channel;
         this._localPlayerId = res.selfPlayerId;
+        this._isHost = false;
         if (res.state) {
             this._lastSeq = res.state.seq ?? 0;
             this._lastStateSeq = res.state.seq ?? -1;

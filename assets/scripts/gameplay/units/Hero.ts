@@ -34,6 +34,7 @@ import { GameEvents } from '../../data/GameEvents';
 import { EventManager } from '../../core/managers/EventManager';
 import { Building } from '../buildings/Building';
 import { HitFeedback } from '../visuals/HitFeedback';
+import { CoopBuildAuthority } from '../../core/runtime/CoopBuildAuthority';
 
 const { ccclass, property } = _decorator;
 const PHYSICS_GROUP_WALL = 1 << 5;
@@ -174,8 +175,12 @@ export class Hero extends Unit {
     }
 
     protected start(): void {
-        this.gameManager.hero = this.node;
-        Coin.HeroNode = this.node; // Set static reference for coins
+        // Only the local player's hero should set global references.
+        // In coop, the remote hero must not overwrite these.
+        if (this.isLocalPlayerHero) {
+            this.gameManager.hero = this.node;
+            Coin.HeroNode = this.node;
+        }
 
         const col = this.node.getComponent(CapsuleCollider);
         if (col) {
@@ -209,6 +214,10 @@ export class Hero extends Unit {
             if (!this.isLocalPlayerHero) {
                 return;
             }
+            // Guest in coop mode cannot pick up coins (host-only building authority)
+            if (CoopBuildAuthority.isGuest) {
+                return;
+            }
             const pos = otherNode.worldPosition;
             this.addCoin(otherNode);
             coin.onPickup();
@@ -222,7 +231,9 @@ export class Hero extends Unit {
         this._state = UnitState.IDLE;
         this._inputVector.set(0, 0);
         this._hasFacingDir = false;
-        this.gameManager.hero = this.node;
+        if (this.isLocalPlayerHero) {
+            this.gameManager.hero = this.node;
+        }
     }
 
     /**
@@ -368,8 +379,12 @@ export class Hero extends Unit {
             const mr = this._rainbowMRs[i];
             if (!mr?.isValid || !mr.material) continue;
             const orig = this._rainbowOrigColors[i] ?? new Color(255, 255, 255, 255);
-            try { mr.material.setProperty('mainColor', orig); } catch (_) {}
-            try { mr.material.setProperty('emissive', new Color(0, 0, 0, 255)); } catch (_) {}
+            try {
+                mr.material.setProperty('mainColor', orig);
+            } catch (_) {}
+            try {
+                mr.material.setProperty('emissive', new Color(0, 0, 0, 255));
+            } catch (_) {}
         }
     }
 
@@ -394,7 +409,9 @@ export class Hero extends Unit {
 
         for (const mr of this._rainbowMRs) {
             if (!mr?.isValid || !mr.material) continue;
-            try { mr.material.setProperty('mainColor', color); } catch (_) {}
+            try {
+                mr.material.setProperty('mainColor', color);
+            } catch (_) {}
             // Emissive boost on standard materials — makes the glow pop
             const esc = showColor ? 0.35 : 0;
             try {
@@ -562,7 +579,10 @@ export class Hero extends Unit {
             // attackMultiplier carries ALL hero attack buffs: level-up, buff cards, base upgrades
             damage: Math.max(
                 1,
-                base.damage * attackMultiplier * heroSkill.WEAPON_DAMAGE_MULTIPLIER * typeDamageScale
+                base.damage *
+                    attackMultiplier *
+                    heroSkill.WEAPON_DAMAGE_MULTIPLIER *
+                    typeDamageScale
             ),
             range: Math.max(0.1, base.range * rangeMultiplier * heroSkill.WEAPON_RANGE_MULTIPLIER),
             attackInterval: Math.max(

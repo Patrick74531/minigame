@@ -7,6 +7,7 @@ import { Localization } from '../core/i18n/Localization';
 import { GameConfig } from '../data/GameConfig';
 import { GameManager } from '../core/managers/GameManager';
 import { SelectionCardTheme } from './SelectionCardTheme';
+import { CoopBuildAuthority } from '../core/runtime/CoopBuildAuthority';
 
 const UI_LAYER = 33554432;
 
@@ -39,6 +40,8 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
 
     private onRequestSelection(data: { padNode: Node }): void {
         if (!data || !data.padNode) return;
+        // Guest in coop mode cannot select towers
+        if (CoopBuildAuthority.isGuest) return;
         this._currentPadNode = data.padNode;
         this.showCards();
     }

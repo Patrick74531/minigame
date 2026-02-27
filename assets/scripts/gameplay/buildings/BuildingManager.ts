@@ -1,5 +1,6 @@
 import { _decorator, Node, Vec3, tween } from 'cc';
 import type { BuildingPadSaveState } from '../../core/managers/GameSaveManager';
+import type { BuildStateSnapshot, BuildStatePadSnapshot } from '../../core/runtime/CoopNetManager';
 import { BuildingPad, BuildingPadState } from './BuildingPad';
 import { BuildingFactory } from './BuildingFactory';
 import { Building, BuildingType } from './Building';
@@ -662,6 +663,109 @@ export class BuildingManager {
         }
 
         this.refreshUpgradePadVisibilityGate();
+    }
+
+    // ── 双人权威建造快照（房客侧应用） ─────────────────────────────
+
+    private _lastAppliedBuildVersion: number = -1;
+
+    /**
+     * 房客侧：接收房主的权威建造快照并幂等地纠偏本地建筑状态。
+     * - 缺失的建筑→补建
+     * - 属性不一致→覆盖（等级/血量/升级费用）
+     * - 多余的建筑→移除（极端边界情况）
+     * - 版本号递增防止旧快照覆盖新状态
+     */
+    public applyAuthoritativeSnapshot(snapshot: BuildStateSnapshot): void {
+        if (!snapshot || typeof snapshot.version !== 'number') return;
+        if (snapshot.version <= this._lastAppliedBuildVersion) return;
+        this._lastAppliedBuildVersion = snapshot.version;
+
+        // Index local pads by coopPadId
+        const padMap = new Map<string, BuildingPad>();
+        for (const pad of this._pads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            padMap.set(pad.coopPadId, pad);
+        }
+
+        for (const data of snapshot.pads) {
+            const pad = padMap.get(data.padId);
+            if (!pad) continue;
+
+            const localBuilding = pad.getAssociatedBuilding();
+
+            if (data.level > 0) {
+                // Snapshot says a building should exist
+                if (!localBuilding) {
+                    // Need to create building from snapshot
+                    this.createBuildingFromSnapshotData(pad, data);
+                } else {
+                    // Building exists — reconcile level & HP
+                    if (localBuilding.level < data.level) {
+                        localBuilding.restoreToLevel(data.level);
+                    }
+                    if (data.hpRatio >= 0 && data.hpRatio <= 1) {
+                        const targetHp = Math.max(
+                            1,
+                            Math.floor(data.hpRatio * localBuilding.maxHp)
+                        );
+                        if (Math.abs(localBuilding.currentHp - targetHp) > 1) {
+                            localBuilding.currentHp = targetHp;
+                        }
+                    }
+                }
+            } else {
+                // Snapshot says no building — if local has one, remove it (edge case)
+                if (localBuilding && localBuilding.node && localBuilding.node.isValid) {
+                    this.unregisterBuilding(localBuilding);
+                    localBuilding.node.destroy();
+                    pad.reset();
+                }
+            }
+        }
+
+        this.refreshUpgradePadVisibilityGate();
+    }
+
+    /**
+     * Create a building on a pad from an authoritative snapshot entry.
+     * Similar to restoreFromSave logic but driven by coop snapshot.
+     */
+    private createBuildingFromSnapshotData(pad: BuildingPad, data: BuildStatePadSnapshot): void {
+        if (!this._buildingContainer) return;
+
+        const pos = pad.getBuildWorldPosition();
+        const angle = pad.node.eulerAngles.y;
+
+        const buildingNode = BuildingFactory.createBuilding(
+            this._buildingContainer,
+            pos.x,
+            pos.z,
+            data.buildingTypeId,
+            this._unitContainer ?? undefined,
+            angle
+        );
+        if (!buildingNode) return;
+
+        const building = buildingNode.getComponent(Building);
+        if (!building) {
+            buildingNode.destroy();
+            return;
+        }
+
+        if (data.level > 1) building.restoreToLevel(data.level);
+        if (data.hpRatio >= 0 && data.hpRatio <= 1) {
+            building.currentHp = Math.max(1, Math.floor(data.hpRatio * building.maxHp));
+        }
+        building.node.active = true;
+
+        if (!this._activeBuildings.includes(building)) {
+            this._activeBuildings.push(building);
+        }
+        pad.initForExistingBuilding(building, data.nextUpgradeCost);
+        pad.placeUpgradeZoneInFront(building.node, true);
+
+        this.tryUnlockPadsAfterTriggerBuild(pad.node);
     }
 
     private get eventManager(): EventManager {

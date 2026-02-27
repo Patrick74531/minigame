@@ -8,6 +8,7 @@ import { Tween } from 'cc';
 import { GameConfig } from '../../data/GameConfig';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { HeroQuery } from '../../core/runtime/HeroQuery';
+import { CoopBuildAuthority } from '../../core/runtime/CoopBuildAuthority';
 
 const { ccclass, property } = _decorator;
 
@@ -81,6 +82,20 @@ export class Coin extends BaseComponent implements IPoolable {
 
     protected update(dt: number): void {
         if (this._isCollecting) return;
+
+        // Guest in coop mode: skip magnet entirely — coins just float.
+        // Host handles all pickup; guest learns via COIN_PICKED network sync.
+        if (CoopBuildAuthority.isGuest) {
+            this._lifetime += dt;
+            if (this.enableLifetime && this._lifetime >= this.lifetimeLimit) {
+                this.collect(true);
+                return;
+            }
+            const floatY =
+                Math.sin(this._lifetime * this.floatSpeed + this.floatPhase) * this.floatAmplitude;
+            this.node.setPosition(this.node.position.x, this.startY + floatY, this.node.position.z);
+            return;
+        }
 
         // Magnet Logic — use HeroQuery for coop-ready nearest-hero lookup
         const hero = HeroQuery.getNearestHero(this.node.worldPosition) ?? Coin.HeroNode;

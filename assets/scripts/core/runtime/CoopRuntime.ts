@@ -6,7 +6,13 @@ import { CoopHeroProvider } from './CoopHeroProvider';
 import { PerPlayerWeaponManager } from './PerPlayerWeaponManager';
 import { TeamLevelSystem } from './TeamLevelSystem';
 import { CoopNetManager } from './CoopNetManager';
-import type { ServerMessage, CoopMatchState } from './CoopNetManager';
+import type {
+    ServerMessage,
+    CoopMatchState,
+    BuildStateSnapshot,
+    BuildStatePadSnapshot,
+} from './CoopNetManager';
+import { CoopBuildAuthority } from './CoopBuildAuthority';
 import { WeaponType } from '../../gameplay/weapons/WeaponTypes';
 import { DualCameraFollow } from '../camera/DualCameraFollow';
 import { GameManager } from '../managers/GameManager';
@@ -14,6 +20,7 @@ import { ServiceRegistry } from '../managers/ServiceRegistry';
 import { EventManager } from '../managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { BuildingManager } from '../../gameplay/buildings/BuildingManager';
+import { BuildingPadState } from '../../gameplay/buildings/BuildingPad';
 import type { BuildingPad } from '../../gameplay/buildings/BuildingPad';
 import { BuildingPad as BuildingPadComponent } from '../../gameplay/buildings/BuildingPad';
 import { Coin } from '../../gameplay/economy/Coin';
@@ -28,6 +35,8 @@ import { Coin } from '../../gameplay/economy/Coin';
  * - 管理 CoopNetManager（网络通信）
  * - 监听服务端广播并同步远程英雄状态
  */
+const BUILD_SYNC_INTERVAL_MS = 2500;
+
 export class CoopRuntime implements IGameRuntime {
     public readonly mode = 'coop' as const;
 
@@ -38,12 +47,17 @@ export class CoopRuntime implements IGameRuntime {
     private _netManager: CoopNetManager;
     private _remoteTargetPositions: Map<string, { x: number; z: number; t: number }> = new Map();
     private _decisionOwnerByPad: Map<string, string> = new Map();
+    private _isHost: boolean = true;
+    private _buildSyncTimer: ReturnType<typeof setInterval> | null = null;
+    private _buildStateVersion: number = 0;
+    private _lastAppliedBuildVersion: number = -1;
     // Cached bound handler to avoid bind leak on on/off
     private _boundOnServerMessage = this.onServerMessage.bind(this);
     private _boundOnLocalWeaponPicked = this.onLocalWeaponPicked.bind(this);
     private _boundOnLocalPadCoinDeposited = this.onLocalPadCoinDeposited.bind(this);
     private _boundOnLocalTowerSelected = this.onLocalTowerSelected.bind(this);
     private _boundOnLocalCoinPicked = this.onLocalCoinPicked.bind(this);
+    private _boundOnBuildingConstructed = this.onBuildingConstructedSync.bind(this);
 
     get heroProvider(): CoopHeroProvider {
         return this._heroProvider;
@@ -61,6 +75,14 @@ export class CoopRuntime implements IGameRuntime {
         return this._teamLevelSystem;
     }
 
+    get isHost(): boolean {
+        return this._isHost;
+    }
+
+    get isGuest(): boolean {
+        return !this._isHost;
+    }
+
     constructor() {
         this._heroProvider = new CoopHeroProvider();
         this._teamLevelSystem = new TeamLevelSystem();
@@ -74,6 +96,8 @@ export class CoopRuntime implements IGameRuntime {
         BuildingPadComponent.setCoopModeEnabled(true);
         this._netManager.on(this._boundOnServerMessage);
         this.eventManager.on(GameEvents.WEAPON_PICKED, this._boundOnLocalWeaponPicked, this);
+        // Building-related event listeners — always registered so host path works.
+        // Guest-side guards are in the handler methods and in BuildingPad/Hero/TowerSelectUI.
         this.eventManager.on(
             GameEvents.COOP_PAD_COIN_DEPOSITED,
             this._boundOnLocalPadCoinDeposited,
@@ -81,11 +105,32 @@ export class CoopRuntime implements IGameRuntime {
         );
         this.eventManager.on(GameEvents.TOWER_SELECTED, this._boundOnLocalTowerSelected, this);
         this.eventManager.on(GameEvents.COOP_COIN_PICKED, this._boundOnLocalCoinPicked, this);
+        this.eventManager.on(
+            GameEvents.BUILDING_CONSTRUCTED,
+            this._boundOnBuildingConstructed,
+            this
+        );
+    }
+
+    /**
+     * 设定本地玩家的房主/房客身份。
+     * 必须在 initialize() 之后、游戏开始之前调用。
+     */
+    setHostMode(isHost: boolean): void {
+        this._isHost = isHost;
+        CoopBuildAuthority.setCoopMode(true, isHost);
+        BuildingPadComponent.setCoopHostEnabled(!isHost ? false : true);
+        if (isHost) {
+            this.startBuildStateSync();
+        }
     }
 
     cleanup(): void {
         HeroQuery.clear();
         BuildingPadComponent.setCoopModeEnabled(false);
+        BuildingPadComponent.setCoopHostEnabled(true);
+        CoopBuildAuthority.reset();
+        this.stopBuildStateSync();
         this._netManager.off(this._boundOnServerMessage);
         this.eventManager.off(GameEvents.WEAPON_PICKED, this._boundOnLocalWeaponPicked, this);
         this.eventManager.off(
@@ -95,6 +140,11 @@ export class CoopRuntime implements IGameRuntime {
         );
         this.eventManager.off(GameEvents.TOWER_SELECTED, this._boundOnLocalTowerSelected, this);
         this.eventManager.off(GameEvents.COOP_COIN_PICKED, this._boundOnLocalCoinPicked, this);
+        this.eventManager.off(
+            GameEvents.BUILDING_CONSTRUCTED,
+            this._boundOnBuildingConstructed,
+            this
+        );
         this._netManager.disconnect().catch(() => {});
         this._teamLevelSystem.cleanup();
         DualCameraFollow.cleanup();
@@ -217,6 +267,9 @@ export class CoopRuntime implements IGameRuntime {
                 gm.resumeGame();
                 break;
             }
+            case 'BUILD_STATE_SNAPSHOT':
+                this.handleBuildStateSnapshot(msg);
+                break;
             case 'MATCH_OVER':
                 // TODO: trigger game over flow
                 break;
@@ -328,6 +381,7 @@ export class CoopRuntime implements IGameRuntime {
         padFilled: boolean;
         eventType?: 'tower_select';
     }): void {
+        if (!this._isHost) return;
         if (!data?.padId || !Number.isFinite(data.amount) || data.amount <= 0) return;
         this._netManager
             .sendAction({
@@ -346,6 +400,7 @@ export class CoopRuntime implements IGameRuntime {
         buildingTypeId: string;
         source?: 'local' | 'remote';
     }): void {
+        if (!this._isHost) return;
         if (!data?.padNode || !data?.buildingTypeId) return;
         if (data.source === 'remote') return;
 
@@ -368,6 +423,7 @@ export class CoopRuntime implements IGameRuntime {
     }
 
     private onLocalCoinPicked(data: { x: number; z: number }): void {
+        if (!this._isHost) return;
         if (!Number.isFinite(data?.x) || !Number.isFinite(data?.z)) return;
         this._netManager
             .sendAction({
@@ -383,6 +439,103 @@ export class CoopRuntime implements IGameRuntime {
         const manager =
             ServiceRegistry.get<BuildingManager>('BuildingManager') ?? BuildingManager.instance;
         return manager.getPadByCoopPadId(padId);
+    }
+
+    // ─── Host-authoritative build state sync ────────────────────────────────
+
+    private startBuildStateSync(): void {
+        this.stopBuildStateSync();
+        this._buildSyncTimer = setInterval(() => {
+            this.sendBuildStateSnapshot();
+        }, BUILD_SYNC_INTERVAL_MS);
+    }
+
+    private stopBuildStateSync(): void {
+        if (this._buildSyncTimer) {
+            clearInterval(this._buildSyncTimer);
+            this._buildSyncTimer = null;
+        }
+    }
+
+    /** Host: send after building events for fast guest sync */
+    private onBuildingConstructedSync(): void {
+        if (!this._isHost) return;
+        // Short delay to let BuildingManager finish creating the building
+        setTimeout(() => this.sendBuildStateSnapshot(), 200);
+    }
+
+    private sendBuildStateSnapshot(): void {
+        if (!this._isHost) return;
+        const manager =
+            ServiceRegistry.get<BuildingManager>('BuildingManager') ?? BuildingManager.instance;
+        const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+
+        const pads: BuildStatePadSnapshot[] = [];
+        for (const pad of manager.pads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            const building = pad.getAssociatedBuilding();
+            pads.push({
+                padId: pad.coopPadId,
+                buildingTypeId: building?.buildingTypeId ?? pad.buildingTypeId,
+                level: building?.level ?? 0,
+                hpRatio: building
+                    ? Math.max(0, building.currentHp / Math.max(1, building.maxHp))
+                    : 0,
+                nextUpgradeCost: pad.nextUpgradeCost,
+                collectedCoins: pad.collectedCoins,
+                state: this.mapPadState(pad.state),
+            });
+        }
+
+        this._buildStateVersion += 1;
+        const snapshot: BuildStateSnapshot = {
+            version: this._buildStateVersion,
+            sharedCoins: gm.coins,
+            pads,
+        };
+
+        this._netManager
+            .sendAction({
+                type: 'BUILD_STATE_SYNC',
+                snapshot,
+            })
+            .catch(() => {});
+    }
+
+    private mapPadState(
+        state: BuildingPadState
+    ): 'waiting' | 'building' | 'upgrading' | 'selecting' | 'complete' {
+        switch (state) {
+            case BuildingPadState.WAITING:
+                return 'waiting';
+            case BuildingPadState.BUILDING:
+                return 'building';
+            case BuildingPadState.UPGRADING:
+                return 'upgrading';
+            case BuildingPadState.SELECTING:
+                return 'selecting';
+            case BuildingPadState.COMPLETE:
+                return 'complete';
+            default:
+                return 'waiting';
+        }
+    }
+
+    /** Guest: apply authoritative build state snapshot from host */
+    private handleBuildStateSnapshot(msg: { snapshot: BuildStateSnapshot; seq: number }): void {
+        // Host ignores its own snapshot echoes
+        if (this._isHost) return;
+        if (!msg.snapshot || typeof msg.snapshot.version !== 'number') return;
+        if (msg.snapshot.version <= this._lastAppliedBuildVersion) return;
+        this._lastAppliedBuildVersion = msg.snapshot.version;
+
+        const manager =
+            ServiceRegistry.get<BuildingManager>('BuildingManager') ?? BuildingManager.instance;
+        manager.applyAuthoritativeSnapshot(msg.snapshot);
+
+        // Also sync shared coins
+        const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+        gm.setCoins(msg.snapshot.sharedCoins);
     }
 
     private get eventManager(): EventManager {
