@@ -75,6 +75,7 @@ export class UnitFactory {
     private static _materials: Map<string, Material> = new Map();
     private static _heroPrefabs: Map<string, Prefab> = new Map();
     private static _heroPrefabLoading: Set<string> = new Set();
+    private static _heroPrefabWaiters: Map<string, Array<(prefab: Prefab) => void>> = new Map();
     private static _heroRunClipCache: Map<string, AnimationClip> = new Map();
     private static _heroRunClipLoading: Set<string> = new Set();
     private static _heroIdleClipCache: Map<string, AnimationClip> = new Map();
@@ -383,6 +384,13 @@ export class UnitFactory {
      */
     public static clearCache(): void {
         this._materials.clear();
+        this._heroPrefabs.clear();
+        this._heroPrefabLoading.clear();
+        this._heroPrefabWaiters.clear();
+        this._heroRunClipCache.clear();
+        this._heroRunClipLoading.clear();
+        this._heroIdleClipCache.clear();
+        this._heroIdleClipLoading.clear();
     }
 
     private static attachHeroModel(root: Node): void {
@@ -587,7 +595,15 @@ export class UnitFactory {
             return;
         }
 
-        if (this._heroRunClipLoading.has(config.key)) return;
+        if (this._heroRunClipLoading.has(config.key)) {
+            // Coop can call ensureRunClip concurrently for two heroes.
+            // If one hero is loading, queue a lightweight retry for the other one.
+            setTimeout(() => {
+                if (!anim || !anim.node || !anim.node.isValid) return;
+                this.ensureRunClip(anim, controller);
+            }, 50);
+            return;
+        }
         this._heroRunClipLoading.add(config.key);
 
         const paths = this.buildClipPaths(config.runClipPath, config.runClipFallbacks);
@@ -679,18 +695,31 @@ export class UnitFactory {
             return;
         }
 
+        const waiters = this._heroPrefabWaiters.get(config.key) ?? [];
+        waiters.push(attach);
+        this._heroPrefabWaiters.set(config.key, waiters);
+
         if (this._heroPrefabLoading.has(config.key)) return;
         this._heroPrefabLoading.add(config.key);
 
         const paths = this.buildPrefabPaths(config);
         this.loadWithFallbacks(paths, Prefab, (err, prefab) => {
             this._heroPrefabLoading.delete(config.key);
+            const pending = this._heroPrefabWaiters.get(config.key) ?? [];
+            this._heroPrefabWaiters.delete(config.key);
+
             if (!prefab) {
                 console.warn('[UnitFactory] Failed to load hero run prefab:', err);
                 return;
             }
             this._heroPrefabs.set(config.key, prefab);
-            attach(prefab);
+            for (const waiter of pending) {
+                try {
+                    waiter(prefab);
+                } catch (attachErr) {
+                    console.warn('[UnitFactory] Failed to attach hero model waiter:', attachErr);
+                }
+            }
         });
     }
 
