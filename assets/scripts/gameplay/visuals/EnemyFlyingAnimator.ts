@@ -129,6 +129,13 @@ export class EnemyFlyingAnimator extends Component {
         }
 
         if (this._anim) {
+            this._anim.useBakedAnimation = false;
+            const clips = this._anim.clips ?? [];
+            for (const clip of clips) {
+                if (clip) {
+                    this.ensureClipTrackDataCompat(clip as unknown as { _exoticAnimation?: any });
+                }
+            }
             // ⚠️ 【重要，请勿修改】以下两行方法调用的顺序和名称被 patch-csp.cjs 的 Patch Y/Z 严格依赖。
             // 不要重命名 detectClips() 或 updateAnimation()，不要在这两行之间插入其他语句，
             // 否则 Patch Y（设置 useBakedAnimation=false）和 Patch Z（BPELEM 修复）将失效。
@@ -189,6 +196,44 @@ export class EnemyFlyingAnimator extends Component {
             return root.position.y + y * root.scale.y;
         }
         return y;
+    }
+
+    private ensureClipTrackDataCompat(clip: { _exoticAnimation?: any }): void {
+        const nodeAnimations = clip._exoticAnimation?._nodeAnimations;
+        if (!Array.isArray(nodeAnimations) || nodeAnimations.length === 0) {
+            return;
+        }
+
+        for (const nodeAnim of nodeAnimations) {
+            for (const key of ['_position', '_rotation', '_scale'] as const) {
+                const track = nodeAnim?.[key];
+                if (!track) continue;
+
+                const values = track.values as
+                    | { BYTES_PER_ELEMENT?: number; _values?: { BYTES_PER_ELEMENT?: number } }
+                    | undefined;
+                if (
+                    values &&
+                    typeof values.BYTES_PER_ELEMENT !== 'number' &&
+                    values._values &&
+                    typeof values._values.BYTES_PER_ELEMENT === 'number'
+                ) {
+                    values.BYTES_PER_ELEMENT = values._values.BYTES_PER_ELEMENT;
+                }
+
+                const times = track.times as
+                    | { BYTES_PER_ELEMENT?: number; _values?: { BYTES_PER_ELEMENT?: number } }
+                    | undefined;
+                if (
+                    times &&
+                    typeof times.BYTES_PER_ELEMENT !== 'number' &&
+                    times._values &&
+                    typeof times._values.BYTES_PER_ELEMENT === 'number'
+                ) {
+                    times.BYTES_PER_ELEMENT = times._values.BYTES_PER_ELEMENT;
+                }
+            }
+        }
     }
 
     // ⚠️ 【重要，请勿修改】此方法名被 Patch Z 依赖，请勿重命名。

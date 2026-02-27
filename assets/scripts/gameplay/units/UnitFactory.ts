@@ -835,6 +835,7 @@ export class UnitFactory {
         clip: AnimationClip,
         stateName: string
     ): string {
+        this.ensureClipTrackDataCompat(clip);
         this.addClipIfNeeded(anim, clip);
         const existing = anim.getState(stateName);
         if (existing) {
@@ -847,6 +848,45 @@ export class UnitFactory {
             return created.name;
         }
         return clip.name;
+    }
+
+    private static ensureClipTrackDataCompat(clip: AnimationClip): void {
+        const exotic = (clip as unknown as { _exoticAnimation?: any })._exoticAnimation;
+        const nodeAnimations = exotic?._nodeAnimations;
+        if (!Array.isArray(nodeAnimations) || nodeAnimations.length === 0) {
+            return;
+        }
+
+        for (const nodeAnim of nodeAnimations) {
+            for (const key of ['_position', '_rotation', '_scale'] as const) {
+                const track = nodeAnim?.[key];
+                if (!track) continue;
+
+                const values = track.values as
+                    | { BYTES_PER_ELEMENT?: number; _values?: { BYTES_PER_ELEMENT?: number } }
+                    | undefined;
+                if (
+                    values &&
+                    typeof values.BYTES_PER_ELEMENT !== 'number' &&
+                    values._values &&
+                    typeof values._values.BYTES_PER_ELEMENT === 'number'
+                ) {
+                    values.BYTES_PER_ELEMENT = values._values.BYTES_PER_ELEMENT;
+                }
+
+                const times = track.times as
+                    | { BYTES_PER_ELEMENT?: number; _values?: { BYTES_PER_ELEMENT?: number } }
+                    | undefined;
+                if (
+                    times &&
+                    typeof times.BYTES_PER_ELEMENT !== 'number' &&
+                    times._values &&
+                    typeof times._values.BYTES_PER_ELEMENT === 'number'
+                ) {
+                    times.BYTES_PER_ELEMENT = times._values.BYTES_PER_ELEMENT;
+                }
+            }
+        }
     }
 
     private static tuneHeroStateSpeed(
