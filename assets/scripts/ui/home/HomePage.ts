@@ -17,6 +17,7 @@ import {
     Graphics,
     tween,
     Vec3,
+    EditBox,
 } from 'cc';
 import { Localization } from '../../core/i18n/Localization';
 import { GameManager } from '../../core/managers/GameManager';
@@ -35,6 +36,7 @@ const { ccclass } = _decorator;
 
 @ccclass('HomePage')
 export class HomePage extends Component {
+    private static readonly COOP_CREATE_MATCH_SENTINEL = '__create__';
     private _backgroundNode: Node | null = null;
     private _backgroundSprite: Sprite | null = null;
     private _contentNode: Node | null = null;
@@ -44,6 +46,7 @@ export class HomePage extends Component {
     private _titleNode: Node | null = null;
     private _subtitleNode: Node | null = null;
     private _startBtn: Node | null = null;
+    private _coopBtn: Node | null = null;
     private _leaderboardBtn: Node | null = null;
     private _subscribeBtn: Node | null = null;
     private _leaderboardPanel: LeaderboardPanel | null = null;
@@ -51,12 +54,16 @@ export class HomePage extends Component {
     private _continueBtn: Node | null = null;
     private _onStartRequested: (() => void) | null = null;
     private _onContinueRequested: (() => void) | null = null;
+    private _onCoopRequested: ((matchId: string) => void) | null = null;
     private _shopBtn: Node | null = null;
     private _shopPanel: ShopPanel | null = null;
     private _coinsLabel: Label | null = null;
     private _diamondLabel: Label | null = null;
     private _currencyPanelNode: Node | null = null;
     private _diamondListener: ((balance: number) => void) | null = null;
+    private _coopModalNode: Node | null = null;
+    private _coopPanelNode: Node | null = null;
+    private _coopInviteEditBox: EditBox | null = null;
 
     public onLoad() {
         this._uiLayer = this.node.parent?.layer ?? Layers.Enum.UI_2D;
@@ -93,6 +100,7 @@ export class HomePage extends Component {
             this._shopPanel.destroy();
             this._shopPanel = null;
         }
+        this._closeCoopModal();
     }
 
     private ensureRootLayout() {
@@ -157,6 +165,9 @@ export class HomePage extends Component {
         this._startBtn = this.createGameButton('StartButton', 'ui.home.start', 0, 120, () =>
             this.onStartClick()
         );
+        this._coopBtn = this.createGameButton('CoopButton', 'ui.home.coop', 0, 60, () =>
+            this.onCoopClick()
+        );
         this._leaderboardBtn = this.createGameButton(
             'LeaderboardButton',
             'ui.home.leaderboard',
@@ -208,6 +219,7 @@ export class HomePage extends Component {
         this._updateDiamondDisplay();
 
         this._contentNode.addChild(this._startBtn);
+        this._contentNode.addChild(this._coopBtn);
         this._contentNode.addChild(this._leaderboardBtn);
         this._contentNode.addChild(this._shopBtn);
         this._contentNode.addChild(this._subscribeBtn);
@@ -348,6 +360,7 @@ export class HomePage extends Component {
         this.ensureRootLayout();
         this.updateBackgroundLayout();
         this.updateContentLayout();
+        this.updateCoopModalLayout();
         this._settingsModule?.onCanvasResize();
     }
 
@@ -419,9 +432,10 @@ export class HomePage extends Component {
         const step = buttonH + gap;
         const hasContinue = !!this._continueBtn;
 
-        // Button stack: continue(opt) > start > leaderboard > shop > subscribe
-        const btnCount = hasContinue ? 5 : 4;
-        const stackCenter = -step * 2.0;
+        // Button stack: continue(opt) > start > coop > leaderboard > shop > subscribe
+        const btnCount = hasContinue ? 6 : 5;
+        // Keep button stack lower to avoid title overlap on dense menus.
+        const stackCenter = -step * 2.9;
 
         let slot = btnCount - 1;
         if (hasContinue) {
@@ -430,6 +444,8 @@ export class HomePage extends Component {
             slot--;
         }
         this.layoutButton(this._startBtn, buttonW, buttonH, stackCenter + step * slot);
+        slot--;
+        this.layoutButton(this._coopBtn, buttonW, buttonH, stackCenter + step * slot);
         slot--;
         this.layoutButton(this._leaderboardBtn, buttonW, buttonH, stackCenter + step * slot);
         slot--;
@@ -519,6 +535,10 @@ export class HomePage extends Component {
                 ?.getComponent(LocalizationComp);
             comp?.refresh();
         }
+        if (this._coopBtn) {
+            const comp = this._coopBtn.getChildByName('Label')?.getComponent(LocalizationComp);
+            comp?.refresh();
+        }
         if (this._subscribeBtn) {
             const comp = this._subscribeBtn.getChildByName('Label')?.getComponent(LocalizationComp);
             comp?.refresh();
@@ -531,6 +551,7 @@ export class HomePage extends Component {
             const comp = this._shopBtn.getChildByName('Label')?.getComponent(LocalizationComp);
             comp?.refresh();
         }
+        this.updateCoopModalLayout();
     }
 
     private _initRedditBridge(): void {
@@ -555,10 +576,14 @@ export class HomePage extends Component {
                 {
                     const pending = DiamondService.drainPendingSettlement();
                     if (pending && pending.wave > 0) {
-                        DiamondService.instance.settleRun(pending.wave, pending.runId, (_earned, _bal) => {
-                            DiamondService.instance.refreshBalance();
-                            this._updateDiamondDisplay();
-                        });
+                        DiamondService.instance.settleRun(
+                            pending.wave,
+                            pending.runId,
+                            (_earned, _bal) => {
+                                DiamondService.instance.refreshBalance();
+                                this._updateDiamondDisplay();
+                            }
+                        );
                     }
                 }
                 break;
@@ -599,6 +624,10 @@ export class HomePage extends Component {
 
     public setOnContinueRequested(cb: () => void): void {
         this._onContinueRequested = cb;
+    }
+
+    public setOnCoopRequested(cb: (matchId: string) => void): void {
+        this._onCoopRequested = cb;
     }
 
     private createTextNode(
@@ -672,6 +701,7 @@ export class HomePage extends Component {
     }
 
     private onStartClick() {
+        this._setRuntimeMode('solo');
         if (this._onStartRequested) {
             this._onStartRequested();
         } else {
@@ -681,9 +711,14 @@ export class HomePage extends Component {
     }
 
     private onContinueClick() {
+        this._setRuntimeMode('solo');
         if (this._onContinueRequested) {
             this._onContinueRequested();
         }
+    }
+
+    private onCoopClick() {
+        this._openCoopModal();
     }
 
     private onLeaderboardClick() {
@@ -732,6 +767,391 @@ export class HomePage extends Component {
         if (!this._diamondLabel) return;
         const ds = DiamondService.instance;
         this._diamondLabel.string = String(ds.balance);
+    }
+
+    private _openCoopModal(initialValue: string = ''): void {
+        if (this._coopModalNode && this._coopModalNode.isValid) return;
+
+        const modal = new Node('CoopModal');
+        modal.layer = this._uiLayer;
+        const modalTf = modal.addComponent(UITransform);
+        const canvasSize = this.getCanvasSize();
+        modalTf.setContentSize(canvasSize.width, canvasSize.height);
+        const modalWidget = modal.addComponent(Widget);
+        modalWidget.isAlignTop = true;
+        modalWidget.isAlignBottom = true;
+        modalWidget.isAlignLeft = true;
+        modalWidget.isAlignRight = true;
+        modalWidget.top = 0;
+        modalWidget.bottom = 0;
+        modalWidget.left = 0;
+        modalWidget.right = 0;
+
+        modal.addComponent(Graphics);
+        const blocker = modal.addComponent(Button);
+        blocker.transition = Button.Transition.NONE;
+        modal.on(Button.EventType.CLICK, () => {
+            // Consume clicks so underlying home buttons are blocked.
+        });
+
+        const panel = new Node('CoopModalPanel');
+        panel.layer = this._uiLayer;
+        panel.addComponent(UITransform);
+        panel.addComponent(Graphics);
+        modal.addChild(panel);
+
+        const titleNode = new Node('Title');
+        titleNode.layer = this._uiLayer;
+        titleNode.addComponent(UITransform);
+        const titleLabel = titleNode.addComponent(Label);
+        titleLabel.isBold = true;
+        titleLabel.color = new Color(255, 233, 143, 255);
+        titleLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        titleLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        titleLabel.overflow = Label.Overflow.SHRINK;
+        applyGameLabelStyle(titleLabel, { outlineWidth: 3, outlineColor: new Color(0, 0, 0, 210) });
+        panel.addChild(titleNode);
+
+        const descNode = new Node('Description');
+        descNode.layer = this._uiLayer;
+        descNode.addComponent(UITransform);
+        const descLabel = descNode.addComponent(Label);
+        descLabel.color = new Color(235, 239, 255, 255);
+        descLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        descLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        descLabel.overflow = Label.Overflow.RESIZE_HEIGHT;
+        panel.addChild(descNode);
+
+        const inputNode = new Node('InviteInput');
+        inputNode.layer = this._uiLayer;
+        inputNode.addComponent(UITransform);
+        inputNode.addComponent(Graphics);
+        panel.addChild(inputNode);
+
+        const inputLabelNode = new Node('InputLabel');
+        inputLabelNode.layer = this._uiLayer;
+        inputNode.addChild(inputLabelNode);
+        inputLabelNode.addComponent(UITransform);
+        const inputLabel = inputLabelNode.addComponent(Label);
+        inputLabel.color = new Color(250, 251, 255, 255);
+        inputLabel.fontSize = 24;
+        inputLabel.lineHeight = 30;
+        inputLabel.horizontalAlign = Label.HorizontalAlign.LEFT;
+        inputLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        inputLabel.overflow = Label.Overflow.SHRINK;
+
+        const placeholderNode = new Node('PlaceholderLabel');
+        placeholderNode.layer = this._uiLayer;
+        inputNode.addChild(placeholderNode);
+        placeholderNode.addComponent(UITransform);
+        const placeholderLabel = placeholderNode.addComponent(Label);
+        placeholderLabel.color = new Color(156, 169, 196, 255);
+        placeholderLabel.fontSize = 22;
+        placeholderLabel.lineHeight = 28;
+        placeholderLabel.horizontalAlign = Label.HorizontalAlign.LEFT;
+        placeholderLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        placeholderLabel.overflow = Label.Overflow.SHRINK;
+
+        const inputEditBox = inputNode.addComponent(EditBox);
+        inputEditBox.maxLength = 120;
+        inputEditBox.string = initialValue;
+        inputEditBox.textLabel = inputLabel;
+        inputEditBox.placeholderLabel = placeholderLabel;
+        this._coopInviteEditBox = inputEditBox;
+
+        const createBtn = this._createCoopModalButton(
+            panel,
+            'CreateBtn',
+            Localization.instance.t('ui.home.coop.create'),
+            () => {
+                this._closeCoopModal();
+                this._requestCoopStart(HomePage.COOP_CREATE_MATCH_SENTINEL);
+            }
+        );
+        const joinBtn = this._createCoopModalButton(
+            panel,
+            'JoinBtn',
+            Localization.instance.t('ui.home.coop.join'),
+            () => {
+                const input = this._coopInviteEditBox?.string?.trim() ?? '';
+                const matchId = this._extractMatchId(input);
+                if (!matchId) {
+                    const msgKey = input ? 'ui.home.coop.invalid' : 'ui.home.coop.empty';
+                    this._showToast(Localization.instance.t(msgKey));
+                    return;
+                }
+                this._closeCoopModal();
+                this._requestCoopStart(matchId);
+            }
+        );
+        const cancelBtn = this._createCoopModalButton(
+            panel,
+            'CancelBtn',
+            Localization.instance.t('ui.home.coop.cancel'),
+            () => this._closeCoopModal()
+        );
+
+        this._coopModalNode = modal;
+        this._coopPanelNode = panel;
+        this.node.addChild(modal);
+        this.updateCoopModalLayout();
+
+        // draw theme colors after size is known
+        this._redrawCoopModalButton(createBtn, new Color(72, 192, 96, 255), Color.WHITE);
+        this._redrawCoopModalButton(joinBtn, new Color(255, 198, 88, 255), Color.WHITE);
+        this._redrawCoopModalButton(
+            cancelBtn,
+            new Color(86, 98, 128, 255),
+            new Color(240, 244, 255, 255)
+        );
+    }
+
+    private _closeCoopModal(): void {
+        if (this._coopModalNode && this._coopModalNode.isValid) {
+            this._coopModalNode.destroy();
+        }
+        this._coopModalNode = null;
+        this._coopPanelNode = null;
+        this._coopInviteEditBox = null;
+    }
+
+    private updateCoopModalLayout(): void {
+        if (!this._coopModalNode || !this._coopModalNode.isValid) return;
+        const modal = this._coopModalNode;
+        const size = this.getCanvasSize();
+        modal.getComponent(UITransform)?.setContentSize(size.width, size.height);
+        modal.getComponent(Widget)?.updateAlignment();
+
+        const mask = modal.getComponent(Graphics);
+        if (mask) {
+            mask.clear();
+            mask.fillColor = new Color(10, 14, 26, 190);
+            mask.rect(-size.width * 0.5, -size.height * 0.5, size.width, size.height);
+            mask.fill();
+        }
+
+        const panel = this._coopPanelNode;
+        if (!panel || !panel.isValid) return;
+
+        const shortSide = Math.min(size.width, size.height);
+        const panelW = Math.round(UIResponsive.clamp(shortSide * 0.84, 320, 560));
+        const panelH = Math.round(UIResponsive.clamp(shortSide * 0.64, 280, 430));
+        panel.getComponent(UITransform)?.setContentSize(panelW, panelH);
+        panel.setPosition(0, -Math.round(shortSide * 0.04), 0);
+
+        const panelBg = panel.getComponent(Graphics);
+        if (panelBg) {
+            const radius = Math.max(16, Math.round(panelH * 0.07));
+            panelBg.clear();
+            panelBg.fillColor = new Color(23, 32, 55, 242);
+            panelBg.roundRect(-panelW / 2, -panelH / 2, panelW, panelH, radius);
+            panelBg.fill();
+            panelBg.strokeColor = new Color(255, 216, 120, 220);
+            panelBg.lineWidth = Math.max(2, Math.round(panelH * 0.012));
+            panelBg.roundRect(-panelW / 2, -panelH / 2, panelW, panelH, radius);
+            panelBg.stroke();
+        }
+
+        const titleNode = panel.getChildByName('Title');
+        const descNode = panel.getChildByName('Description');
+        const inputNode = panel.getChildByName('InviteInput');
+        const createBtn = panel.getChildByName('CreateBtn');
+        const joinBtn = panel.getChildByName('JoinBtn');
+        const cancelBtn = panel.getChildByName('CancelBtn');
+
+        const titleY = panelH * 0.33;
+        const descY = panelH * 0.18;
+        const inputY = panelH * 0.02;
+        const actionY = -panelH * 0.23;
+        const cancelY = -panelH * 0.38;
+
+        const titleLabel = titleNode?.getComponent(Label);
+        if (titleNode && titleLabel) {
+            titleNode.getComponent(UITransform)?.setContentSize(panelW - 56, 54);
+            titleNode.setPosition(0, titleY, 0);
+            titleLabel.fontSize = Math.round(UIResponsive.clamp(panelH * 0.1, 30, 46));
+            titleLabel.lineHeight = titleLabel.fontSize + 8;
+            titleLabel.string = Localization.instance.t('ui.home.coop.modal.title');
+        }
+
+        const descLabel = descNode?.getComponent(Label);
+        if (descNode && descLabel) {
+            descNode.getComponent(UITransform)?.setContentSize(panelW - 72, 62);
+            descNode.setPosition(0, descY, 0);
+            descLabel.fontSize = Math.round(UIResponsive.clamp(panelH * 0.05, 20, 28));
+            descLabel.lineHeight = descLabel.fontSize + 6;
+            descLabel.string = Localization.instance.t('ui.home.coop.modal.desc');
+        }
+
+        const inputW = panelW - 72;
+        const inputH = Math.round(UIResponsive.clamp(panelH * 0.19, 52, 74));
+        const inputBg = inputNode?.getComponent(Graphics);
+        if (inputNode && inputBg) {
+            inputNode.getComponent(UITransform)?.setContentSize(inputW, inputH);
+            inputNode.setPosition(0, inputY, 0);
+            inputBg.clear();
+            inputBg.fillColor = new Color(14, 20, 37, 255);
+            inputBg.roundRect(-inputW / 2, -inputH / 2, inputW, inputH, 12);
+            inputBg.fill();
+            inputBg.strokeColor = new Color(106, 124, 170, 220);
+            inputBg.lineWidth = 2;
+            inputBg.roundRect(-inputW / 2, -inputH / 2, inputW, inputH, 12);
+            inputBg.stroke();
+        }
+
+        const inputLabel = inputNode?.getChildByName('InputLabel')?.getComponent(Label);
+        const placeholderLabel = inputNode?.getChildByName('PlaceholderLabel')?.getComponent(Label);
+        if (inputLabel) {
+            const textW = inputW - 30;
+            const textH = inputH - 8;
+            inputLabel.node.getComponent(UITransform)?.setContentSize(textW, textH);
+            inputLabel.node.setPosition(4, 0, 0);
+            inputLabel.fontSize = Math.round(UIResponsive.clamp(inputH * 0.38, 20, 30));
+            inputLabel.lineHeight = inputLabel.fontSize + 6;
+        }
+        if (placeholderLabel) {
+            const textW = inputW - 30;
+            const textH = inputH - 8;
+            placeholderLabel.node.getComponent(UITransform)?.setContentSize(textW, textH);
+            placeholderLabel.node.setPosition(4, 0, 0);
+            placeholderLabel.fontSize = Math.round(UIResponsive.clamp(inputH * 0.34, 18, 26));
+            placeholderLabel.lineHeight = placeholderLabel.fontSize + 6;
+            placeholderLabel.string = Localization.instance.t('ui.home.coop.input_placeholder');
+        }
+
+        const actionBtnW = Math.round((panelW - 84) * 0.5);
+        const actionBtnH = Math.round(UIResponsive.clamp(panelH * 0.16, 48, 66));
+        if (createBtn) {
+            createBtn.getComponent(UITransform)?.setContentSize(actionBtnW, actionBtnH);
+            createBtn.setPosition(-Math.round(actionBtnW * 0.52), actionY, 0);
+        }
+        if (joinBtn) {
+            joinBtn.getComponent(UITransform)?.setContentSize(actionBtnW, actionBtnH);
+            joinBtn.setPosition(Math.round(actionBtnW * 0.52), actionY, 0);
+        }
+        if (cancelBtn) {
+            const cancelW = Math.round(UIResponsive.clamp(panelW * 0.4, 140, 220));
+            const cancelH = Math.round(UIResponsive.clamp(panelH * 0.13, 42, 56));
+            cancelBtn.getComponent(UITransform)?.setContentSize(cancelW, cancelH);
+            cancelBtn.setPosition(0, cancelY, 0);
+        }
+
+        if (createBtn) {
+            const l = createBtn.getChildByName('Label')?.getComponent(Label);
+            if (l) l.string = Localization.instance.t('ui.home.coop.create');
+            this._redrawCoopModalButton(createBtn, new Color(72, 192, 96, 255), Color.WHITE);
+        }
+        if (joinBtn) {
+            const l = joinBtn.getChildByName('Label')?.getComponent(Label);
+            if (l) l.string = Localization.instance.t('ui.home.coop.join');
+            this._redrawCoopModalButton(joinBtn, new Color(255, 198, 88, 255), Color.WHITE);
+        }
+        if (cancelBtn) {
+            const l = cancelBtn.getChildByName('Label')?.getComponent(Label);
+            if (l) l.string = Localization.instance.t('ui.home.coop.cancel');
+            this._redrawCoopModalButton(
+                cancelBtn,
+                new Color(86, 98, 128, 255),
+                new Color(240, 244, 255, 255)
+            );
+        }
+    }
+
+    private _createCoopModalButton(
+        parent: Node,
+        name: string,
+        text: string,
+        onClick: () => void
+    ): Node {
+        const btnNode = new Node(name);
+        btnNode.layer = this._uiLayer;
+        btnNode.addComponent(UITransform).setContentSize(200, 56);
+        const btn = btnNode.addComponent(Button);
+        btn.transition = Button.Transition.SCALE;
+        btn.zoomScale = 0.96;
+        btnNode.addComponent(Graphics);
+
+        const labelNode = new Node('Label');
+        labelNode.layer = this._uiLayer;
+        btnNode.addChild(labelNode);
+        labelNode.addComponent(UITransform);
+        const label = labelNode.addComponent(Label);
+        label.string = text;
+        label.isBold = true;
+        label.fontSize = 30;
+        label.lineHeight = 36;
+        label.horizontalAlign = Label.HorizontalAlign.CENTER;
+        label.verticalAlign = Label.VerticalAlign.CENTER;
+        label.overflow = Label.Overflow.SHRINK;
+        applyGameLabelStyle(label, { outlineWidth: 2, outlineColor: new Color(0, 0, 0, 180) });
+
+        btnNode.on(Button.EventType.CLICK, onClick, this);
+        parent.addChild(btnNode);
+        return btnNode;
+    }
+
+    private _redrawCoopModalButton(btnNode: Node, fillColor: Color, textColor: Color): void {
+        const tf = btnNode.getComponent(UITransform);
+        const bg = btnNode.getComponent(Graphics);
+        if (!tf || !bg) return;
+
+        const width = tf.contentSize.width;
+        const height = tf.contentSize.height;
+        const radius = Math.max(10, Math.round(height * 0.25));
+        bg.clear();
+        bg.fillColor = fillColor;
+        bg.roundRect(-width / 2, -height / 2, width, height, radius);
+        bg.fill();
+        bg.strokeColor = new Color(255, 255, 255, 180);
+        bg.lineWidth = Math.max(2, Math.round(height * 0.06));
+        bg.roundRect(-width / 2, -height / 2, width, height, radius);
+        bg.stroke();
+
+        const labelNode = btnNode.getChildByName('Label');
+        const labelTf = labelNode?.getComponent(UITransform);
+        const label = labelNode?.getComponent(Label);
+        if (labelTf) {
+            labelTf.setContentSize(Math.max(80, width - 24), height - 6);
+        }
+        if (label) {
+            label.color = textColor;
+            label.fontSize = Math.round(UIResponsive.clamp(height * 0.46, 20, 34));
+            label.lineHeight = label.fontSize + 6;
+        }
+    }
+
+    private _extractMatchId(raw: string): string {
+        const text = raw.trim();
+        if (!text) return '';
+        const idPattern = /^[a-z0-9]+-[a-z0-9]+$/i;
+        if (idPattern.test(text)) return text;
+        try {
+            const parsed = new URL(text, window.location.origin);
+            const matchId = parsed.searchParams.get('matchId')?.trim() ?? '';
+            if (idPattern.test(matchId)) return matchId;
+        } catch {
+            // ignore parse failure
+        }
+        return '';
+    }
+
+    private _setRuntimeMode(mode: 'solo' | 'coop'): void {
+        try {
+            window.localStorage?.setItem('KS_RUNTIME_MODE', mode);
+            if (mode !== 'coop') {
+                window.localStorage?.removeItem('KS_COOP_MATCH_ID');
+            }
+        } catch {
+            // ignore localStorage failures
+        }
+    }
+
+    private _requestCoopStart(matchId: string): void {
+        if (this._onCoopRequested) {
+            this._onCoopRequested(matchId);
+            return;
+        }
+        this._showToast('双人模式初始化失败，请返回首页重试');
     }
 
     private _showToast(text: string): void {

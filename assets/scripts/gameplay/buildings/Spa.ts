@@ -1,6 +1,7 @@
 import { _decorator, Vec3 } from 'cc';
 import { Building, BuildingType } from './Building';
 import { Hero } from '../units/Hero';
+import { HeroQuery } from '../../core/runtime/HeroQuery';
 
 const { ccclass } = _decorator;
 
@@ -42,7 +43,7 @@ export class Spa extends Building {
         super.update(dt);
         if (!this.isAlive || !this.gameManager.isPlaying) return;
 
-        const heroNode = this.gameManager.hero;
+        const heroNode = HeroQuery.getNearestHero(this.node.worldPosition);
         if (!heroNode || !heroNode.isValid) {
             this._healTimer = 0;
             return;

@@ -1,6 +1,5 @@
 import { Color, Graphics, Label, Node, UIOpacity, UITransform } from 'cc';
 import { GameConfig } from '../../data/GameConfig';
-import { GameManager } from '../../core/managers/GameManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
@@ -8,6 +7,7 @@ import { Enemy } from '../../gameplay/units/Enemy';
 import { UIResponsive } from '../UIResponsive';
 import { applyGameLabelStyle, applyLayerRecursive, HUD_UI_LAYER } from './HUDCommon';
 import type { HUDModule } from './HUDModule';
+import { HeroQuery } from '../../core/runtime/HeroQuery';
 
 // ─── Configurable constants ───
 const MINIMAP_UPDATE_INTERVAL_S = 0.08; // ~12 Hz
@@ -525,9 +525,10 @@ export class HUDMinimapModule implements HUDModule {
         if (!g) return;
         g.clear();
 
-        // Hero
-        const heroNode = GameManager.instance.hero;
-        if (heroNode && heroNode.isValid) {
+        // Hero(es) — supports multiple heroes in coop mode
+        const heroes = HeroQuery.getAllHeroes();
+        for (const heroNode of heroes) {
+            if (!heroNode || !heroNode.isValid) continue;
             const hp = this.worldToMinimap(heroNode.position.x, heroNode.position.z);
             g.fillColor = HERO_DOT_COLOR;
             g.circle(hp.x, hp.y, HERO_DOT_RADIUS);

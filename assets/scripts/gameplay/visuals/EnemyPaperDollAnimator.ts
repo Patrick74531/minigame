@@ -21,6 +21,7 @@ import { Enemy } from '../units/Enemy';
 import { UnitState } from '../units/Unit';
 import { GameManager } from '../../core/managers/GameManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import { HeroQuery } from '../../core/runtime/HeroQuery';
 import {
     EnemyAttackPerformedPayload,
     EnemyAttackStateChangedPayload,
@@ -332,7 +333,7 @@ export class EnemyPaperDollAnimator extends Component {
         const enemyState = this._enemy?.state;
         const active = enemyState === UnitState.MOVING || enemyState === UnitState.ATTACKING;
         let fps = Math.max(1, active ? this.activeAnimationFps : this.idleAnimationFps);
-        const heroNode = this.gameManager.hero;
+        const heroNode = HeroQuery.getNearestHero(this.node.worldPosition);
         if (heroNode && heroNode.isValid) {
             const myPos = this.node.worldPosition;
             const heroPos = heroNode.worldPosition;

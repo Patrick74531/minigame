@@ -25,6 +25,7 @@ import { EnemyQuery } from '../../core/managers/EnemyQuery';
 import { HitFeedback } from '../visuals/HitFeedback';
 import { WeaponVFX } from '../weapons/WeaponVFX';
 import { ScreenShake } from '../weapons/vfx/ScreenShake';
+import { HeroQuery } from '../../core/runtime/HeroQuery';
 
 const { ccclass } = _decorator;
 type RouteLane = 'top' | 'mid' | 'bottom';
@@ -475,7 +476,7 @@ export class Enemy extends Unit {
         const aggroSq = this._aggroRange * this._aggroRange;
 
         // 1. Check for nearby Hero (highest priority melee target)
-        const heroNode = this.gameManager.hero;
+        const heroNode = HeroQuery.getNearestHero(myPos);
         if (heroNode && heroNode.isValid) {
             const heroUnit = heroNode.getComponent(Unit);
             if (heroUnit && heroUnit.isAlive) {
@@ -686,7 +687,7 @@ export class Enemy extends Unit {
             return Enemy.NEAR_LOGIC_STEP;
         }
 
-        const heroNode = this.gameManager.hero;
+        const heroNode = HeroQuery.getNearestHero(this.node.position);
         if (!heroNode || !heroNode.isValid) {
             return Enemy.NEAR_LOGIC_STEP;
         }

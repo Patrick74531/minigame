@@ -80,6 +80,15 @@ export class HUDSettingsModule implements HUDModule {
             .start();
     }
 
+    public setVisible(visible: boolean): void {
+        if (this._settingsButtonNode) {
+            this._settingsButtonNode.active = visible;
+        }
+        if (!visible) {
+            this.hideSettingsPanel();
+        }
+    }
+
     public cleanup(): void {
         if (this._settingsPanelOpacity) {
             Tween.stopAllByTarget(this._settingsPanelOpacity);

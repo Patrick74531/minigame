@@ -35,6 +35,7 @@ export type StartContext = {
         ui: Node;
     };
     onSpawned?: (base: Node, hero: Node) => void;
+    onCoopRequested?: (matchId: string) => void;
     showHomePage?: boolean;
     saveData?: GameSaveDataV2 | null;
 };
@@ -76,6 +77,11 @@ export class GameStartFlow {
             homeNode.destroy();
             const continueCtx = { ...ctx, saveData };
             this._showLoadingScreen(continueCtx);
+        });
+
+        homePage.setOnCoopRequested((matchId: string) => {
+            homeNode.destroy();
+            ctx.onCoopRequested?.(matchId);
         });
     }
 

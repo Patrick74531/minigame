@@ -50,6 +50,7 @@ export class BuildingPad extends BaseComponent {
     private static readonly BUILD_AUTO_RETRY_ROUNDS = 2;
     private static readonly UPGRADE_HEAL_STABILIZE_IMMUNITY_SECONDS = 2.6;
     private static readonly _activePads: Set<BuildingPad> = new Set();
+    private static _coopModeEnabled: boolean = false;
 
     /** 每次收集金币数量 */
     @property
@@ -89,6 +90,8 @@ export class BuildingPad extends BaseComponent {
 
     private _initialBuildingTypeId: string = '';
     private _isTowerSlot: boolean = false;
+    private _coopPadId: string = '';
+    private _towerSelectionPrompted: boolean = false;
 
     // === Getters ===
 
@@ -102,6 +105,10 @@ export class BuildingPad extends BaseComponent {
 
     public get nextUpgradeCost(): number {
         return this._nextUpgradeCost;
+    }
+
+    public get coopPadId(): string {
+        return this._coopPadId || this.node.uuid;
     }
 
     // requiredCoins getter replaced by dynamic version below
@@ -134,6 +141,7 @@ export class BuildingPad extends BaseComponent {
     protected initialize(): void {
         // Capture initial anchor early so restore path can use it even before start().
         this._originalPosition.set(this.node.worldPosition);
+        BuildingPad._activePads.add(this);
     }
 
     // === Physics Implementation ===
@@ -141,6 +149,7 @@ export class BuildingPad extends BaseComponent {
     // Flag to track hero presence
     private _heroInArea: boolean = false;
     private _heroRef: Hero | null = null;
+    private _heroesInArea: Set<Node> = new Set();
     private _isAnimating: boolean = false; // New flag to block input during animation
     private _buildEmitAttempts: number = 0;
     private _buildAutoRetryRounds: number = 0;
@@ -200,6 +209,8 @@ export class BuildingPad extends BaseComponent {
 
     protected onDestroy(): void {
         this.eventManager.off(GameEvents.TOWER_SELECTED, this.onTowerSelected, this);
+        BuildingPad._activePads.delete(this);
+        super.onDestroy();
     }
 
     private setupPhysics(): void {
@@ -243,8 +254,8 @@ export class BuildingPad extends BaseComponent {
         }
 
         if (hero) {
-            this._heroInArea = true;
-            this._heroRef = hero;
+            this._heroesInArea.add(hero.node);
+            this.refreshHeroPresence();
 
             // Show Info
             if (this.hudManager) {
@@ -259,13 +270,16 @@ export class BuildingPad extends BaseComponent {
      */
     private onTriggerExit(event: ITriggerEvent): void {
         const otherNode = event.otherCollider.node;
-        const hero = otherNode.getComponent(Hero);
+        let hero = otherNode.getComponent(Hero);
+        if (!hero) {
+            hero = otherNode.getComponent('Hero') as Hero;
+        }
         if (hero) {
-            this._heroInArea = false;
-            this._heroRef = null;
+            this._heroesInArea.delete(hero.node);
+            this.refreshHeroPresence();
 
             // Hide Info
-            if (this.hudManager) {
+            if (!this._heroInArea && this.hudManager) {
                 this.hudManager.hideBuildingInfo();
             }
         }
@@ -288,8 +302,7 @@ export class BuildingPad extends BaseComponent {
 
             // Check if hero still valid
             if (!this._heroRef.node || !this._heroRef.node.isValid) {
-                this._heroInArea = false;
-                this._heroRef = null;
+                this.refreshHeroPresence();
                 return;
             }
 
@@ -442,6 +455,7 @@ export class BuildingPad extends BaseComponent {
         );
 
         // Prevent stale in-area state from old position causing accidental collection
+        this._heroesInArea.clear();
         this._heroInArea = false;
         this._heroRef = null;
         if (this.hudManager) {
@@ -486,13 +500,14 @@ export class BuildingPad extends BaseComponent {
         if (toCollect > 0) {
             this._collectedCoins += toCollect;
             this.updateDisplay();
+            const padFilled = this.isComplete && this._isTowerSlot;
 
             // 检查是否建造/升级完成
             if (this.isComplete) {
                 if (this._state === BuildingPadState.WAITING) {
                     // Check logic for Tower Selection
                     if (this._isTowerSlot) {
-                        this.enterTowerSelection();
+                        this.enterTowerSelection(!BuildingPad._coopModeEnabled);
                     } else {
                         this.onBuildComplete();
                     }
@@ -500,13 +515,27 @@ export class BuildingPad extends BaseComponent {
                     this.onUpgradeComplete();
                 }
             }
+
+            if (BuildingPad._coopModeEnabled) {
+                this.eventManager.emit(GameEvents.COOP_PAD_COIN_DEPOSITED, {
+                    padNode: this.node,
+                    padId: this.coopPadId,
+                    amount: toCollect,
+                    remaining: Math.max(0, this.requiredCoins - this._collectedCoins),
+                    padFilled,
+                    eventType: padFilled ? 'tower_select' : undefined,
+                });
+            }
         }
 
         return toCollect;
     }
 
-    private enterTowerSelection(): void {
+    private enterTowerSelection(showSelectionPrompt: boolean): void {
         this._state = BuildingPadState.SELECTING;
+        if (!showSelectionPrompt) return;
+        if (this._towerSelectionPrompted) return;
+        this._towerSelectionPrompted = true;
         console.debug(`[BuildingPad] Coins collected for Tower Slot. Requesting Selection...`);
         this.eventManager.emit(GameEvents.REQUEST_TOWER_SELECTION, { padNode: this.node });
     }
@@ -519,6 +548,7 @@ export class BuildingPad extends BaseComponent {
         // Update type and config
         this.buildingTypeId = data.buildingTypeId;
         this._config = this.buildingRegistry.get(this.buildingTypeId) ?? null;
+        this._towerSelectionPrompted = false;
 
         // Switch back to WAITING to check costs again vs collected coins
         this._state = BuildingPadState.WAITING;
@@ -705,6 +735,7 @@ export class BuildingPad extends BaseComponent {
         this._isAnimating = false;
         this._buildEmitAttempts = 0;
         this._buildAutoRetryRounds = 0;
+        this._towerSelectionPrompted = false;
 
         // Restore initial type if this was a tower slot
         if (this._isTowerSlot) {
@@ -718,6 +749,90 @@ export class BuildingPad extends BaseComponent {
             const title = this.getHudTitle();
             this.hudManager.showBuildingInfo(title, this.requiredCoins, this.collectedCoins);
         }
+    }
+
+    private refreshHeroPresence(): void {
+        let fallbackHero: Hero | null = null;
+        for (const heroNode of Array.from(this._heroesInArea)) {
+            if (!heroNode || !heroNode.isValid) {
+                this._heroesInArea.delete(heroNode);
+                continue;
+            }
+            const hero = heroNode.getComponent(Hero);
+            if (!hero) {
+                this._heroesInArea.delete(heroNode);
+                continue;
+            }
+            if (BuildingPad._coopModeEnabled && !hero.isLocalPlayerHero) {
+                continue;
+            }
+            if (!fallbackHero) {
+                fallbackHero = hero;
+            }
+        }
+
+        this._heroRef = fallbackHero;
+        this._heroInArea = !!fallbackHero;
+    }
+
+    public applyNetworkCoinDeposit(amount: number): void {
+        if (!Number.isFinite(amount) || amount <= 0) return;
+        if (this._isAnimating) return;
+        if (this._state !== BuildingPadState.WAITING && this._state !== BuildingPadState.UPGRADING)
+            return;
+
+        const needed = this.requiredCoins - this._collectedCoins;
+        if (needed <= 0) return;
+        const applied = Math.min(Math.floor(amount), needed);
+        if (applied <= 0) return;
+
+        this._collectedCoins += applied;
+        this.updateDisplay();
+
+        if (this.isComplete) {
+            if (this._state === BuildingPadState.WAITING) {
+                if (this._isTowerSlot) {
+                    // In coop mode wait for DECISION_OWNER before showing local selection UI.
+                    this.enterTowerSelection(false);
+                } else {
+                    this.onBuildComplete();
+                }
+            } else if (this._state === BuildingPadState.UPGRADING) {
+                this.onUpgradeComplete();
+            }
+        }
+    }
+
+    public applyDecisionOwner(localPlayerOwnsDecision: boolean): void {
+        if (!this._isTowerSlot) return;
+        if (this._state !== BuildingPadState.SELECTING) {
+            if (!this.isComplete) return;
+            this.enterTowerSelection(false);
+        }
+        if (localPlayerOwnsDecision) {
+            this.enterTowerSelection(true);
+        }
+    }
+
+    public setCoopPadId(padId: string): void {
+        this._coopPadId = padId.trim();
+    }
+
+    public static findByCoopPadId(padId: string): BuildingPad | null {
+        const normalized = padId.trim();
+        if (!normalized) return null;
+
+        for (const pad of BuildingPad._activePads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            if (pad.coopPadId === normalized || pad.node.uuid === normalized) {
+                return pad;
+            }
+        }
+        return null;
+    }
+
+    public static setCoopModeEnabled(enabled: boolean): void {
+        BuildingPad._coopModeEnabled = enabled;
     }
 
     private playConstructionEffect(onComplete?: () => void): void {

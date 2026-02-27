@@ -284,6 +284,7 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
             this.eventManager.emit(GameEvents.TOWER_SELECTED, {
                 padNode: this._currentPadNode,
                 buildingTypeId: buildingType,
+                source: 'local',
             });
 
             this.hideCards();

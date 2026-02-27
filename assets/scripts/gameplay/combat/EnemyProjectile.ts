@@ -18,6 +18,7 @@ import { Enemy } from '../units/Enemy';
 import { Unit, UnitType } from '../units/Unit';
 import { WeaponVFX } from '../weapons/WeaponVFX';
 import { ProjectileBlocker } from './ProjectileBlocker';
+import { HeroQuery } from '../../core/runtime/HeroQuery';
 
 const { ccclass, property } = _decorator;
 
@@ -203,7 +204,7 @@ export class EnemyProjectile extends Component {
         let bestTarget: Unit | Building | null = null;
         let bestT = Number.POSITIVE_INFINITY;
 
-        const heroNode = this.gameManager.hero;
+        const heroNode = HeroQuery.getNearestHero(start);
         if (heroNode && heroNode.isValid) {
             const heroUnit = heroNode.getComponent(Unit);
             if (heroUnit && heroUnit.isAlive && heroUnit.unitType === UnitType.HERO) {

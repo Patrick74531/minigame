@@ -1,6 +1,18 @@
 import type { Node, Vec2, Vec3 } from 'cc';
 
 /**
+ * 事件上下文（双人模式扩展）
+ * 所有字段为 optional，单人模式下不传，现有处理器无需修改。
+ */
+export interface EventContext {
+    matchId?: string;
+    playerId?: string;
+    source?: 'local' | 'remote' | 'server';
+    timestamp?: number;
+    seq?: number;
+}
+
+/**
  * 游戏事件名常量
  * 集中管理所有事件名称，避免硬编码字符串
  */
@@ -110,6 +122,10 @@ export const GameEvents = {
     REQUEST_TOWER_SELECTION: 'REQUEST_TOWER_SELECTION',
     /** 玩家选择了塔防类型 { padNode: Node, buildingTypeId: string } */
     TOWER_SELECTED: 'TOWER_SELECTED',
+    /** 双人模式：本地投币到建造点 { padNode: Node, padId: string, amount: number, remaining: number, padFilled: boolean, eventType?: 'tower_select' } */
+    COOP_PAD_COIN_DEPOSITED: 'COOP_PAD_COIN_DEPOSITED',
+    /** 双人模式：本地拾取金币 { x: number, z: number } */
+    COOP_COIN_PICKED: 'COOP_COIN_PICKED',
 
     /** 语言变更 { lang: string } */
     LANGUAGE_CHANGED: 'LANGUAGE_CHANGED',
@@ -215,8 +231,21 @@ export type GameEventPayloads = {
     // === 建筑选择系统 ===
     /** 请求展示塔防选择界面 { padNode: Node } */
     [GameEvents.REQUEST_TOWER_SELECTION]: { padNode: Node };
-    /** 玩家选择了塔防类型 { padNode: Node, buildingTypeId: string } */
-    [GameEvents.TOWER_SELECTED]: { padNode: Node; buildingTypeId: string };
+    /** 玩家选择了塔防类型 { padNode: Node, buildingTypeId: string, source?: 'local' | 'remote' } */
+    [GameEvents.TOWER_SELECTED]: {
+        padNode: Node;
+        buildingTypeId: string;
+        source?: 'local' | 'remote';
+    };
+    [GameEvents.COOP_PAD_COIN_DEPOSITED]: {
+        padNode: Node;
+        padId: string;
+        amount: number;
+        remaining: number;
+        padFilled: boolean;
+        eventType?: 'tower_select';
+    };
+    [GameEvents.COOP_COIN_PICKED]: { x: number; z: number };
     [GameEvents.LANGUAGE_CHANGED]: { lang: string };
 
     // === Boss 宝箱道具系统 ===

@@ -45,6 +45,7 @@ const PHYSICS_GROUP_WALL = 1 << 5;
 @ccclass('Hero')
 export class Hero extends Unit {
     private static readonly RESPAWN_DELAY_SECONDS = 10;
+    public isLocalPlayerHero: boolean = true;
 
     // 移动输入向量 (x, y) -1 ~ 1
     private _inputVector: Vec2 = new Vec2(0, 0);
@@ -205,9 +206,14 @@ export class Hero extends Unit {
         // Check Coin
         const coin = otherNode.getComponent(Coin);
         if (coin) {
+            if (!this.isLocalPlayerHero) {
+                return;
+            }
+            const pos = otherNode.worldPosition;
             this.addCoin(otherNode);
             coin.onPickup();
             this.hudManager.updateCoinDisplay(this.coinCount);
+            this._eventMgr.emit(GameEvents.COOP_COIN_PICKED, { x: pos.x, z: pos.z });
         }
     }
 

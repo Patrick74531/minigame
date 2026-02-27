@@ -477,6 +477,34 @@ if (cc.includes(O_NEW.slice(0, 50))) {
     console.warn('[patch-csp]   ~ Patch O: V3 rotation pattern not found (skipping)');
 }
 
+// ── Patch S: Retry binary downloads on transient CDN failures (503/0) ───────
+// Reddit CDN can intermittently return 503 for native .bin/.cconb files.
+// A single failure currently bubbles up and crashes boot. Keep behavior intact
+// for other assets, but add bounded retry (2x) for binary files only.
+const LX_MARK = '/*__CSP_LX_RETRY__*/';
+const LX_OLD =
+    'function lx(t,e,i,n){var r=new XMLHttpRequest,s="download failed: "+t+", status: ";if(r.open("GET",t,!0),void 0!==e.xhrResponseType&&(r.responseType=e.xhrResponseType),void 0!==e.xhrWithCredentials&&(r.withCredentials=e.xhrWithCredentials),void 0!==e.xhrMimeType&&r.overrideMimeType&&r.overrideMimeType(e.xhrMimeType),void 0!==e.xhrTimeout&&(r.timeout=e.xhrTimeout),e.xhrHeader)for(var a in e.xhrHeader)r.setRequestHeader(a,e.xhrHeader[a]);return r.onload=function(){200===r.status||0===r.status?n&&n(null,r.response):n&&n(new Error(""+s+r.status+"(no response)"))},i&&(r.onprogress=function(t){t.lengthComputable&&i(t.loaded,t.total)}),r.onerror=function(){n&&n(new Error(""+s+r.status+"(error)"))},r.ontimeout=function(){n&&n(new Error(""+s+r.status+"(time out)"))},r.onabort=function(){n&&n(new Error(""+s+r.status+"(abort)"))},r.send(null),r}';
+const LX_NEW =
+    'function lx(t,e,i,n){' +
+    LX_MARK +
+    'var r,s="download failed: "+t+", status: ",a=0,o=function(h){' +
+    'var u=new XMLHttpRequest;return r=u,u.open("GET",h,!0),void 0!==e.xhrResponseType&&(u.responseType=e.xhrResponseType),void 0!==e.xhrWithCredentials&&(u.withCredentials=e.xhrWithCredentials),void 0!==e.xhrMimeType&&u.overrideMimeType&&u.overrideMimeType(e.xhrMimeType),void 0!==e.xhrTimeout&&(u.timeout=e.xhrTimeout),e.xhrHeader&&function(){for(var t in e.xhrHeader)u.setRequestHeader(t,e.xhrHeader[t])}(),' +
+    'u.onload=function(){if(200===u.status||0===u.status)return void(n&&n(null,u.response));if(d(u.status,h)){a++;var e=h+(h.indexOf("?")>=0?"&":"?")+"__lxr="+Date.now()+"_"+a;return void setTimeout((function(){o(e)}),120*a)}n&&n(new Error(""+s+u.status+"(no response)"))},' +
+    'i&&(u.onprogress=function(t){t.lengthComputable&&i(t.loaded,t.total)}),' +
+    'u.onerror=function(){if(d(u.status,h)){a++;var e=h+(h.indexOf("?")>=0?"&":"?")+"__lxr="+Date.now()+"_"+a;return void setTimeout((function(){o(e)}),120*a)}n&&n(new Error(""+s+u.status+"(error)"))},' +
+    'u.ontimeout=function(){if(d(u.status,h)){a++;var e=h+(h.indexOf("?")>=0?"&":"?")+"__lxr="+Date.now()+"_"+a;return void setTimeout((function(){o(e)}),120*a)}n&&n(new Error(""+s+u.status+"(time out)"))},' +
+    'u.onabort=function(){n&&n(new Error(""+s+u.status+"(abort)"))},u.send(null),u},' +
+    'd=function(e,i){return a<2&&(503===e||0===e)&&/\\.(?:bin|cconb)(?:\\?|$)/.test(i)};' +
+    'return o(t),r}';
+if (cc.includes(LX_MARK)) {
+    console.log('[patch-csp]   ~ Patch S: binary download retry already applied (skipping)');
+} else if (cc.includes(LX_OLD)) {
+    cc = cc.replace(LX_OLD, LX_NEW);
+    console.log('[patch-csp]   ✓ Patch S: added retry for .bin/.cconb transient failures');
+} else {
+    console.warn('[patch-csp]   ~ Patch S: lx downloader pattern not found (skipping)');
+}
+
 fs.writeFileSync(ccPath, cc, 'utf8');
 console.log('[patch-csp] Saved', ccPath);
 
@@ -887,6 +915,56 @@ if (fs.existsSync(mainPath)) {
         }
     }
 
+    // ── Patch P0: Repair bad replacement in BuildingPadIconFactory.loadIconTexture ──
+    // A previous broad replacement accidentally changed this function from
+    // resources.load(path, Texture2D, cb) to C.loadAny(...reloadAsset:true...).
+    // BuildingPadIconFactory's module does not import assetManager alias "C",
+    // causing runtime crash: ReferenceError: C is not defined.
+    // This fix is scoped only to loadIconTexture() and restores resources.load().
+    var p0FnStart = main.indexOf('e.loadIconTexture=function');
+    var p0FnEnd = p0FnStart >= 0 ? main.indexOf('},e.getWaitingSet=function', p0FnStart) : -1;
+    if (p0FnStart < 0 || p0FnEnd < 0) {
+        console.warn(
+            '[patch-csp]   ~ Patch P0: loadIconTexture function block not found (skipping)'
+        );
+    } else {
+        var p0FnBody = main.slice(p0FnStart, p0FnEnd);
+        if (p0FnBody.includes('C.loadAny({path:') && p0FnBody.includes('reloadAsset:true')) {
+            var P0_RE =
+                /C\.loadAny\(\{path:(\w+),type:(\w+),bundle:(\w+)\.name\|\|"resources"\},\{reloadAsset:true\},null,\(function\((\w+),(\w+)\)\{/;
+            var p0Match = p0FnBody.match(P0_RE);
+            if (p0Match) {
+                var p0PathVar = p0Match[1];
+                var p0TypeVar = p0Match[2];
+                var p0ResourcesVar = p0Match[3];
+                var p0ErrVar = p0Match[4];
+                var p0AssetVar = p0Match[5];
+                var P0_NEW =
+                    p0ResourcesVar +
+                    '.load(' +
+                    p0PathVar +
+                    ',' +
+                    p0TypeVar +
+                    ',(function(' +
+                    p0ErrVar +
+                    ',' +
+                    p0AssetVar +
+                    '){';
+                p0FnBody = p0FnBody.replace(p0Match[0], P0_NEW);
+                main = main.slice(0, p0FnStart) + p0FnBody + main.slice(p0FnEnd);
+                console.log(
+                    '[patch-csp]   ✓ Patch P0: restored loadIconTexture to resources.load()'
+                );
+            } else {
+                console.warn(
+                    '[patch-csp]   ~ Patch P0: bad loadAny pattern not found in loadIconTexture'
+                );
+            }
+        } else {
+            console.log('[patch-csp]   ~ Patch P0: loadIconTexture already healthy (skipping)');
+        }
+    }
+
     // ── Patch P: Force reloadAsset in loadClipWithFallbacks ───────────────────────
     // Root cause of T-pose: animation clips are deserialized inline from the prefab
     // WITHOUT their .cconb binary companion → typed arrays remain as {__id__:N} stubs.
@@ -894,18 +972,65 @@ if (fs.existsSync(mainPath)) {
     // returns the cached broken version immediately (skipping the .cconb download).
     // Fix: replace bundle.load() with cc.assetManager.loadAny()+reloadAsset:true so
     // the .cconb binary is always downloaded fresh → correct typed arrays → animation.
-    const P_OLD = 'var o=i[a];_.load(o,E,(function(i,l){';
-    const P_NEW =
-        'var o=i[a];' +
-        'v.loadAny({path:o,type:E,bundle:_.name||"resources"},{reloadAsset:true},null,' +
-        '(function(i,l){';
-    if (main.includes('reloadAsset:true')) {
-        console.log('[patch-csp]   ~ Patch P already applied (skipping)');
-    } else if (main.includes(P_OLD)) {
-        main = main.replace(P_OLD, P_NEW);
-        console.log('[patch-csp]   ✓ Patch P: loadClipWithFallbacks now uses reloadAsset:true');
+    const P_RE =
+        /var (\w+)=o\[(\w+)\];(\w+)\.load\(\1,(\w+),\(function\((\w+),(\w+)\)\{/;
+    var pFnIdx = main.indexOf('e.loadClipWithFallbacks=function');
+    var pFnEnd = pFnIdx >= 0 ? main.indexOf('},e.buildHeroStateName=function', pFnIdx) : -1;
+    if (pFnIdx < 0 || pFnEnd < 0) {
+        console.warn('[patch-csp]   ~ Patch P: loadClipWithFallbacks function block not found');
     } else {
-        console.warn('[patch-csp]   ~ Patch P: loadClipWithFallbacks pattern not found (skipping)');
+        var pFnBody = main.slice(pFnIdx, pFnEnd);
+        if (pFnBody.includes('reloadAsset:true')) {
+            console.log('[patch-csp]   ~ Patch P already applied (skipping)');
+        } else {
+            var pMatch = pFnBody.match(P_RE);
+            if (pMatch) {
+                var pPathVar = pMatch[1];
+                var pIndexVar = pMatch[2];
+                var pResourcesVar = pMatch[3];
+                var pClipTypeVar = pMatch[4];
+                var pErrVar = pMatch[5];
+                var pClipVar = pMatch[6];
+                var pAssetManagerVar = null;
+                var pScope = main.slice(Math.max(0, pFnIdx - 6e4), pFnIdx);
+                var pAliasMatches = Array.from(pScope.matchAll(/(\w+)=e\.assetManager/g));
+                if (pAliasMatches.length > 0) {
+                    pAssetManagerVar = pAliasMatches[pAliasMatches.length - 1][1];
+                }
+                var pAssetManagerExpr = pAssetManagerVar
+                    ? pAssetManagerVar
+                    : '(globalThis.cc&&globalThis.cc.assetManager)';
+                var P_NEW =
+                    'var ' +
+                    pPathVar +
+                    '=o[' +
+                    pIndexVar +
+                    '];' +
+                    pAssetManagerExpr +
+                    '.loadAny({path:' +
+                    pPathVar +
+                    ',type:' +
+                    pClipTypeVar +
+                    ',bundle:' +
+                    pResourcesVar +
+                    '.name||"resources"},{reloadAsset:true},null,(function(' +
+                    pErrVar +
+                    ',' +
+                    pClipVar +
+                    '){';
+                pFnBody = pFnBody.replace(pMatch[0], P_NEW);
+                main = main.slice(0, pFnIdx) + pFnBody + main.slice(pFnEnd);
+                console.log(
+                    '[patch-csp]   ✓ Patch P: loadClipWithFallbacks now uses reloadAsset:true (assetManager=' +
+                        (pAssetManagerVar || 'globalThis.cc.assetManager') +
+                        ')'
+                );
+            } else {
+                console.warn(
+                    '[patch-csp]   ~ Patch P: loadClipWithFallbacks inner load() pattern not found'
+                );
+            }
+        }
     }
 
     // ── Patch R: Validate clip typed arrays; UUID-retry if stubs detected ─────────
@@ -1605,6 +1730,79 @@ if (fs.existsSync(mainPath)) {
     else if (skipped > 0)
         console.log('[patch-csp]   ~ .cconb aliases already exist (' + skipped + ' skipped)');
     else console.log('[patch-csp]   ~ no .bin files found to alias (skipping)');
+})();
+
+// ─── 4b. Stabilize scriptPackages bundle path (avoid stale bundle cache) ─────
+// Some Reddit WebView sessions intermittently fail loading src/chunks/bundle.js
+// with SystemJS #3. Keep an alternate copy and point settings.json to it.
+(function patchScriptPackageBundlePath() {
+    const settingsPath = path.join(WEBROOT, 'src', 'settings.json');
+    const chunksDir = path.join(WEBROOT, 'src', 'chunks');
+    const bundleSrcPath = path.join(chunksDir, 'bundle.js');
+    const bundleAltName = 'bundle-r232.js';
+    const bundleAltPath = path.join(chunksDir, bundleAltName);
+
+    if (!fs.existsSync(settingsPath) || !fs.existsSync(bundleSrcPath)) {
+        console.warn(
+            '[patch-csp]   ~ scriptPackages stabilization skipped (settings.json or bundle.js missing)'
+        );
+        return;
+    }
+
+    try {
+        // Always refresh alt bundle so settings path can stay stable across uploads.
+        fs.copyFileSync(bundleSrcPath, bundleAltPath);
+    } catch (copyErr) {
+        console.warn(
+            '[patch-csp]   ~ scriptPackages stabilization: failed to copy alt bundle:',
+            copyErr && copyErr.message
+        );
+        return;
+    }
+
+    let settingsRaw = '';
+    let settings = null;
+    try {
+        settingsRaw = fs.readFileSync(settingsPath, 'utf8');
+        settings = JSON.parse(settingsRaw);
+    } catch (parseErr) {
+        console.warn(
+            '[patch-csp]   ~ scriptPackages stabilization: failed to parse settings.json:',
+            parseErr && parseErr.message
+        );
+        return;
+    }
+
+    const scripting = settings && settings.scripting;
+    const scriptPackages =
+        scripting && Array.isArray(scripting.scriptPackages) ? scripting.scriptPackages : null;
+    if (!scriptPackages) {
+        console.warn(
+            '[patch-csp]   ~ scriptPackages stabilization skipped (scripting.scriptPackages missing)'
+        );
+        return;
+    }
+
+    let changed = false;
+    const updated = scriptPackages.map(entry => {
+        if (typeof entry !== 'string') return entry;
+        const noQuery = entry.split('?')[0];
+        if (noQuery.endsWith('/src/chunks/bundle.js') || noQuery.endsWith('/chunks/bundle.js')) {
+            changed = true;
+            return '../src/chunks/' + bundleAltName;
+        }
+        return entry;
+    });
+
+    if (changed) {
+        settings.scripting.scriptPackages = updated;
+        fs.writeFileSync(settingsPath, JSON.stringify(settings), 'utf8');
+        console.log(
+            '[patch-csp]   ✓ scriptPackages stabilization: settings now points to ' + bundleAltName
+        );
+    } else {
+        console.log('[patch-csp]   ~ scriptPackages stabilization already applied (skipping)');
+    }
 })();
 
 console.log('[patch-csp] All patches applied successfully.');

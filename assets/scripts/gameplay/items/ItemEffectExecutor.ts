@@ -7,6 +7,7 @@ import { Unit } from '../units/Unit';
 import { Hero } from '../units/Hero';
 import { BuildingType } from '../buildings/Building';
 import { ItemEffectType } from './ItemDefs';
+import { HeroQuery } from '../../core/runtime/HeroQuery';
 
 /**
  * 效果处理器签名
@@ -124,8 +125,7 @@ export class ItemEffectExecutor {
 
     private static heroInvincible(params: Record<string, number>): void {
         const duration = params.duration ?? 30;
-        const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
-        const heroNode = gm.hero;
+        const heroNode = HeroQuery.getLocalHero();
         if (!heroNode || !heroNode.isValid) return;
         const hero = heroNode.getComponent(Hero);
         if (hero && hero.isAlive) {

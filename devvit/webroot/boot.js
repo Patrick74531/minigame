@@ -112,6 +112,10 @@
   var _hideScheduled = false;
   var _progressTimer = 0;
   var _fallbackHideTimer = 0;
+  var _bootAutoRecovered = false;
+  try {
+    _bootAutoRecovered = sessionStorage.getItem('KS_BOOT_AUTO_RECOVERED') === '1';
+  } catch (_e0) {}
 
   // ── Re-entry fix ──────────────────────────────────────────────────────────────
   // DevVit keeps the WebView alive between sessions. If the user was away for
@@ -234,6 +238,35 @@
     panel.textContent += '\n' + message;
   }
 
+  function shouldAutoRecoverBoot(errText) {
+    if (!errText) return false;
+    return (
+      errText.indexOf('SystemJS https://git.io/JvFET#3') >= 0 ||
+      /\/cocos-js\/(?:cc\.js|_virtual_cc-[^"' \n]+\.js)/.test(errText)
+    );
+  }
+
+  function tryAutoRecoverBoot(errText) {
+    if (_bootAutoRecovered) return false;
+    if (!shouldAutoRecoverBoot(errText)) return false;
+    _bootAutoRecovered = true;
+    try {
+      sessionStorage.setItem('KS_BOOT_AUTO_RECOVERED', '1');
+    } catch (_e1) {}
+    appendError('[boot] auto-recover triggered');
+    setSplashText('检测到资源加载异常，正在自动重试...');
+    setTimeout(function () {
+      try {
+        var nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.set('_bootRetry', String(Date.now()));
+        window.location.replace(nextUrl.toString());
+      } catch (_e2) {
+        location.reload();
+      }
+    }, 180);
+    return true;
+  }
+
   var originalConsoleError = console.error ? console.error.bind(console) : null;
   console.error = function () {
     var parts = [];
@@ -249,12 +282,16 @@
 
   window.addEventListener('error', function (event) {
     var msg = event && (event.message || (event.error && event.error.stack));
-    if (msg) appendError('[window.error] ' + msg);
+    if (!msg) return;
+    if (tryAutoRecoverBoot(String(msg))) return;
+    appendError('[window.error] ' + msg);
   });
 
   window.addEventListener('unhandledrejection', function (event) {
     var reason = event && event.reason;
-    appendError('[unhandledrejection] ' + String(reason && reason.stack ? reason.stack : reason));
+    var text = String(reason && reason.stack ? reason.stack : reason);
+    if (tryAutoRecoverBoot(text)) return;
+    appendError('[unhandledrejection] ' + text);
   });
 
   mountSplash();
@@ -283,12 +320,17 @@
 
   System.import('./index.js')
     .then(function () {
+      try {
+        sessionStorage.removeItem('KS_BOOT_AUTO_RECOVERED');
+      } catch (_e3) {}
       _fallbackHideTimer = setTimeout(function () {
         if (!_splashHidden) hideSplash();
       }, 25000);
     })
     .catch(function (err) {
-      appendError('[System.import] ' + String(err && err.stack ? err.stack : err));
+      var errText = String(err && err.stack ? err.stack : err);
+      if (tryAutoRecoverBoot(errText)) return;
+      appendError('[System.import] ' + errText);
       console.error(err);
       setSplashText('加载失败，请重试。');
     });

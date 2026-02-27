@@ -46,6 +46,7 @@ export class Base extends Building {
 
         const pad = padNode.addComponent(BuildingPad);
         pad.buildingTypeId = 'base';
+        pad.setCoopPadId('base_upgrade_pad');
         pad.collectRadius = GameConfig.BUILDING.BASE_UPGRADE.COLLECT_RADIUS;
         pad.collectRate = GameConfig.BUILDING.BASE_UPGRADE.COLLECT_RATE;
         pad.collectInterval = GameConfig.BUILDING.BASE_UPGRADE.COLLECT_INTERVAL;

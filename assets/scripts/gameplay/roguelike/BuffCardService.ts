@@ -5,6 +5,7 @@ import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameConfig } from '../../data/GameConfig';
 import { GameEvents } from '../../data/GameEvents';
 import { Hero } from '../units/Hero';
+import { HeroQuery } from '../../core/runtime/HeroQuery';
 
 /**
  * 卡牌效果：支持乘算（multiply）和加算（add）两种模式
@@ -105,7 +106,7 @@ export class BuffCardService extends Singleton<BuffCardService>() {
             return false;
         }
 
-        const heroNode = this.gameManager.hero;
+        const heroNode = HeroQuery.getLocalHero();
         if (!heroNode || !heroNode.isValid) {
             console.warn('[BuffCardService] Hero not available');
             return false;

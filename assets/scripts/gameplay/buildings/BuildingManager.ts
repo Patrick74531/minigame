@@ -124,7 +124,9 @@ export class BuildingManager {
             pad.setHeroNode(this._heroNode);
         }
         if (typeof runtimeIndex === 'number' && Number.isFinite(runtimeIndex)) {
-            this._padNodeToIndex.set(pad.node.uuid, Math.floor(runtimeIndex));
+            const normalizedIndex = Math.floor(runtimeIndex);
+            this._padNodeToIndex.set(pad.node.uuid, normalizedIndex);
+            pad.setCoopPadId(String(normalizedIndex));
         }
     }
 
@@ -274,6 +276,10 @@ export class BuildingManager {
      */
     public get pads(): BuildingPad[] {
         return this._pads;
+    }
+
+    public getPadByCoopPadId(padId: string): BuildingPad | null {
+        return BuildingPad.findByCoopPadId(padId);
     }
 
     private onBuildingDestroyed(data: { buildingId: string; building?: unknown }): void {

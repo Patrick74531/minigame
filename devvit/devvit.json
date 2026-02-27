@@ -23,7 +23,8 @@
         "redis": true,
         "reddit": {
             "enable": true
-        }
+        },
+        "realtime": true
     },
     "menu": {
         "items": [

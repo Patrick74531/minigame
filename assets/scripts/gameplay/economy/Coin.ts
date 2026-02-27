@@ -7,6 +7,7 @@ import { Tween } from 'cc';
 // import { GameManager } from '../../core/managers/GameManager';
 import { GameConfig } from '../../data/GameConfig';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import { HeroQuery } from '../../core/runtime/HeroQuery';
 
 const { ccclass, property } = _decorator;
 
@@ -16,6 +17,8 @@ const { ccclass, property } = _decorator;
  */
 @ccclass('Coin')
 export class Coin extends BaseComponent implements IPoolable {
+    private static readonly _activeCoins: Set<Coin> = new Set();
+
     @property
     public value: number = 5;
     @property
@@ -38,10 +41,12 @@ export class Coin extends BaseComponent implements IPoolable {
         // Initial setup if needed
         this._isCollecting = false;
         this._lifetime = 0;
+        Coin._activeCoins.add(this);
     }
 
     protected cleanup(): void {
         // Cleanup if needed
+        Coin._activeCoins.delete(this);
     }
 
     // Static reference to avoid circular dependency with GameManager
@@ -54,6 +59,7 @@ export class Coin extends BaseComponent implements IPoolable {
         this._isCollecting = false;
         this._lifetime = 0;
         this.enabled = true;
+        Coin._activeCoins.add(this);
 
         const col = this.getComponent(BoxCollider);
         if (col) col.enabled = true;
@@ -61,6 +67,7 @@ export class Coin extends BaseComponent implements IPoolable {
 
     public onDespawn(): void {
         this._isCollecting = false;
+        Coin._activeCoins.delete(this);
     }
 
     protected start(): void {
@@ -75,8 +82,8 @@ export class Coin extends BaseComponent implements IPoolable {
     protected update(dt: number): void {
         if (this._isCollecting) return;
 
-        // Magnet Logic
-        const hero = Coin.HeroNode;
+        // Magnet Logic — use HeroQuery for coop-ready nearest-hero lookup
+        const hero = HeroQuery.getNearestHero(this.node.worldPosition) ?? Coin.HeroNode;
         let isAttracted = false;
 
         if (hero && hero.isValid) {
@@ -156,6 +163,32 @@ export class Coin extends BaseComponent implements IPoolable {
         }
 
         this.node.destroy();
+    }
+
+    public static consumeNearestAt(x: number, z: number, maxDistance: number = 1.25): boolean {
+        if (!Number.isFinite(x) || !Number.isFinite(z)) return false;
+        if (!Number.isFinite(maxDistance) || maxDistance <= 0) return false;
+
+        let best: Coin | null = null;
+        let bestDistSq = maxDistance * maxDistance;
+
+        for (const coin of Coin._activeCoins) {
+            if (!coin || !coin.node || !coin.node.isValid || !coin.node.activeInHierarchy) continue;
+            if (coin._isCollecting) continue;
+            const pos = coin.node.worldPosition;
+            const dx = pos.x - x;
+            const dz = pos.z - z;
+            const distSq = dx * dx + dz * dz;
+            if (distSq <= bestDistSq) {
+                best = coin;
+                bestDistSq = distSq;
+            }
+        }
+
+        if (!best) return false;
+        best.onPickup();
+        best.node.destroy();
+        return true;
     }
 
     private get eventManager(): EventManager {
