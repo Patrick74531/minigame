@@ -46,7 +46,7 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
         descriptionKey: 'item.restore_buildings.description',
         shortKey: 'item.restore_buildings.short',
         iconColor: '#4ADE80',
-        iconSymbol: '✚',
+        iconSymbol: '🔧',
         effectType: 'restore_buildings',
         effectParams: {},
     },

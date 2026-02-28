@@ -55,11 +55,7 @@ export class ItemEffectExecutor {
     private static restoreBuildings(_params: Record<string, number>): void {
         const bm =
             ServiceRegistry.get<BuildingManager>('BuildingManager') ?? BuildingManager.instance;
-        for (const building of bm.activeBuildings) {
-            if (!building || !building.node || !building.node.isValid) continue;
-            if (!building.isAlive) continue;
-            building.restoreToFullHealth();
-        }
+        bm.rebuildDestroyedBuildingsToRecordedLevels();
     }
 
     private static killAllEnemies(_params: Record<string, number>): void {

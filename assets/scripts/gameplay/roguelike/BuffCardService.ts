@@ -85,12 +85,29 @@ export class BuffCardService extends Singleton<BuffCardService>() {
     // === 卡牌抽取 ===
 
     /**
-     * 从卡池中随机抽取 N 张不重复卡牌
+     * 从卡池中按稀有度权重抽取 N 张不重复卡牌
+     * 权重：blue=6, purple=3, gold=1（越强越难抽）
      */
     public drawCards(count: number = GameConfig.BUFF_CARDS.PICK_COUNT): BuffCardDef[] {
         const pool = this.getCardPool();
-        const shuffled = this.shuffle([...pool]);
-        return shuffled.slice(0, Math.min(count, shuffled.length));
+        const RARITY_WEIGHTS: Record<CardRarity, number> = { blue: 6, purple: 3, gold: 1 };
+        const result: BuffCardDef[] = [];
+        const remaining = [...pool];
+        for (let i = 0; i < count && remaining.length > 0; i++) {
+            const totalWeight = remaining.reduce((s, c) => s + (RARITY_WEIGHTS[c.rarity] ?? 1), 0);
+            let r = Math.random() * totalWeight;
+            let picked = remaining[remaining.length - 1];
+            for (let j = 0; j < remaining.length; j++) {
+                r -= RARITY_WEIGHTS[remaining[j].rarity] ?? 1;
+                if (r <= 0) {
+                    picked = remaining[j];
+                    break;
+                }
+            }
+            result.push(picked);
+            remaining.splice(remaining.indexOf(picked), 1);
+        }
+        return result;
     }
 
     // === 效果应用 ===

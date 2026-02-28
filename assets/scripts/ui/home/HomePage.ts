@@ -555,10 +555,14 @@ export class HomePage extends Component {
                 {
                     const pending = DiamondService.drainPendingSettlement();
                     if (pending && pending.wave > 0) {
-                        DiamondService.instance.settleRun(pending.wave, pending.runId, (_earned, _bal) => {
-                            DiamondService.instance.refreshBalance();
-                            this._updateDiamondDisplay();
-                        });
+                        DiamondService.instance.settleRun(
+                            pending.wave,
+                            pending.runId,
+                            (_earned, _bal) => {
+                                DiamondService.instance.refreshBalance();
+                                this._updateDiamondDisplay();
+                            }
+                        );
                     }
                 }
                 break;
@@ -570,11 +574,12 @@ export class HomePage extends Component {
                 break;
             case 'subscription_result':
                 if (event.success) {
-                    this._updateSubscribeButton(true);
-                    const msgKey = event.alreadySubscribed
-                        ? 'ui.home.subscribe.already'
-                        : 'ui.home.subscribe.success';
-                    this._showToast(Localization.instance.t(msgKey));
+                    if (event.diamondsGranted > 0) {
+                        DiamondService.instance.setInitialBalance(event.newBalance);
+                        this._showToast(Localization.instance.t('ui.subscribe.claimed'));
+                    } else {
+                        this._showToast(Localization.instance.t('ui.subscribe.already_claimed'));
+                    }
                 }
                 break;
             case 'error':
@@ -720,12 +725,140 @@ export class HomePage extends Component {
     }
 
     private onSubscribeClick() {
-        const bridge = RedditBridge.instance;
-        if (!bridge.isRedditEnvironment) {
-            this._showToast(Localization.instance.t('ui.home.subscribe.already'));
-            return;
-        }
-        bridge.requestSubscribe();
+        this._showSubscribeConfirmDialog();
+    }
+
+    private _showSubscribeConfirmDialog(): void {
+        if (!this._contentNode) return;
+
+        const overlay = new Node('SubscribeDialogOverlay');
+        overlay.layer = this._uiLayer;
+        const overlayTf = overlay.addComponent(UITransform);
+        const size = this.getCanvasSize();
+        overlayTf.setContentSize(size.width, size.height);
+        const overlayBg = overlay.addComponent(Graphics);
+        overlayBg.fillColor = new Color(0, 0, 0, 160);
+        overlayBg.rect(-size.width / 2, -size.height / 2, size.width, size.height);
+        overlayBg.fill();
+        this._contentNode.addChild(overlay);
+
+        const dialog = new Node('SubscribeDialog');
+        dialog.layer = this._uiLayer;
+        const dialogW = Math.round(
+            UIResponsive.clamp(Math.min(size.width, size.height) * 0.7, 260, 420)
+        );
+        const dialogH = Math.round(dialogW * 0.52);
+        const dialogTf = dialog.addComponent(UITransform);
+        dialogTf.setContentSize(dialogW, dialogH);
+        const dialogBg = dialog.addComponent(Graphics);
+        const dr = Math.max(12, Math.round(dialogH * 0.1));
+        dialogBg.fillColor = new Color(20, 28, 44, 255);
+        dialogBg.roundRect(-dialogW / 2, -dialogH / 2, dialogW, dialogH, dr);
+        dialogBg.fill();
+        dialogBg.strokeColor = new Color(255, 200, 80, 220);
+        dialogBg.lineWidth = 2;
+        dialogBg.roundRect(-dialogW / 2, -dialogH / 2, dialogW, dialogH, dr);
+        dialogBg.stroke();
+        overlay.addChild(dialog);
+
+        const bodyNode = new Node('DialogBody');
+        bodyNode.layer = this._uiLayer;
+        dialog.addChild(bodyNode);
+        bodyNode.addComponent(UITransform).setContentSize(dialogW - 24, Math.round(dialogH * 0.44));
+        bodyNode.setPosition(0, Math.round(dialogH * 0.14), 0);
+        const bodyLabel = bodyNode.addComponent(Label);
+        bodyLabel.string = Localization.instance.t('ui.subscribe.dialog.body');
+        bodyLabel.fontSize = Math.max(18, Math.round(dialogH * 0.14));
+        bodyLabel.lineHeight = Math.max(22, Math.round(dialogH * 0.18));
+        bodyLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        bodyLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        bodyLabel.overflow = Label.Overflow.SHRINK;
+        bodyLabel.color = new Color(255, 240, 180, 255);
+        applyGameLabelStyle(bodyLabel, { outlineWidth: 2, outlineColor: new Color(0, 0, 0, 180) });
+
+        const btnY = -Math.round(dialogH * 0.26);
+        const btnW = Math.round(dialogW * 0.38);
+        const btnH = Math.round(dialogH * 0.22);
+        const btnGap = Math.round(dialogW * 0.08);
+
+        const confirmBtn = this._createDialogButton(
+            dialog,
+            'ConfirmBtn',
+            Localization.instance.t('ui.subscribe.dialog.confirm'),
+            btnW,
+            btnH,
+            btnGap * 0.5 + btnW * 0.5,
+            btnY,
+            new Color(72, 192, 96, 255),
+            () => {
+                overlay.destroy();
+                const bridge = RedditBridge.instance;
+                if (!bridge.isRedditEnvironment) {
+                    this._showToast(Localization.instance.t('ui.subscribe.already_claimed'));
+                    return;
+                }
+                bridge.requestSubscribe();
+            }
+        );
+        void confirmBtn;
+
+        const cancelBtn = this._createDialogButton(
+            dialog,
+            'CancelBtn',
+            Localization.instance.t('ui.subscribe.dialog.cancel'),
+            btnW,
+            btnH,
+            -(btnGap * 0.5 + btnW * 0.5),
+            btnY,
+            new Color(80, 90, 110, 255),
+            () => {
+                overlay.destroy();
+            }
+        );
+        void cancelBtn;
+    }
+
+    private _createDialogButton(
+        parent: Node,
+        name: string,
+        text: string,
+        w: number,
+        h: number,
+        x: number,
+        y: number,
+        bgColor: Color,
+        onClick: () => void
+    ): Node {
+        const btn = new Node(name);
+        btn.layer = this._uiLayer;
+        btn.addComponent(UITransform).setContentSize(w, h);
+        btn.setPosition(x, y, 0);
+        const bg = btn.addComponent(Graphics);
+        const r = Math.max(8, Math.round(h * 0.22));
+        bg.fillColor = bgColor;
+        bg.roundRect(-w / 2, -h / 2, w, h, r);
+        bg.fill();
+        bg.strokeColor = new Color(255, 255, 255, 160);
+        bg.lineWidth = 1.5;
+        bg.roundRect(-w / 2, -h / 2, w, h, r);
+        bg.stroke();
+        const labelNode = new Node('Label');
+        labelNode.layer = this._uiLayer;
+        btn.addChild(labelNode);
+        labelNode.addComponent(UITransform).setContentSize(w - 8, h);
+        const label = labelNode.addComponent(Label);
+        label.string = text;
+        label.fontSize = Math.max(16, Math.round(h * 0.38));
+        label.isBold = true;
+        label.color = Color.WHITE;
+        label.horizontalAlign = Label.HorizontalAlign.CENTER;
+        label.verticalAlign = Label.VerticalAlign.CENTER;
+        label.overflow = Label.Overflow.SHRINK;
+        applyGameLabelStyle(label, { outlineWidth: 2, outlineColor: new Color(0, 0, 0, 160) });
+        btn.addComponent(Button).transition = Button.Transition.SCALE;
+        btn.on(Button.EventType.CLICK, onClick, this);
+        parent.addChild(btn);
+        return btn;
     }
 
     private _updateDiamondDisplay(): void {

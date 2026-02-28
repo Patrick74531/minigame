@@ -140,6 +140,8 @@ export class HUDMinimapModule implements HUDModule {
         root.layer = HUD_UI_LAYER;
         const rootTf = root.addComponent(UITransform);
         rootTf.setAnchorPoint(0.5, 0.5);
+        const rootOpacity = root.addComponent(UIOpacity);
+        rootOpacity.opacity = 168;
         parent.addChild(root);
         this._rootNode = root;
 

@@ -12,7 +12,8 @@ const LEADERBOARD_SIZE = 10;
 // ── Diamond system keys ────────────────────────────────────────────────────────
 const DIAMOND_BALANCE_PREFIX = 'diamond:balance:';
 const DIAMOND_RUN_PREFIX = 'diamond:run:';
-const DIAMOND_INITIAL_GRANT = 300;
+const DIAMOND_INITIAL_GRANT = 0;
+const SUBSCRIBE_DIAMOND_REWARD = 500;
 const DIAMOND_PER_WAVE = 10;
 const DIAMOND_ITEM_PRICE = 100;
 const DIAMOND_DAILY_CAP = 5000;
@@ -314,13 +315,25 @@ api.post('/diamond/buy-item', async c => {
 api.post('/subscribe', async c => {
     try {
         const username = await reddit.getCurrentUsername();
+        let alreadySubscribed = false;
+        let diamondsGranted = 0;
+        let newBalance = 0;
         if (username) {
             const existing = await redis.hGet(FOLLOW_KEY, username);
-            if (existing !== '1') {
+            alreadySubscribed = existing === '1';
+            if (!alreadySubscribed) {
                 await redis.hSet(FOLLOW_KEY, { [username]: '1' });
+                // Grant subscribe reward diamonds
+                const balanceKey = `${DIAMOND_BALANCE_PREFIX}${username}`;
+                const currentBalance = await ensureDiamondBalance(username);
+                newBalance = currentBalance + SUBSCRIBE_DIAMOND_REWARD;
+                await redis.set(balanceKey, String(newBalance));
+                diamondsGranted = SUBSCRIBE_DIAMOND_REWARD;
+            } else {
+                newBalance = await ensureDiamondBalance(username);
             }
         }
-        return jsonNoCache(c, { success: true });
+        return jsonNoCache(c, { success: true, alreadySubscribed, diamondsGranted, newBalance });
     } catch (error) {
         console.error('[api/subscribe] error:', error);
         return jsonError(c, 500, 'Internal server error');

@@ -11,6 +11,12 @@ import { GameManager } from '../../core/managers/GameManager';
 
 const { ccclass } = _decorator;
 
+interface DestroyedBuildingRecord {
+    buildingTypeId: string;
+    level: number;
+    nextUpgradeCost: number;
+}
+
 /**
  * 建造管理器
  * 管理所有建造点，协调建筑生成
@@ -54,6 +60,7 @@ export class BuildingManager {
     private _midSupportBuildingsRevealed: boolean = false;
     private _midSupportRevealToken: number = 0;
     private _midUpgradePadsUnlockedAfterCinematic: boolean = false;
+    private _destroyedBuildingRecords: Map<string, DestroyedBuildingRecord> = new Map();
 
     public static get instance(): BuildingManager {
         if (!this._instance) {
@@ -84,6 +91,7 @@ export class BuildingManager {
         this._midSupportBuildingsRevealed = false;
         this._midSupportRevealToken = 0;
         this._midUpgradePadsUnlockedAfterCinematic = false;
+        this._destroyedBuildingRecords.clear();
 
         // 监听建造完成事件
         this.eventManager.on(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
@@ -169,6 +177,8 @@ export class BuildingManager {
             return;
         }
 
+        this._destroyedBuildingRecords.delete(pad.node.uuid);
+
         if (!this._buildingContainer) {
             console.error('[BuildingManager] Building container is not initialized');
             pad.onBuildFailed('building container unavailable');
@@ -252,6 +262,7 @@ export class BuildingManager {
         this._midSupportBuildingsRevealed = false;
         this._midSupportRevealToken += 1;
         this._midUpgradePadsUnlockedAfterCinematic = false;
+        this._destroyedBuildingRecords.clear();
     }
 
     public get activeBuildings(): Building[] {
@@ -285,6 +296,18 @@ export class BuildingManager {
 
         for (const pad of this._pads) {
             if (!pad || !pad.node || !pad.node.isValid) continue;
+            const building = pad.getAssociatedBuilding();
+            if (!building || !building.node || !building.node.isValid) continue;
+            if (building.node.uuid !== data.buildingId) continue;
+
+            if (building.buildingType !== BuildingType.BASE) {
+                this._destroyedBuildingRecords.set(pad.node.uuid, {
+                    buildingTypeId: building.buildingTypeId,
+                    level: Math.max(1, Math.floor(building.level)),
+                    nextUpgradeCost: Math.max(0, Math.floor(pad.nextUpgradeCost)),
+                });
+            }
+
             if (pad.onAssociatedBuildingDestroyed(data.buildingId)) {
                 // 建筑被摧毁后，恢复该点位为“可重建”状态并立即显示建造 pad。
                 pad.node.active = true;
@@ -582,6 +605,79 @@ export class BuildingManager {
     }
 
     /**
+     * 重建所有已记录的被摧毁建筑（排除家），并恢复到被摧毁前等级。
+     * 同时会把当前存活的非基地建筑回满血。
+     */
+    public rebuildDestroyedBuildingsToRecordedLevels(): void {
+        this.restoreActiveNonBaseBuildingsToFullHealth();
+
+        if (!this._buildingContainer || this._destroyedBuildingRecords.size <= 0) return;
+
+        const records = Array.from(this._destroyedBuildingRecords.entries());
+        for (const [padUuid, record] of records) {
+            const pad = this._pads.find(candidate => candidate?.node?.uuid === padUuid);
+            if (!pad || !pad.node || !pad.node.isValid) {
+                this._destroyedBuildingRecords.delete(padUuid);
+                continue;
+            }
+
+            if (pad.getAssociatedBuilding()) {
+                this._destroyedBuildingRecords.delete(padUuid);
+                continue;
+            }
+
+            const buildingTypeId = (record.buildingTypeId || '').trim();
+            if (
+                !buildingTypeId ||
+                buildingTypeId === BuildingType.BASE ||
+                buildingTypeId === 'base'
+            ) {
+                this._destroyedBuildingRecords.delete(padUuid);
+                continue;
+            }
+
+            const pos = pad.getBuildWorldPosition();
+            const angle = pad.node.eulerAngles.y;
+            const buildingNode = BuildingFactory.createBuilding(
+                this._buildingContainer,
+                pos.x,
+                pos.z,
+                buildingTypeId,
+                this._unitContainer ?? undefined,
+                angle
+            );
+            if (!buildingNode) {
+                continue;
+            }
+
+            const building = buildingNode.getComponent(Building);
+            if (!building) {
+                buildingNode.destroy();
+                continue;
+            }
+
+            const targetLevel = Math.max(1, Math.floor(record.level));
+            if (targetLevel > 1) {
+                building.restoreToLevel(targetLevel);
+            }
+            building.restoreToFullHealth();
+            building.node.active = true;
+
+            if (!this._activeBuildings.includes(building)) {
+                this._activeBuildings.push(building);
+            }
+
+            pad.initForExistingBuilding(building, Math.max(0, Math.floor(record.nextUpgradeCost)));
+            pad.placeUpgradeZoneInFront(building.node, true);
+            pad.node.active = false;
+            this.tryUnlockPadsAfterTriggerBuild(pad.node);
+            this._destroyedBuildingRecords.delete(padUuid);
+        }
+
+        this.refreshUpgradePadVisibilityGate();
+    }
+
+    /**
      * 从存档恢复所有建筑（在 SpawnBootstrap.spawnPads 之后调用）
      */
     public restoreFromSave(states: BuildingPadSaveState[]): void {
@@ -656,6 +752,15 @@ export class BuildingManager {
         }
 
         this.refreshUpgradePadVisibilityGate();
+    }
+
+    private restoreActiveNonBaseBuildingsToFullHealth(): void {
+        for (const building of this._activeBuildings) {
+            if (!building || !building.node || !building.node.isValid) continue;
+            if (!building.isAlive) continue;
+            if (building.buildingType === BuildingType.BASE) continue;
+            building.restoreToFullHealth();
+        }
     }
 
     private get eventManager(): EventManager {

@@ -17,7 +17,13 @@ export type RedditBridgeCallback =
     | { type: 'init'; data: InitData }
     | { type: 'leaderboard'; entries: LeaderboardEntry[] }
     | { type: 'score_submitted'; rank: number; score: number; isNewBest: boolean }
-    | { type: 'subscription_result'; success: boolean; alreadySubscribed: boolean }
+    | {
+          type: 'subscription_result';
+          success: boolean;
+          alreadySubscribed: boolean;
+          diamondsGranted: number;
+          newBalance: number;
+      }
     | { type: 'error'; message: string };
 
 type BridgeListener = (event: RedditBridgeCallback) => void;
@@ -185,12 +191,19 @@ export class RedditBridge {
         }
         this._fetchJson('/api/subscribe', { method: 'POST' })
             .then((data: unknown) => {
-                const d = data as { success?: boolean };
+                const d = data as {
+                    success?: boolean;
+                    alreadySubscribed?: boolean;
+                    diamondsGranted?: number;
+                    newBalance?: number;
+                };
                 this._isSubscribed = true;
                 this._emit({
                     type: 'subscription_result',
                     success: d.success ?? true,
-                    alreadySubscribed: false,
+                    alreadySubscribed: d.alreadySubscribed ?? false,
+                    diamondsGranted: d.diamondsGranted ?? 0,
+                    newBalance: d.newBalance ?? 0,
                 });
             })
             .catch((e: unknown) => {

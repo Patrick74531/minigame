@@ -364,9 +364,9 @@ const BASE = {
         countPerWave: 3,
         countGrowthStepWaves: 3,
         countGrowthStepBonus: 4,
-        hpMultPerWave: 0.44,        // was 0.36 — increased to keep up with weapon scaling
-        hpAccelWaveThreshold: 15,
-        hpAccelPerWave: 0.10,       // was 0.08 — steeper late-game acceleration
+        hpMultPerWave: 0.44, // was 0.36 — increased to keep up with weapon scaling
+        hpAccelWaveThreshold: 5,
+        hpAccelPerWave: 0.14, // was 0.10 — moved threshold to wave 5, steeper acceleration
         attackMultPerWave: 0.11,
         speedMultPerWave: 0.015,
         maxSpeedMult: 1.55,
@@ -431,13 +431,13 @@ const BASE = {
     enemy: {
         moveSpeed: 2.5,
         baseAttack: 7,
-        baseHp: 55,                 // was 40 — increased base HP
+        baseHp: 55, // was 40 — increased base HP
         attackInterval: 1.2,
         attackRange: 0.85,
         aggroRange: 3.0,
         baseReachDamage: 10,
         elite: {
-            hpMultiplier: 7.5,          // was 5.4 — elites are more threatening
+            hpMultiplier: 7.5, // was 5.4 — elites are more threatening
             attackMultiplier: 1.3,
             speedMultiplier: 1.1,
             scaleMultiplier: 1.5,
@@ -500,7 +500,7 @@ const BASE = {
             maxUnitsPerLevel: 2,
         },
         tower: {
-            hp: 390,
+            hp: 750,
             attackRange: 12.5,
             attackDamage: 18,
             attackInterval: 0.36,
@@ -526,7 +526,7 @@ const BASE = {
             },
         },
         frostTower: {
-            hp: 360,
+            hp: 750,
             attackRange: 10.5,
             attackDamage: 8,
             attackInterval: 0.9,
@@ -541,7 +541,7 @@ const BASE = {
             intervalMultiplier: 0.97,
         },
         lightningTower: {
-            hp: 340,
+            hp: 750,
             attackRange: 10.8,
             attackDamage: 26,
             attackInterval: 0.9,
@@ -575,9 +575,9 @@ const BASE = {
             statMultiplier: 1.24,
         },
         wall: {
-            hp: 1450,
+            hp: 1500,
             tauntRange: 15,
-            statMultiplier: 1.35,
+            statMultiplier: 1.5,
         },
     },
     soldier: {
