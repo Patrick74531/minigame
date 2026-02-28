@@ -1,4 +1,6 @@
 import { WeaponType, WeaponInstance } from '../../gameplay/weapons/WeaponTypes';
+import type { WeaponDef } from '../../gameplay/weapons/WeaponTypes';
+import { GameConfig } from '../../data/GameConfig';
 
 /**
  * PerPlayerWeaponManager
@@ -45,10 +47,8 @@ export class PerPlayerWeaponManager {
 
         const instance: WeaponInstance = { type, level: 1 };
         this._inventory.set(type, instance);
-
-        if (!this._activeWeaponType) {
-            this._activeWeaponType = type;
-        }
+        // Always switch active to newly picked weapon (mirrors HeroWeaponManager + server activeWeaponType)
+        this._activeWeaponType = type;
         return 1;
     }
 
@@ -81,6 +81,12 @@ export class PerPlayerWeaponManager {
         if (activeType && this._inventory.has(activeType as WeaponType)) {
             this._activeWeaponType = activeType as WeaponType;
         }
+    }
+
+    getWeaponDef(type: WeaponType): WeaponDef | null {
+        const raw = GameConfig.WEAPON_SYSTEM.WEAPONS[type];
+        if (!raw) return null;
+        return raw as WeaponDef;
     }
 
     cleanup(): void {

@@ -515,7 +515,11 @@ export class BuildingPad extends BaseComponent {
                 if (this._state === BuildingPadState.WAITING) {
                     // Check logic for Tower Selection
                     if (this._isTowerSlot) {
-                        this.enterTowerSelection(!BuildingPad._coopModeEnabled);
+                        // Solo or coop host: show selection immediately.
+                        // Coop guest: never reaches here (tryCollectCoin returns 0).
+                        this.enterTowerSelection(
+                            !BuildingPad._coopModeEnabled || BuildingPad._coopHostEnabled
+                        );
                     } else {
                         this.onBuildComplete();
                     }

@@ -354,7 +354,7 @@ rewrite_index_for_reddit() {
     if (document.visibilityState === 'hidden') {
       _hiddenAt = Date.now();
     } else if (_hiddenAt > 0 && _splashHidden && (Date.now() - _hiddenAt) > 3000) {
-      location.reload();
+      if (!window.__KS_COOP_ACTIVE__) location.reload();
     } else {
       _hiddenAt = 0;
     }

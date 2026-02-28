@@ -5,6 +5,7 @@ import { UnitType } from '../units/Unit';
 import { CoinFactory } from './CoinFactory';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { Enemy } from '../units/Enemy';
+import { CoopBuildAuthority } from '../../core/runtime/CoopBuildAuthority';
 
 /**
  * CoinDropManager
@@ -54,6 +55,18 @@ export class CoinDropManager {
         if (data.unitType !== UnitType.ENEMY) return;
 
         if (!data.position || !this._coinContainer) return;
+
+        // Guest in coop mode: no coin drops (guest sees no coins at all)
+        if (CoopBuildAuthority.isGuest) {
+            // Still emit boss chest drops for guest (items/weapons are OK)
+            if (data.enemySpawnType === 'boss') {
+                this._bossKillCount += 1;
+                this.eventManager.emit(GameEvents.BOSS_CHEST_DROP, {
+                    position: new Vec3(data.position.x, 0.5, data.position.z),
+                });
+            }
+            return;
+        }
 
         // Boss → 掉落宝箱而非金币
         if (data.enemySpawnType === 'boss') {

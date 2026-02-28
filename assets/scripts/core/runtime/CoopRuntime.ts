@@ -1,4 +1,4 @@
-import { Node, Vec3 } from 'cc';
+import { Node } from 'cc';
 import type { IGameRuntime } from './IGameRuntime';
 import { HeroQuery } from './HeroQuery';
 import { PlayerContext } from './PlayerContext';
@@ -51,6 +51,8 @@ export class CoopRuntime implements IGameRuntime {
     private _buildSyncTimer: ReturnType<typeof setInterval> | null = null;
     private _buildStateVersion: number = 0;
     private _lastAppliedBuildVersion: number = -1;
+    private _matchStateSynced: boolean = false;
+    private _remoteVelocities: Map<string, { vx: number; vz: number }> = new Map();
     // Cached bound handler to avoid bind leak on on/off
     private _boundOnServerMessage = this.onServerMessage.bind(this);
     private _boundOnLocalWeaponPicked = this.onLocalWeaponPicked.bind(this);
@@ -58,6 +60,7 @@ export class CoopRuntime implements IGameRuntime {
     private _boundOnLocalTowerSelected = this.onLocalTowerSelected.bind(this);
     private _boundOnLocalCoinPicked = this.onLocalCoinPicked.bind(this);
     private _boundOnBuildingConstructed = this.onBuildingConstructedSync.bind(this);
+    private _boundOnLocalGameOver = this.onLocalGameOver.bind(this);
 
     get heroProvider(): CoopHeroProvider {
         return this._heroProvider;
@@ -110,6 +113,7 @@ export class CoopRuntime implements IGameRuntime {
             this._boundOnBuildingConstructed,
             this
         );
+        this.eventManager.on(GameEvents.GAME_OVER, this._boundOnLocalGameOver, this);
     }
 
     /**
@@ -122,6 +126,10 @@ export class CoopRuntime implements IGameRuntime {
         BuildingPadComponent.setCoopHostEnabled(!isHost ? false : true);
         if (isHost) {
             this.startBuildStateSync();
+        }
+        // Signal boot.js to NOT reload on tab-switch while coop is active
+        if (typeof window !== 'undefined') {
+            (window as any).__KS_COOP_ACTIVE__ = true;
         }
     }
 
@@ -145,6 +153,7 @@ export class CoopRuntime implements IGameRuntime {
             this._boundOnBuildingConstructed,
             this
         );
+        this.eventManager.off(GameEvents.GAME_OVER, this._boundOnLocalGameOver, this);
         this._netManager.disconnect().catch(() => {});
         this._teamLevelSystem.cleanup();
         DualCameraFollow.cleanup();
@@ -155,6 +164,7 @@ export class CoopRuntime implements IGameRuntime {
         this._weaponManagers.clear();
         this._players = [];
         this._remoteTargetPositions.clear();
+        this._remoteVelocities.clear();
         this._decisionOwnerByPad.clear();
     }
 
@@ -209,16 +219,40 @@ export class CoopRuntime implements IGameRuntime {
             this._netManager.queueInput(pos.x, pos.z);
         }
 
-        const LERP_SPEED = 8;
+        // Smooth remote hero interpolation with velocity-based dead-reckoning.
+        // Uses exponential smoothing to eliminate teleport/flashing artifacts.
+        const SMOOTH_SPEED = 10;
+        const PREDICT_AHEAD = 0.08; // seconds of velocity extrapolation
+        const SNAP_DIST_SQ = 400; // snap if >20 units away (reconnect/teleport)
         for (const p of this._players) {
             if (p.isLocal || !p.heroNode || !p.heroNode.isValid) continue;
             const target = this._remoteTargetPositions.get(p.playerId);
             if (!target) continue;
 
+            const vel = this._remoteVelocities.get(p.playerId);
+            // Predict target position using velocity
+            let goalX = target.x;
+            let goalZ = target.z;
+            if (vel) {
+                goalX += vel.vx * PREDICT_AHEAD;
+                goalZ += vel.vz * PREDICT_AHEAD;
+            }
+
             const pos = p.heroNode.position;
-            const nx = pos.x + (target.x - pos.x) * LERP_SPEED * dt;
-            const nz = pos.z + (target.z - pos.z) * LERP_SPEED * dt;
-            p.heroNode.setPosition(new Vec3(nx, pos.y, nz));
+            const dx = goalX - pos.x;
+            const dz = goalZ - pos.z;
+            const distSq = dx * dx + dz * dz;
+
+            if (distSq > SNAP_DIST_SQ) {
+                // Teleport if very far (reconnect scenario)
+                p.heroNode.setPosition(target.x, pos.y, target.z);
+            } else if (distSq > 0.0001) {
+                // Exponential smoothing: smooth convergence without overshoot
+                const factor = 1 - Math.exp(-SMOOTH_SPEED * dt);
+                const nx = pos.x + dx * factor;
+                const nz = pos.z + dz * factor;
+                p.heroNode.setPosition(nx, pos.y, nz);
+            }
         }
         DualCameraFollow.update();
     }
@@ -270,16 +304,25 @@ export class CoopRuntime implements IGameRuntime {
             case 'BUILD_STATE_SNAPSHOT':
                 this.handleBuildStateSnapshot(msg);
                 break;
-            case 'MATCH_OVER':
-                // TODO: trigger game over flow
+            case 'MATCH_OVER': {
+                if (!this._isHost) {
+                    const gm =
+                        ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+                    if (gm.isPlaying) gm.gameOver(false);
+                }
                 break;
+            }
         }
     }
 
     private handleMatchState(state: CoopMatchState): void {
-        // Full state sync — used on join and reconnect
-        const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
-        gm.setCoins(state.sharedCoins);
+        // Only apply economy sync on initial join — not during ongoing sync
+        // polling, which would flash the HUD to stale server values.
+        if (!this._matchStateSynced) {
+            this._matchStateSynced = true;
+            const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+            gm.setCoins(state.sharedCoins);
+        }
         // Restore team level if behind
         if (state.teamLevel > this._teamLevelSystem.level) {
             this._teamLevelSystem.restoreState(state.teamLevel, 0);
@@ -294,8 +337,18 @@ export class CoopRuntime implements IGameRuntime {
         const remote = this._players.find(p => p.playerId === msg.playerId);
         if (!remote || !remote.heroNode || !remote.heroNode.isValid) return;
 
-        // dx/dz are absolute world-space target positions, not deltas.
-        // Client sends hero.worldPosition as (dx, dz) for authoritative positioning.
+        // Compute velocity from consecutive positions for dead-reckoning
+        const prev = this._remoteTargetPositions.get(msg.playerId);
+        if (prev) {
+            const dtSec = (msg.t - prev.t) / 1000;
+            if (dtSec > 0.02 && dtSec < 2) {
+                this._remoteVelocities.set(msg.playerId, {
+                    vx: (msg.dx - prev.x) / dtSec,
+                    vz: (msg.dz - prev.z) / dtSec,
+                });
+            }
+        }
+
         this._remoteTargetPositions.set(msg.playerId, {
             x: msg.dx,
             z: msg.dz,
@@ -420,6 +473,11 @@ export class CoopRuntime implements IGameRuntime {
                 buildingTypeId: data.buildingTypeId,
             })
             .catch(() => {});
+    }
+
+    private onLocalGameOver(): void {
+        if (!this._isHost) return;
+        this._netManager.sendAction({ type: 'MATCH_OVER', victory: false }).catch(() => {});
     }
 
     private onLocalCoinPicked(data: { x: number; z: number }): void {

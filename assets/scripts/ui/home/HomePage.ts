@@ -858,6 +858,20 @@ export class HomePage extends Component {
         inputEditBox.textLabel = inputLabel;
         inputEditBox.placeholderLabel = placeholderLabel;
         this._coopInviteEditBox = inputEditBox;
+        const isForcedLandscape =
+            typeof window !== 'undefined' && (window as any).__BOOT_FORCE_LANDSCAPE__ === true;
+        if (isForcedLandscape && typeof window !== 'undefined') {
+            inputEditBox.enabled = false;
+            const tapInput = inputNode.addComponent(Button);
+            tapInput.transition = Button.Transition.NONE;
+            inputNode.on(
+                Button.EventType.CLICK,
+                () => {
+                    this._showDomInputOverlay();
+                },
+                this
+            );
+        }
 
         const createBtn = this._createCoopModalButton(
             panel,
@@ -873,7 +887,18 @@ export class HomePage extends Component {
             'JoinBtn',
             Localization.instance.t('ui.home.coop.join'),
             () => {
-                const input = this._coopInviteEditBox?.string?.trim() ?? '';
+                let input = this._coopInviteEditBox?.string?.trim() ?? '';
+                if (isForcedLandscape && typeof window !== 'undefined' && !input) {
+                    const prompted = window.prompt(
+                        Localization.instance.t('ui.home.coop.prompt') ||
+                            'Enter invite code / 输入邀请码'
+                    );
+                    if (prompted === null) return; // cancelled
+                    input = prompted.trim();
+                    if (this._coopInviteEditBox) {
+                        this._coopInviteEditBox.string = input;
+                    }
+                }
                 const matchId = this._extractMatchId(input);
                 if (!matchId) {
                     const msgKey = input ? 'ui.home.coop.invalid' : 'ui.home.coop.empty';
@@ -1203,5 +1228,107 @@ export class HomePage extends Component {
                 if (toast.isValid) toast.destroy();
             }
         }, 16);
+    }
+
+    private _showDomInputOverlay(): void {
+        if (typeof document === 'undefined') return;
+        const OVERLAY_ID = 'ks-coop-input-overlay';
+        const existing = document.getElementById(OVERLAY_ID);
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = OVERLAY_ID;
+        // No rotation — portrait modal so the input card and iOS keyboard
+        // are both in portrait orientation and fully usable together.
+        overlay.style.cssText = [
+            'position:fixed',
+            'top:0',
+            'left:0',
+            'width:100vw',
+            'height:100vh',
+            'z-index:99999',
+            'display:flex',
+            'align-items:center',
+            'justify-content:center',
+            'background:rgba(0,0,0,0.75)',
+        ].join(';');
+
+        const card = document.createElement('div');
+        card.style.cssText = [
+            'background:#1a243c',
+            'padding:24px',
+            'border-radius:16px',
+            'border:2px solid #ffd970',
+            'width:320px',
+            'display:flex',
+            'flex-direction:column',
+            'gap:12px',
+            'box-sizing:border-box',
+        ].join(';');
+
+        const title = document.createElement('p');
+        title.textContent = '输入邀请码 / Enter Invite Code';
+        title.style.cssText =
+            'margin:0;color:#ffe891;font-size:15px;text-align:center;font-family:sans-serif;font-weight:bold;';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = this._coopInviteEditBox?.string ?? '';
+        input.maxLength = 120;
+        input.autocomplete = 'off';
+        input.autocapitalize = 'none';
+        input.style.cssText = [
+            'width:100%',
+            'box-sizing:border-box',
+            'padding:10px 14px',
+            'font-size:18px',
+            'border-radius:8px',
+            'border:none',
+            'outline:none',
+            'background:#eef0ff',
+            'color:#111',
+        ].join(';');
+
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:10px;';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = '取消';
+        cancelBtn.style.cssText =
+            'flex:1;padding:10px;background:#5a628f;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;font-family:sans-serif;';
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.textContent = '确认';
+        confirmBtn.style.cssText =
+            'flex:1;padding:10px;background:#48c060;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;font-family:sans-serif;';
+
+        const dismiss = (): void => {
+            const el = document.getElementById(OVERLAY_ID);
+            if (el) el.remove();
+        };
+
+        cancelBtn.onclick = () => dismiss();
+        confirmBtn.onclick = () => {
+            if (this._coopInviteEditBox) {
+                this._coopInviteEditBox.string = input.value.trim();
+            }
+            dismiss();
+        };
+        input.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Enter') {
+                confirmBtn.click();
+            }
+        });
+
+        btnRow.appendChild(cancelBtn);
+        btnRow.appendChild(confirmBtn);
+        card.appendChild(title);
+        card.appendChild(input);
+        card.appendChild(btnRow);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+
+        // Focus after a short delay so the keyboard appears
+        setTimeout(() => input.focus(), 80);
     }
 }

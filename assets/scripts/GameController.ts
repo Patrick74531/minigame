@@ -21,6 +21,8 @@ import { ServiceRegistrar } from './core/bootstrap/ServiceRegistrar';
 import { GameplayBootstrap } from './core/bootstrap/GameplayBootstrap';
 import { RuntimeSystemsBootstrap } from './core/bootstrap/RuntimeSystemsBootstrap';
 import { GameStartFlow, StartContext } from './core/bootstrap/GameStartFlow';
+import { LoadingScreen } from './ui/LoadingScreen';
+import { GameResourceLoader } from './core/bootstrap/GameResourceLoader';
 import { ControllerServices } from './core/bootstrap/ControllerServices';
 import { PlayerInputAdapter } from './core/input/PlayerInputAdapter';
 import { WeaponBehaviorFactory } from './gameplay/weapons/WeaponBehaviorFactory';
@@ -90,6 +92,8 @@ export class GameController extends Component {
     private _coopWaitingOverlay: Node | null = null;
     private _coopWaitingHintLabel: Label | null = null;
     private _coopStartInFlight: boolean = false;
+    private _coopWaitingCancelled: boolean = false;
+    private _coopLoadingScreen: LoadingScreen | null = null;
 
     // === 实体 ===
     private _hero: Node | null = null;
@@ -176,11 +180,16 @@ export class GameController extends Component {
         this._visibilityHandler = () => {
             if (document.hidden) {
                 const gm = this._services.gameManager;
-                if (gm.isPlaying || gm.gameState === GameState.PAUSED) {
+                // Skip save in coop mode
+                const isCoop = this._runtime?.mode === 'coop';
+                if (!isCoop && (gm.isPlaying || gm.gameState === GameState.PAUSED)) {
                     const snap = this.collectSnapshot();
                     if (snap) GameSaveManager.instance.saveImmediate(snap);
                 }
-                director.pause();
+                // In coop mode, don't pause the director (prevents match desync)
+                if (!isCoop) {
+                    director.pause();
+                }
                 if (gm.isPlaying) {
                     gm.pauseGame();
                     this._pausedByVisibility = true;
@@ -243,6 +252,17 @@ export class GameController extends Component {
         this._hideCoopWaitingOverlay();
         this._runtime?.cleanup();
         this._runtime = null;
+
+        // Bug 3: Clear coop mode persistence so next load returns to home page
+        if (typeof window !== 'undefined') {
+            try {
+                window.localStorage?.removeItem('KS_RUNTIME_MODE');
+            } catch {
+                /* ignore */
+            }
+        }
+        this._setCoopActiveFlag(false);
+
         SystemReset.shutdown();
     }
 
@@ -254,6 +274,7 @@ export class GameController extends Component {
             this.startCoopGame().catch(err => {
                 this._logCoopStartFailure('startup', err);
                 this._notifyCoopStartFailure(err);
+                this._setCoopActiveFlag(false);
                 this._runtime?.cleanup();
                 this._runtime = new SoloRuntime();
                 this._runtime.initialize();
@@ -292,6 +313,7 @@ export class GameController extends Component {
                 this.startCoopFromHome(matchId).catch(err => {
                     this._logCoopStartFailure('from_home', err);
                     this._notifyCoopStartFailure(err);
+                    this._setCoopActiveFlag(false);
                     this._runtime?.cleanup();
                     this._runtime = new SoloRuntime();
                     this._runtime.initialize();
@@ -323,6 +345,8 @@ export class GameController extends Component {
     // === 自动存档 ===
 
     private onGameStart(): void {
+        // No autosave in coop mode (coop doesn't use save/continue)
+        if (this._runtime?.mode === 'coop') return;
         if (this._autosaveIntervalId !== null) clearInterval(this._autosaveIntervalId);
         this._autosaveIntervalId = setInterval(() => {
             const snap = this.collectSnapshot();
@@ -408,6 +432,7 @@ export class GameController extends Component {
     }
 
     private async startCoopGame(preferredMatchId: string = ''): Promise<void> {
+        this._setCoopActiveFlag(true);
         const runtime = this._runtime as CoopRuntime;
         const net = runtime.netManager;
         this._services.hudManager.setVisible(false);
@@ -419,7 +444,7 @@ export class GameController extends Component {
             : normalizedPreferredMatchId ||
               this._getQueryParam('matchId') ||
               this._getLocalStorageValue('KS_COOP_MATCH_ID');
-        let state: CoopMatchState;
+        let state!: CoopMatchState;
         if (matchIdParam) {
             try {
                 state = await net.joinMatch(matchIdParam);
@@ -432,19 +457,39 @@ export class GameController extends Component {
                 }
             }
         } else {
-            const created = await net.createMatch();
-            state = created.state;
-            if (typeof window !== 'undefined') {
+            // Try to reuse a recent cached matchId (stable invite codes)
+            const cachedMatchId = this._getCachedCoopMatchId();
+            let reuseSucceeded = false;
+            if (cachedMatchId) {
                 try {
-                    window.localStorage?.setItem('KS_COOP_MATCH_ID', created.matchId);
+                    const cachedState = await net.rejoinMatch(cachedMatchId);
+                    if (cachedState.status === 'waiting' && cachedState.players.length < 2) {
+                        state = cachedState;
+                        reuseSucceeded = true;
+                    }
                 } catch {
-                    // ignore localStorage write failure
+                    // Cached match expired or invalid — create new
                 }
             }
-            const joinUrl = this._buildCoopJoinUrl(created.matchId);
-            this._showCoopWaitingOverlay(created.matchId, joinUrl);
+
+            if (!reuseSucceeded) {
+                const created = await net.createMatch();
+                state = created.state;
+                this._setCachedCoopMatchId(created.matchId);
+            }
+
+            const activeMatchId = net.matchId;
+            if (typeof window !== 'undefined') {
+                try {
+                    window.localStorage?.setItem('KS_COOP_MATCH_ID', activeMatchId);
+                } catch {
+                    /* ignore */
+                }
+            }
+            const joinUrl = this._buildCoopJoinUrl(activeMatchId);
+            this._showCoopWaitingOverlay(activeMatchId, joinUrl);
             try {
-                state = await this.waitForSecondPlayer(net.matchId, state);
+                state = await this.waitForSecondPlayer(activeMatchId, state);
             } finally {
                 this._hideCoopWaitingOverlay();
             }
@@ -463,7 +508,19 @@ export class GameController extends Component {
         const isHost = state.players[0]?.playerId === localPlayerId;
         runtime.setHostMode(isHost);
 
-        this._services.hudManager.setVisible(true);
+        if (this._uiCanvas) {
+            this._coopLoadingScreen = LoadingScreen.show(this._uiCanvas, () => {
+                this._services.hudManager.setVisible(true);
+                GameResourceLoader.loadPhase2();
+            });
+            GameResourceLoader.loadPhase1((loaded, total) => {
+                if (this._coopLoadingScreen?.isValid)
+                    this._coopLoadingScreen.setProgress(loaded, total);
+            }).catch(() => {});
+        } else {
+            this._services.hudManager.setVisible(true);
+        }
+
         if (this._mapGenerator) {
             this._mapGenerator.generateProceduralMap();
         }
@@ -494,22 +551,37 @@ export class GameController extends Component {
 
         CoopStartFlow.startWaves(this._waveLoop);
         this._services.gameManager.startGame();
+
+        if (this._coopLoadingScreen?.isValid) {
+            const ls = this._coopLoadingScreen;
+            this._coopLoadingScreen = null;
+            ls.scheduleOnce(() => {
+                if (ls.isValid) ls.signalReadyToClose();
+            }, 0.5);
+        }
     }
 
     private async waitForSecondPlayer(
         matchId: string,
         initialState: CoopMatchState
     ): Promise<CoopMatchState> {
+        this._coopWaitingCancelled = false;
         const timeoutMs = 120_000;
         const startedAt = Date.now();
         let state = initialState;
         while (Date.now() - startedAt < timeoutMs) {
+            if (this._coopWaitingCancelled) {
+                throw new Error('wait_second_player_cancelled');
+            }
             // Some backend edge cases can lag status updates; player count is the
             // authoritative condition for starting 2P scene bootstrap.
             if (state.players.length >= 2) {
                 return state;
             }
             await new Promise<void>(resolve => setTimeout(resolve, 1000));
+            if (this._coopWaitingCancelled) {
+                throw new Error('wait_second_player_cancelled');
+            }
             state = await (this._runtime as CoopRuntime).netManager.getMatchState(matchId);
         }
         throw new Error('wait_second_player_timeout');
@@ -688,6 +760,20 @@ export class GameController extends Component {
         hintLabel.fontSize = Math.round(Math.max(18, panelH * 0.046));
         hintLabel.lineHeight = hintLabel.fontSize + 6;
 
+        const backBtnW = Math.round(Math.min(panelW * 0.38, 180));
+        const backBtnH = Math.round(Math.max(40, panelH * 0.11));
+        const backBtn = this._createOverlayButton(panel, 'BackBtn', '← 返回主页', () => {
+            this._coopWaitingCancelled = true;
+            this._hideCoopWaitingOverlay();
+        });
+        backBtn.getComponent(UITransform)?.setContentSize(backBtnW, backBtnH);
+        backBtn.setPosition(0, -Math.round(panelH * 0.468), 0);
+        this._drawOverlayButton(
+            backBtn,
+            new Color(86, 98, 128, 255),
+            new Color(240, 244, 255, 255)
+        );
+
         this._coopWaitingOverlay = overlay;
         this._coopWaitingHintLabel = hintLabel;
         this._setCoopWaitingHint('等待好友输入邀请码...');
@@ -841,7 +927,6 @@ export class GameController extends Component {
             const forceCreate = normalizedMatchId === COOP_CREATE_MATCH_SENTINEL;
             if (typeof window !== 'undefined') {
                 try {
-                    window.localStorage?.setItem('KS_RUNTIME_MODE', 'coop');
                     if (normalizedMatchId && !forceCreate) {
                         window.localStorage?.setItem('KS_COOP_MATCH_ID', normalizedMatchId);
                     } else {
@@ -889,6 +974,7 @@ export class GameController extends Component {
         const message = this._extractErrorMessage(error);
         const expectedErrors = [
             'wait_second_player_timeout',
+            'wait_second_player_cancelled',
             'match_not_found',
             'match_full',
             'match_not_waiting',
@@ -902,27 +988,47 @@ export class GameController extends Component {
         console.error(`[GameController] Coop start ${scope} failed:`, error);
     }
 
+    private _getCachedCoopMatchId(): string {
+        if (typeof window === 'undefined') return '';
+        try {
+            const raw = window.localStorage?.getItem('KS_COOP_INVITE_CACHE');
+            if (!raw) return '';
+            const cache = JSON.parse(raw) as { matchId: string; createdAt: number };
+            const TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
+            if (Date.now() - cache.createdAt > TTL_MS) {
+                window.localStorage?.removeItem('KS_COOP_INVITE_CACHE');
+                return '';
+            }
+            return cache.matchId ?? '';
+        } catch {
+            return '';
+        }
+    }
+
+    private _setCachedCoopMatchId(matchId: string): void {
+        if (typeof window === 'undefined') return;
+        try {
+            window.localStorage?.setItem(
+                'KS_COOP_INVITE_CACHE',
+                JSON.stringify({ matchId, createdAt: Date.now() })
+            );
+        } catch {
+            /* ignore */
+        }
+    }
+
     private _resolveRuntime(): IGameRuntime {
         const mode = this._getQueryParam('mode').toLowerCase();
         const coopFlag = this._getQueryParam('coop').toLowerCase();
-        let persistedMode = '';
-        if (typeof window !== 'undefined') {
-            try {
-                persistedMode =
-                    window.localStorage?.getItem('KS_RUNTIME_MODE')?.trim().toLowerCase() ?? '';
-            } catch {
-                persistedMode = '';
-            }
-        }
-        if (
-            mode === 'coop' ||
-            coopFlag === '1' ||
-            coopFlag === 'true' ||
-            persistedMode === 'coop'
-        ) {
+        if (mode === 'coop' || coopFlag === '1' || coopFlag === 'true') {
             return new CoopRuntime();
         }
         return new SoloRuntime();
+    }
+
+    private _setCoopActiveFlag(active: boolean): void {
+        if (typeof window === 'undefined') return;
+        (window as any).__KS_COOP_ACTIVE__ = active;
     }
 
     private get evtMgr(): EventManager {

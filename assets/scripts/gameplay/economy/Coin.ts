@@ -97,8 +97,12 @@ export class Coin extends BaseComponent implements IPoolable {
             return;
         }
 
-        // Magnet Logic — use HeroQuery for coop-ready nearest-hero lookup
-        const hero = HeroQuery.getNearestHero(this.node.worldPosition) ?? Coin.HeroNode;
+        // Magnet Logic — attract only to local hero (prevents coins clustering
+        // around remote hero avatar in coop mode)
+        const hero =
+            (CoopBuildAuthority.isCoopMode
+                ? HeroQuery.getLocalHero()
+                : HeroQuery.getNearestHero(this.node.worldPosition)) ?? Coin.HeroNode;
         let isAttracted = false;
 
         if (hero && hero.isValid) {

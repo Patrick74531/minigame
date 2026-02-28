@@ -12,6 +12,7 @@ import { ServiceRegistry } from '../managers/ServiceRegistry';
 import { PlayerContext } from './PlayerContext';
 import { CoopRuntime } from './CoopRuntime';
 import { Hero } from '../../gameplay/units/Hero';
+import { WeaponType } from '../../gameplay/weapons/WeaponTypes';
 
 export interface CoopSpawnResult {
     base: Node;
@@ -71,6 +72,13 @@ export class CoopStartFlow {
         if (heroAComp) heroAComp.isLocalPlayerHero = true;
         const heroBComp = heroB.getComponent(Hero);
         if (heroBComp) heroBComp.isLocalPlayerHero = false;
+        const remoteWeaponManager = runtime.getWeaponManager(remotePlayerId);
+        if (heroBComp) {
+            heroBComp.setCoopWeaponManager(remoteWeaponManager);
+        }
+        // Pre-seed starter weapon so remote hero fires VFX immediately.
+        // WEAPON_ASSIGNED messages will upgrade/override as the game progresses.
+        remoteWeaponManager?.addWeapon(WeaponType.MACHINE_GUN);
 
         // Initialize team level system
         runtime.initializeTeamLevel();

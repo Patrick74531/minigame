@@ -28,16 +28,27 @@ import type { BuffCardEffect } from '../roguelike/BuffCardService';
 import { HeroWeaponManager } from '../weapons/HeroWeaponManager';
 import { WeaponBehaviorFactory } from '../weapons/WeaponBehaviorFactory';
 import { WeaponSFXManager } from '../weapons/WeaponSFXManager';
-import { getWeaponLevelStats, type WeaponLevelStats } from '../weapons/WeaponTypes';
+import {
+    getWeaponLevelStats,
+    type WeaponDef,
+    type WeaponLevelStats,
+    type WeaponType,
+} from '../weapons/WeaponTypes';
 import { HeroLevelSystem } from './HeroLevelSystem';
 import { GameEvents } from '../../data/GameEvents';
 import { EventManager } from '../../core/managers/EventManager';
 import { Building } from '../buildings/Building';
 import { HitFeedback } from '../visuals/HitFeedback';
 import { CoopBuildAuthority } from '../../core/runtime/CoopBuildAuthority';
+import type { PerPlayerWeaponManager } from '../../core/runtime/PerPlayerWeaponManager';
 
 const { ccclass, property } = _decorator;
 const PHYSICS_GROUP_WALL = 1 << 5;
+type HeroWeaponManagerLike = {
+    activeWeaponType: WeaponType | null;
+    activeWeapon: { type: WeaponType; level: number } | null;
+    getWeaponDef(type: WeaponType): WeaponDef | null;
+};
 
 /**
  * 英雄单位
@@ -68,6 +79,7 @@ export class Hero extends Unit {
     private _wasSpinning: boolean = false;
     /** 上一帧激活的武器类型，用于检测切换并停止旧 behavior */
     private _prevWeaponType: string | null = null;
+    private _coopWeaponManager: PerPlayerWeaponManager | null = null;
 
     /** 基础属性快照（用于成长计算） */
     private _baseStats = {
@@ -104,7 +116,7 @@ export class Hero extends Unit {
         WeaponSFXManager.stopAllLoops(this.node);
         this._respawning = false;
         this._respawnRemainingSeconds = 0;
-        this.hudManager.hideHeroRespawnCountdown();
+        if (this.isLocalPlayerHero) this.hudManager.hideHeroRespawnCountdown();
         if (this.gameManager.hero === this.node) {
             this.gameManager.hero = null;
         }
@@ -481,6 +493,10 @@ export class Hero extends Unit {
         this._state = input.lengthSqr() > 0.01 ? UnitState.MOVING : UnitState.IDLE;
     }
 
+    public setCoopWeaponManager(manager: PerPlayerWeaponManager | null): void {
+        this._coopWeaponManager = manager;
+    }
+
     protected update(dt: number): void {
         if (!this.isAlive) return;
         // 游戏暂停时不处理移动和攻击
@@ -488,13 +504,14 @@ export class Hero extends Unit {
 
         this._lastDt = dt;
         this.updateInvincibility(dt);
+        const manager = this._getWeaponManager();
 
         // 空投武器冷却
         if (this._customWeaponTimer > 0) {
             this._customWeaponTimer -= dt;
         }
 
-        const isMoving = this._inputVector.lengthSqr() > 0.01;
+        const isMoving = this.isLocalPlayerHero && this._inputVector.lengthSqr() > 0.01;
 
         // 始终索敌（移动时也能锁定目标并开火）
         this.updateTargeting();
@@ -507,7 +524,6 @@ export class Hero extends Unit {
 
         // 只要有目标 + 武器就绪，无论移动还是静止都开火
         // 持续型武器每帧触发，离散型武器按冷却间隔
-        const manager = HeroWeaponManager.instance;
         // 武器切换检测：停止旧 behavior 的持续特效，防止残留
         const curWeaponType = manager.activeWeapon?.type ?? null;
         if (curWeaponType !== this._prevWeaponType) {
@@ -527,22 +543,24 @@ export class Hero extends Unit {
                 Boolean(this._target && this._target.isAlive)
             );
             if (shouldFire) {
-                this.performAttack();
+                this.performAttack(manager);
             } else if (!this._target) {
                 // 无目标时停止持续型武器
-                this._stopCurrentWeapon();
+                this._stopCurrentWeapon(manager);
             }
         } else {
             WeaponSFXManager.syncLoopState(this.node, null, false);
         }
 
-        super.update(dt);
-        this.applyFacingDirection();
+        // Remote hero: no local movement/state simulation; position is driven by CoopRuntime.tick().
+        if (this.isLocalPlayerHero) {
+            super.update(dt);
+        }
+        this.applyFacingDirection(manager);
     }
 
     /** 获取当前有效攻击范围（优先使用武器射程） */
-    private getEffectiveRange(): number {
-        const manager = HeroWeaponManager.instance;
+    private getEffectiveRange(manager: HeroWeaponManagerLike): number {
         const active = manager.activeWeapon;
         if (active) {
             const def = manager.getWeaponDef(active.type);
@@ -596,7 +614,7 @@ export class Hero extends Unit {
 
     private updateTargeting(): void {
         let nearest: Node | null = null;
-        const effectiveRange = this.getEffectiveRange();
+        const effectiveRange = this.getEffectiveRange(this._getWeaponManager());
 
         const provider = CombatService.provider;
         if (provider && provider.findEnemyInRange) {
@@ -678,8 +696,7 @@ export class Hero extends Unit {
         }
     }
 
-    private applyFacingDirection(): void {
-        const manager = HeroWeaponManager.instance;
+    private applyFacingDirection(manager: HeroWeaponManagerLike): void {
         const behavior = manager.activeWeapon
             ? WeaponBehaviorFactory.get(manager.activeWeapon.type)
             : null;
@@ -704,14 +721,14 @@ export class Hero extends Unit {
         this.node.lookAt(lookAt);
     }
 
-    protected performAttack(): void {
+    protected performAttack(managerOverride?: HeroWeaponManagerLike): void {
         if (!this._target || !this._target.isAlive) {
             this._stopCurrentWeapon();
             return;
         }
 
         // 优先使用空投武器系统
-        const manager = HeroWeaponManager.instance;
+        const manager = managerOverride ?? this._getWeaponManager();
         const active = manager.activeWeapon;
         if (active) {
             const behavior = WeaponBehaviorFactory.get(active.type);
@@ -747,8 +764,8 @@ export class Hero extends Unit {
     }
 
     /** 停止当前持续型武器的效果 */
-    private _stopCurrentWeapon(): void {
-        const manager = HeroWeaponManager.instance;
+    private _stopCurrentWeapon(managerOverride?: HeroWeaponManagerLike): void {
+        const manager = managerOverride ?? this._getWeaponManager();
         const active = manager.activeWeapon;
         if (active) {
             const behavior = WeaponBehaviorFactory.get(active.type);
@@ -757,6 +774,13 @@ export class Hero extends Unit {
             }
         }
         WeaponSFXManager.stopAllLoops(this.node);
+    }
+
+    private _getWeaponManager(): HeroWeaponManagerLike {
+        if (!this.isLocalPlayerHero && this._coopWeaponManager) {
+            return this._coopWeaponManager;
+        }
+        return HeroWeaponManager.instance;
     }
 
     // === 升级处理 ===
@@ -888,7 +912,8 @@ export class Hero extends Unit {
         this._stopCurrentWeapon();
         this.setHeroCollisionEnabled(false);
 
-        this.hudManager.showHeroRespawnCountdown(this._respawnRemainingSeconds);
+        if (this.isLocalPlayerHero)
+            this.hudManager.showHeroRespawnCountdown(this._respawnRemainingSeconds);
 
         this.unschedule(this.tickRespawnCountdown);
         this.unschedule(this.finishRespawn);
@@ -899,7 +924,7 @@ export class Hero extends Unit {
     private tickRespawnCountdown(): void {
         if (!this._respawning) return;
         this._respawnRemainingSeconds = Math.max(0, this._respawnRemainingSeconds - 1);
-        if (this._respawnRemainingSeconds > 0) {
+        if (this._respawnRemainingSeconds > 0 && this.isLocalPlayerHero) {
             this.hudManager.updateHeroRespawnCountdown(this._respawnRemainingSeconds);
         }
     }
@@ -920,7 +945,7 @@ export class Hero extends Unit {
         this._hasFacingDir = false;
         this.setHeroCollisionEnabled(true);
 
-        this.hudManager.showHeroRespawnReadyPrompt();
+        if (this.isLocalPlayerHero) this.hudManager.showHeroRespawnReadyPrompt();
     }
 
     private resolveRespawnPosition(): Vec3 {
