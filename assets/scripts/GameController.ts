@@ -32,6 +32,7 @@ import { ScreenShake } from './gameplay/weapons/vfx/ScreenShake';
 import { HeroLevelSystem } from './gameplay/units/HeroLevelSystem';
 import { LevelUpVFX } from './gameplay/effects/LevelUpVFX';
 import { GameEvents } from './data/GameEvents';
+import { GameConfig } from './data/GameConfig';
 import { EventManager } from './core/managers/EventManager';
 import { ResourcePreloader } from './core/bootstrap/ResourcePreloader';
 import { CoinFactory } from './gameplay/economy/CoinFactory';
@@ -178,23 +179,23 @@ export class GameController extends Component {
 
         // 切Tab/息屏时暂停游戏，回来时自动恢复
         this._visibilityHandler = () => {
+            const isCoop = this._runtime?.mode === 'coop';
             if (document.hidden) {
                 const gm = this._services.gameManager;
-                // Skip save in coop mode
-                const isCoop = this._runtime?.mode === 'coop';
-                if (!isCoop && (gm.isPlaying || gm.gameState === GameState.PAUSED)) {
+                // V2: In coop mode, skip ALL pause/save logic to prevent desync
+                if (isCoop) return;
+                if (gm.isPlaying || gm.gameState === GameState.PAUSED) {
                     const snap = this.collectSnapshot();
                     if (snap) GameSaveManager.instance.saveImmediate(snap);
                 }
-                // In coop mode, don't pause the director (prevents match desync)
-                if (!isCoop) {
-                    director.pause();
-                }
+                director.pause();
                 if (gm.isPlaying) {
                     gm.pauseGame();
                     this._pausedByVisibility = true;
                 }
             } else {
+                // V2: In coop mode, no need to resume (never paused)
+                if (isCoop) return;
                 director.resume();
                 if (this._pausedByVisibility) {
                     this._pausedByVisibility = false;
@@ -506,6 +507,7 @@ export class GameController extends Component {
 
         // Determine host/guest: slot 0 = host (match creator)
         const isHost = state.players[0]?.playerId === localPlayerId;
+        runtime.bindWaveLoop(this._waveLoop);
         runtime.setHostMode(isHost);
 
         if (this._uiCanvas) {
@@ -549,7 +551,7 @@ export class GameController extends Component {
         this._services.itemCardUI.initialize(this._uiCanvas!);
         this._services.itemBarUI.initialize(this._uiCanvas!);
 
-        CoopStartFlow.startWaves(this._waveLoop);
+        CoopStartFlow.startWaves(this._waveLoop, GameConfig.WAVE.FIRST_WAVE_DELAY, 1, isHost);
         this._services.gameManager.startGame();
 
         if (this._coopLoadingScreen?.isValid) {

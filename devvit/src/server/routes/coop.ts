@@ -69,6 +69,7 @@ interface MatchState {
     teamLevel: number;
     sharedCoins: number;
     waveNumber: number;
+    waveStartAt: number | null;
     buildingDecisions: BuildingDecision[];
     seq: number;
     buildState?: BuildStateSnapshot;
@@ -76,7 +77,7 @@ interface MatchState {
 
 type ServerMessage =
     | { type: 'MATCH_STATE'; state: MatchState }
-    | { type: 'PLAYER_INPUT'; playerId: string; dx: number; dz: number; seq: number; t: number }
+    | { type: 'PLAYER_INPUT'; playerId: string; dx: number; dz: number; t: number }
     | {
           type: 'COIN_DEPOSITED';
           padId: string;
@@ -113,7 +114,10 @@ type ServerMessage =
     | { type: 'GAME_PAUSE'; seq: number }
     | { type: 'GAME_RESUME'; seq: number }
     | { type: 'MATCH_OVER'; victory: boolean; seq: number }
-    | { type: 'BUILD_STATE_SNAPSHOT'; snapshot: BuildStateSnapshot; seq: number };
+    | { type: 'BUILD_STATE_SNAPSHOT'; snapshot: BuildStateSnapshot; seq: number }
+    | { type: 'CLOCK_SYNC'; serverTime: number; clientTime: number; seq: number }
+    | { type: 'WAVE_STARTED'; waveIndex: number; startAt: number; seq: number }
+    | { type: 'PHASE_CHANGE'; phase: string; serverTime: number; seq: number };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -232,6 +236,7 @@ coop.post('/create-match', async c => {
             teamLevel: 1,
             sharedCoins: 0,
             waveNumber: 1,
+            waveStartAt: null,
             buildingDecisions: [],
             seq: 0,
         };
@@ -424,7 +429,7 @@ coop.post('/action', async c => {
                     return jsonNoCache(c, { error: 'invalid_input_params' }, 400);
                 }
                 player.heroState.position = { x: dx, z: dz };
-                await emitWithSeq(seq => ({ type: 'PLAYER_INPUT', playerId, dx, dz, seq, t }));
+                await emitNoSeq({ type: 'PLAYER_INPUT', playerId, dx, dz, t });
                 break;
             }
 
@@ -575,6 +580,41 @@ coop.post('/action', async c => {
 
             case 'HEARTBEAT': {
                 player.lastHeartbeat = Date.now();
+                break;
+            }
+
+            case 'CLOCK_SYNC_REQUEST': {
+                const clientTime = payload.clientTime as number;
+                if (!Number.isFinite(clientTime)) {
+                    return jsonNoCache(c, { error: 'invalid_clock_sync_params' }, 400);
+                }
+                await emitWithSeq(seq => ({
+                    type: 'CLOCK_SYNC' as const,
+                    serverTime: Date.now(),
+                    clientTime,
+                    seq,
+                }));
+                break;
+            }
+
+            case 'WAVE_ADVANCE': {
+                // Host-only: server records authoritative wave start time
+                if (!isHostPlayer(state, playerId)) {
+                    return jsonNoCache(c, { error: 'host_only_action' }, 403);
+                }
+                const waveIdx = payload.waveIndex as number;
+                if (!Number.isFinite(waveIdx) || waveIdx < 1 || !Number.isInteger(waveIdx)) {
+                    return jsonNoCache(c, { error: 'invalid_wave_advance_params' }, 400);
+                }
+                const startAt = Date.now();
+                state.waveNumber = waveIdx;
+                state.waveStartAt = startAt;
+                await emitWithSeq(seq => ({
+                    type: 'WAVE_STARTED' as const,
+                    waveIndex: waveIdx,
+                    startAt,
+                    seq,
+                }));
                 break;
             }
 

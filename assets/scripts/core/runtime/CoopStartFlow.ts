@@ -104,14 +104,16 @@ export class CoopStartFlow {
     static startWaves(
         waveLoop: WaveLoop | null,
         delaySeconds: number = GameConfig.WAVE.FIRST_WAVE_DELAY,
-        startingWave: number = 1
+        startingWave: number = 1,
+        autoStart: boolean = true
     ): void {
         if (!waveLoop) return;
         waveLoop.initialize(
             CoopStartFlow.waveManager,
             CoopStartFlow.gameManager,
             delaySeconds,
-            startingWave
+            startingWave,
+            autoStart
         );
     }
 

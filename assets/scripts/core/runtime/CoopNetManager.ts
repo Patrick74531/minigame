@@ -4,9 +4,13 @@
  * - 连接/断开 Realtime channel
  * - 通过 HTTP POST 发送消息到服务端（Devvit Realtime 是单向：server→client）
  * - 接收服务端广播消息并分发给监听者
- * - 消息排序缓冲（按 seq 排序，超时 200ms 强制应用）
- * - 断线重连（3s 间隔，最多 5 次）
+ * - V2: 高频位置消息不参与 seq 链路（最新值优先），低频事件保持有序
+ * - V2: 自动从 window.__DEVVIT_REALTIME__ 注入适配器
+ * - V2: 服务器权威时钟同步 (RTT + offset)
+ * - V2: 断线自动 fallback /sync，恢复后回切 Realtime
+ * - V2: RTT/抖动/时钟偏移监控日志
  */
+import { COOP_REALTIME_V2, CoopRealtimeConfig } from './CoopRealtimeConfig';
 
 // ─── Message types (mirrors server definitions) ────────────────────────────────
 
@@ -38,6 +42,7 @@ export interface CoopMatchState {
     teamLevel: number;
     sharedCoins: number;
     waveNumber: number;
+    waveStartAt: number | null;
     seq: number;
     buildState?: BuildStateSnapshot;
 }
@@ -80,12 +85,14 @@ export type ClientAction =
     | { type: 'PAUSE_REQUEST' }
     | { type: 'RESUME_REQUEST' }
     | { type: 'MATCH_OVER'; victory: boolean }
-    | { type: 'BUILD_STATE_SYNC'; snapshot: BuildStateSnapshot };
+    | { type: 'BUILD_STATE_SYNC'; snapshot: BuildStateSnapshot }
+    | { type: 'CLOCK_SYNC_REQUEST'; clientTime: number }
+    | { type: 'WAVE_ADVANCE'; waveIndex: number };
 
 /** Server → Client broadcast message types */
 export type ServerMessage =
     | { type: 'MATCH_STATE'; state: CoopMatchState }
-    | { type: 'PLAYER_INPUT'; playerId: string; dx: number; dz: number; seq: number; t: number }
+    | { type: 'PLAYER_INPUT'; playerId: string; dx: number; dz: number; t: number }
     | {
           type: 'COIN_DEPOSITED';
           padId: string;
@@ -110,7 +117,10 @@ export type ServerMessage =
     | { type: 'GAME_PAUSE'; seq: number }
     | { type: 'GAME_RESUME'; seq: number }
     | { type: 'MATCH_OVER'; victory: boolean; seq: number }
-    | { type: 'BUILD_STATE_SNAPSHOT'; snapshot: BuildStateSnapshot; seq: number };
+    | { type: 'BUILD_STATE_SNAPSHOT'; snapshot: BuildStateSnapshot; seq: number }
+    | { type: 'CLOCK_SYNC'; serverTime: number; clientTime: number; seq: number }
+    | { type: 'WAVE_STARTED'; waveIndex: number; startAt: number; seq: number }
+    | { type: 'PHASE_CHANGE'; phase: string; serverTime: number; seq: number };
 
 export type CoopMessageListener = (msg: ServerMessage) => void;
 
@@ -170,10 +180,12 @@ const API_BASE = '/api/coop';
 const API_TIMEOUT_MS = 8000;
 const RECONNECT_INTERVAL_MS = 3000;
 const RECONNECT_MAX_ATTEMPTS = 5;
-const SEQ_BUFFER_TIMEOUT_MS = 200;
-const INPUT_AGGREGATE_INTERVAL_MS = 100;
+const SEQ_BUFFER_TIMEOUT_MS = COOP_REALTIME_V2 ? CoopRealtimeConfig.SEQ_BUFFER_TIMEOUT_MS : 200;
+const INPUT_AGGREGATE_INTERVAL_MS = COOP_REALTIME_V2
+    ? CoopRealtimeConfig.INPUT_SEND_INTERVAL_MS
+    : 100;
 const HEARTBEAT_INTERVAL_MS = 15_000;
-const SYNC_POLL_INTERVAL_MS = 150;
+const SYNC_POLL_INTERVAL_MS = COOP_REALTIME_V2 ? CoopRealtimeConfig.FALLBACK_SYNC_INTERVAL_MS : 150;
 
 // ─── Manager ───────────────────────────────────────────────────────────────────
 
@@ -218,6 +230,20 @@ export class CoopNetManager {
     private _syncInFlight: boolean = false;
     private _lastStateSeq: number = -1;
 
+    // V2: Realtime recovery timer (when fallback is active, periodically try reconnect)
+    private _realtimeRecoveryTimer: ReturnType<typeof setInterval> | null = null;
+
+    // V2: Server authoritative clock
+    private _clockOffset: number = 0; // serverTime - localTime (ms)
+    private _clockSyncTimer: ReturnType<typeof setInterval> | null = null;
+    private _clockSyncPending: number = 0; // clientTime of last sync request
+
+    // V2: RTT monitoring
+    private _rttSamples: number[] = [];
+    private _jitterSamples: number[] = [];
+    private _monitorTimer: ReturnType<typeof setInterval> | null = null;
+    private _resyncCount: number = 0;
+
     // ─── Public API ────────────────────────────────────────────────────────
 
     get matchId(): string {
@@ -240,6 +266,33 @@ export class CoopNetManager {
     }
     get lastSeq(): number {
         return this._lastSeq;
+    }
+
+    /** V2: Estimated server time (ms) */
+    get serverNow(): number {
+        return Date.now() + this._clockOffset;
+    }
+
+    /** V2: Current clock offset (serverTime - localTime, ms) */
+    get clockOffset(): number {
+        return this._clockOffset;
+    }
+
+    /** V2: Median RTT (ms) */
+    get medianRtt(): number {
+        if (this._rttSamples.length === 0) return 0;
+        const sorted = [...this._rttSamples].sort((a, b) => a - b);
+        return sorted[Math.floor(sorted.length / 2)];
+    }
+
+    /** V2: Is using realtime (not polling fallback) */
+    get isUsingRealtime(): boolean {
+        return !this._useSyncPolling && this._connected;
+    }
+
+    /** V2: Resync count */
+    get resyncCount(): number {
+        return this._resyncCount;
     }
 
     /**
@@ -325,22 +378,69 @@ export class CoopNetManager {
     /**
      * Connect to the Realtime channel for receiving server broadcasts.
      * Must be called after createMatch/joinMatch and setRealtimeAdapter.
+     * V2: Auto-injects realtime adapter from window.__DEVVIT_REALTIME__ bridge.
      */
     async connect(playerId: string): Promise<void> {
         this._localPlayerId = playerId;
         this._disconnected = false;
         this._reconnectAttempts = 0;
+
+        // V2: Auto-inject realtime adapter from bridge if not already set
+        if (COOP_REALTIME_V2 && !this._realtimeAdapter) {
+            this.autoInjectRealtimeAdapter();
+        }
+
         this._useSyncPolling = !this._realtimeAdapter;
 
         if (this._useSyncPolling) {
+            console.warn(
+                '[CoopNetManager] No Realtime adapter available, using sync polling fallback'
+            );
             this._connected = true;
             this.startSyncPolling();
             this.syncOnce().catch(() => {});
         } else {
+            console.log('[CoopNetManager] Connecting via Realtime channel:', this._channel);
             this.connectRealtime();
         }
         this.startInputAggregation();
         this.startHeartbeat();
+
+        // V2: Start clock sync and monitoring
+        if (COOP_REALTIME_V2) {
+            this.startClockSync();
+            this.startMonitor();
+        }
+    }
+
+    /**
+     * V2: Auto-inject realtime adapter from the window.__DEVVIT_REALTIME__ bridge
+     * that was loaded by realtime-bridge.js in the game HTML.
+     */
+    private autoInjectRealtimeAdapter(): void {
+        if (typeof window === 'undefined') return;
+        const bridge = (window as any).__DEVVIT_REALTIME__;
+        if (!bridge || typeof bridge.connectRealtime !== 'function') {
+            console.warn('[CoopNetManager] window.__DEVVIT_REALTIME__ not available');
+            return;
+        }
+
+        const adapter: RealtimeAdapter = {
+            connect(opts) {
+                const conn = bridge.connectRealtime({
+                    channel: opts.channel,
+                    onConnect: () => opts.onConnect(),
+                    onDisconnect: () => opts.onDisconnect(),
+                    onMessage: (data: any) => opts.onMessage(data as ServerMessage),
+                });
+                return {
+                    disconnect: () => conn.disconnect(),
+                };
+            },
+        };
+
+        this._realtimeAdapter = adapter;
+        console.log('[CoopNetManager] Auto-injected Realtime adapter from bridge');
     }
 
     /**
@@ -367,6 +467,8 @@ export class CoopNetManager {
         }
         this._connected = false;
         this._useSyncPolling = false;
+        this._rttSamples.length = 0;
+        this._jitterSamples.length = 0;
     }
 
     /**
@@ -417,14 +519,47 @@ export class CoopNetManager {
             return;
         }
 
+        // Disconnect existing connection before reconnecting
+        if (this._realtimeConnection) {
+            try {
+                this._realtimeConnection.disconnect().catch(() => {});
+            } catch {
+                /* ignore */
+            }
+            this._realtimeConnection = null;
+        }
+
         try {
             this._realtimeConnection = this._realtimeAdapter.connect({
                 channel: this._channel,
                 onConnect: () => {
+                    console.log('[CoopNetManager] Realtime connected');
                     this._connected = true;
                     this._reconnectAttempts = 0;
+
+                    // V2: If we were on sync fallback, switch back to realtime
+                    if (COOP_REALTIME_V2 && this._useSyncPolling) {
+                        console.log('[CoopNetManager] Realtime recovered, stopping sync polling');
+                        this._useSyncPolling = false;
+                        this.stopSyncPolling();
+                        this.stopRealtimeRecovery();
+                        // Rejoin to catch up on missed actions
+                        this.postApi<RejoinResponse>('/rejoin', {
+                            matchId: this._matchId,
+                            lastSeq: this._lastSeq,
+                        })
+                            .then(res => {
+                                if (res.missedActions) {
+                                    for (const action of res.missedActions) {
+                                        this.onServerMessage(action);
+                                    }
+                                }
+                            })
+                            .catch(() => {});
+                    }
                 },
                 onDisconnect: () => {
+                    console.warn('[CoopNetManager] Realtime disconnected');
                     this._connected = false;
                     if (!this._disconnected) {
                         this.scheduleReconnect();
@@ -439,18 +574,38 @@ export class CoopNetManager {
             this._useSyncPolling = true;
             this._connected = true;
             this.startSyncPolling();
+            if (COOP_REALTIME_V2) {
+                this.startRealtimeRecovery();
+            }
         }
     }
 
     // ─── Reconnection ──────────────────────────────────────────────────────
 
     private scheduleReconnect(): void {
+        if (this._disconnected) return;
+
+        // V2: On realtime disconnect, immediately start sync polling as fallback
+        // AND periodically try to reconnect realtime.
+        if (COOP_REALTIME_V2 && this._realtimeAdapter) {
+            if (!this._useSyncPolling) {
+                console.warn(
+                    '[CoopNetManager] Realtime disconnected, switching to sync polling fallback'
+                );
+                this._useSyncPolling = true;
+                this._connected = true;
+                this.startSyncPolling();
+                this.startRealtimeRecovery();
+                this._resyncCount++;
+            }
+            return;
+        }
+
         if (this._useSyncPolling) {
             this._connected = true;
             this.startSyncPolling();
             return;
         }
-        if (this._disconnected) return;
         if (this._reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
             this.dispatch({ type: 'PLAYER_DISCONNECTED', playerId: this._localPlayerId });
             return;
@@ -482,12 +637,39 @@ export class CoopNetManager {
         }, RECONNECT_INTERVAL_MS);
     }
 
+    // V2: Periodically attempt to reconnect realtime while on sync fallback
+    private startRealtimeRecovery(): void {
+        this.stopRealtimeRecovery();
+        this._realtimeRecoveryTimer = setInterval(() => {
+            if (this._disconnected || !this._realtimeAdapter) return;
+            if (!this._useSyncPolling) {
+                this.stopRealtimeRecovery();
+                return;
+            }
+            console.log('[CoopNetManager] Attempting realtime recovery...');
+            this.connectRealtime();
+        }, CoopRealtimeConfig.REALTIME_RECOVERY_CHECK_MS);
+    }
+
+    private stopRealtimeRecovery(): void {
+        if (this._realtimeRecoveryTimer) {
+            clearInterval(this._realtimeRecoveryTimer);
+            this._realtimeRecoveryTimer = null;
+        }
+    }
+
     // ─── Message handling ──────────────────────────────────────────────────
 
     private onServerMessage(msg: ServerMessage): void {
+        // V2: Handle clock sync response immediately (bypass seq)
+        if (COOP_REALTIME_V2 && msg.type === 'CLOCK_SYNC') {
+            this.handleClockSync(msg as any);
+            return;
+        }
+
         const msgSeq = (msg as { seq?: number }).seq;
 
-        // Messages without seq (e.g. PLAYER_DISCONNECTED) dispatch immediately
+        // Messages without seq (e.g. PLAYER_INPUT / PLAYER_DISCONNECTED) dispatch immediately.
         if (msgSeq === undefined) {
             this.dispatch(msg);
             return;
@@ -621,7 +803,9 @@ export class CoopNetManager {
             }
             if (res.state) {
                 const stateSeq = res.state.seq ?? -1;
-                if (stateSeq !== this._lastStateSeq) {
+                // In sync-poll fallback, PLAYER_INPUT may be no-seq and won't appear in replay.
+                // Always dispatch MATCH_STATE so remote hero positions can still update from state.players.
+                if (this._useSyncPolling || stateSeq !== this._lastStateSeq) {
                     this._lastStateSeq = stateSeq;
                     this.dispatch({ type: 'MATCH_STATE', state: res.state });
                 }
@@ -636,12 +820,105 @@ export class CoopNetManager {
         }
     }
 
+    // ─── V2: Server authoritative clock ────────────────────────────────────
+
+    private startClockSync(): void {
+        this.stopClockSync();
+        // Initial sync
+        this.requestClockSync();
+        this._clockSyncTimer = setInterval(() => {
+            this.requestClockSync();
+        }, CoopRealtimeConfig.CLOCK_SYNC_INTERVAL_MS);
+    }
+
+    private stopClockSync(): void {
+        if (this._clockSyncTimer) {
+            clearInterval(this._clockSyncTimer);
+            this._clockSyncTimer = null;
+        }
+    }
+
+    private requestClockSync(): void {
+        if (!this._connected || !this._matchId) return;
+        this._clockSyncPending = Date.now();
+        this.sendAction({ type: 'CLOCK_SYNC_REQUEST', clientTime: this._clockSyncPending }).catch(
+            () => {}
+        );
+    }
+
+    private handleClockSync(msg: { serverTime: number; clientTime: number }): void {
+        const now = Date.now();
+        const rtt = now - msg.clientTime;
+        const oneWay = rtt / 2;
+        const newOffset = msg.serverTime + oneWay - now;
+
+        // Track RTT sample
+        this._rttSamples.push(rtt);
+        if (this._rttSamples.length > CoopRealtimeConfig.MONITOR_RTT_SAMPLES) {
+            this._rttSamples.shift();
+        }
+
+        // Track jitter
+        if (this._rttSamples.length >= 2) {
+            const prev = this._rttSamples[this._rttSamples.length - 2];
+            this._jitterSamples.push(Math.abs(rtt - prev));
+            if (this._jitterSamples.length > CoopRealtimeConfig.MONITOR_RTT_SAMPLES) {
+                this._jitterSamples.shift();
+            }
+        }
+
+        // Soft correction: blend towards new offset
+        const drift = Math.abs(newOffset - this._clockOffset);
+        if (drift > CoopRealtimeConfig.CLOCK_DRIFT_THRESHOLD_MS) {
+            this._clockOffset +=
+                (newOffset - this._clockOffset) * CoopRealtimeConfig.CLOCK_CORRECTION_RATE;
+            this._resyncCount++;
+        } else {
+            this._clockOffset = newOffset;
+        }
+    }
+
+    // ─── V2: Monitoring ───────────────────────────────────────────────────
+
+    private startMonitor(): void {
+        this.stopMonitor();
+        this._monitorTimer = setInterval(() => {
+            this.logMonitorStats();
+        }, CoopRealtimeConfig.MONITOR_LOG_INTERVAL_MS);
+    }
+
+    private stopMonitor(): void {
+        if (this._monitorTimer) {
+            clearInterval(this._monitorTimer);
+            this._monitorTimer = null;
+        }
+    }
+
+    private logMonitorStats(): void {
+        if (this._rttSamples.length === 0) return;
+        const sorted = [...this._rttSamples].sort((a, b) => a - b);
+        const p50 = sorted[Math.floor(sorted.length * 0.5)];
+        const p95 = sorted[Math.floor(sorted.length * 0.95)];
+        const jitterAvg =
+            this._jitterSamples.length > 0
+                ? Math.round(
+                      this._jitterSamples.reduce((a, b) => a + b, 0) / this._jitterSamples.length
+                  )
+                : 0;
+        console.log(
+            `[CoopNet-Monitor] RTT p50=${p50}ms p95=${p95}ms | jitter=${jitterAvg}ms | offset=${Math.round(this._clockOffset)}ms | resyncs=${this._resyncCount} | realtime=${!this._useSyncPolling} | seqBuf=${this._seqBuffer.length}`
+        );
+    }
+
     // ─── Cleanup ───────────────────────────────────────────────────────────
 
     private stopTimers(): void {
         this.stopInputTimer();
         this.stopHeartbeat();
         this.stopSyncPolling();
+        this.stopRealtimeRecovery();
+        this.stopClockSync();
+        this.stopMonitor();
         if (this._reconnectTimer) {
             clearTimeout(this._reconnectTimer);
             this._reconnectTimer = null;

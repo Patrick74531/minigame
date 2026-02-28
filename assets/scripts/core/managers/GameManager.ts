@@ -4,6 +4,7 @@ import { EventManager } from './EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { GameConfig } from '../../data/GameConfig';
 import { ServiceRegistry } from './ServiceRegistry';
+import { CoopBuildAuthority } from '../runtime/CoopBuildAuthority';
 
 const { ccclass, property } = _decorator;
 
@@ -101,8 +102,12 @@ export class GameManager extends Singleton<GameManager>() {
 
     /**
      * 暂停游戏
+     * V2: Coop 模式下此方法为 no-op，双人模式永不暂停。
      */
     public pauseGame(): void {
+        // V2: In coop mode, never pause the game world
+        if (CoopBuildAuthority.isCoopMode) return;
+
         if (this._gameState === GameState.PAUSED) {
             this._pauseRequestCount += 1;
             return;

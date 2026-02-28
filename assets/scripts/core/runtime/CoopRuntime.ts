@@ -6,6 +6,7 @@ import { CoopHeroProvider } from './CoopHeroProvider';
 import { PerPlayerWeaponManager } from './PerPlayerWeaponManager';
 import { TeamLevelSystem } from './TeamLevelSystem';
 import { CoopNetManager } from './CoopNetManager';
+import { COOP_REALTIME_V2, CoopRealtimeConfig } from './CoopRealtimeConfig';
 import type {
     ServerMessage,
     CoopMatchState,
@@ -24,6 +25,7 @@ import { BuildingPadState } from '../../gameplay/buildings/BuildingPad';
 import type { BuildingPad } from '../../gameplay/buildings/BuildingPad';
 import { BuildingPad as BuildingPadComponent } from '../../gameplay/buildings/BuildingPad';
 import { Coin } from '../../gameplay/economy/Coin';
+import { WaveLoop } from '../../gameplay/wave/WaveLoop';
 
 /**
  * CoopRuntime
@@ -53,6 +55,9 @@ export class CoopRuntime implements IGameRuntime {
     private _lastAppliedBuildVersion: number = -1;
     private _matchStateSynced: boolean = false;
     private _remoteVelocities: Map<string, { vx: number; vz: number }> = new Map();
+    private _waveLoop: WaveLoop | null = null;
+    private _lastAuthoritativeWave: number = 0;
+    private _pendingAuthoritativeWaveStart: { waveIndex: number; startAt: number } | null = null;
     // Cached bound handler to avoid bind leak on on/off
     private _boundOnServerMessage = this.onServerMessage.bind(this);
     private _boundOnLocalWeaponPicked = this.onLocalWeaponPicked.bind(this);
@@ -61,6 +66,7 @@ export class CoopRuntime implements IGameRuntime {
     private _boundOnLocalCoinPicked = this.onLocalCoinPicked.bind(this);
     private _boundOnBuildingConstructed = this.onBuildingConstructedSync.bind(this);
     private _boundOnLocalGameOver = this.onLocalGameOver.bind(this);
+    private _boundOnLocalWaveStart = this.onLocalWaveStart.bind(this);
 
     get heroProvider(): CoopHeroProvider {
         return this._heroProvider;
@@ -114,6 +120,7 @@ export class CoopRuntime implements IGameRuntime {
             this
         );
         this.eventManager.on(GameEvents.GAME_OVER, this._boundOnLocalGameOver, this);
+        this.eventManager.on(GameEvents.WAVE_START, this._boundOnLocalWaveStart, this);
     }
 
     /**
@@ -124,12 +131,23 @@ export class CoopRuntime implements IGameRuntime {
         this._isHost = isHost;
         CoopBuildAuthority.setCoopMode(true, isHost);
         BuildingPadComponent.setCoopHostEnabled(!isHost ? false : true);
+        this._waveLoop?.setExternalAuthority(!isHost);
         if (isHost) {
             this.startBuildStateSync();
         }
         // Signal boot.js to NOT reload on tab-switch while coop is active
         if (typeof window !== 'undefined') {
             (window as any).__KS_COOP_ACTIVE__ = true;
+        }
+    }
+
+    bindWaveLoop(waveLoop: WaveLoop | null): void {
+        this._waveLoop = waveLoop;
+        this._waveLoop?.setExternalAuthority(!this._isHost);
+        if (this._waveLoop && this._pendingAuthoritativeWaveStart) {
+            const pending = this._pendingAuthoritativeWaveStart;
+            this._pendingAuthoritativeWaveStart = null;
+            this.handleWaveStarted({ ...pending, seq: this._netManager.lastSeq });
         }
     }
 
@@ -154,6 +172,7 @@ export class CoopRuntime implements IGameRuntime {
             this
         );
         this.eventManager.off(GameEvents.GAME_OVER, this._boundOnLocalGameOver, this);
+        this.eventManager.off(GameEvents.WAVE_START, this._boundOnLocalWaveStart, this);
         this._netManager.disconnect().catch(() => {});
         this._teamLevelSystem.cleanup();
         DualCameraFollow.cleanup();
@@ -166,6 +185,9 @@ export class CoopRuntime implements IGameRuntime {
         this._remoteTargetPositions.clear();
         this._remoteVelocities.clear();
         this._decisionOwnerByPad.clear();
+        this._waveLoop = null;
+        this._lastAuthoritativeWave = 0;
+        this._pendingAuthoritativeWaveStart = null;
     }
 
     // ─── Player management ─────────────────────────────────────────────────
@@ -221,9 +243,10 @@ export class CoopRuntime implements IGameRuntime {
 
         // Smooth remote hero interpolation with velocity-based dead-reckoning.
         // Uses exponential smoothing to eliminate teleport/flashing artifacts.
-        const SMOOTH_SPEED = 10;
-        const PREDICT_AHEAD = 0.08; // seconds of velocity extrapolation
-        const SNAP_DIST_SQ = 400; // snap if >20 units away (reconnect/teleport)
+        // V2: Tuned for lower latency with realtime channel.
+        const SMOOTH_SPEED = COOP_REALTIME_V2 ? CoopRealtimeConfig.INTERP_SMOOTH_SPEED : 10;
+        const PREDICT_AHEAD = COOP_REALTIME_V2 ? CoopRealtimeConfig.INTERP_PREDICT_AHEAD : 0.08;
+        const SNAP_DIST_SQ = COOP_REALTIME_V2 ? CoopRealtimeConfig.INTERP_SNAP_DIST_SQ : 400;
         for (const p of this._players) {
             if (p.isLocal || !p.heroNode || !p.heroNode.isValid) continue;
             const target = this._remoteTargetPositions.get(p.playerId);
@@ -292,15 +315,32 @@ export class CoopRuntime implements IGameRuntime {
                 this.handlePlayerReconnected(msg);
                 break;
             case 'GAME_PAUSE': {
-                const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
-                gm.pauseGame();
+                // V2: In coop mode, GAME_PAUSE from server is ignored.
+                // GameManager.pauseGame() is already guarded, but skip dispatch entirely.
+                if (!COOP_REALTIME_V2) {
+                    const gm =
+                        ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+                    gm.pauseGame();
+                }
                 break;
             }
             case 'GAME_RESUME': {
-                const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
-                gm.resumeGame();
+                // V2: In coop mode, GAME_RESUME from server is ignored.
+                if (!COOP_REALTIME_V2) {
+                    const gm =
+                        ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+                    gm.resumeGame();
+                }
                 break;
             }
+            case 'CLOCK_SYNC':
+            case 'PHASE_CHANGE':
+                // These are handled by CoopNetManager directly (clock sync)
+                // or could be dispatched to WaveManager in the future.
+                break;
+            case 'WAVE_STARTED':
+                this.handleWaveStarted(msg);
+                break;
             case 'BUILD_STATE_SNAPSHOT':
                 this.handleBuildStateSnapshot(msg);
                 break;
@@ -326,6 +366,38 @@ export class CoopRuntime implements IGameRuntime {
         // Restore team level if behind
         if (state.teamLevel > this._teamLevelSystem.level) {
             this._teamLevelSystem.restoreState(state.teamLevel, 0);
+        }
+
+        // Fallback path: when realtime is unavailable, use match-state player positions
+        // to keep remote hero movement and animation alive.
+        const localPlayerId = this._netManager.localPlayerId;
+        const now = Date.now();
+        for (const slot of state.players) {
+            if (!slot?.playerId || slot.playerId === localPlayerId) continue;
+            const x = slot.heroState?.position?.x;
+            const z = slot.heroState?.position?.z;
+            if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
+
+            const prev = this._remoteTargetPositions.get(slot.playerId);
+            if (prev) {
+                const dtSec = (now - prev.t) / 1000;
+                if (dtSec > 0.02 && dtSec < 2) {
+                    this._remoteVelocities.set(slot.playerId, {
+                        vx: (x - prev.x) / dtSec,
+                        vz: (z - prev.z) / dtSec,
+                    });
+                }
+            }
+            this._remoteTargetPositions.set(slot.playerId, { x, z, t: now });
+        }
+
+        // Guest follows host-authoritative wave timeline.
+        if (!this._isHost && state.waveStartAt && state.waveNumber > 0) {
+            this.handleWaveStarted({
+                waveIndex: state.waveNumber,
+                startAt: state.waveStartAt,
+                seq: state.seq,
+            });
         }
     }
 
@@ -492,6 +564,12 @@ export class CoopRuntime implements IGameRuntime {
             .catch(() => {});
     }
 
+    private onLocalWaveStart(data: { wave?: number; waveIndex?: number }): void {
+        if (!this._isHost) return;
+        const waveNumber = Math.max(1, Math.floor(data.wave ?? data.waveIndex ?? 1));
+        this._netManager.sendAction({ type: 'WAVE_ADVANCE', waveIndex: waveNumber }).catch(() => {});
+    }
+
     private findPad(padId: string): BuildingPad | null {
         if (!padId) return null;
         const manager =
@@ -594,6 +672,26 @@ export class CoopRuntime implements IGameRuntime {
         // Also sync shared coins
         const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
         gm.setCoins(msg.snapshot.sharedCoins);
+    }
+
+    private handleWaveStarted(msg: { waveIndex: number; startAt: number; seq: number }): void {
+        if (this._isHost) {
+            this._lastAuthoritativeWave = Math.max(this._lastAuthoritativeWave, msg.waveIndex);
+            return;
+        }
+        if (!Number.isFinite(msg.waveIndex) || msg.waveIndex < 1) return;
+        if (!this._waveLoop) {
+            this._pendingAuthoritativeWaveStart = {
+                waveIndex: msg.waveIndex,
+                startAt: msg.startAt,
+            };
+            return;
+        }
+        if (msg.waveIndex <= this._lastAuthoritativeWave) return;
+
+        this._lastAuthoritativeWave = msg.waveIndex;
+        const delaySeconds = Math.max(0, (msg.startAt - this._netManager.serverNow) / 1000);
+        this._waveLoop.scheduleExternalWaveStart(msg.waveIndex, delaySeconds);
     }
 
     private get eventManager(): EventManager {

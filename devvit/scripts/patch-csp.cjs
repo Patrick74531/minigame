@@ -972,8 +972,7 @@ if (fs.existsSync(mainPath)) {
     // returns the cached broken version immediately (skipping the .cconb download).
     // Fix: replace bundle.load() with cc.assetManager.loadAny()+reloadAsset:true so
     // the .cconb binary is always downloaded fresh → correct typed arrays → animation.
-    const P_RE =
-        /var (\w+)=o\[(\w+)\];(\w+)\.load\(\1,(\w+),\(function\((\w+),(\w+)\)\{/;
+    const P_RE = /var (\w+)=o\[(\w+)\];(\w+)\.load\(\1,(\w+),\(function\((\w+),(\w+)\)\{/;
     var pFnIdx = main.indexOf('e.loadClipWithFallbacks=function');
     var pFnEnd = pFnIdx >= 0 ? main.indexOf('},e.buildHeroStateName=function', pFnIdx) : -1;
     if (pFnIdx < 0 || pFnEnd < 0) {
@@ -1522,7 +1521,9 @@ if (fs.existsSync(mainPath)) {
     const RB_DETECT_NEW =
         'i="localhost"===e||"127.0.0.1"===e||e.endsWith(".local");return t&&!i||""===e||e.includes("reddit.com")||e.includes("redd.it")||void 0!==window.__devvit__';
     if (main.includes('e.includes("redd.it")')) {
-        console.log('[patch-csp]   ~ Patch RB_MOBILE_SYNC: detectRedditEnvironment already updated');
+        console.log(
+            '[patch-csp]   ~ Patch RB_MOBILE_SYNC: detectRedditEnvironment already updated'
+        );
     } else if (main.includes(RB_DETECT_OLD)) {
         main = main.replace(RB_DETECT_OLD, RB_DETECT_NEW);
         console.log(
@@ -1563,7 +1564,10 @@ if (fs.existsSync(mainPath)) {
         );
     } else if (main.includes(RB_LB_FETCH_OLD)) {
         main = main.replace(RB_LB_FETCH_OLD, RB_LB_FETCH_NEW);
-        main = main.replace(')):this._emit({type:"leaderboard",entries:this._cachedLeaderboard})', '))');
+        main = main.replace(
+            ')):this._emit({type:"leaderboard",entries:this._cachedLeaderboard})',
+            '))'
+        );
         console.log(
             '[patch-csp]   ✓ Patch RB_MOBILE_SYNC: requestLeaderboard always calls /api/leaderboard'
         );
@@ -1585,7 +1589,9 @@ if (fs.existsSync(mainPath)) {
             '):this._emit({type:"error",message:"SUBMIT_SCORE unavailable outside Devvit"})',
             ')'
         );
-        console.log('[patch-csp]   ✓ Patch RB_MOBILE_SYNC: submitScore always posts with keepalive');
+        console.log(
+            '[patch-csp]   ✓ Patch RB_MOBILE_SYNC: submitScore always posts with keepalive'
+        );
     } else {
         console.warn('[patch-csp]   ~ Patch RB_MOBILE_SYNC: submitScore pattern not found');
     }
@@ -1600,7 +1606,9 @@ if (fs.existsSync(mainPath)) {
         );
     } else if (main.includes(RB_SUBMIT_EMIT_OLD)) {
         main = main.replace(RB_SUBMIT_EMIT_OLD, RB_SUBMIT_EMIT_NEW);
-        console.log('[patch-csp]   ✓ Patch RB_MOBILE_SYNC: submitScore now refreshes leaderboard cache');
+        console.log(
+            '[patch-csp]   ✓ Patch RB_MOBILE_SYNC: submitScore now refreshes leaderboard cache'
+        );
     } else {
         console.warn('[patch-csp]   ~ Patch RB_MOBILE_SYNC: submitScore emit pattern not found');
     }
@@ -1866,6 +1874,58 @@ console.log('[patch-csp] All patches applied successfully.');
             '[patch-csp] esbuild preview bundle failed:',
             err.stderr ? err.stderr.toString() : err.message
         );
+    }
+
+    // ── Bundle realtime-bridge.ts → webroot/realtime-bridge.js ──────────────
+    var realtimeBridgeEntry = path.join(clientDir, 'realtime-bridge.ts');
+    var realtimeBridgeOut = path.join(WEBROOT, 'realtime-bridge.js');
+    if (fs.existsSync(realtimeBridgeEntry)) {
+        try {
+            execSync(
+                JSON.stringify(esbuildBin) +
+                    ' ' +
+                    JSON.stringify(realtimeBridgeEntry) +
+                    ' --bundle --format=iife --platform=browser --outfile=' +
+                    JSON.stringify(realtimeBridgeOut) +
+                    ' --minify',
+                { cwd: DEVVIT_DIR, stdio: 'pipe' }
+            );
+            console.log('[patch-csp]   ✓ Bundled realtime-bridge.ts → webroot/realtime-bridge.js');
+        } catch (err) {
+            console.error(
+                '[patch-csp] esbuild realtime-bridge bundle failed:',
+                err.stderr ? err.stderr.toString() : err.message
+            );
+        }
+    } else {
+        console.warn('[patch-csp]   ~ realtime-bridge.ts not found (skipping)');
+    }
+
+    // ── Inject realtime-bridge.js into game index.html ───────────────────────
+    var gameIndexPath = path.join(WEBROOT, 'index.html');
+    if (fs.existsSync(gameIndexPath) && fs.existsSync(realtimeBridgeOut)) {
+        var gameHtml = fs.readFileSync(gameIndexPath, 'utf8');
+        var RT_BRIDGE_TAG = '<script src="realtime-bridge.js"></script>';
+        if (gameHtml.includes(RT_BRIDGE_TAG)) {
+            console.log(
+                '[patch-csp]   ~ realtime-bridge.js already injected in index.html (skipping)'
+            );
+        } else {
+            // Inject before the first <script> tag in <body> so it runs before game code
+            var bodyScriptIdx = gameHtml.indexOf('<script', gameHtml.indexOf('<body'));
+            if (bodyScriptIdx >= 0) {
+                gameHtml =
+                    gameHtml.slice(0, bodyScriptIdx) +
+                    RT_BRIDGE_TAG +
+                    '\n' +
+                    gameHtml.slice(bodyScriptIdx);
+            } else {
+                // Fallback: inject before </body>
+                gameHtml = gameHtml.replace('</body>', RT_BRIDGE_TAG + '\n</body>');
+            }
+            fs.writeFileSync(gameIndexPath, gameHtml, 'utf8');
+            console.log('[patch-csp]   ✓ Injected realtime-bridge.js into game index.html');
+        }
     }
 
     var serverEntry = path.join(DEVVIT_DIR, 'src', 'server', 'index.ts');

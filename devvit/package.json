@@ -1,13 +1,14 @@
 {
     "name": "granny-vs-robot",
-    "version": "0.0.238",
+    "version": "0.0.252",
     "license": "BSD-3-Clause",
     "type": "module",
     "private": true,
     "scripts": {
         "build:preview": "esbuild src/client/preview-entry.ts --bundle --format=iife --platform=browser --outfile=webroot/preview.js --minify",
+        "build:realtime-bridge": "esbuild src/client/realtime-bridge.ts --bundle --format=iife --platform=browser --outfile=webroot/realtime-bridge.js --minify",
         "build:server": "esbuild src/server/index.ts --bundle --platform=node --format=cjs --outfile=dist/server/index.cjs",
-        "build": "npm run build:preview && npm run build:server",
+        "build": "npm run build:preview && npm run build:realtime-bridge && npm run build:server",
         "patch": "node scripts/patch-csp.cjs",
         "upload": "node scripts/patch-csp.cjs && npm run build && devvit upload"
     },
