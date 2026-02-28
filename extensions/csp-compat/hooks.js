@@ -351,6 +351,10 @@ exports.throwWhenFailed = false;
 
 exports.onAfterBuild = async function (options) {
     if (options.platform !== 'web-mobile') return;
+    if (process.env.GVR_ENABLE_REDDIT_CSP_PATCH !== '1') {
+        console.log('[csp-compat] Skip patching (set GVR_ENABLE_REDDIT_CSP_PATCH=1 to enable).');
+        return;
+    }
 
     const dest = options.dest;
     console.log('[csp-compat] Patching build at:', dest);

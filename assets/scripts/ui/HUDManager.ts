@@ -18,7 +18,7 @@ import {
 } from './hud/HUDBossIntroModule';
 import { HUDCameraCinematicService } from './hud/HUDCameraCinematicService';
 import { HUDMinimapModule } from './hud/HUDMinimapModule';
-import { RedditBridge } from '../core/reddit/RedditBridge';
+import { getSocialBridge, type SocialBridge } from '../core/reddit/RedditBridge';
 import { DiamondService } from '../core/diamond/DiamondService';
 
 /**
@@ -56,6 +56,7 @@ export class HUDManager {
     private readonly _bossIntroModule = new HUDBossIntroModule();
     private readonly _minimapModule = new HUDMinimapModule();
     private readonly _cameraCinematicService = new HUDCameraCinematicService();
+    private readonly _socialBridge: SocialBridge = getSocialBridge();
 
     /**
      * 初始化 HUD
@@ -248,7 +249,7 @@ export class HUDManager {
     private onGameOver(data: { victory: boolean }): void {
         const wave = WaveService.instance.currentWave;
         this._gameOverModule.showGameOver(Boolean(data?.victory), wave);
-        RedditBridge.instance.submitScore(wave * 100, wave);
+        this._socialBridge.submitScore(wave * 100, wave);
         // Settle diamond reward for this run (wave × 10)
         const runId = DiamondService.generateRunId();
         DiamondService.instance.settleRun(wave, runId, (earned, _balance) => {

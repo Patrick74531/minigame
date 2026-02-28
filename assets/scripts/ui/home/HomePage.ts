@@ -24,7 +24,11 @@ import { HUDSettingsModule } from '../hud/HUDSettingsModule';
 import { applyGameLabelStyle } from '../hud/HUDCommon';
 import { LocalizationComp } from '../LocalizationComp';
 import { UIResponsive } from '../UIResponsive';
-import { RedditBridge, type RedditBridgeCallback } from '../../core/reddit/RedditBridge';
+import {
+    getSocialBridge,
+    type SocialBridge,
+    type SocialBridgeCallback,
+} from '../../core/reddit/RedditBridge';
 import { LeaderboardPanel } from './LeaderboardPanel';
 import { GameSaveManager } from '../../core/managers/GameSaveManager';
 import { DiamondService } from '../../core/diamond/DiamondService';
@@ -47,7 +51,7 @@ export class HomePage extends Component {
     private _leaderboardBtn: Node | null = null;
     private _subscribeBtn: Node | null = null;
     private _leaderboardPanel: LeaderboardPanel | null = null;
-    private _bridgeListener: ((e: RedditBridgeCallback) => void) | null = null;
+    private _bridgeListener: ((e: SocialBridgeCallback) => void) | null = null;
     private _continueBtn: Node | null = null;
     private _onStartRequested: (() => void) | null = null;
     private _onContinueRequested: (() => void) | null = null;
@@ -57,6 +61,7 @@ export class HomePage extends Component {
     private _diamondLabel: Label | null = null;
     private _currencyPanelNode: Node | null = null;
     private _diamondListener: ((balance: number) => void) | null = null;
+    private readonly _socialBridge: SocialBridge = getSocialBridge();
 
     public onLoad() {
         this._uiLayer = this.node.parent?.layer ?? Layers.Enum.UI_2D;
@@ -77,14 +82,14 @@ export class HomePage extends Component {
         // Show buttons immediately — don't wait for background texture
         this._revealContent();
 
-        this._initRedditBridge();
+        this._initSocialBridge();
     }
 
     public onDestroy() {
         view.off('canvas-resize', this.onCanvasResize, this);
         this._settingsModule?.cleanup();
         if (this._bridgeListener) {
-            RedditBridge.instance.removeListener(this._bridgeListener);
+            this._socialBridge.removeListener(this._bridgeListener);
         }
         if (this._diamondListener) {
             DiamondService.instance.removeListener(this._diamondListener);
@@ -164,13 +169,17 @@ export class HomePage extends Component {
             0,
             () => this.onLeaderboardClick()
         );
-        this._subscribeBtn = this.createGameButton(
-            'SubscribeButton',
-            'ui.home.subscribe',
-            0,
-            -120,
-            () => this.onSubscribeClick()
-        );
+        if (this._socialBridge.supportsSubscribe) {
+            this._subscribeBtn = this.createGameButton(
+                'SubscribeButton',
+                'ui.home.subscribe',
+                0,
+                -120,
+                () => this.onSubscribeClick()
+            );
+        } else {
+            this._subscribeBtn = null;
+        }
 
         this._shopBtn = this.createGameButton('ShopButton', 'ui.home.shop', 0, -120, () =>
             this.onShopClick()
@@ -210,7 +219,9 @@ export class HomePage extends Component {
         this._contentNode.addChild(this._startBtn);
         this._contentNode.addChild(this._leaderboardBtn);
         this._contentNode.addChild(this._shopBtn);
-        this._contentNode.addChild(this._subscribeBtn);
+        if (this._subscribeBtn) {
+            this._contentNode.addChild(this._subscribeBtn);
+        }
 
         if (GameSaveManager.instance.hasSave()) {
             this._continueBtn = this.createGameButton(
@@ -418,9 +429,10 @@ export class HomePage extends Component {
         const gap = Math.round(UIResponsive.clamp(shortSide * 0.022, 6, 24));
         const step = buttonH + gap;
         const hasContinue = !!this._continueBtn;
+        const hasSubscribe = !!this._subscribeBtn;
 
-        // Button stack: continue(opt) > start > leaderboard > shop > subscribe
-        const btnCount = hasContinue ? 5 : 4;
+        // Button stack: continue(opt) > start > leaderboard > shop > subscribe(opt)
+        const btnCount = (hasContinue ? 1 : 0) + 3 + (hasSubscribe ? 1 : 0);
         const stackCenter = -step * 2.0;
 
         let slot = btnCount - 1;
@@ -435,8 +447,10 @@ export class HomePage extends Component {
         slot--;
         this.layoutButton(this._shopBtn, buttonW, buttonH, stackCenter + step * slot);
         this.redrawShopButton(this._shopBtn, buttonW, buttonH);
-        slot--;
-        this.layoutButton(this._subscribeBtn, buttonW, buttonH, stackCenter + step * slot);
+        if (hasSubscribe) {
+            slot--;
+            this.layoutButton(this._subscribeBtn, buttonW, buttonH, stackCenter + step * slot);
+        }
 
         const topSlot = btnCount - 1;
         const topBtnY = stackCenter + step * topSlot;
@@ -533,16 +547,15 @@ export class HomePage extends Component {
         }
     }
 
-    private _initRedditBridge(): void {
-        const bridge = RedditBridge.instance;
-        this._bridgeListener = (event: RedditBridgeCallback) => {
+    private _initSocialBridge(): void {
+        this._bridgeListener = (event: SocialBridgeCallback) => {
             this._onBridgeEvent(event);
         };
-        bridge.addListener(this._bridgeListener);
-        bridge.requestInit();
+        this._socialBridge.addListener(this._bridgeListener);
+        this._socialBridge.requestInit();
     }
 
-    private _onBridgeEvent(event: RedditBridgeCallback): void {
+    private _onBridgeEvent(event: SocialBridgeCallback): void {
         switch (event.type) {
             case 'init':
                 this._updateSubscribeButton(event.data.isSubscribed);
@@ -570,7 +583,7 @@ export class HomePage extends Component {
                 this._leaderboardPanel?.showEntries(event.entries);
                 break;
             case 'score_submitted':
-                // Cache/UI refresh is handled inside RedditBridge.submitScore().
+                // Cache/UI refresh is handled inside active bridge.submitScore().
                 break;
             case 'subscription_result':
                 if (event.success) {
@@ -701,7 +714,7 @@ export class HomePage extends Component {
             this._leaderboardPanel?.destroy();
             this._leaderboardPanel = null;
         });
-        const bridge = RedditBridge.instance;
+        const bridge = this._socialBridge;
         const cached = bridge.cachedLeaderboard;
         if (cached.length > 0) {
             this._leaderboardPanel.showEntries(cached);
@@ -725,6 +738,7 @@ export class HomePage extends Component {
     }
 
     private onSubscribeClick() {
+        if (!this._socialBridge.supportsSubscribe) return;
         this._showSubscribeConfirmDialog();
     }
 
@@ -792,12 +806,10 @@ export class HomePage extends Component {
             new Color(72, 192, 96, 255),
             () => {
                 overlay.destroy();
-                const bridge = RedditBridge.instance;
-                if (!bridge.isRedditEnvironment) {
-                    this._showToast(Localization.instance.t('ui.subscribe.already_claimed'));
+                if (!this._socialBridge.supportsSubscribe) {
                     return;
                 }
-                bridge.requestSubscribe();
+                this._socialBridge.requestSubscribe();
             }
         );
         void confirmBtn;

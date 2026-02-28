@@ -10,10 +10,12 @@
         "format:check": "prettier --check \"assets/scripts/**/*.ts\"",
         "prepare": "husky",
         "patch": "node devvit/scripts/patch-csp.cjs",
-        "upload": "npm run build && cd devvit && npx devvit upload",
-        "playtest": "npm run build && cd devvit && npx devvit playtest",
-        "build": "bash scripts/build_reddit_package.sh --source-build-dir build/reddit-web --output-webroot devvit/webroot --no-optimize-source-assets --cocos-build-opts \"stage=build;buildPath=project://build;outputName=reddit-web\"",
-        "deploy": "npm run build && cd devvit && npm install && npx devvit upload && npx devvit install granny_vs_robot_dev"
+        "build": "npm run build:reddit",
+        "build:reddit": "bash scripts/build_reddit_package.sh --source-build-dir build/reddit-web --output-webroot devvit/webroot --no-optimize-source-assets --cocos-build-opts \"stage=build;buildPath=project://build;outputName=reddit-web\"",
+        "build:tiktok": "bash scripts/build_tiktok_package.sh --source-build-dir build/tiktok-web --output-webroot dist/tiktok-package/webroot --cocos-build-opts \"stage=build;buildPath=project://build;outputName=tiktok-web\"",
+        "upload": "npm run build:reddit && cd devvit && npx devvit upload",
+        "playtest": "npm run build:reddit && cd devvit && npx devvit playtest",
+        "deploy": "npm run build:reddit && cd devvit && npm install && npx devvit upload && npx devvit install granny_vs_robot_dev"
     },
     "keywords": [
         "game",

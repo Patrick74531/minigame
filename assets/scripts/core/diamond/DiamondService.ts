@@ -1,6 +1,6 @@
 /**
  * DiamondService
- * 客户端钻石余额管理：通过 RedditBridge 与服务端 Redis 通信，
+ * 客户端钻石余额管理：通过当前平台后端 API 通信，
  * 本地维护缓存余额用于即时 UI 显示。
  */
 
@@ -179,7 +179,9 @@ export class DiamondService {
         try {
             const data: PendingSettle = { runId, wave };
             localStorage.setItem(PENDING_SETTLE_KEY, JSON.stringify(data));
-        } catch { /* ignore */ }
+        } catch {
+            /* ignore */
+        }
     }
 
     /** Drain the pending settlement from localStorage (returns null if none) */
@@ -196,7 +198,11 @@ export class DiamondService {
 
     /** Clear any pending settlement (call after confirmed server success) */
     public static clearPendingSettlement(): void {
-        try { localStorage.removeItem(PENDING_SETTLE_KEY); } catch { /* ignore */ }
+        try {
+            localStorage.removeItem(PENDING_SETTLE_KEY);
+        } catch {
+            /* ignore */
+        }
     }
 
     private _fetchApi(path: string, init: RequestInit): Promise<unknown> {

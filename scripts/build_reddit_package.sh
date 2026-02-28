@@ -1075,7 +1075,7 @@ if [ "$SKIP_COCOS_BUILD" -eq 0 ]; then
   log "Running headless Cocos build..."
   BUILD_STARTED_AT="$(date +%s)"
   set +e
-  "$COCOS_CREATOR" --project "$ROOT_DIR" --build "$BUILD_OPT_BASE"
+  GVR_ENABLE_REDDIT_CSP_PATCH=1 "$COCOS_CREATOR" --project "$ROOT_DIR" --build "$BUILD_OPT_BASE"
   COCOS_EXIT_CODE=$?
   set -e
   if [ "$COCOS_EXIT_CODE" -ne 0 ]; then
