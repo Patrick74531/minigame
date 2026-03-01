@@ -698,18 +698,20 @@ export function detectRuntimePlatform(): RuntimePlatform {
             return queryPlatform;
         }
 
+        const host = window.location.hostname.toLowerCase();
         if (
-            w['tt'] !== undefined ||
-            w['TikTokMiniGame'] !== undefined ||
-            w['TTJSBridge'] !== undefined
+            w['__devvit__'] !== undefined ||
+            host === '' ||
+            host.includes('reddit.com') ||
+            host.includes('redd.it')
         ) {
-            return 'tiktok';
+            return 'reddit';
         }
     } catch {
         // keep fallback
     }
 
-    return RedditBridge.instance.isRedditEnvironment ? 'reddit' : 'tiktok';
+    return 'reddit';
 }
 
 export function getSocialBridge(): SocialBridge {

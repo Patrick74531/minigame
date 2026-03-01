@@ -1,6 +1,9 @@
 {
     "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
     "name": "granny-vs-robot",
+    "marketingAssets": {
+        "icon": "assets/marketing/icon-1024.png"
+    },
     "post": {
         "dir": "webroot",
         "entrypoints": {
