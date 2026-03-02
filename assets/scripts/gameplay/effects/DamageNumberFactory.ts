@@ -69,7 +69,8 @@ export class DamageNumberFactory {
     private static readonly COLOR_CRIT = new Color(255, 245, 60, 255);
     private static readonly COLOR_CRIT_OUTLINE = new Color(255, 50, 10, 255);
     private static readonly COLOR_CRIT_SHADOW = new Color(180, 0, 0, 200);
-    private static readonly FONT_FAMILY = 'Arial Black';
+    // Use broad-coverage system font to reduce mini-game runtime glyph fallback issues.
+    private static readonly FONT_FAMILY = 'Arial';
 
     // 每个单位的伤害数字节流（避免高射速武器刷屏）
     private static readonly THROTTLE_INTERVAL = 0.15; // 秒
@@ -279,7 +280,9 @@ export class DamageNumberFactory {
         label.horizontalAlign = Label.HorizontalAlign.CENTER;
         label.verticalAlign = Label.VerticalAlign.CENTER;
         label.color = color;
-        label.cacheMode = Label.CacheMode.CHAR;
+        // CHAR uses a shared glyph atlas and is more prone to cross-runtime glitches.
+        // NONE is slower but significantly more predictable across web + mini-game runtimes.
+        label.cacheMode = Label.CacheMode.NONE;
         label.useSystemFont = true;
         label.fontFamily = DamageNumberFactory.FONT_FAMILY;
 

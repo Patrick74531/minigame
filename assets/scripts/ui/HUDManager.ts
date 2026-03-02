@@ -90,11 +90,19 @@ export class HUDManager {
     }
 
     private refreshAllText(): void {
-        this._statusModule.onLanguageChanged?.();
-        this._settingsModule.onLanguageChanged?.();
-        this._waveNoticeModule.onLanguageChanged?.();
-        this._gameOverModule.onLanguageChanged?.();
-        this._bossIntroModule.onLanguageChanged();
+        this.safeRefresh('status', () => this._statusModule.onLanguageChanged?.());
+        this.safeRefresh('settings', () => this._settingsModule.onLanguageChanged?.());
+        this.safeRefresh('waveNotice', () => this._waveNoticeModule.onLanguageChanged?.());
+        this.safeRefresh('gameOver', () => this._gameOverModule.onLanguageChanged?.());
+        this.safeRefresh('bossIntro', () => this._bossIntroModule.onLanguageChanged());
+    }
+
+    private safeRefresh(name: string, fn: () => void): void {
+        try {
+            fn();
+        } catch (err) {
+            console.error(`[HUDManager] language refresh failed in ${name}:`, err);
+        }
     }
 
     private destroyLegacyHudNodes(uiCanvas: Node): void {
@@ -291,6 +299,7 @@ export class HUDManager {
     }
 
     private onLanguageChanged(): void {
+        console.log('[HUDManager] onLanguageChanged');
         this.refreshAllText();
     }
 

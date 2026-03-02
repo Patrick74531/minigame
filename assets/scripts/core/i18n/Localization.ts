@@ -54,11 +54,23 @@ export class Localization {
             lang = DEFAULT_LANGUAGE;
         }
 
+        if (this._currentLang === lang) {
+            return;
+        }
+
         this._currentLang = lang;
-        localStorage.setItem(this.STORAGE_KEY, lang);
+        try {
+            localStorage.setItem(this.STORAGE_KEY, lang);
+        } catch (err) {
+            console.error('[Localization] Failed to persist language:', err);
+        }
 
         // Emit language changed event
-        EventManager.instance.emit(GameEvents.LANGUAGE_CHANGED, { lang });
+        try {
+            EventManager.instance.emit(GameEvents.LANGUAGE_CHANGED, { lang });
+        } catch (err) {
+            console.error('[Localization] Failed to emit language change event:', err);
+        }
     }
 
     public get currentLanguage(): LanguageCode {

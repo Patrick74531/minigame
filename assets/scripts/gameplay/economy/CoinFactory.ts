@@ -22,9 +22,11 @@ export class CoinFactory {
     private static _materials: Map<string, Material> = new Map();
     private static _starCoinPrefab: Prefab | null = null;
     private static _isLoading: boolean = false;
+    private static _loadFailed: boolean = false;
+    private static _fallbackWarned: boolean = false;
 
     public static loadResources(): void {
-        if (this._isLoading || this._starCoinPrefab) return;
+        if (this._isLoading || this._starCoinPrefab || this._loadFailed) return;
         this._isLoading = true;
 
         // Try loading 'effects/star_coin'
@@ -38,7 +40,7 @@ export class CoinFactory {
                 return;
             }
 
-            console.warn('[CoinFactory] Failed to load effects/star_coin:', err);
+            console.debug('[CoinFactory] effects/star_coin missing, try fallback path.');
 
             // Try loading 'effects/star_coin/star_coin' (common GLTF import issue)
             resources.load('effects/star_coin/star_coin', Prefab, (err2, prefab2) => {
@@ -48,7 +50,8 @@ export class CoinFactory {
                     );
                     this._starCoinPrefab = prefab2;
                 } else {
-                    console.error('[CoinFactory] Failed to load star_coin from both paths.', err2);
+                    this._loadFailed = true;
+                    console.warn('[CoinFactory] StarCoin prefab unavailable, fallback to cube coin.');
                 }
                 this._isLoading = false;
             });
@@ -80,7 +83,10 @@ export class CoinFactory {
             //      renderer.material = goldMaterial;
             // }
         } else {
-            console.warn('[CoinFactory] StarCoin prefab not ready, using cube.');
+            if (!this._fallbackWarned) {
+                this._fallbackWarned = true;
+                console.warn('[CoinFactory] StarCoin prefab not ready, using cube.');
+            }
             node = this.createCubeNode('Coin', new Color(255, 165, 0, 255));
             node.setScale(0.3, 0.3, 0.3); // Slightly larger for visibility
         }

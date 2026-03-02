@@ -86,14 +86,14 @@ export class BuffCardUI {
         // 创建标题
         this.createTitle(this._root, viewport.width, viewport.height);
 
+        // 居中排列卡牌
+        const totalWidth = cards.length * CARD_WIDTH + (cards.length - 1) * CARD_GAP;
+
         // 创建卡牌容器
         const cardContainer = new Node('CardContainer');
         cardContainer.layer = UI_LAYER;
-        cardContainer.addComponent(UITransform);
+        cardContainer.addComponent(UITransform).setContentSize(totalWidth, CARD_HEIGHT);
         this._root.addChild(cardContainer);
-
-        // 居中排列卡牌
-        const totalWidth = cards.length * CARD_WIDTH + (cards.length - 1) * CARD_GAP;
 
         // Dynamic scaling if total width exceeds screen width
         const size = this._root.getComponent(UITransform)?.contentSize;
@@ -236,8 +236,8 @@ export class BuffCardUI {
         const nameLabel = nameNode.addComponent(Label);
         nameLabel.string = Localization.instance.t(card.nameKey);
         SelectionCardTheme.applyLabelTheme(nameLabel, {
-            fontSize: 30,
-            lineHeight: 34,
+            fontSize: 28,
+            lineHeight: 32,
             color: Color.WHITE,
             bold: true,
             hAlign: Label.HorizontalAlign.CENTER,
@@ -246,6 +246,7 @@ export class BuffCardUI {
             outlineWidth: 3,
         });
         nameLabel.overflow = Label.Overflow.SHRINK;
+        nameLabel.enableWrapText = false;
         nameNode.setPosition(0, CARD_HEIGHT / 2 - 42, 0);
 
         SelectionCardTheme.createBadge(
@@ -274,7 +275,8 @@ export class BuffCardUI {
             outlineColor: new Color(10, 22, 38, 255),
             outlineWidth: 2,
         });
-        detailLabel.overflow = Label.Overflow.CLAMP;
+        detailLabel.overflow = Label.Overflow.SHRINK;
+        detailLabel.enableWrapText = true;
         detailNode.setPosition(0, -52, 0);
 
         // 点击区域（覆盖整张卡牌）

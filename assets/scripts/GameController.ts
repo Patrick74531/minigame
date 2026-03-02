@@ -71,6 +71,9 @@ export class GameController extends Component {
     private _joystick: Joystick | null = null;
     private _inputAdapter: PlayerInputAdapter | null = null;
     private _services: ControllerServices = new ControllerServices();
+    private _deferStartupLoadsForTikTok: boolean = false;
+    private _deferRuntimeMediaBootstrapForTikTok: boolean = false;
+    private _runtimeMediaBootstrapped: boolean = false;
 
     // === 生命周期 ===
 
@@ -80,9 +83,20 @@ export class GameController extends Component {
     protected onLoad(): void {
         applyCanvasOnDisableSafetyPatch();
 
-        // 预加载关键资源（贴图/Prefab/动画），避免首波帧率抖动
-        ResourcePreloader.preloadAll();
-        CoinFactory.loadResources();
+        // TikTok native: defer heavy preloads until actual gameplay starts.
+        const isTikTokRuntime =
+            (globalThis as unknown as { __GVR_PLATFORM__?: unknown }).__GVR_PLATFORM__ ===
+                'tiktok' || typeof (globalThis as unknown as { tt?: unknown }).tt !== 'undefined';
+        if (isTikTokRuntime) {
+            this._deferStartupLoadsForTikTok = true;
+            this._deferRuntimeMediaBootstrapForTikTok = true;
+            this.forceLandscapeForTikTok();
+        } else {
+            // 预加载关键资源（贴图/Prefab/动画），避免首波帧率抖动
+            ResourcePreloader.preloadAll();
+            CoinFactory.loadResources();
+            this.bootstrapRuntimeMediaSystems();
+        }
 
         console.debug('╔════════════════════════════════════════════════════╗');
         console.debug('║       KingShit MVP - Modular Version               ║');
@@ -131,9 +145,6 @@ export class GameController extends Component {
         this._services.chestDropManager.initialize(this._coinContainer!, null);
 
         // Initialize weapon system
-        WeaponVFX.initialize();
-        AudioSettingsManager.instance.initialize(this.node);
-        WeaponSFXManager.initialize(this.node);
         WeaponBehaviorFactory.initialize();
         this._services.heroWeaponManager.initialize();
         this._services.airdropService.initialize();
@@ -259,6 +270,15 @@ export class GameController extends Component {
     // === 自动存档 ===
 
     private onGameStart(): void {
+        if (this._deferRuntimeMediaBootstrapForTikTok) {
+            this._deferRuntimeMediaBootstrapForTikTok = false;
+            this.bootstrapRuntimeMediaSystems();
+        }
+        if (this._deferStartupLoadsForTikTok) {
+            this._deferStartupLoadsForTikTok = false;
+            ResourcePreloader.preloadAll();
+            CoinFactory.loadResources();
+        }
         if (this._autosaveIntervalId !== null) clearInterval(this._autosaveIntervalId);
         this._autosaveIntervalId = setInterval(() => {
             const snap = this.collectSnapshot();
@@ -332,6 +352,62 @@ export class GameController extends Component {
             nextOfferWave,
             items,
         };
+    }
+
+    private bootstrapRuntimeMediaSystems(): void {
+        if (this._runtimeMediaBootstrapped) return;
+        this._runtimeMediaBootstrapped = true;
+
+        WeaponVFX.initialize();
+        AudioSettingsManager.instance.initialize(this.node);
+        WeaponSFXManager.initialize(this.node);
+    }
+
+    private forceLandscapeForTikTok(): void {
+        const g = globalThis as unknown as {
+            tt?: Record<string, unknown>;
+            TTMinis?: { game?: Record<string, unknown> };
+            screen?: { orientation?: { lock?: (orientation: string) => Promise<unknown> } };
+        };
+
+        const candidates: Record<string, unknown>[] = [];
+        if (g.tt && typeof g.tt === 'object') candidates.push(g.tt);
+        if (g.TTMinis?.game && typeof g.TTMinis.game === 'object') {
+            candidates.push(g.TTMinis.game);
+        }
+
+        const payloads = [
+            { value: 'landscape' },
+            { orientation: 'landscape' },
+            { direction: 'landscape' },
+        ];
+        const names = ['setDeviceOrientation', 'setScreenOrientation', 'setGameOrientation'];
+
+        for (const api of candidates) {
+            for (const fnName of names) {
+                const fn = api[fnName];
+                if (typeof fn !== 'function') continue;
+                for (const payload of payloads) {
+                    try {
+                        (fn as (p: Record<string, string>) => unknown).call(api, payload);
+                        break;
+                    } catch (_e) {
+                        // ignore and fallback to next signature
+                    }
+                }
+            }
+        }
+
+        try {
+            const lock = g.screen?.orientation?.lock;
+            if (typeof lock === 'function') {
+                lock.call(g.screen.orientation, 'landscape-primary').catch(() => {
+                    // ignore
+                });
+            }
+        } catch (_e) {
+            // ignore
+        }
     }
 
     // === 升级 VFX ===

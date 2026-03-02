@@ -20,6 +20,9 @@ export class GameResourceLoader {
         'models/nature', // trees, bushes, rocks
         'floor', // all floor textures
         'character', // hero GLB + animation clips
+        'icon', // coin/diamond/weapon/building type icons — needed for HUD & building pads
+        'textures', // bullet sprites, fog, tower_bullet — needed for combat VFX
+        'weapons', // weapon models — needed for hero weapon display
     ];
 
     // Phase 2 directories — silently preloaded after game begins
@@ -29,9 +32,6 @@ export class GameResourceLoader {
         'enemies/bullet',
         'footman',
         'effects',
-        'textures',
-        'icon',
-        'weapons',
         'shaders',
     ];
 

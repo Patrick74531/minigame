@@ -93,6 +93,7 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
         // 动态缩放适配
         const totalWidth =
             this.TOWER_TYPES.length * CARD_WIDTH + (this.TOWER_TYPES.length - 1) * CARD_GAP;
+        container.addComponent(UITransform).setContentSize(totalWidth, CARD_HEIGHT);
         const size = rootTransform.contentSize;
         if (totalWidth > size.width - 100) {
             const scale = (size.width - 100) / totalWidth;
@@ -205,8 +206,8 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
         const nameLabel = nameNode.addComponent(Label);
         nameLabel.string = Localization.instance.t(config.nameKey) || buildingType;
         SelectionCardTheme.applyLabelTheme(nameLabel, {
-            fontSize: 30,
-            lineHeight: 34,
+            fontSize: 28,
+            lineHeight: 32,
             color: Color.WHITE,
             bold: true,
             hAlign: Label.HorizontalAlign.CENTER,
@@ -215,6 +216,7 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
             outlineWidth: 3,
         });
         nameLabel.overflow = Label.Overflow.SHRINK;
+        nameLabel.enableWrapText = false;
         nameNode.setPosition(0, CARD_HEIGHT / 2 - 42, 0);
 
         SelectionCardTheme.createBadge(
@@ -234,8 +236,8 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
         const descLabel = descNode.addComponent(Label);
         descLabel.string = Localization.instance.t(config.descriptionKey) || '';
         SelectionCardTheme.applyLabelTheme(descLabel, {
-            fontSize: 18,
-            lineHeight: 24,
+            fontSize: 17,
+            lineHeight: 23,
             color: new Color(194, 208, 232, 255),
             hAlign: Label.HorizontalAlign.CENTER,
             vAlign: Label.VerticalAlign.TOP,

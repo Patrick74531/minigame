@@ -9,7 +9,6 @@ import {
     Tween,
     tween,
     UITransform,
-    UIOpacity,
     Vec3,
     Widget,
 } from 'cc';
@@ -54,7 +53,6 @@ export class HUDSettingsModule implements HUDModule {
     private _settingsPanelRoot: Node | null = null;
     private _settingsPanelNode: Node | null = null;
     private _settingsPanelBg: Graphics | null = null;
-    private _settingsPanelOpacity: UIOpacity | null = null;
     private _settingsBgmSlider: VolumeSliderView | null = null;
     private _settingsSfxSlider: VolumeSliderView | null = null;
 
@@ -81,9 +79,6 @@ export class HUDSettingsModule implements HUDModule {
     }
 
     public cleanup(): void {
-        if (this._settingsPanelOpacity) {
-            Tween.stopAllByTarget(this._settingsPanelOpacity);
-        }
         if (this._settingsPanelRoot) {
             Tween.stopAllByTarget(this._settingsPanelRoot);
         }
@@ -94,7 +89,6 @@ export class HUDSettingsModule implements HUDModule {
         this._settingsPanelRoot = null;
         this._settingsPanelNode = null;
         this._settingsPanelBg = null;
-        this._settingsPanelOpacity = null;
         this._settingsBgmSlider = null;
         this._settingsSfxSlider = null;
     }
@@ -104,7 +98,11 @@ export class HUDSettingsModule implements HUDModule {
     }
 
     public onLanguageChanged(): void {
-        this.refreshText();
+        try {
+            this.refreshText();
+        } catch (err) {
+            console.error('[HUDSettingsModule] onLanguageChanged failed:', err);
+        }
     }
 
     private createSettingsUI(parent: Node): void {
@@ -168,8 +166,6 @@ export class HUDSettingsModule implements HUDModule {
         rootWidget.isAlignBottom = true;
         rootWidget.isAlignLeft = true;
         rootWidget.isAlignRight = true;
-        this._settingsPanelOpacity = panelRoot.addComponent(UIOpacity);
-        this._settingsPanelOpacity.opacity = 0;
 
         const blocker = new Node('SettingsPanelBlocker');
         panelRoot.addChild(blocker);
@@ -317,14 +313,18 @@ export class HUDSettingsModule implements HUDModule {
         btnNode.addChild(labelNode);
         labelNode.addComponent(UITransform).setContentSize(104, 38);
         const label = labelNode.addComponent(Label);
-        label.string = Localization.instance.t(textKey);
+        label.string = this.resolveLanguageButtonText(langCode, textKey);
         label.fontSize = 24;
         label.lineHeight = 28;
         label.horizontalAlign = Label.HorizontalAlign.CENTER;
         label.verticalAlign = Label.VerticalAlign.CENTER;
         label.overflow = Label.Overflow.SHRINK;
+        label.enableWrapText = false;
         label.color = new Color(255, 255, 255, 255);
-        applyGameLabelStyle(label);
+        label.cacheMode = Label.CacheMode.NONE;
+        label.useSystemFont = true;
+        label.fontFamily = 'sans-serif';
+        this.forceRefreshLabel(label);
 
         btnNode.on(Button.EventType.CLICK, () => {
             this.onLanguageSwitch(langCode);
@@ -352,9 +352,17 @@ export class HUDSettingsModule implements HUDModule {
 
     private onLanguageSwitch(lang: 'zh' | 'en'): void {
         if (Localization.instance.currentLanguage === lang) return;
-
-        Localization.instance.setLanguage(lang);
-        this._onLanguageChanged();
+        console.log(`[HUDSettingsModule] switch language -> ${lang}`);
+        try {
+            Localization.instance.setLanguage(lang);
+        } catch (err) {
+            console.error('[HUDSettingsModule] setLanguage failed:', err);
+            try {
+                this._onLanguageChanged();
+            } catch (refreshErr) {
+                console.error('[HUDSettingsModule] fallback language refresh failed:', refreshErr);
+            }
+        }
     }
 
     private createVolumeSlider(
@@ -639,7 +647,7 @@ export class HUDSettingsModule implements HUDModule {
     }
 
     private showSettingsPanel(): void {
-        if (!this._settingsPanelRoot || !this._settingsPanelOpacity) return;
+        if (!this._settingsPanelRoot) return;
 
         this.updateSettingsLayout();
         this.refreshSettingsPanelUI();
@@ -649,79 +657,104 @@ export class HUDSettingsModule implements HUDModule {
         if (rootParent) {
             this._settingsPanelRoot.setSiblingIndex(rootParent.children.length - 1);
         }
-        this._settingsPanelOpacity.opacity = 0;
-        Tween.stopAllByTarget(this._settingsPanelOpacity);
-        tween(this._settingsPanelOpacity).to(0.14, { opacity: 255 }).start();
     }
 
     private hideSettingsPanel(): void {
-        if (!this._settingsPanelRoot || !this._settingsPanelOpacity) return;
-        Tween.stopAllByTarget(this._settingsPanelOpacity);
-        tween(this._settingsPanelOpacity)
-            .to(0.12, { opacity: 0 })
-            .call(() => {
-                if (this._settingsPanelRoot) {
-                    this._settingsPanelRoot.active = false;
-                }
-            })
-            .start();
+        if (!this._settingsPanelRoot) return;
+        this._settingsPanelRoot.active = false;
     }
 
     private refreshText(): void {
-        const panel = this._settingsPanelNode;
-        if (panel) {
-            const title = panel.getChildByName('SettingsTitle')?.getComponent(Label);
-            if (title) title.string = Localization.instance.t('ui.settings.title');
+        try {
+            const panel = this._settingsPanelNode;
+            if (panel) {
+                const title = panel.getChildByName('SettingsTitle')?.getComponent(Label);
+                if (title) title.string = Localization.instance.t('ui.settings.title');
 
-            if (this._settingsBgmSlider) {
-                this._settingsBgmSlider.titleLabel.string = Localization.instance.t(
-                    this._settingsBgmSlider.titleKey
-                );
-            }
-            if (this._settingsSfxSlider) {
-                this._settingsSfxSlider.titleLabel.string = Localization.instance.t(
-                    this._settingsSfxSlider.titleKey
-                );
-            }
+                if (this._settingsBgmSlider) {
+                    this._settingsBgmSlider.titleLabel.string = Localization.instance.t(
+                        this._settingsBgmSlider.titleKey
+                    );
+                }
+                if (this._settingsSfxSlider) {
+                    this._settingsSfxSlider.titleLabel.string = Localization.instance.t(
+                        this._settingsSfxSlider.titleKey
+                    );
+                }
 
-            const langRow = panel.getChildByName('SettingsLangRow');
-            if (langRow) {
-                const label = langRow.getChildByName('SettingsLangTitle')?.getComponent(Label);
-                if (label) label.string = Localization.instance.t('ui.settings.language');
+                const langRow = panel.getChildByName('SettingsLangRow');
+                if (langRow) {
+                    const label = langRow.getChildByName('SettingsLangTitle')?.getComponent(Label);
+                    if (label) label.string = Localization.instance.t('ui.settings.language');
 
-                const container = langRow.getChildByName('LangBtnContainer');
-                if (container) {
-                    const codes: Array<'zh' | 'en'> = ['zh', 'en'];
-                    for (const code of codes) {
-                        const btn = container.getChildByName(`LangBtn_${code}`);
-                        if (!btn) continue;
-                        const bg = btn.getComponent(Graphics);
-                        if (bg) {
-                            this.drawLanguageButtonBg(
-                                bg,
-                                Localization.instance.currentLanguage === code
-                            );
-                        }
-                        const buttonLabel = btn.getChildByName('Label')?.getComponent(Label);
-                        if (buttonLabel) {
-                            buttonLabel.string = Localization.instance.t(
-                                `ui.settings.lang.${code}`
-                            );
+                    const container = langRow.getChildByName('LangBtnContainer');
+                    if (container) {
+                        const codes: Array<'zh' | 'en'> = ['zh', 'en'];
+                        for (const code of codes) {
+                            const btn = container.getChildByName(`LangBtn_${code}`);
+                            if (!btn) continue;
+                            const bg = btn.getComponent(Graphics);
+                            if (bg) {
+                                this.drawLanguageButtonBg(
+                                    bg,
+                                    Localization.instance.currentLanguage === code
+                                );
+                            }
+                            const buttonLabel = btn.getChildByName('Label')?.getComponent(Label);
+                            if (buttonLabel) {
+                                buttonLabel.string = this.resolveLanguageButtonText(
+                                    code,
+                                    `ui.settings.lang.${code}`
+                                );
+                                buttonLabel.cacheMode = Label.CacheMode.NONE;
+                                this.forceRefreshLabel(buttonLabel);
+                            }
                         }
                     }
                 }
             }
-        }
 
-        const btnLabel = this._settingsButtonNode
-            ?.getChildByName('SettingsButtonLabel')
-            ?.getComponent(Label);
-        if (btnLabel) {
-            btnLabel.string = Localization.instance.t('ui.settings.button');
-        }
+            const btnLabel = this._settingsButtonNode
+                ?.getChildByName('SettingsButtonLabel')
+                ?.getComponent(Label);
+            if (btnLabel) {
+                btnLabel.string = Localization.instance.t('ui.settings.button');
+            }
 
-        this.updateSettingsLayout();
-        this.refreshSettingsPanelUI();
+            this.updateSettingsLayout();
+            this.refreshSettingsPanelUI();
+        } catch (err) {
+            console.error('[HUDSettingsModule] refreshText failed:', err);
+        }
+    }
+
+    private resolveLanguageButtonText(langCode: 'zh' | 'en', key: string): string {
+        if (langCode === 'zh') return '中文';
+        if (langCode === 'en') return 'EN';
+        const localized = Localization.instance.t(key);
+        if (typeof localized !== 'string') {
+            return langCode === 'zh' ? '中文' : 'EN';
+        }
+        const compact = localized.trim();
+        if (compact.length === 0) return langCode === 'zh' ? '中文' : 'EN';
+        if (langCode === 'en' && compact.length > 4) return 'EN';
+        return compact;
+    }
+
+    private forceRefreshLabel(label: Label | null): void {
+        if (!label?.isValid) return;
+        const refresh = () => {
+            if (!label?.isValid) return;
+            if (typeof label.markForUpdateRenderData === 'function') {
+                label.markForUpdateRenderData(true);
+            } else if (typeof label.updateRenderData === 'function') {
+                label.updateRenderData(true);
+            }
+        };
+        refresh();
+        setTimeout(refresh, 0);
+        setTimeout(refresh, 140);
+        setTimeout(refresh, 520);
     }
 
     private updateSettingsLayout(): void {
@@ -961,6 +994,9 @@ export class HUDSettingsModule implements HUDModule {
             if (label) {
                 label.fontSize = Math.max(20, Math.min(26, Math.round(buttonH * 0.48)));
                 label.lineHeight = label.fontSize + 4;
+                label.cacheMode = Label.CacheMode.NONE;
+                label.useSystemFont = true;
+                label.fontFamily = 'sans-serif';
             }
 
             const bg = btn.getComponent(Graphics);

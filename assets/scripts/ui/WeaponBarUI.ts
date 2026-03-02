@@ -54,6 +54,7 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
 
         this.eventManager.on(GameEvents.WEAPON_INVENTORY_CHANGED, this.refresh, this);
         this.eventManager.on(GameEvents.WEAPON_SWITCHED, this.refresh, this);
+        this.eventManager.on(GameEvents.LANGUAGE_CHANGED, this.refresh, this);
         view.on('canvas-resize', this.onResize, this);
         this.updateLayout();
         this.refresh();
@@ -62,6 +63,7 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
     public cleanup(): void {
         this.eventManager.off(GameEvents.WEAPON_INVENTORY_CHANGED, this.refresh, this);
         this.eventManager.off(GameEvents.WEAPON_SWITCHED, this.refresh, this);
+        this.eventManager.off(GameEvents.LANGUAGE_CHANGED, this.refresh, this);
         view.off('canvas-resize', this.onResize, this);
         if (this._barNode) {
             this._barNode.destroy();
@@ -375,7 +377,11 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         label.lineHeight = 14;
         label.horizontalAlign = Label.HorizontalAlign.CENTER;
         label.verticalAlign = Label.VerticalAlign.CENTER;
+        label.overflow = Label.Overflow.SHRINK;
         label.color = isActive ? new Color(42, 24, 10, 255) : new Color(232, 244, 255, 255);
+        label.cacheMode = Label.CacheMode.NONE;
+        label.useSystemFont = true;
+        label.fontFamily = 'sans-serif';
     }
 
     private createKeyHintBadge(parent: Node, slotIndex: number, iconSize: number): void {
@@ -405,6 +411,9 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         keyLabel.color = new Color(255, 233, 156, 255);
         keyLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         keyLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        keyLabel.cacheMode = Label.CacheMode.NONE;
+        keyLabel.useSystemFont = true;
+        keyLabel.fontFamily = 'sans-serif';
     }
 
     // === 工具 ===

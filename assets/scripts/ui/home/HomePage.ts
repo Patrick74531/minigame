@@ -17,6 +17,8 @@ import {
     Graphics,
     tween,
     Vec3,
+    assetManager,
+    AssetManager,
 } from 'cc';
 import { Localization } from '../../core/i18n/Localization';
 import { GameManager } from '../../core/managers/GameManager';
@@ -253,6 +255,11 @@ export class HomePage extends Component {
     }
 
     private loadBackgroundTexture() {
+        if (this.isTikTokRuntime()) {
+            this.loadTikTokBackgroundTexture();
+            return;
+        }
+
         resources.load('ui/homepage', Texture2D, (textureErr, texture) => {
             if (!textureErr && texture) {
                 this.applyBackgroundTexture(texture);
@@ -269,6 +276,106 @@ export class HomePage extends Component {
                 }
             });
         });
+    }
+
+    private loadTikTokBackgroundTexture(): void {
+        const path = 'ui/homepage';
+        this.ensureResourcesBundleForTikTok()
+            .then(bundle => {
+                bundle.load(path, Texture2D, (textureErr, texture) => {
+                    if (!textureErr && texture) {
+                        this.applyBackgroundTexture(texture);
+                        return;
+                    }
+
+                    bundle.load(path, ImageAsset, (imageErr, imageAsset) => {
+                        if (!imageErr && imageAsset) {
+                            const fallbackTexture = new Texture2D();
+                            fallbackTexture.image = imageAsset;
+                            this.applyBackgroundTexture(fallbackTexture);
+                        } else {
+                            console.warn(
+                                'Failed to load homepage background from TikTok resources bundle',
+                                imageErr ?? textureErr
+                            );
+                        }
+                    });
+                });
+            })
+            .catch(err => {
+                console.warn(
+                    'Failed to prepare TikTok resources bundle for homepage background',
+                    err
+                );
+                // Fallback to the default resources API.
+                resources.load(path, Texture2D, (textureErr, texture) => {
+                    if (!textureErr && texture) {
+                        this.applyBackgroundTexture(texture);
+                        return;
+                    }
+                    resources.load(path, ImageAsset, (imageErr, imageAsset) => {
+                        if (!imageErr && imageAsset) {
+                            const fallbackTexture = new Texture2D();
+                            fallbackTexture.image = imageAsset;
+                            this.applyBackgroundTexture(fallbackTexture);
+                        } else {
+                            console.warn(
+                                'Failed to load homepage background',
+                                imageErr ?? textureErr
+                            );
+                        }
+                    });
+                });
+            });
+    }
+
+    private ensureResourcesBundleForTikTok(): Promise<AssetManager.Bundle> {
+        const existing = assetManager.getBundle('resources');
+        if (existing) return Promise.resolve(existing);
+
+        const loadBundle = () =>
+            new Promise<AssetManager.Bundle>((resolve, reject) => {
+                assetManager.loadBundle('resources', (err, bundle) => {
+                    if (err || !bundle) {
+                        reject(err ?? new Error('resources bundle load returned empty bundle'));
+                        return;
+                    }
+                    resolve(bundle);
+                });
+            });
+
+        return loadBundle().catch(firstErr => {
+            const ttLike = (
+                globalThis as unknown as {
+                    tt?: {
+                        loadSubpackage?: (options: {
+                            name: string;
+                            success?: () => void;
+                            fail?: (err: unknown) => void;
+                        }) => void;
+                    };
+                }
+            ).tt;
+
+            if (!ttLike?.loadSubpackage) {
+                throw firstErr;
+            }
+
+            return new Promise<AssetManager.Bundle>((resolve, reject) => {
+                ttLike.loadSubpackage?.({
+                    name: 'resources',
+                    success: () => {
+                        loadBundle().then(resolve).catch(reject);
+                    },
+                    fail: reject,
+                });
+            });
+        });
+    }
+
+    private isTikTokRuntime(): boolean {
+        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
+        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
     }
 
     private _revealContent(): void {
@@ -521,30 +628,27 @@ export class HomePage extends Component {
     }
 
     private refreshText() {
-        this._settingsModule?.onLanguageChanged();
+        try {
+            this._settingsModule?.onLanguageChanged();
+        } catch (err) {
+            console.error('[HomePage] settings language refresh failed:', err);
+        }
 
-        if (this._startBtn) {
-            const comp = this._startBtn.getChildByName('Label')?.getComponent(LocalizationComp);
-            comp?.refresh();
-        }
-        if (this._leaderboardBtn) {
-            const comp = this._leaderboardBtn
-                .getChildByName('Label')
-                ?.getComponent(LocalizationComp);
-            comp?.refresh();
-        }
-        if (this._subscribeBtn) {
-            const comp = this._subscribeBtn.getChildByName('Label')?.getComponent(LocalizationComp);
-            comp?.refresh();
-        }
-        if (this._continueBtn) {
-            const comp = this._continueBtn.getChildByName('Label')?.getComponent(LocalizationComp);
-            comp?.refresh();
-        }
-        if (this._shopBtn) {
-            const comp = this._shopBtn.getChildByName('Label')?.getComponent(LocalizationComp);
-            comp?.refresh();
-        }
+        const refreshLabel = (node: Node | null, name: string): void => {
+            if (!node) return;
+            try {
+                const comp = node.getChildByName('Label')?.getComponent(LocalizationComp);
+                comp?.refresh();
+            } catch (err) {
+                console.error(`[HomePage] ${name} label refresh failed:`, err);
+            }
+        };
+
+        refreshLabel(this._startBtn, 'start');
+        refreshLabel(this._leaderboardBtn, 'leaderboard');
+        refreshLabel(this._subscribeBtn, 'subscribe');
+        refreshLabel(this._continueBtn, 'continue');
+        refreshLabel(this._shopBtn, 'shop');
     }
 
     private _initSocialBridge(): void {

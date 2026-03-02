@@ -5,7 +5,6 @@ import {
     LabelOutline,
     LabelShadow,
     Node,
-    UIOpacity,
     UITransform,
     Vec3,
     tween,
@@ -27,6 +26,11 @@ export type LabelThemeOptions = {
 };
 
 export class SelectionCardTheme {
+    private static isTikTokRuntime(): boolean {
+        const g = globalThis as any;
+        return g?.__GVR_PLATFORM__ === 'tiktok' || typeof g?.tt !== 'undefined';
+    }
+
     public static drawOverlayMask(bg: Graphics, width: number, height: number): void {
         bg.clear();
         bg.fillColor = new Color(5, 10, 18, 182);
@@ -79,6 +83,12 @@ export class SelectionCardTheme {
     }
 
     public static applyLabelTheme(label: Label, options?: LabelThemeOptions): void {
+        const isTikTok = this.isTikTokRuntime();
+        // Prefer NONE cache for cross-platform stability (TikTok + Reddit).
+        label.cacheMode = Label.CacheMode.NONE;
+        label.useSystemFont = true;
+        label.fontFamily = 'sans-serif';
+
         if (options?.fontSize !== undefined) {
             label.fontSize = options.fontSize;
         }
@@ -101,12 +111,34 @@ export class SelectionCardTheme {
         const outline =
             label.node.getComponent(LabelOutline) ?? label.node.addComponent(LabelOutline);
         outline.color = options?.outlineColor ?? new Color(10, 18, 30, 255);
-        outline.width = options?.outlineWidth ?? 3;
+        outline.width = isTikTok ? 0 : (options?.outlineWidth ?? 3);
+        outline.enabled = outline.width > 0;
 
         const shadow = label.node.getComponent(LabelShadow) ?? label.node.addComponent(LabelShadow);
         shadow.color = options?.shadowColor ?? new Color(0, 0, 0, 168);
         shadow.offset.set(options?.shadowOffsetX ?? 2, options?.shadowOffsetY ?? -2);
         shadow.blur = options?.shadowBlur ?? 2;
+        shadow.enabled = !isTikTok;
+
+        this.refreshLabelRender(label, isTikTok);
+    }
+
+    private static refreshLabelRender(label: Label, isTikTok: boolean): void {
+        const refresh = () => {
+            if (!label?.isValid) return;
+            if (typeof label.markForUpdateRenderData === 'function') {
+                label.markForUpdateRenderData(true);
+            } else if (typeof label.updateRenderData === 'function') {
+                label.updateRenderData(true);
+            }
+        };
+        refresh();
+        setTimeout(refresh, 0);
+        setTimeout(refresh, 120);
+        if (isTikTok) {
+            setTimeout(refresh, 450);
+            setTimeout(refresh, 1200);
+        }
     }
 
     public static createBadge(
@@ -138,6 +170,8 @@ export class SelectionCardTheme {
         label.string = text;
         label.horizontalAlign = Label.HorizontalAlign.CENTER;
         label.verticalAlign = Label.VerticalAlign.CENTER;
+        label.overflow = Label.Overflow.SHRINK;
+        label.enableWrapText = false;
         this.applyLabelTheme(label, {
             fontSize: Math.max(12, Math.round(size.h * 0.46)),
             lineHeight: Math.max(14, Math.round(size.h * 0.56)),
@@ -151,19 +185,16 @@ export class SelectionCardTheme {
     }
 
     public static playCardReveal(card: Node, index: number): void {
-        const opacity = card.getComponent(UIOpacity) ?? card.addComponent(UIOpacity);
-        opacity.opacity = 0;
+        const opacity = card.getComponent('cc.UIOpacity');
+        if (opacity && typeof opacity.destroy === 'function') {
+            opacity.destroy();
+        }
         card.setScale(0.82, 0.82, 1);
 
         tween(card)
             .delay(index * 0.1)
             .to(0.25, { scale: new Vec3(1.03, 1.03, 1) }, { easing: 'backOut' })
             .to(0.12, { scale: new Vec3(1, 1, 1) })
-            .start();
-
-        tween(opacity)
-            .delay(index * 0.1)
-            .to(0.2, { opacity: 255 })
             .start();
     }
 

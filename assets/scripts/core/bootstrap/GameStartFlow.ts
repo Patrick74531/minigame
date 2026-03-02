@@ -1,4 +1,4 @@
-import { Node } from 'cc';
+import { Node, assetManager } from 'cc';
 import { GameManager } from '../managers/GameManager';
 import { GameConfig } from '../../data/GameConfig';
 import { SpawnBootstrap } from './SpawnBootstrap';
@@ -44,6 +44,8 @@ export type StartContext = {
  * 负责游戏启动与初始实体生成流程
  */
 export class GameStartFlow {
+    private static _tiktokResourcesReadyPromise: Promise<void> | null = null;
+
     public static run(ctx: StartContext): void {
         const game = this.gameManager;
 
@@ -80,6 +82,19 @@ export class GameStartFlow {
     }
 
     private static _showLoadingScreen(ctx: StartContext) {
+        this.ensureTikTokResourcesBundleReady()
+            .catch(err => {
+                console.warn(
+                    '[GameStartFlow] TikTok resources bundle gate failed, continue with default loader.',
+                    err
+                );
+            })
+            .finally(() => {
+                this._showLoadingScreenAfterBundleReady(ctx);
+            });
+    }
+
+    private static _showLoadingScreenAfterBundleReady(ctx: StartContext) {
         // onComplete fires AFTER GPU warmup (loading screen still visible during warmup)
         const screen = LoadingScreen.show(ctx.containers.ui, () => {
             GameResourceLoader.loadPhase2();
@@ -98,11 +113,11 @@ export class GameStartFlow {
                     this.gameManager.setCoins(ctx.saveData.coins);
                     this.gameManager.setScore(ctx.saveData.score);
                 }
-                // GPU warmup: wait 0.5 s (~30 frames) for textures to upload before revealing scene.
+                // GPU warmup: wait 1.0 s (~60 frames) for textures to upload before revealing scene.
                 if (screen.isValid) {
                     screen.scheduleOnce(() => {
                         if (screen.isValid) screen.signalReadyToClose();
-                    }, 0.5);
+                    }, 1.0);
                 }
             })
             .catch(() => {
@@ -115,6 +130,58 @@ export class GameStartFlow {
                 }
                 if (screen.isValid) screen.signalReadyToClose();
             });
+    }
+
+    private static ensureTikTokResourcesBundleReady(): Promise<void> {
+        if (!this.isTikTokRuntime()) return Promise.resolve();
+        if (assetManager.getBundle('resources')) return Promise.resolve();
+        if (this._tiktokResourcesReadyPromise) return this._tiktokResourcesReadyPromise;
+
+        const loadBundle = () =>
+            new Promise<void>((resolve, reject) => {
+                assetManager.loadBundle('resources', err => {
+                    if (err) {
+                        reject(err);
+                        return;
+                    }
+                    resolve();
+                });
+            });
+
+        this._tiktokResourcesReadyPromise = loadBundle().catch(firstErr => {
+            const ttLike = (
+                globalThis as unknown as {
+                    tt?: {
+                        loadSubpackage?: (options: {
+                            name: string;
+                            success?: () => void;
+                            fail?: (err: unknown) => void;
+                        }) => void;
+                    };
+                }
+            ).tt;
+
+            if (!ttLike?.loadSubpackage) {
+                throw firstErr;
+            }
+
+            return new Promise<void>((resolve, reject) => {
+                ttLike.loadSubpackage?.({
+                    name: 'resources',
+                    success: () => {
+                        loadBundle().then(resolve).catch(reject);
+                    },
+                    fail: reject,
+                });
+            });
+        });
+
+        return this._tiktokResourcesReadyPromise;
+    }
+
+    private static isTikTokRuntime(): boolean {
+        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
+        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
     }
 
     // Refactored actual start logic (Map generation, Spawning)

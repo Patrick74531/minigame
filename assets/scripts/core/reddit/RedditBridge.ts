@@ -687,6 +687,11 @@ export function detectRuntimePlatform(): RuntimePlatform {
     if (typeof window === 'undefined') return 'reddit';
 
     try {
+        const g = globalThis as unknown as Record<string, unknown>;
+        if (g['tt'] !== undefined) {
+            return 'tiktok';
+        }
+
         const w = window as unknown as Record<string, unknown>;
         const forced = w['__GVR_PLATFORM__'];
         if (forced === 'tiktok' || forced === 'reddit') {

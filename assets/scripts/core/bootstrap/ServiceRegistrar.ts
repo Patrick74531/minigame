@@ -39,7 +39,7 @@ export class ServiceRegistrar {
         PoolManager.instance.registerFactoryPool(
             'soldier_basic',
             () => UnitFactory.createSoldier(null),
-            5
+            0
         );
         // Fallback spawner when soldier pool is not registered
         ServiceRegistry.register('SoldierSpawner', (parent: Node, x: number, z: number) =>

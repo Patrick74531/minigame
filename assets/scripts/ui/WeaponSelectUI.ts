@@ -118,6 +118,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         const cardContainer = new Node('CardContainer');
         cardContainer.layer = UI_LAYER;
         this._rootNode.addChild(cardContainer);
+        cardContainer.addComponent(UITransform).setContentSize(totalWidth, CARD_HEIGHT);
 
         if (size && totalWidth > size.width - 100) {
             const scale = (size.width - 100) / totalWidth;
@@ -233,8 +234,8 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         const nameLabel = nameNode.addComponent(Label);
         nameLabel.string = Localization.instance.t(def.nameKey);
         SelectionCardTheme.applyLabelTheme(nameLabel, {
-            fontSize: 30,
-            lineHeight: 34,
+            fontSize: 28,
+            lineHeight: 32,
             color: Color.WHITE,
             bold: true,
             hAlign: Label.HorizontalAlign.CENTER,
@@ -243,6 +244,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
             outlineWidth: 3,
         });
         nameLabel.overflow = Label.Overflow.SHRINK;
+        nameLabel.enableWrapText = false;
         nameNode.setPosition(0, CARD_HEIGHT / 2 - 42, 0);
 
         // 等级标签
@@ -269,8 +271,8 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         const descLabel = descNode.addComponent(Label);
         descLabel.string = Localization.instance.t(def.descriptionKey);
         SelectionCardTheme.applyLabelTheme(descLabel, {
-            fontSize: 18,
-            lineHeight: 24,
+            fontSize: 17,
+            lineHeight: 23,
             color: new Color(194, 208, 232, 255),
             hAlign: Label.HorizontalAlign.CENTER,
             vAlign: Label.VerticalAlign.TOP,
@@ -279,6 +281,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
             shadowBlur: 1,
         });
         descLabel.overflow = Label.Overflow.SHRINK;
+        descLabel.enableWrapText = true;
         descNode.setPosition(0, 34, 0);
 
         // 武器图标 (替代原有的 Stats)

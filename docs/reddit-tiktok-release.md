@@ -10,12 +10,12 @@
 ## 2. 构建命令
 
 - Reddit 构建：`npm run build:reddit`
-- TikTok 构建：`npm run build:tiktok`
+- TikTok Native 构建：`npm run build:tiktok:native`
 
 说明：
 
 - `build:reddit` 会开启 `GVR_ENABLE_REDDIT_CSP_PATCH=1`，执行 Reddit/Devvit CSP 相关补丁。
-- `build:tiktok` 会关闭该补丁，并自动注入 `platform-config.js`（设置 `window.__GVR_PLATFORM__='tiktok'`）。
+- `build:tiktok:native` 会关闭 Reddit CSP 补丁，仅走 TikTok Native 打包流程。
 
 ## 3. 以后发布 Reddit 的步骤
 
@@ -29,13 +29,15 @@
 
 ## 4. 以后发布 TikTok 的步骤
 
-1. 执行 `npm run build:tiktok`
-2. 使用构建产物目录 `dist/tiktok-package/webroot` 作为 TikTok Mini Game 上传包
+1. 执行 `npm run build:tiktok:native`
+2. 使用输出 zip（`dist/tiktok-package/tiktok-native-*.zip`）作为 TikTok Mini Game 上传包（选择 `Native` 资产类型）
 3. 在 TikTok 平台后台配置你的后端域名白名单（用于 `/api/tiktok/*`）
+4. 如 DevTool 出现旧包缓存，清理 `~/__TTMG__/<client_key>` 后重新上传最新 zip
 
-产物目录：
+产物：
 
-- `dist/tiktok-package/webroot`
+- `dist/tiktok-package/native`
+- `dist/tiktok-package/tiktok-native-*.zip`
 
 ## 5. TikTok 后端对接约定
 
@@ -50,3 +52,8 @@
 可选：
 
 - 通过全局变量覆盖接口前缀：`window.__GVR_TIKTOK_API_BASE__ = 'https://your-domain/api/tiktok'`
+
+## 6. 常见问题排查
+
+- 报错 `assets/resources/config.json` not found：通常是上传了旧 zip 或本地缓存还是旧包；确认使用最新 `dist/tiktok-package/tiktok-native-*.zip`，并清理 `~/__TTMG__/<client_key>`
+- 如果构建脚本成功但运行仍异常，先检查打包日志中是否存在：`Integrity check passed: core=gamecore, deferred=resources`

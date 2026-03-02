@@ -1,0 +1,184 @@
+<% if (isUsePhysX) { %>
+const systemInfo = tt.getSystemInfoSync();
+// a hack way to load physics provide by bytedance
+if (tt.getPhysx) {
+    tt.getPhysx({
+        success (physx) {
+            if (!physx) {
+                console.error('can not use native PhysX');
+            } else {
+                console.info('physics plugin load success, version=' + physx.getVersion());
+                GameGlobal.nativePhysX = physx;
+            }
+            loadCC();
+        },
+        fail () {
+            loadCC();
+        }
+    });
+} else if (systemInfo.platform === 'android' && tt.getLoader && tt.getLoader()) {
+    const appid = "<%= appid %>";
+    const loader = tt.getLoader().loader;
+    loader.load('physics', appid, "token", message => {
+        if (message) {
+            console.error('[tt.loader]:' + message);
+        } else {
+            console.info('[tt.loader]: physics plugin load success, version=' + tt.getPhy().getVersion());
+            GameGlobal.nativePhysX = tt.getPhy();
+        }
+        loadCC();
+    });
+} else {
+    loadCC();
+}
+<% } %>
+
+const tryLandscapeAPIs = () => {
+    const candidates = [];
+    if (typeof tt !== 'undefined' && tt) candidates.push(tt);
+
+    const ttMinisGame =
+        typeof TTMinis !== 'undefined' && TTMinis && TTMinis.game ? TTMinis.game : null;
+    if (ttMinisGame) candidates.push(ttMinisGame);
+
+    const payloads = [
+        { value: 'landscape' },
+        { orientation: 'landscape' },
+        { direction: 'landscape' },
+    ];
+
+    const names = ['setDeviceOrientation', 'setScreenOrientation', 'setGameOrientation'];
+    for (let i = 0; i < candidates.length; i += 1) {
+        const api = candidates[i];
+        for (let j = 0; j < names.length; j += 1) {
+            const fn = api[names[j]];
+            if (typeof fn !== 'function') continue;
+            for (let k = 0; k < payloads.length; k += 1) {
+                try {
+                    fn.call(api, payloads[k]);
+                    break;
+                } catch (_e) {
+                    // try next signature
+                }
+            }
+        }
+    }
+};
+
+tryLandscapeAPIs();
+
+<% if (!isUsePhysX) { %>
+loadCC();
+<% } %>
+
+function loadCC() {
+    require('./web-adapter');
+
+    const normalizeProjectPath = (urlNoSchema) => {
+        const v = String(urlNoSchema || '');
+        if (v.length === 0) return './';
+        if (v[0] === '.') return v;
+        if (v[0] === '/') return `.${v}`;
+        return `./${v}`;
+    };
+
+    const requireProjectPath = (urlNoSchema) => {
+        return require(normalizeProjectPath(urlNoSchema));
+    };
+
+<% if(polyfillsBundleFile) { %>
+    // Polyfills bundle.
+    requireProjectPath("<%= polyfillsBundleFile %>");
+<% } %>
+
+    // SystemJS support.
+    requireProjectPath("<%= systemJsBundleFile %>");
+
+    // Keep canvas orientation aligned to project config first, then runtime hints.
+    if (canvas){
+        const readLandscapeFlag = (value) => {
+            const normalized = String(value || '').toLowerCase();
+            if (normalized === 'landscape' || normalized === 'horizontal') return true;
+            if (normalized === 'portrait' || normalized === 'vertical') return false;
+            return null;
+        };
+
+        const getTargetOrientation = () => {
+            try {
+                const gameConf = require('./game.json') || {};
+                const byDevice = readLandscapeFlag(gameConf.deviceOrientation);
+                if (byDevice !== null) return { landscape: byDevice, source: 'game.json.deviceOrientation' };
+                const byOrientation = readLandscapeFlag(gameConf.orientation);
+                if (byOrientation !== null) return { landscape: byOrientation, source: 'game.json.orientation' };
+            } catch (_e0) {}
+
+            try {
+                const miniConf = require('./minigame.config.json') || {};
+                const byMini = readLandscapeFlag(miniConf.orientation);
+                if (byMini !== null) return { landscape: byMini, source: 'minigame.config.orientation' };
+            } catch (_e1) {}
+
+            try {
+                if (typeof tt !== 'undefined' && tt && typeof tt.getSystemInfoSync === 'function') {
+                    const sys = tt.getSystemInfoSync() || {};
+                    const sw = Number(sys.screenWidth || sys.windowWidth || 0);
+                    const sh = Number(sys.screenHeight || sys.windowHeight || 0);
+                    if (sw > 0 && sh > 0) {
+                        return { landscape: sw >= sh, source: 'systemInfo' };
+                    }
+                }
+            } catch (_e2) {}
+
+            return { landscape: canvas.width >= canvas.height, source: 'canvas' };
+        };
+
+        const target = getTargetOrientation();
+        const shouldLandscape = !!target.landscape;
+        const isLandscapeCanvas = canvas.width >= canvas.height;
+        if (shouldLandscape !== isLandscapeCanvas) {
+            const tmp = canvas.width;
+            canvas.width = canvas.height;
+            canvas.height = tmp;
+        }
+        try {
+            console.log('[BOOT] orientation target=' + (shouldLandscape ? 'landscape' : 'portrait')
+                + ' source=' + target.source + ' canvas=' + canvas.width + 'x' + canvas.height);
+        } catch (_e3) {}
+    }
+
+    // Adjust initial canvas size
+    if (canvas && window.devicePixelRatio >= 2) {canvas.width *= 2; canvas.height *= 2;}
+
+    const importMapFilePath = normalizeProjectPath("<%= importMapFile%>");
+    const importMap = require(importMapFilePath).default;
+    System.warmup({
+        importMap,
+        importMapUrl: importMapFilePath,
+        defaultHandler: (urlNoSchema) => {
+            requireProjectPath(urlNoSchema);
+        },
+        handlers: {
+            'plugin:': (urlNoSchema) => {
+                typeof requirePlugin === 'function' ? requirePlugin(urlNoSchema) : require(urlNoSchema);
+            },
+            'project:': (urlNoSchema) => {
+                requireProjectPath(urlNoSchema);
+            },
+        },
+    });
+
+    System.import('<%= applicationJs %>').then(({ Application }) => {
+        return new Application();
+    }).then((application) => {
+        return onApplicationCreated(application);
+    }).catch((err) => {
+        console.error(err);
+    });
+
+    function onApplicationCreated(application) {
+        return System.import('cc').then((cc) => {
+            require('./engine-adapter');
+            return application.init(cc);
+        }).then(() => { return application.start(); });
+    }
+}

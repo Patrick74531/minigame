@@ -47,12 +47,12 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
 
         this.createTitle(this._root, viewport.width, viewport.height);
 
+        const totalWidth = items.length * CARD_WIDTH + (items.length - 1) * CARD_GAP;
         const cardContainer = new Node('ItemCardContainer');
         cardContainer.layer = UI_LAYER;
-        cardContainer.addComponent(UITransform);
+        cardContainer.addComponent(UITransform).setContentSize(totalWidth, CARD_HEIGHT);
         this._root.addChild(cardContainer);
 
-        const totalWidth = items.length * CARD_WIDTH + (items.length - 1) * CARD_GAP;
         const size = this._root.getComponent(UITransform)?.contentSize;
         if (size && totalWidth > size.width - 100) {
             const scale = (size.width - 100) / totalWidth;
@@ -158,6 +158,7 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         nameLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         nameLabel.verticalAlign = Label.VerticalAlign.CENTER;
         nameLabel.overflow = Label.Overflow.SHRINK;
+        nameLabel.enableWrapText = false;
         SelectionCardTheme.applyLabelTheme(nameLabel, {
             fontSize: 22,
             lineHeight: 26,
@@ -177,7 +178,8 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         descLabel.string = Localization.instance.t(def.shortKey);
         descLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         descLabel.verticalAlign = Label.VerticalAlign.CENTER;
-        descLabel.overflow = Label.Overflow.CLAMP;
+        descLabel.overflow = Label.Overflow.SHRINK;
+        descLabel.enableWrapText = true;
         SelectionCardTheme.applyLabelTheme(descLabel, {
             fontSize: 16,
             lineHeight: 22,
