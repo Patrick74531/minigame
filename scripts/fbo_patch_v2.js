@@ -48,8 +48,8 @@ const preludeA = `
                 var pLeftInset = sa.left || 0;
                 var pRightInset = sw - (sa.right || sw);
                 info.safeArea = {
-                    left: pBotInset, top: pLeftInset,
-                    right: sh - pTopInset, bottom: sw - pRightInset,
+                    left: pTopInset, top: pRightInset,
+                    right: sh - pBotInset, bottom: sw - pLeftInset,
                     width: sh - pTopInset - pBotInset,
                     height: sw - pLeftInset - pRightInset
                 };
@@ -75,8 +75,8 @@ const preludeA = `
     var _remapTouch = function(t) {
         var ox = t.clientX !== undefined ? t.clientX : (t.x || 0);
         var oy = t.clientY !== undefined ? t.clientY : (t.y || 0);
-        var nx = lw - oy;
-        var ny = ox;
+        var nx = oy;
+        var ny = lh - ox;
         if (_touchDbgCount < 5) {
             console.log('[FBO] touch remap (' + ox.toFixed(1) + ',' + oy.toFixed(1) + ')->(' + nx.toFixed(1) + ',' + ny.toFixed(1) + ')');
         }
@@ -204,12 +204,12 @@ const preludeB = `
         gl.bindRenderbuffer(gl.RENDERBUFFER, null);
         gl.bindTexture(gl.TEXTURE_2D, null);
 
-        // Blit shader: 90-deg CW rotation.
+        // Blit shader: 90-deg CCW rotation.
         var vs = gl.createShader(gl.VERTEX_SHADER);
         gl.shaderSource(vs, 'attribute vec2 a_pos; varying vec2 v_uv; void main(){ v_uv=a_pos*0.5+0.5; gl_Position=vec4(a_pos,0.0,1.0); }');
         gl.compileShader(vs);
         var fs = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(fs, 'precision mediump float; varying vec2 v_uv; uniform sampler2D u_tex; void main(){ gl_FragColor=texture2D(u_tex,vec2(v_uv.y,1.0-v_uv.x)); }');
+        gl.shaderSource(fs, 'precision mediump float; varying vec2 v_uv; uniform sampler2D u_tex; void main(){ gl_FragColor=texture2D(u_tex,vec2(1.0-v_uv.y,v_uv.x)); }');
         gl.compileShader(fs);
         _blitProg = gl.createProgram();
         gl.attachShader(_blitProg, vs);

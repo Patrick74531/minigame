@@ -24,6 +24,35 @@ export class CoinFactory {
     private static _isLoading: boolean = false;
     private static _loadFailed: boolean = false;
     private static _fallbackWarned: boolean = false;
+    private static _onReadyCallbacks: Array<() => void> = [];
+
+    public static get isReady(): boolean {
+        return !!this._starCoinPrefab;
+    }
+
+    public static get hasFailed(): boolean {
+        return this._loadFailed;
+    }
+
+    /** Register a callback that fires once when the prefab is loaded (or immediately if already ready/failed). */
+    public static onReady(cb: () => void): void {
+        if (this._starCoinPrefab || this._loadFailed) {
+            cb();
+            return;
+        }
+        this._onReadyCallbacks.push(cb);
+    }
+
+    private static _flushReadyCallbacks(): void {
+        const cbs = this._onReadyCallbacks.splice(0);
+        for (const cb of cbs) {
+            try {
+                cb();
+            } catch (e) {
+                console.warn('[CoinFactory] onReady callback error', e);
+            }
+        }
+    }
 
     public static loadResources(): void {
         if (this._isLoading || this._starCoinPrefab || this._loadFailed) return;
@@ -37,6 +66,7 @@ export class CoinFactory {
                 );
                 this._starCoinPrefab = prefab;
                 this._isLoading = false;
+                this._flushReadyCallbacks();
                 return;
             }
 
@@ -51,9 +81,12 @@ export class CoinFactory {
                     this._starCoinPrefab = prefab2;
                 } else {
                     this._loadFailed = true;
-                    console.warn('[CoinFactory] StarCoin prefab unavailable, fallback to cube coin.');
+                    console.warn(
+                        '[CoinFactory] StarCoin prefab unavailable, fallback to cube coin.'
+                    );
                 }
                 this._isLoading = false;
+                this._flushReadyCallbacks();
             });
         });
     }

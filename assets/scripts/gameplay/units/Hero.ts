@@ -269,6 +269,22 @@ export class Hero extends Unit {
             return;
         }
 
+        // On TikTok the coin prefab may still be loading (deferred resources bundle).
+        // Wait for it before creating coins to avoid fallback cubes.
+        if (safeCount > 0 && !CoinFactory.isReady && !CoinFactory.hasFailed) {
+            CoinFactory.loadResources(); // ensure loading has started
+            CoinFactory.onReady(() => {
+                if (this.node?.isValid) this._doRestoreCoins(safeCount);
+            });
+            return;
+        }
+
+        this._doRestoreCoins(safeCount);
+    }
+
+    private _doRestoreCoins(safeCount: number): void {
+        if (!this._stackVisualizer) return;
+
         // Clear existing carried coins first to avoid duplication on repeated restore calls.
         while (this._stackVisualizer.count > 0) {
             const existing = this._stackVisualizer.popFromStack();
@@ -362,8 +378,12 @@ export class Hero extends Unit {
             const mr = this._rainbowMRs[i];
             if (!mr?.isValid || !mr.material) continue;
             const orig = this._rainbowOrigColors[i] ?? new Color(255, 255, 255, 255);
-            try { mr.material.setProperty('mainColor', orig); } catch (_) {}
-            try { mr.material.setProperty('emissive', new Color(0, 0, 0, 255)); } catch (_) {}
+            try {
+                mr.material.setProperty('mainColor', orig);
+            } catch (_) {}
+            try {
+                mr.material.setProperty('emissive', new Color(0, 0, 0, 255));
+            } catch (_) {}
         }
     }
 
@@ -388,7 +408,9 @@ export class Hero extends Unit {
 
         for (const mr of this._rainbowMRs) {
             if (!mr?.isValid || !mr.material) continue;
-            try { mr.material.setProperty('mainColor', color); } catch (_) {}
+            try {
+                mr.material.setProperty('mainColor', color);
+            } catch (_) {}
             // Emissive boost on standard materials — makes the glow pop
             const esc = showColor ? 0.35 : 0;
             try {
@@ -556,7 +578,10 @@ export class Hero extends Unit {
             // attackMultiplier carries ALL hero attack buffs: level-up, buff cards, base upgrades
             damage: Math.max(
                 1,
-                base.damage * attackMultiplier * heroSkill.WEAPON_DAMAGE_MULTIPLIER * typeDamageScale
+                base.damage *
+                    attackMultiplier *
+                    heroSkill.WEAPON_DAMAGE_MULTIPLIER *
+                    typeDamageScale
             ),
             range: Math.max(0.1, base.range * rangeMultiplier * heroSkill.WEAPON_RANGE_MULTIPLIER),
             attackInterval: Math.max(

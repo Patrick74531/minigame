@@ -157,13 +157,23 @@ export class UIFactory {
 
         this._loadCurrencyIconSprite(panelNode, 'icon/coins', iconSize, coinIconX);
         const coinsLabel = this._currencyVal(
-            panelNode, '0', new Color(255, 216, 95, 255), new Color(34, 16, 4, 255),
-            valW, panelH, coinValX
+            panelNode,
+            '0',
+            new Color(255, 216, 95, 255),
+            new Color(34, 16, 4, 255),
+            valW,
+            panelH,
+            coinValX
         );
         this._loadCurrencyIconSprite(panelNode, 'icon/diamonds', iconSize, diamIconX);
         const diamondsLabel = this._currencyVal(
-            panelNode, '0', new Color(100, 210, 255, 255), new Color(0, 40, 80, 255),
-            valW, panelH, diamValX
+            panelNode,
+            '0',
+            new Color(100, 210, 255, 255),
+            new Color(0, 40, 80, 255),
+            valW,
+            panelH,
+            diamValX
         );
 
         return { coinsLabel, diamondsLabel, panelNode };
@@ -194,13 +204,19 @@ export class UIFactory {
                 sprite.spriteFrame = sf;
                 return;
             }
-            resources.load(resourcePath, Texture2D, (err2, tex) => {
+            console.debug(
+                `[UIFactory] icon '${resourcePath}' SpriteFrame failed: ${err?.message ?? 'null'}`
+            );
+            resources.load(resourcePath + '/texture', Texture2D, (err2, tex) => {
                 if (!err2 && tex && iconNode.isValid) {
                     const sf2 = new SpriteFrame();
                     sf2.texture = tex;
                     sprite.spriteFrame = sf2;
                     return;
                 }
+                console.debug(
+                    `[UIFactory] icon '${resourcePath}/texture' Tex2D failed: ${err2?.message ?? 'null'}`
+                );
                 // Final fallback: load as ImageAsset
                 resources.load(resourcePath, ImageAsset, (err3, img) => {
                     if (!err3 && img && iconNode.isValid) {
@@ -209,7 +225,11 @@ export class UIFactory {
                         const sf3 = new SpriteFrame();
                         sf3.texture = tex2;
                         sprite.spriteFrame = sf3;
+                        return;
                     }
+                    console.warn(
+                        `[UIFactory] icon '${resourcePath}' ALL fallbacks failed: ${err3?.message ?? 'null'}`
+                    );
                 });
             });
         });
