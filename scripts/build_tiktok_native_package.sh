@@ -433,14 +433,13 @@ NODE
   fi
 
   # Text compatibility fallback:
-  # Keep only lightweight symbol/font replacements; do not mass-rewrite cacheMode
-  # in compiled JS, otherwise engine/runtime logic may be affected.
+  # Keep only lightweight font-name normalization. Do not rewrite item icon symbols
+  # to ASCII letters, otherwise UI will show W/!/F/U/S instead of intended icons.
   for text_js in \
     "${subpackage_root}/assets/main/index.js" \
     "${subpackage_root}/game.pack.js"; do
     if [ -f "${text_js}" ]; then
-      # Font/icon fallback for mini-game runtimes that have partial glyph support.
-      perl -CSDA -Mutf8 -0pi -e "s/Arial Black/Arial/g; s/\\x{1F527}/W/g; s/\\x{26A1}/!/g; s/\\x{1F6E1}/S/g; s/\\x{2744}/F/g; s/\\x{2B06}/U/g;" "${text_js}"
+      perl -CSDA -Mutf8 -0pi -e "s/Arial Black/Arial/g;" "${text_js}"
     fi
   done
 
