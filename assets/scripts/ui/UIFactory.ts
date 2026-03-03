@@ -16,6 +16,7 @@ import {
     Texture2D,
     ImageAsset,
     resources,
+    assetManager,
 } from 'cc';
 import { Joystick } from './Joystick';
 import { Localization } from '../core/i18n/Localization';
@@ -29,6 +30,10 @@ export class UIFactory {
     private static readonly UI_LAYER = 33554432;
     private static readonly DESIGN_WIDTH = 1280;
     private static readonly DESIGN_HEIGHT = 720;
+    private static readonly CURRENCY_ICON_MAX_RETRIES = 8;
+    private static _resourcesReady = false;
+    private static _resourcesLoading = false;
+    private static _resourcesWaiters: Array<() => void> = [];
 
     public static createUICanvas(): Node {
         const node = new Node('UICanvas');
@@ -198,41 +203,165 @@ export class UIFactory {
         sprite.type = Sprite.Type.SIMPLE;
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
 
-        // Try loading as SpriteFrame first, then ImageAsset fallback
-        resources.load(resourcePath, SpriteFrame, (err, sf) => {
-            if (!err && sf && iconNode.isValid) {
-                sprite.spriteFrame = sf;
+        this._loadCurrencyIconWithRetry(resourcePath, 0, frame => {
+            if (!frame || !iconNode.isValid) {
                 return;
             }
-            console.debug(
-                `[UIFactory] icon '${resourcePath}' SpriteFrame failed: ${err?.message ?? 'null'}`
-            );
-            resources.load(resourcePath + '/texture', Texture2D, (err2, tex) => {
-                if (!err2 && tex && iconNode.isValid) {
-                    const sf2 = new SpriteFrame();
-                    sf2.texture = tex;
-                    sprite.spriteFrame = sf2;
+            sprite.spriteFrame = frame;
+        });
+    }
+
+    private static _iconLoadCandidates(path: string): string[] {
+        const raw = [
+            path,
+            `${path}/spriteFrame`,
+            `${path}/texture`,
+            path.endsWith('.webp') ? path : `${path}.webp`,
+            path.endsWith('.webp') ? `${path}/spriteFrame` : `${path}.webp/spriteFrame`,
+            path.endsWith('.webp') ? `${path}/texture` : `${path}.webp/texture`,
+        ];
+
+        const deduped: string[] = [];
+        for (const candidate of raw) {
+            if (!candidate || deduped.includes(candidate)) continue;
+            deduped.push(candidate);
+        }
+        return deduped;
+    }
+
+    private static _loadCurrencyIconByCandidate(
+        candidates: string[],
+        index: number,
+        done: (frame: SpriteFrame | null, lastError: string | null) => void
+    ): void {
+        if (index >= candidates.length) {
+            done(null, null);
+            return;
+        }
+
+        const candidate = candidates[index];
+        resources.load(candidate, SpriteFrame, (sfErr, spriteFrame) => {
+            if (!sfErr && spriteFrame) {
+                done(spriteFrame, null);
+                return;
+            }
+
+            resources.load(candidate, Texture2D, (texErr, texture) => {
+                if (!texErr && texture) {
+                    const frame = new SpriteFrame();
+                    frame.texture = texture;
+                    done(frame, null);
                     return;
                 }
-                console.debug(
-                    `[UIFactory] icon '${resourcePath}/texture' Tex2D failed: ${err2?.message ?? 'null'}`
-                );
-                // Final fallback: load as ImageAsset
-                resources.load(resourcePath, ImageAsset, (err3, img) => {
-                    if (!err3 && img && iconNode.isValid) {
-                        const tex2 = new Texture2D();
-                        tex2.image = img;
-                        const sf3 = new SpriteFrame();
-                        sf3.texture = tex2;
-                        sprite.spriteFrame = sf3;
+
+                resources.load(candidate, ImageAsset, (imgErr, imageAsset) => {
+                    if (!imgErr && imageAsset) {
+                        const textureFromImage = new Texture2D();
+                        textureFromImage.image = imageAsset;
+                        const frameFromImage = new SpriteFrame();
+                        frameFromImage.texture = textureFromImage;
+                        done(frameFromImage, null);
                         return;
                     }
-                    console.warn(
-                        `[UIFactory] icon '${resourcePath}' ALL fallbacks failed: ${err3?.message ?? 'null'}`
-                    );
+
+                    const errMsg =
+                        sfErr?.message ??
+                        texErr?.message ??
+                        imgErr?.message ??
+                        'incompatible asset';
+                    console.debug(`[UIFactory] icon '${candidate}' load failed: ${errMsg}`);
+                    this._loadCurrencyIconByCandidate(candidates, index + 1, (frame, nextError) => {
+                        done(frame, nextError ?? errMsg);
+                    });
                 });
             });
         });
+    }
+
+    private static _loadCurrencyIconWithRetry(
+        resourcePath: string,
+        attempt: number,
+        done: (frame: SpriteFrame | null) => void
+    ): void {
+        this._ensureResourcesBundleReady(() => {
+            const candidates = this._iconLoadCandidates(resourcePath);
+            this._loadCurrencyIconByCandidate(candidates, 0, (frame, lastError) => {
+                if (frame) {
+                    done(frame);
+                    return;
+                }
+
+                if (attempt < this.CURRENCY_ICON_MAX_RETRIES - 1) {
+                    const delayMs = Math.min(1200, 180 * (attempt + 1));
+                    console.warn(
+                        `[UIFactory] icon '${resourcePath}' not ready, retry ${attempt + 1}/${this.CURRENCY_ICON_MAX_RETRIES} in ${delayMs}ms (${lastError ?? 'no compatible asset'})`
+                    );
+                    setTimeout(() => {
+                        this._loadCurrencyIconWithRetry(resourcePath, attempt + 1, done);
+                    }, delayMs);
+                    return;
+                }
+
+                console.warn(
+                    `[UIFactory] icon '${resourcePath}' ALL fallbacks failed after retries: ${lastError ?? 'no compatible asset'}`
+                );
+                done(null);
+            });
+        });
+    }
+
+    private static _ensureResourcesBundleReady(onReady: () => void): void {
+        if (this._resourcesReady || assetManager.getBundle('resources')) {
+            this._resourcesReady = true;
+            onReady();
+            return;
+        }
+
+        this._resourcesWaiters.push(onReady);
+        if (this._resourcesLoading) return;
+        this._resourcesLoading = true;
+
+        const flush = () => {
+            this._resourcesLoading = false;
+            this._resourcesReady = !!assetManager.getBundle('resources');
+            const waiters = this._resourcesWaiters.splice(0);
+            for (const waiter of waiters) {
+                waiter();
+            }
+        };
+
+        const tryLoadBundle = () => {
+            assetManager.loadBundle('resources', () => {
+                flush();
+            });
+        };
+
+        const ttLike = (
+            globalThis as unknown as {
+                tt?: {
+                    loadSubpackage?: (options: {
+                        name: string;
+                        success?: () => void;
+                        fail?: (err: unknown) => void;
+                    }) => void;
+                };
+            }
+        ).tt;
+
+        if (ttLike?.loadSubpackage) {
+            ttLike.loadSubpackage({
+                name: 'resources',
+                success: () => {
+                    tryLoadBundle();
+                },
+                fail: () => {
+                    tryLoadBundle();
+                },
+            });
+            return;
+        }
+
+        tryLoadBundle();
     }
 
     private static _currencyVal(
