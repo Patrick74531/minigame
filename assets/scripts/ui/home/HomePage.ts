@@ -794,12 +794,18 @@ export class HomePage extends Component {
     }
 
     private onStartClick() {
-        if (this._onStartRequested) {
-            this._onStartRequested();
-        } else {
-            GameManager.instance.startGame();
-            this.node.destroy();
-        }
+        this._refreshTikTokIdentityOnGesture()
+            .catch((err: unknown) => {
+                console.warn('[HomePage] TikTok identity refresh skipped:', err);
+            })
+            .finally(() => {
+                if (this._onStartRequested) {
+                    this._onStartRequested();
+                } else {
+                    GameManager.instance.startGame();
+                    this.node.destroy();
+                }
+            });
     }
 
     private onContinueClick() {
@@ -814,10 +820,14 @@ export class HomePage extends Component {
             this._leaderboardPanel = null;
             return;
         }
-        this._leaderboardPanel = new LeaderboardPanel(this.node, () => {
-            this._leaderboardPanel?.destroy();
-            this._leaderboardPanel = null;
-        });
+        this._leaderboardPanel = new LeaderboardPanel(
+            this.node,
+            () => {
+                this._leaderboardPanel?.destroy();
+                this._leaderboardPanel = null;
+            },
+            this._socialBridge.platform === 'reddit'
+        );
         const bridge = this._socialBridge;
         const cached = bridge.cachedLeaderboard;
         if (cached.length > 0) {
@@ -981,6 +991,528 @@ export class HomePage extends Component {
         if (!this._diamondLabel) return;
         const ds = DiamondService.instance;
         this._diamondLabel.string = String(ds.balance);
+    }
+
+    private async _refreshTikTokIdentityOnGesture(): Promise<void> {
+        if (this._socialBridge.platform !== 'tiktok') return;
+        const candidates = this._collectTikTokHosts();
+        if (candidates.length === 0) {
+            console.log('[HomePage] TikTok host missing for identity refresh');
+            return;
+        }
+
+        let profile: { userId: string; displayName: string; avatarUrl: string } | null = null;
+        for (const candidate of candidates) {
+            this._logTikTokHostCapabilities(candidate.name, candidate.api);
+            profile = await this._requestTikTokProfile(candidate.api, candidate.name);
+            if (profile?.userId && profile.displayName) break;
+        }
+        if (!profile) {
+            console.log('[HomePage] TikTok profile unavailable after user gesture');
+            return;
+        }
+        this._applyTikTokIdentityProfile(profile, 'gesture');
+    }
+
+    private _collectTikTokHosts(): Array<{ name: string; api: Record<string, unknown> }> {
+        const g = globalThis as unknown as Record<string, unknown>;
+        const out: Array<{ name: string; api: Record<string, unknown> }> = [];
+        const push = (name: string, api: unknown) => {
+            if (!api || typeof api !== 'object') return;
+            const ref = api as Record<string, unknown>;
+            if (out.some(item => item.api === ref)) return;
+            out.push({ name, api: ref });
+        };
+
+        push('tt', g['tt']);
+        const ttMinis = g['TTMinis'] as Record<string, unknown> | undefined;
+        push('TTMinis', ttMinis);
+        push('TTMinis.game', ttMinis?.['game']);
+        return out;
+    }
+
+    private _logTikTokHostCapabilities(hostName: string, host: Record<string, unknown>): void {
+        const keys = Object.keys(host)
+            .filter(key => /user|auth|profile|account|login|open|nick/i.test(key))
+            .slice(0, 40);
+        console.log(
+            `[HomePage] ${hostName} candidate APIs: ${keys.length > 0 ? keys.join(',') : 'none'}`
+        );
+    }
+
+    private _requestTikTokProfile(
+        host: Record<string, unknown>,
+        hostName: string
+    ): Promise<{ userId: string; displayName: string; avatarUrl: string } | null> {
+        type AuthProbe = {
+            profile: { userId: string; displayName: string; avatarUrl: string } | null;
+            code: string;
+        };
+
+        const requestCodeFromApi = (
+            apiName: 'authorize' | 'login',
+            extraArgs: Record<string, unknown> = {}
+        ) =>
+            new Promise<AuthProbe>(resolve => {
+                let settled = false;
+                const settle = (value: AuthProbe) => {
+                    if (settled) return;
+                    settled = true;
+                    resolve(value);
+                };
+                const fn = host[apiName] as
+                    | ((args: Record<string, unknown>) => unknown)
+                    | undefined;
+                if (typeof fn !== 'function') {
+                    console.log(`[HomePage] ${hostName}.${apiName} API missing`);
+                    settle({ profile: null, code: '' });
+                    return;
+                }
+
+                const onResponse = (raw: unknown) => {
+                    console.log(
+                        `[HomePage] ${hostName}.${apiName} response: ${this._describeTikTokRaw(raw)}`
+                    );
+                    settle({
+                        profile: this._extractTikTokProfile(raw),
+                        code: this._extractTikTokAuthCode(raw),
+                    });
+                };
+                try {
+                    const req: Record<string, unknown> = {
+                        ...extraArgs,
+                        success: (res: unknown) => {
+                            console.log(`[HomePage] ${hostName}.${apiName} success`);
+                            onResponse(res);
+                        },
+                        fail: (err: unknown) => {
+                            console.log(
+                                `[HomePage] ${hostName}.${apiName} fail: ${this._describeTikTokRaw(err)}`
+                            );
+                            settle({ profile: null, code: '' });
+                        },
+                    };
+                    const ret = fn.call(host, req);
+                    if (ret && typeof (ret as Promise<unknown>).then === 'function') {
+                        (ret as Promise<unknown>)
+                            .then((res: unknown) => {
+                                console.log(`[HomePage] ${hostName}.${apiName} promise resolved`);
+                                onResponse(res);
+                            })
+                            .catch((err: unknown) => {
+                                console.log(
+                                    `[HomePage] ${hostName}.${apiName} promise rejected: ${this._describeTikTokRaw(err)}`
+                                );
+                                settle({ profile: null, code: '' });
+                            });
+                    }
+                } catch {
+                    console.log(`[HomePage] ${hostName}.${apiName} threw`);
+                    settle({ profile: null, code: '' });
+                }
+            });
+
+        const requestFromApi = (apiName: string) =>
+            new Promise<{ userId: string; displayName: string; avatarUrl: string } | null>(
+                resolve => {
+                    const fn = host[apiName] as
+                        | ((args: Record<string, unknown>) => unknown)
+                        | undefined;
+                    if (typeof fn !== 'function') {
+                        console.log(`[HomePage] ${hostName}.${apiName} missing on host`);
+                        resolve(null);
+                        return;
+                    }
+
+                    const done = (raw: unknown) => {
+                        console.log(
+                            `[HomePage] ${hostName}.${apiName} response: ${this._describeTikTokRaw(raw)}`
+                        );
+                        resolve(this._extractTikTokProfile(raw));
+                    };
+                    try {
+                        const req: Record<string, unknown> = {
+                            withCredentials: true,
+                            lang: 'zh_CN',
+                            desc: '用于排行榜展示昵称',
+                            success: (res: unknown) => done(res),
+                            fail: (err: unknown) => {
+                                console.log(
+                                    `[HomePage] ${hostName}.${apiName} fail: ${this._describeTikTokRaw(err)}`
+                                );
+                                resolve(null);
+                            },
+                        };
+                        const ret = fn.call(host, req);
+                        if (ret && typeof (ret as Promise<unknown>).then === 'function') {
+                            (ret as Promise<unknown>).then(done).catch((err: unknown) => {
+                                console.log(
+                                    `[HomePage] ${hostName}.${apiName} reject: ${this._describeTikTokRaw(err)}`
+                                );
+                                resolve(null);
+                            });
+                        }
+                    } catch {
+                        console.log(`[HomePage] ${hostName}.${apiName} threw`);
+                        resolve(null);
+                    }
+                }
+            );
+
+        const timeoutMs = 5000;
+        return Promise.race([
+            (async () => {
+                const seenCodes = new Set<string>();
+
+                const authorized = await requestCodeFromApi('authorize', {
+                    scope: 'user.info.basic',
+                });
+                if (authorized.profile?.userId && authorized.profile.displayName) {
+                    return authorized.profile;
+                }
+                if (authorized.code) {
+                    seenCodes.add(authorized.code);
+                    const exchanged = await this._exchangeTikTokCodeForProfile(
+                        authorized.code,
+                        hostName,
+                        'authorize'
+                    );
+                    if (exchanged) return exchanged;
+                }
+
+                const loggedIn = await requestCodeFromApi('login');
+                if (loggedIn.profile?.userId && loggedIn.profile.displayName) {
+                    return loggedIn.profile;
+                }
+                if (loggedIn.code && !seenCodes.has(loggedIn.code)) {
+                    const exchanged = await this._exchangeTikTokCodeForProfile(
+                        loggedIn.code,
+                        hostName,
+                        'login'
+                    );
+                    if (exchanged) return exchanged;
+                }
+
+                const apiCandidates = [
+                    'getUserProfile',
+                    'getUserInfo',
+                    'getUserPublicInfo',
+                    'getProfile',
+                ];
+                for (const apiName of apiCandidates) {
+                    const profile = await requestFromApi(apiName);
+                    if (profile?.userId && profile.displayName) return profile;
+                }
+                return null;
+            })(),
+            new Promise<null>(resolve => {
+                globalThis.setTimeout(() => {
+                    console.log(
+                        `[HomePage] ${hostName} profile probe timed out after ${timeoutMs}ms`
+                    );
+                    resolve(null);
+                }, timeoutMs);
+            }),
+        ]);
+    }
+
+    private async _exchangeTikTokCodeForProfile(
+        code: string,
+        hostName: string,
+        sourceApi: 'authorize' | 'login'
+    ): Promise<{ userId: string; displayName: string; avatarUrl: string } | null> {
+        const normalized = code.trim();
+        if (!normalized) return null;
+
+        const base = this._resolveTikTokApiBase();
+        const url = `${base.replace(/\/+$/, '')}/identity/exchange`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                cache: 'no-store',
+                credentials: 'omit',
+                body: JSON.stringify({ code: normalized }),
+            });
+
+            let payload: unknown = null;
+            try {
+                payload = await response.json();
+            } catch {
+                payload = null;
+            }
+
+            const pick = (obj: unknown, paths: string[][]): string => {
+                for (const path of paths) {
+                    let cursor: unknown = obj;
+                    for (const segment of path) {
+                        if (!cursor || typeof cursor !== 'object') {
+                            cursor = null;
+                            break;
+                        }
+                        cursor = (cursor as Record<string, unknown>)[segment];
+                    }
+                    if (typeof cursor === 'string' && cursor.trim()) {
+                        return cursor.trim();
+                    }
+                }
+                return '';
+            };
+
+            if (!response.ok) {
+                const bodyCode = pick(payload, [
+                    ['code'],
+                    ['error'],
+                    ['error_code'],
+                    ['error', 'code'],
+                ]);
+                const bodyMessage = pick(payload, [
+                    ['message'],
+                    ['error_description'],
+                    ['description'],
+                    ['error', 'message'],
+                ]);
+                const bodyRequestId = pick(payload, [['requestId'], ['request_id'], ['log_id']]);
+                console.log(
+                    `[HomePage] code exchange HTTP ${response.status} from ${hostName}.${sourceApi} code=${
+                        bodyCode || '-'
+                    } message=${bodyMessage || '-'} requestId=${bodyRequestId || '-'}`
+                );
+                return null;
+            }
+
+            const root =
+                payload && typeof payload === 'object'
+                    ? (payload as Record<string, unknown>)['ok'] === true &&
+                      (payload as Record<string, unknown>)['data'] &&
+                      typeof (payload as Record<string, unknown>)['data'] === 'object'
+                        ? ((payload as Record<string, unknown>)['data'] as Record<string, unknown>)
+                        : (payload as Record<string, unknown>)
+                    : null;
+            const profile = this._extractTikTokProfile(root);
+            if (!profile) {
+                console.log(
+                    `[HomePage] code exchange missing profile from ${hostName}.${sourceApi}: ${this._describeTikTokRaw(
+                        payload
+                    )}`
+                );
+                return null;
+            }
+
+            console.log(
+                `[HomePage] code exchange ok from ${hostName}.${sourceApi} displayName=${profile.displayName}`
+            );
+            this._applyTikTokIdentityProfile(profile, `${hostName}.${sourceApi}`);
+            return profile;
+        } catch (err) {
+            console.log(
+                `[HomePage] code exchange fetch failed from ${hostName}.${sourceApi}: ${String(err)}`
+            );
+            return null;
+        }
+    }
+
+    private _applyTikTokIdentityProfile(
+        profile: { userId: string; displayName: string; avatarUrl: string },
+        source: string
+    ): void {
+        const userId = (profile.userId || '').trim();
+        const displayName = (profile.displayName || '').trim();
+        if (!userId || !displayName) return;
+
+        const payload = JSON.stringify({ userId, displayName, avatarUrl: profile.avatarUrl || '' });
+        const token = this._base64EncodeUtf8(payload);
+        if (!token) return;
+
+        const g = globalThis as unknown as Record<string, unknown>;
+        g['__GVR_TIKTOK_USER_ID__'] = userId;
+        g['__GVR_TIKTOK_USERNAME__'] = displayName;
+        g['__GVR_TIKTOK_TOKEN__'] = token;
+
+        if (typeof window !== 'undefined') {
+            const w = window as unknown as Record<string, unknown>;
+            w['__GVR_TIKTOK_USER_ID__'] = userId;
+            w['__GVR_TIKTOK_USERNAME__'] = displayName;
+            w['__GVR_TIKTOK_TOKEN__'] = token;
+            if (typeof window.dispatchEvent === 'function') {
+                try {
+                    if (typeof Event === 'function') {
+                        window.dispatchEvent(new Event('gvr:tiktok-identity-ready'));
+                    }
+                } catch (err) {
+                    console.log(`[HomePage] identity-ready dispatch skipped: ${String(err)}`);
+                }
+            }
+        }
+
+        console.log(
+            `[HomePage] TikTok identity refreshed source=${source} userId=${userId} displayName=${displayName}`
+        );
+
+        // Force bridge sync so backend/player display_name is updated immediately.
+        this._socialBridge.requestInit();
+    }
+
+    private _resolveTikTokApiBase(): string {
+        const read = (obj: Record<string, unknown> | null | undefined): string => {
+            if (!obj) return '';
+            const value = obj['__GVR_TIKTOK_API_BASE__'];
+            if (typeof value !== 'string') return '';
+            const normalized = value.trim();
+            return normalized || '';
+        };
+
+        const g = globalThis as unknown as Record<string, unknown>;
+        const fromGlobal = read(g);
+        if (fromGlobal) return fromGlobal;
+        if (typeof window !== 'undefined') {
+            const fromWindow = read(window as unknown as Record<string, unknown>);
+            if (fromWindow) return fromWindow;
+        }
+        return 'https://tiktok-leaderboard-prod.mineskystudio.workers.dev/api/tiktok';
+    }
+
+    private _extractTikTokAuthCode(raw: unknown): string {
+        if (!raw || typeof raw !== 'object') return '';
+        const root = raw as Record<string, unknown>;
+        const authResponse =
+            root['authResponse'] && typeof root['authResponse'] === 'object'
+                ? (root['authResponse'] as Record<string, unknown>)
+                : null;
+        const info =
+            root['userInfo'] && typeof root['userInfo'] === 'object'
+                ? (root['userInfo'] as Record<string, unknown>)
+                : root;
+
+        const pick = (obj: Record<string, unknown> | null, keys: string[]): string => {
+            if (!obj) return '';
+            for (const key of keys) {
+                const value = obj[key];
+                if (typeof value === 'string' && value.trim()) return value.trim();
+            }
+            return '';
+        };
+
+        return (
+            pick(info, ['code', 'authCode', 'auth_code', 'loginCode', 'login_code']) ||
+            pick(root, ['code', 'authCode', 'auth_code', 'loginCode', 'login_code']) ||
+            pick(authResponse, ['code', 'authCode', 'auth_code']) ||
+            ''
+        );
+    }
+
+    private _extractTikTokProfile(raw: unknown): {
+        userId: string;
+        displayName: string;
+        avatarUrl: string;
+    } | null {
+        if (!raw || typeof raw !== 'object') return null;
+        const root = raw as Record<string, unknown>;
+        const info =
+            root['userInfo'] && typeof root['userInfo'] === 'object'
+                ? (root['userInfo'] as Record<string, unknown>)
+                : root;
+
+        const pick = (keys: string[]): string => {
+            for (const key of keys) {
+                const value = info[key];
+                if (typeof value === 'string' && value.trim()) return value.trim();
+            }
+            return '';
+        };
+
+        const userId = pick(['openId', 'openid', 'unionId', 'unionid', 'userId', 'uid']);
+        const displayName = pick([
+            'nickName',
+            'nick_name',
+            'nickname',
+            'userName',
+            'user_name',
+            'screenName',
+            'screen_name',
+            'displayName',
+            'display_name',
+            'name',
+        ]);
+        const avatarUrl = pick(['avatarUrl', 'avatar_url', 'avatar']);
+        if (!userId || !displayName) {
+            console.log(
+                `[HomePage] profile missing required fields: ${this._describeTikTokRaw(raw)}`
+            );
+            return null;
+        }
+        return { userId, displayName, avatarUrl };
+    }
+
+    private _describeTikTokRaw(raw: unknown): string {
+        if (!raw || typeof raw !== 'object') return `raw=${typeof raw}`;
+        const root = raw as Record<string, unknown>;
+        const info =
+            root['userInfo'] && typeof root['userInfo'] === 'object'
+                ? (root['userInfo'] as Record<string, unknown>)
+                : root;
+        const rootKeys = Object.keys(root).slice(0, 16).join(',');
+        const infoKeys = Object.keys(info).slice(0, 16).join(',');
+        const probeKeys = [
+            'code',
+            'authCode',
+            'auth_code',
+            'openId',
+            'openid',
+            'unionId',
+            'unionid',
+            'userId',
+            'uid',
+            'nickName',
+            'nick_name',
+            'nickname',
+            'userName',
+            'user_name',
+            'screenName',
+            'screen_name',
+            'displayName',
+            'display_name',
+            'name',
+        ];
+        const candidates: string[] = [];
+        for (const k of probeKeys) {
+            const v = info[k];
+            if (typeof v === 'string' && v.trim()) {
+                candidates.push(`${k}=${v.trim().slice(0, 48)}`);
+            }
+        }
+        return `rootKeys=[${rootKeys}] infoKeys=[${infoKeys}] candidates=[${candidates.join(' | ')}]`;
+    }
+
+    private _base64EncodeUtf8(input: string): string | null {
+        try {
+            if (typeof btoa === 'function') {
+                const bytes = encodeURIComponent(input).replace(
+                    /%([0-9A-F]{2})/g,
+                    (_m, p1: string) => String.fromCharCode(parseInt(p1, 16))
+                );
+                return btoa(bytes);
+            }
+        } catch {
+            // continue
+        }
+        try {
+            const g = globalThis as unknown as {
+                Buffer?: {
+                    from: (v: string, enc: string) => { toString: (enc: string) => string };
+                };
+            };
+            if (g.Buffer) {
+                return g.Buffer.from(input, 'utf8').toString('base64');
+            }
+        } catch {
+            // continue
+        }
+        return null;
     }
 
     private _showToast(text: string): void {

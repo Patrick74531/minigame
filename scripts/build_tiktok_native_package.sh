@@ -468,6 +468,7 @@ NODE
   cat > "${package_dir}/game.js" <<EOF_JS
 (function () {
   var SUBPACKAGE_NAME = '${subpackage_name}';
+  var API_BASE = '${TIKTOK_API_BASE}';
   var ENTRY_CANDIDATES = [
     'subpackages/${subpackage_name}/game.js',
     './subpackages/${subpackage_name}/game.js'
@@ -511,11 +512,301 @@ NODE
     try {
       if (typeof globalThis !== 'undefined') {
         globalThis.__GVR_PLATFORM__ = 'tiktok';
+        if (API_BASE) {
+          globalThis.__GVR_TIKTOK_API_BASE__ = API_BASE;
+        }
       }
       if (typeof window !== 'undefined') {
         window.__GVR_PLATFORM__ = 'tiktok';
+        if (API_BASE) {
+          window.__GVR_TIKTOK_API_BASE__ = API_BASE;
+        }
+      }
+      if (API_BASE) {
+        console.log('[BOOT][API_BASE] ' + API_BASE);
       }
     } catch (_e) {}
+  }
+
+  function _gvrBase64EncodeUtf8(input) {
+    try {
+      if (typeof btoa === 'function') {
+        var bytes = encodeURIComponent(String(input || '')).replace(
+          /%([0-9A-F]{2})/g,
+          function(_m, p1) { return String.fromCharCode(parseInt(p1, 16)); }
+        );
+        return btoa(bytes);
+      }
+    } catch (_e0) {}
+    try {
+      if (typeof Buffer !== 'undefined' && Buffer && typeof Buffer.from === 'function') {
+        return Buffer.from(String(input || ''), 'utf8').toString('base64');
+      }
+    } catch (_e1) {}
+    return '';
+  }
+
+  function _gvrReadStorage(host, key) {
+    try {
+      if (host && typeof host.getStorageSync === 'function') {
+        var v = host.getStorageSync(key);
+        if (typeof v === 'string') return v;
+        if (v && typeof v === 'object' && typeof v.data === 'string') return v.data;
+        if (v !== undefined && v !== null) return String(v);
+      }
+    } catch (_e) {}
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage) {
+        var lv = localStorage.getItem(key);
+        if (typeof lv === 'string' && lv) return lv;
+      }
+    } catch (_e2) {}
+    return '';
+  }
+
+  function _gvrWriteStorage(host, key, value) {
+    try {
+      if (host && typeof host.setStorageSync === 'function') {
+        host.setStorageSync(key, String(value || ''));
+      }
+    } catch (_e) {}
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage) {
+        localStorage.setItem(key, String(value || ''));
+      }
+    } catch (_e2) {}
+  }
+
+  function _gvrExtractProfile(raw) {
+    if (!raw || typeof raw !== 'object') return { userId: '', displayName: '', avatarUrl: '' };
+    var root = raw;
+    var info = root.userInfo && typeof root.userInfo === 'object' ? root.userInfo : root;
+
+    var userId =
+      (typeof info.openId === 'string' && info.openId) ||
+      (typeof info.openid === 'string' && info.openid) ||
+      (typeof info.unionId === 'string' && info.unionId) ||
+      (typeof info.unionid === 'string' && info.unionid) ||
+      (typeof info.userId === 'string' && info.userId) ||
+      (typeof info.uid === 'string' && info.uid) ||
+      '';
+    var displayName =
+      (typeof info.nickName === 'string' && info.nickName) ||
+      (typeof info.nick_name === 'string' && info.nick_name) ||
+      (typeof info.nickname === 'string' && info.nickname) ||
+      (typeof info.userName === 'string' && info.userName) ||
+      (typeof info.user_name === 'string' && info.user_name) ||
+      (typeof info.screenName === 'string' && info.screenName) ||
+      (typeof info.screen_name === 'string' && info.screen_name) ||
+      (typeof info.displayName === 'string' && info.displayName) ||
+      (typeof info.display_name === 'string' && info.display_name) ||
+      (typeof info.name === 'string' && info.name) ||
+      '';
+    var avatarUrl =
+      (typeof info.avatarUrl === 'string' && info.avatarUrl) ||
+      (typeof info.avatar === 'string' && info.avatar) ||
+      (typeof info.avatar_url === 'string' && info.avatar_url) ||
+      '';
+    return {
+      userId: String(userId || '').trim(),
+      displayName: String(displayName || '').trim(),
+      avatarUrl: String(avatarUrl || '').trim()
+    };
+  }
+
+  function _gvrSafeText(input, maxLen) {
+    var text = '';
+    try { text = String(input || ''); } catch (_e0) {}
+    if (text.length > maxLen) return text.slice(0, maxLen) + '...';
+    return text;
+  }
+
+  function _gvrProfileDebug(raw) {
+    if (!raw || typeof raw !== 'object') return 'raw=' + typeof raw;
+    var root = raw;
+    var info = root.userInfo && typeof root.userInfo === 'object' ? root.userInfo : root;
+
+    var rootKeys = [];
+    var infoKeys = [];
+    try { rootKeys = Object.keys(root).slice(0, 16); } catch (_e0) {}
+    try { infoKeys = Object.keys(info).slice(0, 16); } catch (_e1) {}
+
+    var pick = function(obj, key) {
+      var v = obj && obj[key];
+      if (typeof v !== 'string' || !v.trim()) return '';
+      return key + '=' + _gvrSafeText(v.trim(), 48);
+    };
+
+    var fields = [];
+    var candidateKeys = [
+      'openId','openid','unionId','unionid','userId','uid',
+      'nickName','nick_name','nickname','userName','user_name',
+      'screenName','screen_name','displayName','display_name','name'
+    ];
+    for (var i = 0; i < candidateKeys.length; i += 1) {
+      var part = pick(info, candidateKeys[i]);
+      if (part) fields.push(part);
+    }
+
+    return (
+      'rootKeys=[' + rootKeys.join(',') + '] ' +
+      'infoKeys=[' + infoKeys.join(',') + '] ' +
+      'candidates=[' + fields.join(' | ') + ']'
+    );
+  }
+
+  function _gvrExposeTikTokIdentity(profile, host) {
+    var userId = String((profile && profile.userId) || '').trim();
+    var displayName = String((profile && profile.displayName) || '').trim();
+    var avatarUrl = String((profile && profile.avatarUrl) || '').trim();
+
+    if (!userId) {
+      var cachedUid = _gvrReadStorage(host, '__gvr_tiktok_uid_v1');
+      if (cachedUid) {
+        userId = cachedUid;
+      } else {
+        userId = 'tt_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+        _gvrWriteStorage(host, '__gvr_tiktok_uid_v1', userId);
+      }
+    }
+
+    if (!displayName) {
+      var suffix = userId ? userId.slice(-6) : '';
+      displayName = suffix ? ('TikTokPlayer_' + suffix) : 'TikTokPlayer';
+    }
+
+    var payload = {
+      userId: userId,
+      displayName: displayName,
+      avatarUrl: avatarUrl || ''
+    };
+    var token = _gvrBase64EncodeUtf8(JSON.stringify(payload));
+
+    try {
+      if (typeof globalThis !== 'undefined') {
+        globalThis.__GVR_TIKTOK_USER_ID__ = userId;
+        globalThis.__GVR_TIKTOK_USERNAME__ = displayName;
+        if (token) globalThis.__GVR_TIKTOK_TOKEN__ = token;
+      }
+      if (typeof window !== 'undefined') {
+        window.__GVR_TIKTOK_USER_ID__ = userId;
+        window.__GVR_TIKTOK_USERNAME__ = displayName;
+        if (token) window.__GVR_TIKTOK_TOKEN__ = token;
+      }
+    } catch (_e0) {}
+
+    _gvrWriteStorage(host, '__gvr_tiktok_identity_v1', JSON.stringify(payload));
+    console.log('[BOOT][IDENTITY] user=' + userId + ' name=' + displayName + ' token=' + (token ? 'yes' : 'no'));
+  }
+
+  function prepareTikTokIdentity(done) {
+    var ttHost = (typeof tt !== 'undefined' && tt) ? tt : null;
+    var ttMinisHost = (typeof TTMinis !== 'undefined' && TTMinis && TTMinis.game) ? TTMinis.game : null;
+    var host = ttHost || ttMinisHost;
+    var completed = false;
+
+    var expose = function(profile) {
+      _gvrExposeTikTokIdentity(profile || {}, host);
+      try {
+        if (typeof globalThis !== 'undefined') {
+          globalThis.__GVR_TIKTOK_IDENTITY_READY__ = Date.now();
+        }
+      } catch (_e0) {}
+      try {
+        if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+          window.dispatchEvent(new Event('gvr:tiktok-identity-ready'));
+        }
+      } catch (_e1) {}
+    };
+
+    var finish = function(profile) {
+      if (completed) return;
+      completed = true;
+      expose(profile || {});
+      if (typeof done === 'function') done();
+    };
+
+    var cachedRaw = _gvrReadStorage(host, '__gvr_tiktok_identity_v1');
+    var cachedProfile = {};
+    if (cachedRaw) {
+      try { cachedProfile = JSON.parse(cachedRaw); } catch (_e0) {}
+    }
+
+    var timeoutId = 0;
+    if (typeof setTimeout === 'function') {
+      timeoutId = setTimeout(function() { finish(cachedProfile); }, 2500);
+    }
+
+    var candidates = [];
+    if (ttHost) candidates.push({ name: 'tt', api: ttHost });
+    if (ttMinisHost && ttMinisHost !== ttHost) candidates.push({ name: 'TTMinis.game', api: ttMinisHost });
+    if (candidates.length === 0) {
+      if (timeoutId) clearTimeout(timeoutId);
+      finish(cachedProfile);
+      return;
+    }
+
+    var onSuccess = function(profile, source) {
+      if (timeoutId) clearTimeout(timeoutId);
+      console.log('[BOOT][IDENTITY] profile from ' + source);
+      if (!completed) {
+        finish(profile);
+        return;
+      }
+      // Timeout may already have launched the game with cached identity.
+      // Apply late-arriving real profile so runtime requests can use it.
+      expose(profile);
+    };
+
+    var tryApi = function(apiName, hostName, api) {
+      var fn = api && api[apiName];
+      if (typeof fn !== 'function') return false;
+      try {
+        var req = {
+          lang: 'zh_CN',
+          withCredentials: true,
+          success: function(res) {
+            try {
+              console.log('[BOOT][IDENTITY] ' + hostName + '.' + apiName + ' success ' + _gvrProfileDebug(res));
+            } catch (_e2) {}
+            var profile = _gvrExtractProfile(res);
+            onSuccess(profile, hostName + '.' + apiName + '.success');
+          },
+          fail: function(err) {
+            try {
+              console.log('[BOOT][IDENTITY] ' + hostName + '.' + apiName + ' fail=' + JSON.stringify(err || {}));
+            } catch (_e2) {}
+          }
+        };
+        var ret = fn.call(api, req);
+        if (ret && typeof ret.then === 'function') {
+          ret.then(function(res) {
+            try {
+              console.log('[BOOT][IDENTITY] ' + hostName + '.' + apiName + ' promise ' + _gvrProfileDebug(res));
+            } catch (_e2) {}
+            var profile = _gvrExtractProfile(res);
+            onSuccess(profile, hostName + '.' + apiName + '.promise');
+          }).catch(function(err) {
+            try {
+              console.log('[BOOT][IDENTITY] ' + hostName + '.' + apiName + ' reject=' + JSON.stringify(err || {}));
+            } catch (_e2) {}
+          });
+        }
+        return true;
+      } catch (_e) {
+        try {
+          console.log('[BOOT][IDENTITY] ' + hostName + '.' + apiName + ' throw=' + (_e && _e.message ? _e.message : _e));
+        } catch (_e2) {}
+        return false;
+      }
+    };
+
+    for (var h = 0; h < candidates.length; h += 1) {
+      var hostName = candidates[h].name;
+      var api = candidates[h].api;
+      tryApi('getUserInfo', hostName, api);
+      tryApi('getUserProfile', hostName, api);
+    }
   }
 
   function installCrashBreadcrumbs() {
@@ -659,17 +950,19 @@ NODE
   installCrashBreadcrumbs();
   requestLandscapeEarly();
 
-  if (typeof tt !== 'undefined' && tt && typeof tt.loadSubpackage === 'function') {
-    tt.loadSubpackage({
-      name: SUBPACKAGE_NAME,
-      success: launch,
-      fail: function (err) {
-        console.error('[tiktok-native-build] loadSubpackage failed:', err);
-      }
-    });
-  } else {
-    launch();
-  }
+  prepareTikTokIdentity(function() {
+    if (typeof tt !== 'undefined' && tt && typeof tt.loadSubpackage === 'function') {
+      tt.loadSubpackage({
+        name: SUBPACKAGE_NAME,
+        success: launch,
+        fail: function (err) {
+          console.error('[tiktok-native-build] loadSubpackage failed:', err);
+        }
+      });
+    } else {
+      launch();
+    }
+  });
 })();
 EOF_JS
 
@@ -924,6 +1217,7 @@ SUBPACKAGE_NAME="gamecore"
 ENABLE_DEFERRED_RESOURCES_SPLIT=1
 DEFERRED_RESOURCES_SUBPACKAGE_NAME="resources"
 ENABLE_EXPERIMENTAL_FBO_ROTATION_PATCH="${ENABLE_EXPERIMENTAL_FBO_ROTATION_PATCH:-1}"
+TIKTOK_API_BASE="${TIKTOK_API_BASE:-https://tiktok-leaderboard-prod.mineskystudio.workers.dev/api/tiktok}"
 
 usage() {
   cat <<'EOF_USAGE'
@@ -945,6 +1239,7 @@ Options:
   --subpackage-name <name>        Subpackage name for split runtime. Default: gamecore
   --no-deferred-resources-split   Keep resources bundle in startup subpackage.
   --deferred-resources-name <n>   Deferred resources subpackage name. Default: resources
+  --tiktok-api-base <url>         Inject window.__GVR_TIKTOK_API_BASE__ into package game.js
   --enable-fbo-rotation-patch     Force-enable FBO landscape patch.
   --disable-fbo-rotation-patch    Disable FBO landscape patch and use native orientation only.
   -h, --help                      Show this help.
@@ -967,6 +1262,7 @@ while [ $# -gt 0 ]; do
     --subpackage-name) SUBPACKAGE_NAME="$2"; shift ;;
     --no-deferred-resources-split) ENABLE_DEFERRED_RESOURCES_SPLIT=0 ;;
     --deferred-resources-name) DEFERRED_RESOURCES_SUBPACKAGE_NAME="$2"; shift ;;
+    --tiktok-api-base) TIKTOK_API_BASE="$2"; shift ;;
     --enable-fbo-rotation-patch) ENABLE_EXPERIMENTAL_FBO_ROTATION_PATCH=1 ;;
     --disable-fbo-rotation-patch) ENABLE_EXPERIMENTAL_FBO_ROTATION_PATCH=0 ;;
     -h|--help) usage; exit 0 ;;

@@ -33,10 +33,12 @@ export class LeaderboardPanel {
     private _onClose: (() => void) | null = null;
     private _panelW: number = 520;
     private _panelH: number = 600;
+    private _showRedditPrefix: boolean = true;
 
-    constructor(parent: Node, onClose: () => void) {
+    constructor(parent: Node, onClose: () => void, showRedditPrefix: boolean = true) {
         this._uiLayer = parent.layer ?? Layers.Enum.UI_2D;
         this._onClose = onClose;
+        this._showRedditPrefix = showRedditPrefix;
         const vs = view.getVisibleSize();
         this._panelW = Math.min(520, Math.floor(vs.width * 0.88));
         this._panelH = Math.min(620, Math.floor(vs.height * 0.88));
@@ -236,7 +238,7 @@ export class LeaderboardPanel {
         rankNode.setPosition(-listW / 2 + 36, 0, 0);
         row.addChild(rankNode);
 
-        const usernameNode = this._makeLabel(`u/${entry.username}`, 20, TEXT_WHITE);
+        const usernameNode = this._makeLabel(this._formatUsername(entry.username), 20, TEXT_WHITE);
         usernameNode.getComponent(UITransform)?.setContentSize(200, ROW_H);
         usernameNode.setPosition(-listW / 2 + 150, 0, 0);
         row.addChild(usernameNode);
@@ -256,6 +258,13 @@ export class LeaderboardPanel {
         row.addChild(scoreNode);
 
         return row;
+    }
+
+    private _formatUsername(rawName: string): string {
+        const name = (rawName ?? '').trim() || 'Player';
+        if (!this._showRedditPrefix) return name;
+        if (name.startsWith('u/')) return name;
+        return `u/${name}`;
     }
 
     private _buildCloseButton(panel: Node): void {

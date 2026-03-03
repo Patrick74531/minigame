@@ -1,0 +1,42 @@
+name = "tiktok-leaderboard"
+main = "src/index.ts"
+compatibility_date = "2024-06-14"
+compatibility_flags = ["nodejs_compat"]
+
+# ─── D1 Database Binding ───
+[[d1_databases]]
+binding = "DB"
+database_name = "d1-leaderboard-database"
+database_id   = "16cf53fa-3737-4282-a2de-492ffd2e4e18"
+
+# ─── Environment Variables (secrets should use `wrangler secret put`) ───
+[vars]
+ENV = "dev"
+TIKTOK_APP_ID = "mgfvegxjhzjkiey2"
+TIKTOK_ALLOWED_ORIGINS = "null"
+
+# ─── Staging ───
+[env.staging]
+name = "tiktok-leaderboard-staging"
+[env.staging.vars]
+ENV = "staging"
+TIKTOK_APP_ID = "mgfvegxjhzjkiey2"
+TIKTOK_ALLOWED_ORIGINS = "null"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "d1-leaderboard-database"
+database_id   = "16cf53fa-3737-4282-a2de-492ffd2e4e18"
+
+# ─── Production ───
+[env.production]
+name = "tiktok-leaderboard-prod"
+[env.production.vars]
+ENV = "production"
+TIKTOK_APP_ID = "mgfvegxjhzjkiey2"
+TIKTOK_ALLOWED_ORIGINS = "null"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "d1-leaderboard-database"
+database_id   = "16cf53fa-3737-4282-a2de-492ffd2e4e18"

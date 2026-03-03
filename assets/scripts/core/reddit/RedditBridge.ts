@@ -276,9 +276,12 @@ export class RedditBridge {
             cache: 'no-store',
             signal: controller?.signal,
         })
+            .catch((e: unknown) => {
+                throw new Error(`[TikTokBridge] fetch failed: ${url} :: ${String(e)}`);
+            })
             .then(r => {
                 if (!r.ok) {
-                    throw new Error(`HTTP ${r.status} ${r.statusText}`);
+                    throw new Error(`HTTP ${r.status} ${r.statusText} @ ${url}`);
                 }
                 return r.json() as Promise<unknown>;
             })
@@ -313,8 +316,11 @@ interface TikTokLocalLeaderboardEntry {
 
 class TikTokBridge implements SocialBridge {
     private static readonly API_TIMEOUT_MS = 8000;
+    private static readonly DEFAULT_API_BASE =
+        'https://tiktok-leaderboard-prod.mineskystudio.workers.dev/api/tiktok';
     private static readonly STORAGE_LEADERBOARD_KEY = 'gvr.tiktok.leaderboard.v1';
     private static readonly STORAGE_USERNAME_KEY = 'gvr.tiktok.username';
+    private static readonly STORAGE_DIAMONDS_KEY = 'gvr.tiktok.diamonds.v1';
 
     public readonly platform: RuntimePlatform = 'tiktok';
     public readonly supportsSubscribe: boolean = false;
@@ -324,6 +330,8 @@ class TikTokBridge implements SocialBridge {
     private _username: string = 'TikTokPlayer';
     private _submitInFlight: boolean = false;
     private _leaderboardInFlight: boolean = false;
+    private _identityListenerBound: boolean = false;
+    private _lastIdentityToken: string = '';
 
     public get cachedLeaderboard(): LeaderboardEntry[] {
         return this._cachedLeaderboard;
@@ -339,6 +347,8 @@ class TikTokBridge implements SocialBridge {
     }
 
     public requestInit(): void {
+        this._ensureIdentityReadyListener();
+
         const injectedName = this._readInjectedTikTokName();
         if (injectedName) {
             this._username = injectedName;
@@ -346,21 +356,27 @@ class TikTokBridge implements SocialBridge {
         } else {
             this._username = this._loadLocalUsername() ?? this._username;
         }
+        this._lastIdentityToken = this._readInjectedTikTokToken() ?? '';
 
         this._fetchJson(this._withApiBase('/init'), {}, { bustCache: true })
             .then((data: unknown) => {
-                const d = data as {
-                    username?: string;
-                    leaderboard?: LeaderboardEntry[];
-                    diamonds?: number;
-                };
-                if (d.username) {
-                    this._username = d.username;
-                    this._saveLocalUsername(d.username);
+                const d = this._unwrapApiData(data);
+                const username = this._extractString(d, ['username', 'displayName']);
+                if (username) {
+                    this._username = username;
+                    this._saveLocalUsername(username);
                 }
-                this._cachedLeaderboard = Array.isArray(d.leaderboard)
-                    ? d.leaderboard
-                    : this._loadLocalLeaderboard();
+
+                const normalizedEntries = this._normalizeLeaderboardEntries(
+                    d['leaderboard'] ?? d['entries']
+                );
+                this._cachedLeaderboard = normalizedEntries ?? this._loadLocalLeaderboard();
+
+                const diamonds = this._extractNumber(d, ['diamonds', 'balance']) ?? 0;
+                this._saveLocalDiamonds(diamonds);
+                console.log(
+                    `[TikTokBridge] init ok username=${this._username} diamonds=${diamonds} entries=${this._cachedLeaderboard.length}`
+                );
                 this._emit({
                     type: 'init',
                     data: {
@@ -368,11 +384,13 @@ class TikTokBridge implements SocialBridge {
                         isSubscribed: false,
                         subredditName: 'tiktok',
                         leaderboard: this._cachedLeaderboard,
-                        diamonds: d.diamonds ?? 0,
+                        diamonds,
                     },
                 });
+                this._emit({ type: 'leaderboard', entries: this._cachedLeaderboard });
             })
-            .catch(() => {
+            .catch((e: unknown) => {
+                console.warn('[TikTokBridge] requestInit failed:', e);
                 this._cachedLeaderboard = this._loadLocalLeaderboard();
                 this._emit({
                     type: 'init',
@@ -381,45 +399,59 @@ class TikTokBridge implements SocialBridge {
                         isSubscribed: false,
                         subredditName: 'tiktok',
                         leaderboard: this._cachedLeaderboard,
-                        diamonds: 0,
+                        diamonds: this._loadLocalDiamonds(),
                     },
                 });
+                this._emit({ type: 'leaderboard', entries: this._cachedLeaderboard });
             });
     }
 
     public submitScore(score: number, wave: number): void {
         if (this._submitInFlight) return;
         this._submitInFlight = true;
+        const runId = this._generateRunId();
 
         this._fetchJson(this._withApiBase('/submit-score'), {
             method: 'POST',
-            keepalive: true,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ score, wave }),
+            body: JSON.stringify({ score, wave, runId }),
         })
             .then((data: unknown) => {
-                const d = data as {
-                    rank?: number;
-                    score?: number;
-                    isNewBest?: boolean;
-                    leaderboard?: LeaderboardEntry[];
-                };
-                if (Array.isArray(d.leaderboard)) {
-                    this._cachedLeaderboard = d.leaderboard;
+                const d = this._unwrapApiData(data);
+                const normalizedEntries = this._normalizeLeaderboardEntries(
+                    d['leaderboard'] ?? d['entries']
+                );
+                if (normalizedEntries) {
+                    this._cachedLeaderboard = normalizedEntries;
                     this._emit({ type: 'leaderboard', entries: this._cachedLeaderboard });
                 } else {
-                    const localResult = this._submitLocalScore(score, wave);
-                    this._cachedLeaderboard = localResult.entries;
-                    this._emit({ type: 'leaderboard', entries: this._cachedLeaderboard });
+                    // Cloud response may omit full leaderboard; fetch it explicitly.
+                    this.requestLeaderboard();
                 }
+
+                const rankRaw = d['rank'];
+                const rank =
+                    typeof rankRaw === 'number'
+                        ? rankRaw
+                        : typeof rankRaw === 'object' &&
+                            rankRaw !== null &&
+                            typeof (rankRaw as Record<string, unknown>)['rank'] === 'number'
+                          ? ((rankRaw as Record<string, unknown>)['rank'] as number)
+                          : 0;
+                const apiScore = this._extractNumber(d, ['score']);
+                const isNewBest = this._extractBoolean(d, ['isNewBest', 'newBest']) ?? false;
+                console.log(
+                    `[TikTokBridge] submit ok rank=${rank} score=${apiScore ?? score} isNewBest=${isNewBest}`
+                );
                 this._emit({
                     type: 'score_submitted',
-                    rank: d.rank ?? 0,
-                    score: d.score ?? score,
-                    isNewBest: d.isNewBest ?? false,
+                    rank,
+                    score: apiScore ?? score,
+                    isNewBest,
                 });
             })
-            .catch(() => {
+            .catch((e: unknown) => {
+                console.warn('[TikTokBridge] submitScore failed:', e);
                 const localResult = this._submitLocalScore(score, wave);
                 this._cachedLeaderboard = localResult.entries;
                 this._emit({ type: 'leaderboard', entries: this._cachedLeaderboard });
@@ -441,9 +473,12 @@ class TikTokBridge implements SocialBridge {
 
         this._fetchJson(this._withApiBase('/leaderboard'), {}, { bustCache: true })
             .then((data: unknown) => {
-                const d = data as { entries?: LeaderboardEntry[] };
-                if (Array.isArray(d.entries)) {
-                    this._cachedLeaderboard = d.entries;
+                const d = this._unwrapApiData(data);
+                const normalizedEntries = this._normalizeLeaderboardEntries(
+                    d['entries'] ?? d['leaderboard']
+                );
+                if (normalizedEntries) {
+                    this._cachedLeaderboard = normalizedEntries;
                 } else {
                     this._cachedLeaderboard = this._loadLocalLeaderboard();
                 }
@@ -472,6 +507,7 @@ class TikTokBridge implements SocialBridge {
         if (!headers.has('Accept')) {
             headers.set('Accept', 'application/json');
         }
+        this._applyTikTokAuthHeaders(headers);
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
         const timeoutId = controller
             ? globalThis.setTimeout(() => controller.abort(), TikTokBridge.API_TIMEOUT_MS)
@@ -480,7 +516,7 @@ class TikTokBridge implements SocialBridge {
         return fetch(url, {
             ...init,
             headers,
-            credentials: 'include',
+            credentials: 'omit',
             cache: 'no-store',
             signal: controller?.signal,
         })
@@ -496,10 +532,11 @@ class TikTokBridge implements SocialBridge {
     }
 
     private _withApiBase(path: string): string {
-        if (typeof window === 'undefined') return path;
-        const w = window as unknown as Record<string, unknown>;
-        const baseValue = w['__GVR_TIKTOK_API_BASE__'];
-        const base = typeof baseValue === 'string' ? baseValue : '/api/tiktok';
+        const baseValue = this._readRuntimeString('__GVR_TIKTOK_API_BASE__');
+        const base =
+            typeof baseValue === 'string' && baseValue.trim()
+                ? baseValue.trim()
+                : TikTokBridge.DEFAULT_API_BASE;
         const normalizedBase = base.replace(/\/+$/, '');
         const normalizedPath = path.startsWith('/') ? path : `/${path}`;
         if (!normalizedBase) return normalizedPath;
@@ -512,11 +549,176 @@ class TikTokBridge implements SocialBridge {
     }
 
     private _readInjectedTikTokName(): string | null {
-        if (typeof window === 'undefined') return null;
-        const w = window as unknown as Record<string, unknown>;
-        const key = w['__GVR_TIKTOK_USERNAME__'];
-        if (typeof key === 'string' && key.trim()) return key.trim();
+        return this._readRuntimeString('__GVR_TIKTOK_USERNAME__');
+    }
+
+    private _readInjectedTikTokUserId(): string | null {
+        return this._readRuntimeString('__GVR_TIKTOK_USER_ID__');
+    }
+
+    private _readInjectedTikTokToken(): string | null {
+        return this._readRuntimeString('__GVR_TIKTOK_TOKEN__');
+    }
+
+    private _readRuntimeString(key: string): string | null {
+        try {
+            const g = globalThis as unknown as Record<string, unknown>;
+            const gv = g[key];
+            if (typeof gv === 'string' && gv.trim()) return gv.trim();
+        } catch {
+            // continue
+        }
+
+        if (typeof window !== 'undefined') {
+            const w = window as unknown as Record<string, unknown>;
+            const wv = w[key];
+            if (typeof wv === 'string' && wv.trim()) return wv.trim();
+        }
+
         return null;
+    }
+
+    private _ensureIdentityReadyListener(): void {
+        if (this._identityListenerBound) return;
+        if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+        this._identityListenerBound = true;
+        window.addEventListener('gvr:tiktok-identity-ready', () => {
+            const token = this._readInjectedTikTokToken() ?? '';
+            if (!token || token === this._lastIdentityToken) return;
+            this._lastIdentityToken = token;
+            this.requestInit();
+        });
+    }
+
+    private _generateRunId(): string {
+        const ts = Date.now().toString(36);
+        const rand = Math.random().toString(36).slice(2, 10);
+        return `tt-${ts}-${rand}`;
+    }
+
+    private _applyTikTokAuthHeaders(headers: Headers): void {
+        if (headers.has('X-TikTok-Token')) return;
+
+        const injectedToken = this._readInjectedTikTokToken();
+        if (injectedToken) {
+            headers.set('X-TikTok-Token', injectedToken);
+            return;
+        }
+
+        const injectedUserId = this._readInjectedTikTokUserId();
+        if (!injectedUserId) return;
+        const displayName = this._readInjectedTikTokName() ?? this._username ?? 'TikTokPlayer';
+        const token = this._buildIdentityToken(injectedUserId, displayName);
+        if (token) {
+            headers.set('X-TikTok-Token', token);
+        }
+    }
+
+    private _buildIdentityToken(userId: string, displayName: string): string | null {
+        const payload = JSON.stringify({
+            userId,
+            displayName: displayName || 'TikTokPlayer',
+            avatarUrl: '',
+        });
+        const encoded = this._base64EncodeUtf8(payload);
+        return encoded && encoded.trim() ? encoded : null;
+    }
+
+    private _base64EncodeUtf8(input: string): string | null {
+        try {
+            if (typeof btoa === 'function') {
+                const bytes = encodeURIComponent(input).replace(
+                    /%([0-9A-F]{2})/g,
+                    (_m, p1: string) => String.fromCharCode(parseInt(p1, 16))
+                );
+                return btoa(bytes);
+            }
+        } catch {
+            // continue
+        }
+        try {
+            const g = globalThis as unknown as {
+                Buffer?: {
+                    from: (v: string, enc: string) => { toString: (enc: string) => string };
+                };
+            };
+            if (g.Buffer) {
+                return g.Buffer.from(input, 'utf8').toString('base64');
+            }
+        } catch {
+            // continue
+        }
+        return null;
+    }
+
+    private _unwrapApiData(input: unknown): Record<string, unknown> {
+        if (!input || typeof input !== 'object') return {};
+        const outer = input as Record<string, unknown>;
+        if (outer['ok'] === true && outer['data'] && typeof outer['data'] === 'object') {
+            return outer['data'] as Record<string, unknown>;
+        }
+        return outer;
+    }
+
+    private _extractString(obj: Record<string, unknown>, keys: string[]): string | null {
+        for (const key of keys) {
+            const value = obj[key];
+            if (typeof value === 'string' && value.trim()) return value.trim();
+        }
+        return null;
+    }
+
+    private _extractNumber(obj: Record<string, unknown>, keys: string[]): number | null {
+        for (const key of keys) {
+            const value = obj[key];
+            if (typeof value === 'number' && Number.isFinite(value)) return value;
+        }
+        return null;
+    }
+
+    private _extractBoolean(obj: Record<string, unknown>, keys: string[]): boolean | null {
+        for (const key of keys) {
+            const value = obj[key];
+            if (typeof value === 'boolean') return value;
+        }
+        return null;
+    }
+
+    private _normalizeLeaderboardEntries(raw: unknown): LeaderboardEntry[] | null {
+        if (!Array.isArray(raw)) return null;
+        const out: LeaderboardEntry[] = [];
+        for (let i = 0; i < raw.length; i += 1) {
+            const item = raw[i] as Record<string, unknown>;
+            if (!item || typeof item !== 'object') continue;
+
+            const username =
+                (typeof item['username'] === 'string' && item['username'].trim()) ||
+                (typeof item['displayName'] === 'string' && item['displayName'].trim()) ||
+                (typeof item['playerId'] === 'string' && item['playerId'].trim()) ||
+                'TikTokPlayer';
+
+            const scoreRaw =
+                typeof item['score'] === 'number'
+                    ? item['score']
+                    : typeof item['bestScore'] === 'number'
+                      ? item['bestScore']
+                      : 0;
+            const waveRaw =
+                typeof item['wave'] === 'number'
+                    ? item['wave']
+                    : typeof item['bestWave'] === 'number'
+                      ? item['bestWave']
+                      : 0;
+            const rankRaw = typeof item['rank'] === 'number' ? item['rank'] : i + 1;
+
+            out.push({
+                rank: Math.max(1, Math.floor(rankRaw)),
+                username: username.trim(),
+                score: Math.max(0, Math.floor(scoreRaw)),
+                wave: Math.max(0, Math.floor(waveRaw)),
+            });
+        }
+        return out;
     }
 
     private _loadLocalLeaderboard(): LeaderboardEntry[] {
@@ -572,6 +774,28 @@ class TikTokBridge implements SocialBridge {
     private _saveLocalUsername(name: string): void {
         try {
             localStorage.setItem(TikTokBridge.STORAGE_USERNAME_KEY, name);
+        } catch {
+            // ignore
+        }
+    }
+
+    private _loadLocalDiamonds(): number {
+        try {
+            const raw = localStorage.getItem(TikTokBridge.STORAGE_DIAMONDS_KEY);
+            if (!raw) return 0;
+            const parsed = parseInt(raw, 10);
+            return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+        } catch {
+            return 0;
+        }
+    }
+
+    private _saveLocalDiamonds(balance: number): void {
+        try {
+            localStorage.setItem(
+                TikTokBridge.STORAGE_DIAMONDS_KEY,
+                String(Math.max(0, Math.floor(balance)))
+            );
         } catch {
             // ignore
         }
@@ -684,14 +908,25 @@ class RedditBridgeAdapter implements SocialBridge {
 let _socialBridgeInstance: SocialBridge | null = null;
 
 export function detectRuntimePlatform(): RuntimePlatform {
-    if (typeof window === 'undefined') return 'reddit';
-
     try {
         const g = globalThis as unknown as Record<string, unknown>;
         if (g['tt'] !== undefined) {
             return 'tiktok';
         }
+        if (g['TTMinis'] !== undefined) {
+            return 'tiktok';
+        }
+        const forcedGlobal = g['__GVR_PLATFORM__'];
+        if (forcedGlobal === 'tiktok' || forcedGlobal === 'reddit') {
+            return forcedGlobal;
+        }
+    } catch {
+        // keep fallback
+    }
 
+    if (typeof window === 'undefined') return 'reddit';
+
+    try {
         const w = window as unknown as Record<string, unknown>;
         const forced = w['__GVR_PLATFORM__'];
         if (forced === 'tiktok' || forced === 'reddit') {
