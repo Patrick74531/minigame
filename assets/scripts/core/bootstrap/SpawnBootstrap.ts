@@ -1,4 +1,4 @@
-import { Node, Vec3 } from 'cc';
+import { Node } from 'cc';
 import { GameConfig } from '../../data/GameConfig';
 import { BuildingFactory } from '../../gameplay/buildings/BuildingFactory';
 import { UnitFactory } from '../../gameplay/units/UnitFactory';
@@ -9,6 +9,7 @@ import { WaveManager } from '../../gameplay/wave/WaveManager';
 import { GameManager } from '../managers/GameManager';
 import { WaveLoop } from '../../gameplay/wave/WaveLoop';
 import { ServiceRegistry } from '../managers/ServiceRegistry';
+import { UIResponsive } from '../../ui/UIResponsive';
 
 export type SpawnResult = {
     base: Node;
@@ -38,8 +39,8 @@ export class SpawnBootstrap {
         );
 
         SpawnBootstrap.waveManager.initialize(containers.enemy, base);
-        // Less top-down: lower pitch and pull back for clearer character/enemy fronts.
-        CameraRig.setupFollow(base.scene, hero, new Vec3(0, 8.2, 9.8));
+        const cameraPreset = UIResponsive.getGameplayCameraPreset();
+        CameraRig.setupFollow(base.scene, hero, cameraPreset.offset, cameraPreset.fov);
 
         SpawnBootstrap.buildingManager.setHeroNode(hero);
         BuildingPadSpawner.spawnPads(containers.building, SpawnBootstrap.buildingManager);

@@ -1,3 +1,281 @@
+// TikTok real-device compatibility shim:
+// Avoid native Headers/AbortController crashes (napi_create_reference) seen on some Android clients.
+(function installTikTokCompat() {
+    const g =
+        typeof globalThis !== 'undefined'
+            ? globalThis
+            : (typeof window !== 'undefined' ? window : {});
+    const hasTikTokHost = typeof tt !== 'undefined' && !!tt;
+    if (!hasTikTokHost) return;
+
+    const normalizeName = (name) => String(name || '').toLowerCase();
+    const normalizeValue = (value) => String(value ?? '');
+
+    class SafeHeaders {
+        constructor(init) {
+            this._map = {};
+            if (!init) return;
+
+            if (init instanceof SafeHeaders) {
+                this._map = { ...init._map };
+                return;
+            }
+
+            if (Array.isArray(init)) {
+                for (let i = 0; i < init.length; i += 1) {
+                    const pair = init[i];
+                    if (!Array.isArray(pair) || pair.length < 2) continue;
+                    this.set(pair[0], pair[1]);
+                }
+                return;
+            }
+
+            if (typeof init.forEach === 'function') {
+                try {
+                    init.forEach((value, key) => this.set(key, value));
+                    return;
+                } catch (_e) {
+                    // continue
+                }
+            }
+
+            if (typeof init === 'object') {
+                const keys = Object.keys(init);
+                for (let i = 0; i < keys.length; i += 1) {
+                    const key = keys[i];
+                    this.set(key, init[key]);
+                }
+            }
+        }
+
+        set(name, value) {
+            this._map[normalizeName(name)] = normalizeValue(value);
+        }
+
+        append(name, value) {
+            this.set(name, value);
+        }
+
+        has(name) {
+            return Object.prototype.hasOwnProperty.call(this._map, normalizeName(name));
+        }
+
+        get(name) {
+            const key = normalizeName(name);
+            return this.has(key) ? this._map[key] : null;
+        }
+
+        delete(name) {
+            delete this._map[normalizeName(name)];
+        }
+
+        forEach(cb) {
+            const keys = Object.keys(this._map);
+            for (let i = 0; i < keys.length; i += 1) {
+                const key = keys[i];
+                cb(this._map[key], key, this);
+            }
+        }
+
+        toJSON() {
+            return { ...this._map };
+        }
+    }
+
+    class SafeAbortController {
+        constructor() {
+            this.signal = {
+                aborted: false,
+                addEventListener() {},
+                removeEventListener() {},
+            };
+        }
+
+        abort() {
+            this.signal.aborted = true;
+        }
+    }
+
+    const toHeaderObject = (input) => {
+        const out = {};
+        if (!input) return out;
+        if (input instanceof SafeHeaders) return input.toJSON();
+
+        if (Array.isArray(input)) {
+            for (let i = 0; i < input.length; i += 1) {
+                const pair = input[i];
+                if (!Array.isArray(pair) || pair.length < 2) continue;
+                out[String(pair[0])] = String(pair[1]);
+            }
+            return out;
+        }
+
+        if (typeof input.forEach === 'function') {
+            try {
+                input.forEach((value, key) => {
+                    out[String(key)] = String(value);
+                });
+                return out;
+            } catch (_e) {
+                // continue
+            }
+        }
+
+        if (typeof input === 'object') {
+            const keys = Object.keys(input);
+            for (let i = 0; i < keys.length; i += 1) {
+                const key = keys[i];
+                out[key] = String(input[key]);
+            }
+        }
+        return out;
+    };
+
+    const parseMaybeJsonBody = (body, headers) => {
+        if (typeof body !== 'string') return body;
+        const keys = Object.keys(headers || {});
+        let contentType = '';
+        for (let i = 0; i < keys.length; i += 1) {
+            const key = keys[i];
+            if (key.toLowerCase() === 'content-type') {
+                contentType = String(headers[key] || '').toLowerCase();
+                break;
+            }
+        }
+        if (contentType.includes('application/json')) {
+            try {
+                return JSON.parse(body);
+            } catch (_e) {
+                return body;
+            }
+        }
+        return body;
+    };
+
+    const installFetchPolyfillIfMissing = () => {
+        if (typeof g.fetch === 'function') return;
+        if (typeof tt === 'undefined' || !tt || typeof tt.request !== 'function') return;
+
+        g.fetch = (input, init) =>
+            new Promise((resolve, reject) => {
+                let url = '';
+                let method = 'GET';
+                let headers = {};
+                let body = undefined;
+
+                if (typeof input === 'string') {
+                    url = input;
+                } else if (input && typeof input === 'object') {
+                    url = String(input.url || '');
+                    if (input.method) method = String(input.method);
+                    headers = toHeaderObject(input.headers);
+                    body = input.body;
+                }
+
+                const reqInit = init && typeof init === 'object' ? init : {};
+                if (reqInit.method) method = String(reqInit.method);
+                headers = { ...headers, ...toHeaderObject(reqInit.headers) };
+                if (typeof reqInit.body !== 'undefined') body = reqInit.body;
+
+                const data = parseMaybeJsonBody(body, headers);
+
+                try {
+                    tt.request({
+                        url,
+                        method,
+                        header: headers,
+                        data,
+                        success: (res) => {
+                            const status = Number(res && res.statusCode ? res.statusCode : 0);
+                            const responseData = res ? res.data : undefined;
+                            const responseHeaders =
+                                res && res.header && typeof res.header === 'object'
+                                    ? res.header
+                                    : {};
+
+                            resolve({
+                                ok: status >= 200 && status < 300,
+                                status,
+                                statusText: String(status),
+                                headers: {
+                                    get: (name) => {
+                                        const target = String(name || '').toLowerCase();
+                                        const hKeys = Object.keys(responseHeaders);
+                                        for (let i = 0; i < hKeys.length; i += 1) {
+                                            const hk = hKeys[i];
+                                            if (hk.toLowerCase() === target) {
+                                                return String(responseHeaders[hk]);
+                                            }
+                                        }
+                                        return null;
+                                    },
+                                },
+                                json: () =>
+                                    new Promise((jsonResolve, jsonReject) => {
+                                        try {
+                                            if (typeof responseData === 'string') {
+                                                jsonResolve(
+                                                    responseData.length
+                                                        ? JSON.parse(responseData)
+                                                        : null
+                                                );
+                                            } else {
+                                                jsonResolve(responseData);
+                                            }
+                                        } catch (err) {
+                                            jsonReject(err);
+                                        }
+                                    }),
+                                text: () =>
+                                    Promise.resolve(
+                                        typeof responseData === 'string'
+                                            ? responseData
+                                            : JSON.stringify(responseData ?? '')
+                                    ),
+                            });
+                        },
+                        fail: (err) => {
+                            reject(
+                                err instanceof Error
+                                    ? err
+                                    : new Error(String((err && err.errMsg) || err || 'tt.request failed'))
+                            );
+                        },
+                    });
+                } catch (err) {
+                    reject(err);
+                }
+            });
+    };
+
+    try {
+        g.Headers = SafeHeaders;
+        if (typeof window !== 'undefined') window.Headers = SafeHeaders;
+    } catch (_e) {
+        // ignore
+    }
+
+    try {
+        g.AbortController = SafeAbortController;
+        if (typeof window !== 'undefined') window.AbortController = SafeAbortController;
+    } catch (_e) {
+        // ignore
+    }
+
+    installFetchPolyfillIfMissing();
+
+    if (typeof g.fetch === 'function') {
+        const nativeFetch = g.fetch.bind(g);
+        g.fetch = (input, init) => {
+            if (init && init.headers instanceof SafeHeaders) {
+                const nextInit = { ...init, headers: init.headers.toJSON() };
+                return nativeFetch(input, nextInit);
+            }
+            return nativeFetch(input, init);
+        };
+    }
+})();
+
 <% if (isUsePhysX) { %>
 const systemInfo = tt.getSystemInfoSync();
 // a hack way to load physics provide by bytedance
@@ -32,40 +310,6 @@ if (tt.getPhysx) {
     loadCC();
 }
 <% } %>
-
-const tryLandscapeAPIs = () => {
-    const candidates = [];
-    if (typeof tt !== 'undefined' && tt) candidates.push(tt);
-
-    const ttMinisGame =
-        typeof TTMinis !== 'undefined' && TTMinis && TTMinis.game ? TTMinis.game : null;
-    if (ttMinisGame) candidates.push(ttMinisGame);
-
-    const payloads = [
-        { value: 'landscape' },
-        { orientation: 'landscape' },
-        { direction: 'landscape' },
-    ];
-
-    const names = ['setDeviceOrientation', 'setScreenOrientation', 'setGameOrientation'];
-    for (let i = 0; i < candidates.length; i += 1) {
-        const api = candidates[i];
-        for (let j = 0; j < names.length; j += 1) {
-            const fn = api[names[j]];
-            if (typeof fn !== 'function') continue;
-            for (let k = 0; k < payloads.length; k += 1) {
-                try {
-                    fn.call(api, payloads[k]);
-                    break;
-                } catch (_e) {
-                    // try next signature
-                }
-            }
-        }
-    }
-};
-
-tryLandscapeAPIs();
 
 <% if (!isUsePhysX) { %>
 loadCC();
@@ -118,17 +362,6 @@ function loadCC() {
                 if (byMini !== null) return { landscape: byMini, source: 'minigame.config.orientation' };
             } catch (_e1) {}
 
-            try {
-                if (typeof tt !== 'undefined' && tt && typeof tt.getSystemInfoSync === 'function') {
-                    const sys = tt.getSystemInfoSync() || {};
-                    const sw = Number(sys.screenWidth || sys.windowWidth || 0);
-                    const sh = Number(sys.screenHeight || sys.windowHeight || 0);
-                    if (sw > 0 && sh > 0) {
-                        return { landscape: sw >= sh, source: 'systemInfo' };
-                    }
-                }
-            } catch (_e2) {}
-
             return { landscape: canvas.width >= canvas.height, source: 'canvas' };
         };
 
@@ -143,11 +376,14 @@ function loadCC() {
         try {
             console.log('[BOOT] orientation target=' + (shouldLandscape ? 'landscape' : 'portrait')
                 + ' source=' + target.source + ' canvas=' + canvas.width + 'x' + canvas.height);
-        } catch (_e3) {}
+        } catch (_e2) {}
     }
 
-    // Adjust initial canvas size
-    if (canvas && window.devicePixelRatio >= 2) {canvas.width *= 2; canvas.height *= 2;}
+    // Use a single render sizing path for all TikTok devices.
+    if (canvas && window.devicePixelRatio >= 2) {
+        canvas.width *= 2;
+        canvas.height *= 2;
+    }
 
     const importMapFilePath = normalizeProjectPath("<%= importMapFile%>");
     const importMap = require(importMapFilePath).default;

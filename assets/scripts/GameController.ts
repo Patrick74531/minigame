@@ -90,7 +90,6 @@ export class GameController extends Component {
         if (isTikTokRuntime) {
             this._deferStartupLoadsForTikTok = true;
             this._deferRuntimeMediaBootstrapForTikTok = true;
-            this.forceLandscapeForTikTok();
         } else {
             // 预加载关键资源（贴图/Prefab/动画），避免首波帧率抖动
             ResourcePreloader.preloadAll();
@@ -361,53 +360,6 @@ export class GameController extends Component {
         WeaponVFX.initialize();
         AudioSettingsManager.instance.initialize(this.node);
         WeaponSFXManager.initialize(this.node);
-    }
-
-    private forceLandscapeForTikTok(): void {
-        const g = globalThis as unknown as {
-            tt?: Record<string, unknown>;
-            TTMinis?: { game?: Record<string, unknown> };
-            screen?: { orientation?: { lock?: (orientation: string) => Promise<unknown> } };
-        };
-
-        const candidates: Record<string, unknown>[] = [];
-        if (g.tt && typeof g.tt === 'object') candidates.push(g.tt);
-        if (g.TTMinis?.game && typeof g.TTMinis.game === 'object') {
-            candidates.push(g.TTMinis.game);
-        }
-
-        const payloads = [
-            { value: 'landscape' },
-            { orientation: 'landscape' },
-            { direction: 'landscape' },
-        ];
-        const names = ['setDeviceOrientation', 'setScreenOrientation', 'setGameOrientation'];
-
-        for (const api of candidates) {
-            for (const fnName of names) {
-                const fn = api[fnName];
-                if (typeof fn !== 'function') continue;
-                for (const payload of payloads) {
-                    try {
-                        (fn as (p: Record<string, string>) => unknown).call(api, payload);
-                        break;
-                    } catch (_e) {
-                        // ignore and fallback to next signature
-                    }
-                }
-            }
-        }
-
-        try {
-            const lock = g.screen?.orientation?.lock;
-            if (typeof lock === 'function') {
-                lock.call(g.screen.orientation, 'landscape-primary').catch(() => {
-                    // ignore
-                });
-            }
-        } catch (_e) {
-            // ignore
-        }
     }
 
     // === 升级 VFX ===

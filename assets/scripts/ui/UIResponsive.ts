@@ -7,10 +7,19 @@ export type ScreenBounds = {
     top: number;
 };
 
+export type RuntimeDisplayProfile = 'default' | 'tiktok_phone_portrait';
+
 export class UIResponsive {
     private static readonly DESIGN_SHORT_SIDE = 720;
     private static readonly MAX_SAFE_INSET_RATIO = 0.2;
     private static readonly TEMP_INPUT_MODE: 'touch' | 'desktop' | null = null;
+
+    public static getRuntimeDisplayProfile(): RuntimeDisplayProfile {
+        if (this.isTikTokRuntime() && this.isPhoneLikeViewport() && this.isPortraitViewport()) {
+            return 'tiktok_phone_portrait';
+        }
+        return 'default';
+    }
 
     public static getVisibleSize(): Size {
         return view.getVisibleSize();
@@ -42,6 +51,9 @@ export class UIResponsive {
     public static getControlScale(): number {
         const size = this.getVisibleSize();
         const shortSide = Math.min(size.width, size.height);
+        if (this.getRuntimeDisplayProfile() === 'tiktok_phone_portrait') {
+            return this.clamp((shortSide / this.DESIGN_SHORT_SIDE) * 1.18, 0.92, 1.22);
+        }
         return this.clamp(shortSide / this.DESIGN_SHORT_SIDE, 0.82, 1.1);
     }
 
@@ -53,9 +65,22 @@ export class UIResponsive {
     } {
         const size = this.getVisibleSize();
         const shortSide = Math.min(size.width, size.height);
-        const horizontal = Math.round(this.clamp(shortSide * 0.08, 36, 84));
-        const bottom = Math.round(this.clamp(shortSide * 0.09, 40, 96));
-        const top = Math.round(this.clamp(shortSide * 0.05, 24, 52));
+        const profile = this.getRuntimeDisplayProfile();
+        const horizontal = Math.round(
+            profile === 'tiktok_phone_portrait'
+                ? this.clamp(shortSide * 0.065, 26, 62)
+                : this.clamp(shortSide * 0.08, 36, 84)
+        );
+        const bottom = Math.round(
+            profile === 'tiktok_phone_portrait'
+                ? this.clamp(shortSide * 0.105, 44, 104)
+                : this.clamp(shortSide * 0.09, 40, 96)
+        );
+        const top = Math.round(
+            profile === 'tiktok_phone_portrait'
+                ? this.clamp(shortSide * 0.075, 28, 68)
+                : this.clamp(shortSide * 0.05, 24, 52)
+        );
         const safe = this.getSafeAreaInsets();
 
         return {
@@ -64,6 +89,13 @@ export class UIResponsive {
             bottom: bottom + safe.bottom,
             top: top + safe.top,
         };
+    }
+
+    public static getGameplayCameraPreset(): { fov: number; offset: Vec3 } {
+        if (this.getRuntimeDisplayProfile() === 'tiktok_phone_portrait') {
+            return { fov: 48, offset: new Vec3(0, 10.6, 12.4) };
+        }
+        return { fov: 42, offset: new Vec3(0, 8.2, 9.8) };
     }
 
     public static getBounds(padding: {
@@ -140,6 +172,17 @@ export class UIResponsive {
 
     private static isMobileLikeViewport(): boolean {
         return this.isPadLikeViewport() || this.isPhoneLikeViewport();
+    }
+
+    private static isPortraitViewport(): boolean {
+        const size = this.getVisibleSize();
+        if (size.width <= 0 || size.height <= 0) return false;
+        return size.height > size.width;
+    }
+
+    private static isTikTokRuntime(): boolean {
+        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
+        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
     }
 
     private static hasTouchCapability(): boolean {

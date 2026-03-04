@@ -74,10 +74,7 @@ export class HomePage extends Component {
         this.ensureRootLayout();
         this.createUI();
 
-        this._settingsModule = new HUDSettingsModule(() => {
-            this.refreshText();
-        });
-        this._settingsModule.initialize(this.node);
+        this.hideHomeOnlyHudEntries();
         EventManager.instance.on(GameEvents.LANGUAGE_CHANGED, this.onLanguageChanged, this);
 
         view.on('canvas-resize', this.onCanvasResize, this);
@@ -217,6 +214,8 @@ export class HomePage extends Component {
         cpWidget.isAlignLeft = true;
         cpWidget.top = 10;
         cpWidget.left = 10;
+        // Home page should not show in-game currency HUD.
+        this._currencyPanelNode.active = false;
         // Register listener so diamond display auto-updates when balance changes
         this._diamondListener = () => this._updateDiamondDisplay();
         DiamondService.instance.addListener(this._diamondListener);
@@ -389,8 +388,6 @@ export class HomePage extends Component {
         tween(this._contentNode)
             .to(0.3, { scale: new Vec3(1, 1, 1) })
             .start();
-        // Show settings button at the same time as content buttons.
-        this._settingsModule?.show();
         // Delay hiding the HTML boot splash by ~3 frames so the GPU has time to
         // upload the background texture and render at least one full frame before
         // the HTML overlay starts fading. Without this delay a 1-frame black flash
@@ -471,6 +468,58 @@ export class HomePage extends Component {
         this.updateBackgroundLayout();
         this.updateContentLayout();
         this._settingsModule?.onCanvasResize();
+        this.hideHomeOnlyHudEntries();
+    }
+
+    private hideHomeOnlyHudEntries(): void {
+        if (this._currencyPanelNode?.isValid) {
+            this._currencyPanelNode.active = false;
+        }
+
+        const settingsBtn = this._settingsModule?.settingsButtonNode;
+        if (settingsBtn?.isValid) {
+            this.disableInteractionNode(settingsBtn);
+        }
+
+        const settingsPanelRoot = this.node.getChildByName('SettingsPanelRoot');
+        if (settingsPanelRoot?.isValid) {
+            this.disableInteractionNode(settingsPanelRoot);
+        }
+
+        // Home should not expose settings triggers from any leaked HUD node.
+        this.disableNamedNodeRecursively(this.node, 'SettingsButton');
+        this.disableNamedNodeRecursively(this.node, 'SettingsPanelRoot');
+        const parentNode = this.node.parent;
+        if (parentNode && parentNode !== this.node) {
+            this.disableNamedNodeRecursively(parentNode, 'SettingsButton');
+            this.disableNamedNodeRecursively(parentNode, 'SettingsPanelRoot');
+        }
+    }
+
+    private disableNamedNodeRecursively(root: Node, nodeName: string): void {
+        if (!root?.isValid) return;
+        const stack: Node[] = [root];
+        while (stack.length > 0) {
+            const current = stack.pop();
+            if (!current || !current.isValid) continue;
+            if (current.name === nodeName) {
+                this.disableInteractionNode(current);
+            }
+            for (const child of current.children) {
+                stack.push(child);
+            }
+        }
+    }
+
+    private disableInteractionNode(node: Node): void {
+        if (!node?.isValid) return;
+        node.active = false;
+        const btn = node.getComponent(Button);
+        if (btn) {
+            btn.interactable = false;
+            btn.enabled = false;
+        }
+        node.pauseSystemEvents(true);
     }
 
     private updateBackgroundLayout() {
@@ -535,9 +584,15 @@ export class HomePage extends Component {
         this._contentNode.getComponent(Widget)?.updateAlignment();
 
         const shortSide = Math.min(size.width, size.height);
-        const buttonW = Math.round(UIResponsive.clamp(shortSide * 0.34, 130, 300));
-        const buttonH = Math.round(UIResponsive.clamp(shortSide * 0.09, 38, 76));
-        const gap = Math.round(UIResponsive.clamp(shortSide * 0.022, 6, 24));
+        const isTikTokPortraitProfile =
+            UIResponsive.getRuntimeDisplayProfile() === 'tiktok_phone_portrait';
+        const buttonWidthFactor = isTikTokPortraitProfile ? 0.39 : 0.34;
+        const buttonHeightFactor = isTikTokPortraitProfile ? 0.105 : 0.09;
+        const buttonW = Math.round(UIResponsive.clamp(shortSide * buttonWidthFactor, 130, 320));
+        const buttonH = Math.round(UIResponsive.clamp(shortSide * buttonHeightFactor, 38, 84));
+        const gap = Math.round(
+            UIResponsive.clamp(shortSide * 0.022, 6, isTikTokPortraitProfile ? 20 : 24)
+        );
         const step = buttonH + gap;
         const hasContinue = !!this._continueBtn;
         const hasSubscribe = !!this._subscribeBtn;

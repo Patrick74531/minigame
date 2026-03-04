@@ -146,211 +146,6 @@ split_runtime_to_subpackage() {
       "${subpackage_root}/game.js"
   fi
 
-  # Lightweight landscape patch for TikTok runtime:
-  # - no WebGL/FBO hooks
-  # - only orientation API + system info/canvas dimension normalization
-  # NOTE: when FBO mode is enabled we skip LS-LITE entirely to avoid conflicts.
-  if [ "${ENABLE_EXPERIMENTAL_FBO_ROTATION_PATCH}" -eq 0 ] && [ -f "${subpackage_root}/game.js" ]; then
-    SUBPACKAGE_GAME_JS="${subpackage_root}/game.js" node <<'NODE'
-const fs = require('fs');
-const gameJsPath = process.env.SUBPACKAGE_GAME_JS;
-let source = fs.readFileSync(gameJsPath, 'utf8');
-
-const litePrePatch = `
-// [LS-LITE] lightweight landscape pre-patch (safe mode)
-(function _gvrLandscapeLitePrePatch() {
-    try {
-        var _tt = (typeof tt !== 'undefined' && tt) ? tt : null;
-        var _ttMinis = (typeof TTMinis !== 'undefined' && TTMinis && TTMinis.game) ? TTMinis.game : null;
-        var _hosts = [];
-        if (_tt) _hosts.push({ name: 'tt', api: _tt });
-        if (_ttMinis && _ttMinis !== _tt) _hosts.push({ name: 'TTMinis.game', api: _ttMinis });
-
-        var _orientationPayloads = [{ value: 'landscape' }, { orientation: 'landscape' }, { direction: 'landscape' }];
-        var _orientationFns = ['setDeviceOrientation', 'setScreenOrientation', 'setGameOrientation'];
-        var _orientationRounds = [0, 80, 240, 800];
-        var _triedSig = {};
-        var _foundOrientationFn = false;
-        var _callOrientationOnce = function(roundTag) {
-            for (var h = 0; h < _hosts.length; h += 1) {
-                var hostName = _hosts[h].name;
-                var hostApi = _hosts[h].api;
-                for (var i = 0; i < _orientationFns.length; i += 1) {
-                    var fnName = _orientationFns[i];
-                    var fn = hostApi && hostApi[fnName];
-                    if (typeof fn !== 'function') continue;
-                    _foundOrientationFn = true;
-                    for (var j = 0; j < _orientationPayloads.length; j += 1) {
-                        var payloadBase = _orientationPayloads[j];
-                        var sig = hostName + ':' + fnName + ':' + j;
-                        try {
-                            var payload = Object.assign({}, payloadBase, {
-                                success: function() {},
-                                fail: function() {}
-                            });
-                            var ret = fn.call(hostApi, payload);
-                            if (!_triedSig[sig]) {
-                                console.log('[LS-LITE][ORIENT] ' + roundTag + ' ok ' + hostName + '.' + fnName
-                                    + ' payload=' + JSON.stringify(payloadBase));
-                                _triedSig[sig] = 1;
-                            }
-                            if (ret && typeof ret.then === 'function') {
-                                (function(_sig, _hn, _fn, _pb) {
-                                    ret.then(function() {
-                                        if (!_triedSig[_sig + ':then']) {
-                                            console.log('[LS-LITE][ORIENT] promise ok ' + _hn + '.' + _fn
-                                                + ' payload=' + JSON.stringify(_pb));
-                                            _triedSig[_sig + ':then'] = 1;
-                                        }
-                                    }).catch(function(err) {
-                                        console.log('[LS-LITE][ORIENT] promise fail ' + _hn + '.' + _fn
-                                            + ' payload=' + JSON.stringify(_pb)
-                                            + ' err=' + (err && err.message ? err.message : err));
-                                    });
-                                })(sig, hostName, fnName, payloadBase);
-                            }
-                            break;
-                        } catch (_e5) {
-                            if (!_triedSig[sig + ':err']) {
-                                console.log('[LS-LITE][ORIENT] ' + roundTag + ' err ' + hostName + '.' + fnName
-                                    + ' payload=' + JSON.stringify(payloadBase)
-                                    + ' err=' + (_e5 && _e5.message ? _e5.message : _e5));
-                                _triedSig[sig + ':err'] = 1;
-                            }
-                        }
-                    }
-                }
-            }
-            try {
-                var s = _tt && typeof _tt.getSystemInfoSync === 'function' ? _tt.getSystemInfoSync() : null;
-                if (s) {
-                    console.log('[LS-LITE][SYS] ' + roundTag + ' sw=' + s.screenWidth + ' sh=' + s.screenHeight
-                        + ' ww=' + s.windowWidth + ' wh=' + s.windowHeight
-                        + ' ori=' + (s.deviceOrientation || 'n/a'));
-                }
-            } catch (_e6) {}
-        };
-
-        for (var r = 0; r < _orientationRounds.length; r += 1) {
-            (function(delayMs) {
-                try {
-                    if (delayMs === 0) {
-                        _callOrientationOnce('t0');
-                    } else if (typeof setTimeout === 'function') {
-                        setTimeout(function() { _callOrientationOnce('t+' + delayMs); }, delayMs);
-                    }
-                } catch (_e7) {}
-            })(_orientationRounds[r]);
-        }
-
-        if (_hosts.length === 0) {
-            console.log('[LS-LITE][ORIENT] no host api (tt/TTMinis.game missing)');
-        } else if (!_foundOrientationFn) {
-            console.log('[LS-LITE][ORIENT] no orientation functions on host');
-        }
-
-        try {
-            if (_tt && typeof _tt.onWindowResize === 'function' && !_tt.__gvrLsResizeLogPatched) {
-                _tt.onWindowResize(function(res) {
-                    try {
-                        console.log('[LS-LITE][RESIZE] ww=' + res.windowWidth + ' wh=' + res.windowHeight
-                            + ' sw=' + res.screenWidth + ' sh=' + res.screenHeight);
-                    } catch (_e8) {}
-                });
-                _tt.__gvrLsResizeLogPatched = true;
-            }
-        } catch (_e9) {}
-
-        if (typeof GameGlobal !== 'undefined' && GameGlobal) {
-            GameGlobal.__gvrLandscapeLite = 1;
-            GameGlobal.__gvrTargetLandscape = 1;
-            GameGlobal.__gvrOrientationApiAvailable = _foundOrientationFn ? 1 : 0;
-        }
-        console.log('[LS-LITE] pre-patch enabled');
-    } catch (e) {
-        console.log('[LS-LITE] pre-patch error: ' + (e && e.message ? e.message : e));
-    }
-})();
-`;
-
-const liteCanvasPatch = `
-// [LS-LITE] canvas orientation patch (safe mode)
-(function _gvrLandscapeLiteCanvasPatch() {
-    try {
-        if (typeof canvas === 'undefined' || !canvas) return;
-        var w = Number(canvas.width || 0);
-        var h = Number(canvas.height || 0);
-        var _sys = null;
-        try {
-            if (typeof tt !== 'undefined' && tt && typeof tt.getSystemInfoSync === 'function') {
-                _sys = tt.getSystemInfoSync() || null;
-            }
-        } catch (_e0) {}
-        var shouldLandscape = !!(_sys && Number(_sys.windowWidth || _sys.screenWidth || 0) >= Number(_sys.windowHeight || _sys.screenHeight || 0));
-        if (w > 0 && h > 0 && w < h && shouldLandscape) {
-            canvas.width = h;
-            canvas.height = w;
-            console.log('[LS-LITE] canvas swapped to ' + canvas.width + 'x' + canvas.height);
-        } else {
-            console.log('[LS-LITE] canvas keep ' + w + 'x' + h + ' shouldLandscape=' + (shouldLandscape ? 1 : 0));
-        }
-    } catch (e) {
-        console.log('[LS-LITE] canvas patch error: ' + (e && e.message ? e.message : e));
-    }
-})();
-`;
-
-if (!source.includes('_gvrLandscapeLitePrePatch') && source.includes('loadCC();')) {
-    source = source.replace('loadCC();', `${litePrePatch}\nloadCC();`);
-}
-
-if (!source.includes('_gvrLandscapeLiteCanvasPatch') && source.includes("require('./web-adapter');")) {
-    source = source.replace("require('./web-adapter');", `require('./web-adapter');${liteCanvasPatch}`);
-}
-
-// Replace legacy IOS swap block that can revert LS-LITE landscape back to portrait
-// when `screen.width/height` is stale in TikTok runtime.
-const legacyCanvasAdaptPattern = /\/\/ Adapt for IOS, swap if opposite[\s\S]*?canvas\.height = _h;\s*\n\s*\}/s;
-if (legacyCanvasAdaptPattern.test(source)) {
-    const safeCanvasAdapt = `// Adapt canvas orientation using runtime system info
-    if (canvas){
-        var _targetLandscape = (canvas.width >= canvas.height);
-        try {
-            if (typeof tt !== 'undefined' && tt && typeof tt.getSystemInfoSync === 'function') {
-                var _sys = tt.getSystemInfoSync() || {};
-                var _sw = Number(_sys.screenWidth || _sys.windowWidth || 0);
-                var _sh = Number(_sys.screenHeight || _sys.windowHeight || 0);
-                if (_sw > 0 && _sh > 0) _targetLandscape = _sw >= _sh;
-            }
-        } catch (_e6) {}
-
-        var _isLandscapeCanvas = canvas.width >= canvas.height;
-        if (_targetLandscape !== _isLandscapeCanvas) {
-            var _tmp = canvas.width;
-            canvas.width = canvas.height;
-            canvas.height = _tmp;
-            console.log('[LS-LITE] canvas adapted to ' + (_targetLandscape ? 'landscape' : 'portrait')
-                + ' ' + canvas.width + 'x' + canvas.height);
-        }
-    }`;
-    source = source.replace(legacyCanvasAdaptPattern, safeCanvasAdapt);
-}
-
-fs.writeFileSync(gameJsPath, source);
-NODE
-  fi
-
-  # Experimental FBO rotation patch (landscape fallback for runtimes without
-  # orientation APIs). In our TikTok device chain this is the only reliable
-  # way to force landscape rendering.
-  if [ "${ENABLE_EXPERIMENTAL_FBO_ROTATION_PATCH}" -eq 1 ] && [ -f "${subpackage_root}/game.js" ]; then
-    log "Applying FBO V2 minimal rotation patch..."
-    node "${ROOT_DIR}/scripts/fbo_patch_v2.js" "${subpackage_root}/game.js"
-  elif [ -f "${subpackage_root}/game.js" ]; then
-    log "FBO rotation patch disabled (stable mode)"
-  fi
-
-
   # Some TikTok runtime builds occasionally fail to hydrate assets.subpackages from settings
   # and fall back to root assets/<bundle>/config.json lookups.
   # Force a stable fallback map for deferred resources subpackage in engine adapter.
@@ -412,10 +207,9 @@ if (settings.scripting && Array.isArray(settings.scripting.scriptPackages)) {
 if (!settings.screen || typeof settings.screen !== 'object') {
   settings.screen = {};
 }
-settings.screen.orientation = 'landscape';
+settings.screen.orientation = 'portrait';
 
-// Disable Cocos splash screen for TikTok — FBO rotation makes it display wrong orientation.
-// Our own LoadingScreen takes over instead.
+// Disable Cocos splash screen for TikTok; custom LoadingScreen takes over.
 if (settings.splashScreen && typeof settings.splashScreen === 'object') {
   settings.splashScreen.totalTime = 0;
   console.log('[tiktok-native-build] Splash screen disabled (totalTime=0)');
@@ -856,85 +650,6 @@ NODE
     } catch (_e) {}
   }
 
-  // Request landscape orientation as early as possible (before subpackage load).
-  function requestLandscapeEarly() {
-    try {
-      var ttHost = (typeof tt !== 'undefined' && tt) ? tt : null;
-      var ttMinisHost = (typeof TTMinis !== 'undefined' && TTMinis && TTMinis.game) ? TTMinis.game : null;
-      var hosts = [];
-      if (ttHost) hosts.push({ name: 'tt', api: ttHost });
-      if (ttMinisHost && ttMinisHost !== ttHost) hosts.push({ name: 'TTMinis.game', api: ttMinisHost });
-      if (hosts.length === 0) {
-        console.log('[BOOT][ORIENT] no host api');
-        return;
-      }
-
-      var payloads = [{value:'landscape'},{orientation:'landscape'},{direction:'landscape'}];
-      var fns = ['setDeviceOrientation','setScreenOrientation','setGameOrientation'];
-      var once = {};
-      var foundOrientationFn = false;
-      var callRound = function(tag) {
-        for (var h = 0; h < hosts.length; h++) {
-          var hostName = hosts[h].name;
-          var hostApi = hosts[h].api;
-          for (var i = 0; i < fns.length; i++) {
-            var fnName = fns[i];
-            var fn = hostApi[fnName];
-            if (typeof fn !== 'function') continue;
-            foundOrientationFn = true;
-            for (var j = 0; j < payloads.length; j++) {
-              var basePayload = payloads[j];
-              var sig = hostName + ':' + fnName + ':' + j;
-              try {
-                fn.call(hostApi, Object.assign({}, basePayload, { success: function(){}, fail: function(){} }));
-                if (!once[sig]) {
-                  console.log('[BOOT][ORIENT] ' + tag + ' ok ' + hostName + '.' + fnName + ' payload=' + JSON.stringify(basePayload));
-                  once[sig] = 1;
-                }
-                break;
-              } catch(_e2) {
-                if (!once[sig + ':err']) {
-                  console.log('[BOOT][ORIENT] ' + tag + ' err ' + hostName + '.' + fnName + ' payload=' + JSON.stringify(basePayload)
-                    + ' err=' + (_e2 && _e2.message ? _e2.message : _e2));
-                  once[sig + ':err'] = 1;
-                }
-              }
-            }
-          }
-        }
-        try {
-          if (ttHost && typeof ttHost.getSystemInfoSync === 'function') {
-            var s = ttHost.getSystemInfoSync() || {};
-            console.log('[BOOT][SYS] ' + tag + ' sw=' + s.screenWidth + ' sh=' + s.screenHeight
-              + ' ww=' + s.windowWidth + ' wh=' + s.windowHeight
-              + ' ori=' + (s.deviceOrientation || 'n/a'));
-          }
-        } catch(_e3) {}
-      };
-
-      callRound('t0');
-      if (!foundOrientationFn) {
-        console.log('[BOOT][ORIENT] no orientation functions on host');
-      }
-      if (typeof setTimeout === 'function') {
-        setTimeout(function(){ callRound('t+120'); }, 120);
-        setTimeout(function(){ callRound('t+500'); }, 500);
-        setTimeout(function(){ callRound('t+1200'); }, 1200);
-      }
-      if (ttHost && typeof ttHost.onWindowResize === 'function' && !ttHost.__gvrBootResizeLog) {
-        ttHost.onWindowResize(function(res){
-          try {
-            console.log('[BOOT][RESIZE] ww=' + res.windowWidth + ' wh=' + res.windowHeight
-              + ' sw=' + res.screenWidth + ' sh=' + res.screenHeight);
-          } catch(_e4) {}
-        });
-        ttHost.__gvrBootResizeLog = true;
-      }
-    } catch (_e) {
-      try { console.log('[BOOT][ORIENT] exception ' + (_e && _e.message ? _e.message : _e)); } catch(_e2) {}
-    }
-  }
-
   function launch() {
     if (started) {
       return;
@@ -948,7 +663,6 @@ NODE
 
   exposePlatform();
   installCrashBreadcrumbs();
-  requestLandscapeEarly();
 
   prepareTikTokIdentity(function() {
     if (typeof tt !== 'undefined' && tt && typeof tt.loadSubpackage === 'function') {
@@ -989,9 +703,8 @@ if (deferredEnabled) {
 gameJson.subpackages = subpackages;
 // Official config key in docs uses subPackages; keep both for compatibility.
 gameJson.subPackages = subpackages;
-// Force landscape for TikTok native runtime to match gameplay layout.
-gameJson.deviceOrientation = 'landscape';
-gameJson.orientation = 'landscape';
+gameJson.deviceOrientation = 'portrait';
+gameJson.orientation = 'portrait';
 fs.writeFileSync(gameJsonPath, `${JSON.stringify(gameJson, null, 4)}\n`);
 
 // Create CommonJS module wrappers inside the subpackage so that
@@ -1004,7 +717,7 @@ fs.writeFileSync(
   'module.exports = ' + JSON.stringify(gameJson, null, 4) + ';\n'
 );
 const miniCfgSrc = path.join(packageDir, 'minigame.config.json');
-let miniCfgObj = { orientation: 'landscape' };
+let miniCfgObj = { orientation: 'portrait' };
 if (fs.existsSync(miniCfgSrc)) {
   try {
     const raw = JSON.parse(fs.readFileSync(miniCfgSrc, 'utf8'));
@@ -1193,8 +906,8 @@ write_ttmg_dev_config() {
   local config_path="${package_dir}/minigame.config.json"
   cat > "$config_path" <<'EOF_JSON'
 {
-  "_comment": "ttmg local dev config; set orientation to horizontal for on-device debug sessions.",
-  "orientation": "HORIZONTAL",
+  "_comment": "ttmg local dev config; portrait for mobile adaptation verification.",
+  "orientation": "VERTICAL",
   "dev": {
     "port": 9527
   }
@@ -1216,7 +929,6 @@ ENABLE_SUBPACKAGE_SPLIT=1
 SUBPACKAGE_NAME="gamecore"
 ENABLE_DEFERRED_RESOURCES_SPLIT=1
 DEFERRED_RESOURCES_SUBPACKAGE_NAME="resources"
-ENABLE_EXPERIMENTAL_FBO_ROTATION_PATCH="${ENABLE_EXPERIMENTAL_FBO_ROTATION_PATCH:-1}"
 TIKTOK_API_BASE="${TIKTOK_API_BASE:-https://tiktok-leaderboard-prod.mineskystudio.workers.dev/api/tiktok}"
 
 usage() {
@@ -1240,8 +952,6 @@ Options:
   --no-deferred-resources-split   Keep resources bundle in startup subpackage.
   --deferred-resources-name <n>   Deferred resources subpackage name. Default: resources
   --tiktok-api-base <url>         Inject window.__GVR_TIKTOK_API_BASE__ into package game.js
-  --enable-fbo-rotation-patch     Force-enable FBO landscape patch.
-  --disable-fbo-rotation-patch    Disable FBO landscape patch and use native orientation only.
   -h, --help                      Show this help.
 EOF_USAGE
 }
@@ -1263,8 +973,6 @@ while [ $# -gt 0 ]; do
     --no-deferred-resources-split) ENABLE_DEFERRED_RESOURCES_SPLIT=0 ;;
     --deferred-resources-name) DEFERRED_RESOURCES_SUBPACKAGE_NAME="$2"; shift ;;
     --tiktok-api-base) TIKTOK_API_BASE="$2"; shift ;;
-    --enable-fbo-rotation-patch) ENABLE_EXPERIMENTAL_FBO_ROTATION_PATCH=1 ;;
-    --disable-fbo-rotation-patch) ENABLE_EXPERIMENTAL_FBO_ROTATION_PATCH=0 ;;
     -h|--help) usage; exit 0 ;;
     *) die "Unknown option: $1" ;;
   esac
@@ -1337,11 +1045,6 @@ fi
 [ -f "${SOURCE_BUILD_DIR}/game.js" ] || die "game.js not found in source build dir: $SOURCE_BUILD_DIR"
 
 log "Packaging from $SOURCE_BUILD_DIR"
-if [ "${ENABLE_EXPERIMENTAL_FBO_ROTATION_PATCH}" -eq 1 ]; then
-  warn "Using FBO landscape patch (runtime fallback mode)."
-else
-  log "Using stable orientation mode (FBO rotation patch disabled)."
-fi
 copy_dir_clean "$SOURCE_BUILD_DIR" "$OUTPUT_PACKAGE_DIR"
 find "$OUTPUT_PACKAGE_DIR" -type f \( -name "*.map" -o -name ".DS_Store" \) -delete
 
