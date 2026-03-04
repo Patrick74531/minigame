@@ -96,6 +96,8 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         const activeType = manager.activeWeaponType;
         const iconSize = this._iconSize;
         const spacing = iconSize + ICON_GAP;
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
+        const columns = isTikTokPortrait ? 2 : 1;
         let index = 0;
 
         inventory.forEach((instance, type) => {
@@ -105,14 +107,18 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
             const icon = this.createIconNode(type, def, instance.level, type === activeType, index);
             this._barNode!.addChild(icon);
 
-            const x = -BAR_PADDING_X - iconSize * 0.5 - index * spacing;
-            const y = BAR_PADDING_Y + iconSize * 0.5;
+            const col = isTikTokPortrait ? index % columns : index;
+            const row = isTikTokPortrait ? Math.floor(index / columns) : 0;
+            const x = isTikTokPortrait
+                ? BAR_PADDING_X + iconSize * 0.5 + col * spacing
+                : -BAR_PADDING_X - iconSize * 0.5 - col * spacing;
+            const y = BAR_PADDING_Y + iconSize * 0.5 + row * spacing;
             icon.setPosition(x, y, 0);
             this._iconNodes.set(type, icon);
             index++;
         });
 
-        this.updateContainerSize(index);
+        this.updateContainerSize(index, isTikTokPortrait);
     }
 
     // === UI 构建 ===
@@ -141,10 +147,18 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         if (!this._barNode || !this._barWidget) return;
 
         const isTouch = UIResponsive.shouldUseTouchControls();
-        const padding = isTouch ? UIResponsive.getControlPadding() : { right: 20, bottom: 20 };
+        const padding = isTouch
+            ? UIResponsive.getControlPadding()
+            : { left: 20, right: 20, bottom: 20 };
         const scale = isTouch ? UIResponsive.getControlScale() : 1;
-        this._iconSize = isTouch ? TOUCH_ICON_SIZE : DESKTOP_ICON_SIZE;
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
+        this._iconSize = isTouch
+            ? isTikTokPortrait
+                ? Math.round(TOUCH_ICON_SIZE * 0.72)
+                : TOUCH_ICON_SIZE
+            : DESKTOP_ICON_SIZE;
         this._barNode.setScale(scale, scale, 1);
+        this._barNode.getComponent(UITransform)?.setAnchorPoint(isTikTokPortrait ? 0 : 1, 0);
 
         // Bypass Widget entirely — position directly from visible viewport edges.
         // UICanvas UITransform is hardcoded 1280×720 by UIFactory; Widget.isAlignRight
@@ -152,12 +166,20 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         // Disable Widget entirely so onEnable() cannot re-apply original alignment values.
         if (this._barWidget) this._barWidget.enabled = false;
         const vis = UIResponsive.getVisibleSize();
-        // Bar anchor is (1, 0): setPosition places the right-bottom corner of the node.
-        this._barNode.setPosition(
-            Math.round(vis.width * 0.5 - padding.right),
-            Math.round(-vis.height * 0.5 + padding.bottom),
-            0
-        );
+        // Anchor (0, 0) => left-bottom corner; (1, 0) => right-bottom corner.
+        if (isTikTokPortrait) {
+            this._barNode.setPosition(
+                Math.round(-vis.width * 0.5 + padding.left),
+                Math.round(-vis.height * 0.5 + padding.bottom),
+                0
+            );
+        } else {
+            this._barNode.setPosition(
+                Math.round(vis.width * 0.5 - padding.right),
+                Math.round(-vis.height * 0.5 + padding.bottom),
+                0
+            );
+        }
 
         this._showKeyboardHints = !isTouch;
         this.refresh();
@@ -337,12 +359,20 @@ export class WeaponBarUI extends Singleton<WeaponBarUI>() {
         return waitingSet;
     }
 
-    private updateContainerSize(iconCount: number): void {
+    private updateContainerSize(iconCount: number, isTikTokPortrait: boolean): void {
         if (!this._barNode) return;
+        const columns = isTikTokPortrait ? Math.min(2, Math.max(1, iconCount)) : iconCount;
+        const rows = isTikTokPortrait ? Math.max(1, Math.ceil(iconCount / 2)) : 1;
         const iconAreaWidth =
-            iconCount > 0 ? iconCount * this._iconSize + Math.max(0, iconCount - 1) * ICON_GAP : 0;
-        const width = Math.max(BAR_MIN_WIDTH, iconAreaWidth + BAR_PADDING_X * 2);
-        const height = Math.max(BAR_MIN_HEIGHT, this._iconSize + BAR_PADDING_Y * 2 + 12);
+            columns > 0 ? columns * this._iconSize + Math.max(0, columns - 1) * ICON_GAP : 0;
+        const iconAreaHeight =
+            rows > 0 ? rows * this._iconSize + Math.max(0, rows - 1) * ICON_GAP : 0;
+        const minWidth = isTikTokPortrait ? Math.round(this._iconSize * 1.4) : BAR_MIN_WIDTH;
+        const minHeight = isTikTokPortrait
+            ? Math.round(this._iconSize + BAR_PADDING_Y * 2 + 12)
+            : BAR_MIN_HEIGHT;
+        const width = Math.max(minWidth, iconAreaWidth + BAR_PADDING_X * 2);
+        const height = Math.max(minHeight, iconAreaHeight + BAR_PADDING_Y * 2 + 12);
         this._barNode.getComponent(UITransform)?.setContentSize(width, height);
     }
 

@@ -50,23 +50,26 @@ export class Joystick extends Component {
     }
 
     public setInputEnabled(enabled: boolean): void {
-        if (this._inputEnabled === enabled) return;
+        this.resolveVisualRefs();
+        if (this._inputEnabled === enabled) {
+            this.applyVisualState();
+            return;
+        }
         this._inputEnabled = enabled;
         if (!enabled) {
             this._touchId = null;
             this._mouseActive = false;
             this.endInput();
+            this.applyVisualState();
+            return;
         }
+        this.applyVisualState();
     }
 
     protected onLoad(): void {
+        this.resolveVisualRefs();
         this._desktopMode = !UIResponsive.shouldUseTouchControls();
         this.setInputEnabled(!this._desktopMode);
-        if (this._desktopMode) {
-            this.hideVisuals();
-        } else {
-            this.showVisuals();
-        }
 
         input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);
         input.on(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
@@ -79,7 +82,12 @@ export class Joystick extends Component {
         this.node.getComponent(Widget)?.updateAlignment();
         view.on('canvas-resize', this.onResize, this);
         this.updateDefaultPosition();
-        this.scheduleOnce(() => this.updateDefaultPosition(), 0);
+        this.applyVisualState();
+        this.scheduleOnce(() => {
+            this.resolveVisualRefs();
+            this.updateDefaultPosition();
+            this.applyVisualState();
+        }, 0);
     }
 
     protected onDestroy(): void {
@@ -94,21 +102,16 @@ export class Joystick extends Component {
     }
 
     private onResize(): void {
+        this.resolveVisualRefs();
         this._desktopMode = !UIResponsive.shouldUseTouchControls();
         this.setInputEnabled(!this._desktopMode);
         this.updateDefaultPosition();
-        if (this._touchId === null && !this._mouseActive) {
-            if (this._desktopMode) {
-                this.hideVisuals();
-            } else {
-                this.showVisuals();
-                this.resetPosition();
-            }
-        }
+        this.applyVisualState();
     }
 
     private updateDefaultPosition(): void {
         const scale = UIResponsive.getControlScale();
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
         this._effectiveRadius = Math.max(1, this.maxRadius * scale);
         this.background?.setScale(scale, scale, 1);
         this.stick?.setScale(scale, scale, 1);
@@ -131,7 +134,7 @@ export class Joystick extends Component {
         };
 
         if (!this._movementBounds) return;
-        const x = this._movementBounds.left;
+        const x = isTikTokPortrait ? this._movementBounds.right : this._movementBounds.left;
         const y = this._movementBounds.bottom;
         this._defaultPos.set(x, y, 0);
 
@@ -144,6 +147,27 @@ export class Joystick extends Component {
     private resetPosition(): void {
         if (this.background) this.background.setPosition(this._defaultPos);
         if (this.stick) this.stick.setPosition(this._defaultPos);
+    }
+
+    private resolveVisualRefs(): void {
+        if (!this.background || !this.background.isValid) {
+            this.background = this.node.getChildByName('Background');
+        }
+        if (!this.stick || !this.stick.isValid) {
+            this.stick = this.node.getChildByName('Stick');
+        }
+    }
+
+    private applyVisualState(): void {
+        if (this._desktopMode || !this._inputEnabled) {
+            this.hideVisuals();
+            return;
+        }
+
+        this.showVisuals();
+        if (this._touchId === null && !this._mouseActive) {
+            this.resetPosition();
+        }
     }
 
     private showVisuals(): void {
@@ -260,8 +284,15 @@ export class Joystick extends Component {
         const area = this.getControlAreaSize();
         const halfW = area.width * 0.5;
         const halfH = area.height * 0.5;
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
         const zoneRight = -halfW + area.width * JOYSTICK_ZONE_WIDTH_RATIO;
+        const zoneLeft = halfW - area.width * JOYSTICK_ZONE_WIDTH_RATIO;
         const zoneTop = -halfH + area.height * JOYSTICK_ZONE_HEIGHT_RATIO;
+        if (isTikTokPortrait) {
+            return (
+                local.x >= zoneLeft && local.x <= halfW && local.y >= -halfH && local.y <= zoneTop
+            );
+        }
 
         return local.x >= -halfW && local.x <= zoneRight && local.y >= -halfH && local.y <= zoneTop;
     }

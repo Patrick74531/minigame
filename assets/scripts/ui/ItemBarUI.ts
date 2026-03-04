@@ -16,6 +16,12 @@ const TOUCH_ICON_SIZE = 64;
 const ICON_GAP = 10;
 const BAR_PADDING_X = 10;
 const BAR_PADDING_Y = 8;
+const WEAPON_TOUCH_ICON_SIZE = 96;
+const WEAPON_TOUCH_ICON_SCALE_TIKTOK = 0.72;
+const WEAPON_ICON_GAP = 14;
+const WEAPON_BAR_PADDING_Y = 10;
+const WEAPON_BAR_EXTRA_HEIGHT = 12;
+const WEAPON_BAR_PORTRAIT_ROWS = 2;
 
 /**
  * ItemBarUI
@@ -72,6 +78,7 @@ export class ItemBarUI extends Singleton<ItemBarUI>() {
         const itemService = ItemService.instance;
         const iconSize = this._iconSize;
         const spacing = iconSize + ICON_GAP;
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
         let index = 0;
 
         for (const itemId of ALL_ITEM_IDS) {
@@ -82,14 +89,16 @@ export class ItemBarUI extends Singleton<ItemBarUI>() {
             const icon = this.createIconNode(itemId, def, count, index);
             this._barNode.addChild(icon);
 
-            const x = -BAR_PADDING_X - iconSize * 0.5 - index * spacing;
+            const x = isTikTokPortrait
+                ? BAR_PADDING_X + iconSize * 0.5 + index * spacing
+                : -BAR_PADDING_X - iconSize * 0.5 - index * spacing;
             const y = BAR_PADDING_Y + iconSize * 0.5;
             icon.setPosition(x, y, 0);
             this._iconNodes.set(itemId, icon);
             index++;
         }
 
-        this.updateContainerSize(index);
+        this.updateContainerSize(index, isTikTokPortrait);
 
         if (this._barNode) {
             this._barNode.active = index > 0;
@@ -123,22 +132,46 @@ export class ItemBarUI extends Singleton<ItemBarUI>() {
         if (!this._barNode || !this._barWidget) return;
 
         const isTouch = UIResponsive.shouldUseTouchControls();
-        const padding = isTouch ? UIResponsive.getControlPadding() : { right: 20, bottom: 20 };
+        const padding = isTouch
+            ? UIResponsive.getControlPadding()
+            : { left: 20, right: 20, bottom: 20 };
         const scale = isTouch ? UIResponsive.getControlScale() : 1;
-        this._iconSize = isTouch ? TOUCH_ICON_SIZE : DESKTOP_ICON_SIZE;
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
+        this._iconSize = isTouch
+            ? isTikTokPortrait
+                ? Math.round(TOUCH_ICON_SIZE * 0.84)
+                : TOUCH_ICON_SIZE
+            : DESKTOP_ICON_SIZE;
         this._barNode.setScale(scale, scale, 1);
+        this._barNode.getComponent(UITransform)?.setAnchorPoint(isTikTokPortrait ? 0 : 1, 0);
 
         if (this._barWidget) this._barWidget.enabled = false;
         const vis = UIResponsive.getVisibleSize();
 
-        // Position above weapon bar: weapon bar is at bottom-right,
-        // item bar goes above it with offset
-        const weaponBarHeight = isTouch ? 110 : 96;
-        this._barNode.setPosition(
-            Math.round(vis.width * 0.5 - padding.right),
-            Math.round(-vis.height * 0.5 + padding.bottom + weaponBarHeight + 8),
-            0
-        );
+        if (isTikTokPortrait) {
+            // Keep items above the 2x2 weapon grid in portrait TikTok.
+            const weaponIconSize = Math.round(
+                WEAPON_TOUCH_ICON_SIZE * WEAPON_TOUCH_ICON_SCALE_TIKTOK
+            );
+            const weaponGridHeight =
+                WEAPON_BAR_PORTRAIT_ROWS * weaponIconSize +
+                (WEAPON_BAR_PORTRAIT_ROWS - 1) * WEAPON_ICON_GAP;
+            const weaponBarHeight =
+                weaponGridHeight + WEAPON_BAR_PADDING_Y * 2 + WEAPON_BAR_EXTRA_HEIGHT;
+            this._barNode.setPosition(
+                Math.round(-vis.width * 0.5 + padding.left),
+                Math.round(-vis.height * 0.5 + padding.bottom + weaponBarHeight + 4),
+                0
+            );
+        } else {
+            // Position above weapon bar on default layouts (right-bottom anchored).
+            const weaponBarHeight = isTouch ? 110 : 96;
+            this._barNode.setPosition(
+                Math.round(vis.width * 0.5 - padding.right),
+                Math.round(-vis.height * 0.5 + padding.bottom + weaponBarHeight + 8),
+                0
+            );
+        }
 
         this.refresh();
     }
@@ -238,11 +271,12 @@ export class ItemBarUI extends Singleton<ItemBarUI>() {
         label.color = new Color(255, 255, 255, 255);
     }
 
-    private updateContainerSize(iconCount: number): void {
+    private updateContainerSize(iconCount: number, isTikTokPortrait: boolean): void {
         if (!this._barNode) return;
         const iconAreaWidth =
             iconCount > 0 ? iconCount * this._iconSize + Math.max(0, iconCount - 1) * ICON_GAP : 0;
-        const width = Math.max(70, iconAreaWidth + BAR_PADDING_X * 2);
+        const minWidth = isTikTokPortrait ? Math.round(this._iconSize + BAR_PADDING_X * 2) : 70;
+        const width = Math.max(minWidth, iconAreaWidth + BAR_PADDING_X * 2);
         const height = Math.max(70, this._iconSize + BAR_PADDING_Y * 2);
         this._barNode.getComponent(UITransform)?.setContentSize(width, height);
     }

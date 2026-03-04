@@ -87,6 +87,7 @@ export class HUDManager {
         this._statusModule.setVisible(visible);
         this._waveNoticeModule.setVisible(visible);
         this._minimapModule.setVisible(visible);
+        this._settingsModule.setVisible(visible);
     }
 
     private refreshAllText(): void {

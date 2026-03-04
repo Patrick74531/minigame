@@ -214,25 +214,29 @@ export class HUDBossIntroModule implements HUDModule {
     }
 
     private applyResponsiveLayout(): void {
-        const canvasTransform = this._uiCanvas?.getComponent(UITransform);
-        if (!canvasTransform) return;
-        const viewportW = Math.max(480, Math.round(canvasTransform.contentSize.width));
-        const viewportH = Math.max(320, Math.round(canvasTransform.contentSize.height));
-        const compact = viewportW < 900 || viewportH < 620;
+        const viewport = UIResponsive.getLayoutViewportSize(480, 320, 'canvas');
+        const viewportW = viewport.width;
+        const viewportH = viewport.height;
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
+        const compact = isTikTokPortrait || viewportW < 900 || viewportH < 620;
         const padding = UIResponsive.getControlPadding();
+        const minW = isTikTokPortrait ? 240 : BOSS_INTRO_MIN_WIDTH;
+        const maxW = isTikTokPortrait ? 420 : BOSS_INTRO_MAX_WIDTH;
+        const minH = isTikTokPortrait ? 130 : BOSS_INTRO_MIN_HEIGHT;
+        const maxH = isTikTokPortrait ? 230 : BOSS_INTRO_MAX_HEIGHT;
 
         this._bossIntroWidth = Math.round(
             UIResponsive.clamp(
-                viewportW * (compact ? 0.88 : 0.72),
-                BOSS_INTRO_MIN_WIDTH,
-                BOSS_INTRO_MAX_WIDTH
+                viewportW * (isTikTokPortrait ? 0.86 : compact ? 0.88 : 0.72),
+                minW,
+                maxW
             )
         );
         this._bossIntroHeight = Math.round(
             UIResponsive.clamp(
-                viewportH * (compact ? 0.35 : 0.28),
-                BOSS_INTRO_MIN_HEIGHT,
-                BOSS_INTRO_MAX_HEIGHT
+                viewportH * (isTikTokPortrait ? 0.2 : compact ? 0.35 : 0.28),
+                minH,
+                maxH
             )
         );
 
@@ -240,7 +244,23 @@ export class HUDBossIntroModule implements HUDModule {
         rootTransform?.setContentSize(this._bossIntroWidth, this._bossIntroHeight);
         const rootWidget = this._bossIntroRoot?.getComponent(Widget);
         if (rootWidget) {
-            rootWidget.bottom = Math.max(10, Math.round(padding.bottom * 0.24));
+            if (isTikTokPortrait) {
+                rootWidget.isAlignHorizontalCenter = true;
+                rootWidget.isAlignVerticalCenter = true;
+                rootWidget.isAlignBottom = false;
+                rootWidget.isAlignTop = false;
+                rootWidget.isAlignLeft = false;
+                rootWidget.isAlignRight = false;
+                rootWidget.verticalCenter = 0;
+            } else {
+                rootWidget.isAlignBottom = true;
+                rootWidget.isAlignHorizontalCenter = true;
+                rootWidget.isAlignTop = false;
+                rootWidget.isAlignLeft = false;
+                rootWidget.isAlignRight = false;
+                rootWidget.isAlignVerticalCenter = false;
+                rootWidget.bottom = Math.max(10, Math.round(padding.bottom * 0.24));
+            }
             rootWidget.updateAlignment();
         }
         this.drawBossIntroBackground();
@@ -255,8 +275,8 @@ export class HUDBossIntroModule implements HUDModule {
         titleNode?.setPosition(0, Math.round(this._bossIntroHeight * 0.25), 0);
         if (this._bossIntroTitleLabel) {
             this._bossIntroTitleLabel.fontSize = Math.max(
-                28,
-                Math.min(42, Math.round(this._bossIntroHeight * 0.16))
+                isTikTokPortrait ? 22 : 28,
+                Math.min(isTikTokPortrait ? 32 : 42, Math.round(this._bossIntroHeight * 0.16))
             );
             this._bossIntroTitleLabel.lineHeight = this._bossIntroTitleLabel.fontSize + 6;
         }
@@ -267,8 +287,8 @@ export class HUDBossIntroModule implements HUDModule {
         quoteNode?.setPosition(0, -Math.round(this._bossIntroHeight * 0.09), 0);
         if (this._bossIntroQuoteLabel) {
             this._bossIntroQuoteLabel.fontSize = Math.max(
-                20,
-                Math.min(28, Math.round(this._bossIntroHeight * 0.11))
+                isTikTokPortrait ? 16 : 20,
+                Math.min(isTikTokPortrait ? 22 : 28, Math.round(this._bossIntroHeight * 0.11))
             );
             this._bossIntroQuoteLabel.lineHeight = this._bossIntroQuoteLabel.fontSize + 8;
         }

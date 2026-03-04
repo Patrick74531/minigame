@@ -1,4 +1,4 @@
-import { Color, Graphics, Label, Node, UITransform, Widget } from 'cc';
+import { Color, Graphics, Label, LabelOutline, LabelShadow, Node, UITransform, Widget } from 'cc';
 import { DiamondService } from '../../core/diamond/DiamondService';
 import { GameConfig } from '../../data/GameConfig';
 import { WaveService } from '../../core/managers/WaveService';
@@ -16,6 +16,11 @@ import {
 import type { HUDModule } from './HUDModule';
 
 export class HUDStatusModule implements HUDModule {
+    private static readonly TIKTOK_WEAPON_ICON_SIZE = 96;
+    private static readonly TIKTOK_WEAPON_ICON_SCALE = 0.72;
+    private static readonly TIKTOK_WEAPON_ICON_GAP = 14;
+    private static readonly TIKTOK_WEAPON_BAR_PADDING_X = 14;
+
     private _coinsLabel: Label | null = null;
     private _diamondsLabel: Label | null = null;
     private _currencyPanelNode: Node | null = null;
@@ -32,6 +37,7 @@ export class HUDStatusModule implements HUDModule {
     private _xpRootWidget: Widget | null = null;
     private _xpBarWidth = 320;
     private _xpBarHeight = 16;
+    private _xpFillRatio = 0;
 
     private _isWaitingForNextWave: boolean = false;
     private _currentCountdownSeconds: number = 0;
@@ -342,8 +348,9 @@ export class HUDStatusModule implements HUDModule {
 
     private drawXpFill(ratio: number): void {
         if (!this._xpBarFg) return;
+        this._xpFillRatio = Math.max(0, Math.min(1, ratio));
         this._xpBarFg.clear();
-        const w = this._xpBarWidth * Math.max(0, Math.min(1, ratio));
+        const w = this._xpBarWidth * this._xpFillRatio;
         if (w < 1) return;
         this._xpBarFg.fillColor = new Color(92, 220, 255, 255);
         this._xpBarFg.roundRect(
@@ -356,6 +363,68 @@ export class HUDStatusModule implements HUDModule {
         this._xpBarFg.fill();
     }
 
+    private updateXpGeometry(width: number, height: number, isTikTokPortrait: boolean): void {
+        const targetW = Math.round(width);
+        const targetH = Math.round(height);
+        if (
+            targetW === this._xpBarWidth &&
+            targetH === this._xpBarHeight &&
+            this._xpBarBg &&
+            this._xpBarFg
+        ) {
+            return;
+        }
+
+        this._xpBarWidth = targetW;
+        this._xpBarHeight = targetH;
+
+        const root = this._xpRootWidget?.node;
+        root?.getComponent(UITransform)?.setContentSize(
+            this._xpBarWidth + 90,
+            this._xpBarHeight + 34
+        );
+
+        const levelNode = root?.getChildByName('LevelLabel');
+        if (levelNode?.isValid) {
+            const levelLabel = levelNode.getComponent(Label);
+            if (levelLabel) {
+                levelLabel.fontSize = isTikTokPortrait ? 16 : 26;
+                levelLabel.lineHeight = levelLabel.fontSize + 4;
+            }
+            levelNode.setPosition(0, isTikTokPortrait ? 14 : 14, 0);
+        }
+
+        const yOffset = isTikTokPortrait ? -4 : -6;
+        root?.getChildByName('XpBg')?.setPosition(0, yOffset, 0);
+        root?.getChildByName('XpFg')?.setPosition(0, yOffset, 0);
+
+        if (this._xpBarBg) {
+            const radius = Math.max(5, Math.round(this._xpBarHeight * 0.44));
+            this._xpBarBg.clear();
+            this._xpBarBg.fillColor = new Color(12, 22, 34, 210);
+            this._xpBarBg.roundRect(
+                -this._xpBarWidth / 2,
+                -this._xpBarHeight / 2,
+                this._xpBarWidth,
+                this._xpBarHeight,
+                radius
+            );
+            this._xpBarBg.fill();
+            this._xpBarBg.strokeColor = new Color(82, 180, 236, 215);
+            this._xpBarBg.lineWidth = isTikTokPortrait ? 1.5 : 2;
+            this._xpBarBg.roundRect(
+                -this._xpBarWidth / 2,
+                -this._xpBarHeight / 2,
+                this._xpBarWidth,
+                this._xpBarHeight,
+                radius
+            );
+            this._xpBarBg.stroke();
+        }
+
+        this.drawXpFill(this._xpFillRatio);
+    }
+
     private parseLevel(text: string): number {
         const num = Number(text.replace(/[^\d]/g, ''));
         return Number.isFinite(num) && num > 0 ? num : 1;
@@ -365,42 +434,183 @@ export class HUDStatusModule implements HUDModule {
         applyGameLabelStyle(label, options);
     }
 
+    private redrawCurrencyPanelBackground(panelW: number, panelH: number): void {
+        const bg = this._currencyPanelNode?.getComponent(Graphics);
+        if (!bg) return;
+
+        const radius = Math.max(8, Math.round(panelH * 0.28));
+        bg.clear();
+        bg.fillColor = new Color(10, 16, 32, 210);
+        bg.roundRect(-panelW / 2, -panelH / 2, panelW, panelH, radius);
+        bg.fill();
+        bg.strokeColor = new Color(255, 200, 60, 110);
+        bg.lineWidth = Math.max(1, Math.round(panelH * 0.04));
+        bg.roundRect(-panelW / 2, -panelH / 2, panelW, panelH, radius);
+        bg.stroke();
+    }
+
     private applyHudEdgeLayout(): void {
         const padding = UIResponsive.getControlPadding();
         const size = UIResponsive.getVisibleSize();
-        const compact = Math.min(size.width, size.height) < 700;
-        const topInset = Math.max(14, Math.round(padding.top * 0.86));
-        const bottomInset = Math.max(20, Math.round(padding.bottom * 0.82));
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
+        const compact = isTikTokPortrait || Math.min(size.width, size.height) < 700;
+        const topInset = isTikTokPortrait
+            ? Math.max(8, Math.round(padding.top * 0.42))
+            : Math.max(14, Math.round(padding.top * 0.86));
+        const bottomInset = isTikTokPortrait
+            ? Math.max(16, Math.round(padding.bottom * 0.76))
+            : Math.max(20, Math.round(padding.bottom * 0.82));
+        const tiktokTopReserve = isTikTokPortrait
+            ? Math.max(84, Math.round(padding.top * 0.55), Math.round(size.height * 0.12))
+            : 0;
 
         if (this._currencyPanelNode?.isValid) {
-            const panelW = Math.round(UIResponsive.clamp(size.width * 0.155, 130, 188));
-            const panelH = Math.round(UIResponsive.clamp(size.height * 0.116, 62, 88));
-            this._currencyPanelNode.getComponent(UITransform)?.setContentSize(panelW, panelH);
-            const fontSize = compact ? 20 : 24;
-            if (this._coinsLabel?.isValid) {
-                this._coinsLabel.fontSize = fontSize;
-                this._coinsLabel.lineHeight = fontSize + 4;
-            }
-            if (this._diamondsLabel?.isValid) {
-                this._diamondsLabel.fontSize = fontSize;
-                this._diamondsLabel.lineHeight = fontSize + 4;
-            }
             const panelWidget = this._currencyPanelNode.getComponent(Widget);
-            if (panelWidget) {
-                panelWidget.isAlignTop = true;
-                panelWidget.isAlignLeft = true;
-                panelWidget.isAlignRight = false;
-                panelWidget.isAlignBottom = false;
-                panelWidget.isAlignHorizontalCenter = false;
-                panelWidget.isAlignVerticalCenter = false;
-                // Mirror the settings button's topPad so vertical centers align.
-                const topPad = Math.max(10, Math.round(padding.top * 0.45));
-                const settingsBtnH = Math.round(
-                    UIResponsive.clamp(size.height * (compact ? 0.1 : 0.085), 48, 68)
+            const iconNodes = this._currencyPanelNode.children.filter(
+                child => child.name === 'CIcon'
+            );
+            const coinIconNode = iconNodes[0] ?? null;
+            const diamondIconNode = iconNodes[1] ?? null;
+            const coinValueNode = this._coinsLabel?.node ?? null;
+            const diamondValueNode = this._diamondsLabel?.node ?? null;
+
+            if (isTikTokPortrait) {
+                const panelW = Math.round(UIResponsive.clamp(size.width * 0.2, 78, 96));
+                const panelH = Math.round(UIResponsive.clamp(size.height * 0.048, 30, 36));
+                this._currencyPanelNode.getComponent(UITransform)?.setContentSize(panelW, panelH);
+                this.redrawCurrencyPanelBackground(panelW, panelH);
+
+                const coinFontSize = Math.max(14, Math.min(18, Math.round(panelH * 0.5)));
+                if (this._coinsLabel?.isValid) {
+                    this._coinsLabel.fontSize = coinFontSize;
+                    this._coinsLabel.lineHeight = coinFontSize + 4;
+                    this._coinsLabel.horizontalAlign = Label.HorizontalAlign.LEFT;
+                }
+
+                if (diamondIconNode?.isValid) {
+                    diamondIconNode.active = false;
+                }
+                if (diamondValueNode?.isValid) {
+                    diamondValueNode.active = false;
+                }
+
+                if (coinIconNode?.isValid) {
+                    const iconSize = Math.round(UIResponsive.clamp(panelH * 0.52, 14, 18));
+                    coinIconNode.getComponent(UITransform)?.setContentSize(iconSize, iconSize);
+                    coinIconNode.setPosition(Math.round(-panelW * 0.5 + 5 + iconSize * 0.5), 0, 0);
+                    coinIconNode.active = true;
+                }
+                if (coinValueNode?.isValid) {
+                    const iconSize =
+                        coinIconNode?.getComponent(UITransform)?.contentSize.width ?? 16;
+                    const valueW = Math.max(24, Math.round(panelW * 0.44));
+                    const groupGap = Math.max(3, Math.round(panelW * 0.03));
+                    const groupW = iconSize + groupGap + valueW;
+                    const groupLeft = -groupW * 0.5;
+                    const iconX = Math.round(groupLeft + iconSize * 0.5);
+                    const valueX = Math.round(iconX + iconSize * 0.5 + groupGap + valueW * 0.5);
+
+                    if (coinIconNode?.isValid) {
+                        coinIconNode.setPosition(iconX, 0, 0);
+                    }
+                    coinValueNode.getComponent(UITransform)?.setContentSize(valueW, panelH);
+                    coinValueNode.setPosition(valueX, 0, 0);
+                    this._coinsLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+                }
+
+                const mapTopPad = tiktokTopReserve;
+                const halfW = size.width * 0.5;
+                const halfH = size.height * 0.5;
+                const minimapTopY = halfH - mapTopPad;
+                const leftPad = Math.max(10, Math.round(padding.left * 0.22));
+                const clampedX = Math.round(-halfW + leftPad + panelW * 0.5);
+                this._currencyPanelNode.setPosition(
+                    clampedX,
+                    Math.round(minimapTopY - panelH * 0.5),
+                    0
                 );
-                panelWidget.top = Math.max(4, topPad + Math.round((settingsBtnH - panelH) * 0.5));
-                panelWidget.left = Math.max(10, Math.round(padding.left * 0.72));
-                panelWidget.updateAlignment();
+
+                if (panelWidget) {
+                    panelWidget.enabled = false;
+                }
+            } else {
+                const panelW = Math.round(UIResponsive.clamp(size.width * 0.165, 152, 214));
+                const panelH = Math.round(UIResponsive.clamp(size.height * 0.116, 62, 88));
+                this._currencyPanelNode.getComponent(UITransform)?.setContentSize(panelW, panelH);
+                this.redrawCurrencyPanelBackground(panelW, panelH);
+                const iconSize = Math.round(UIResponsive.clamp(panelH * 0.48, 20, 28));
+                const gap = Math.max(3, Math.round(panelW * 0.018));
+                const horizontalInset = Math.max(8, Math.round(panelW * 0.06));
+                const contentW = panelW - horizontalInset * 2;
+                const sectionGap = Math.max(6, Math.round(contentW * 0.07));
+                const pairW = Math.max(
+                    iconSize + gap + 34,
+                    Math.floor((contentW - sectionGap) * 0.5)
+                );
+                const valueW = Math.max(34, pairW - iconSize - gap);
+                const startX = -panelW * 0.5 + horizontalInset;
+                const coinIconX = Math.round(startX + iconSize * 0.5);
+                const coinValX = Math.round(coinIconX + iconSize * 0.5 + gap + valueW * 0.5);
+                const diamPairStartX = startX + pairW + sectionGap;
+                const diamIconX = Math.round(diamPairStartX + iconSize * 0.5);
+                const diamValX = Math.round(diamIconX + iconSize * 0.5 + gap + valueW * 0.5);
+
+                if (coinIconNode?.isValid) {
+                    coinIconNode.active = true;
+                    coinIconNode.getComponent(UITransform)?.setContentSize(iconSize, iconSize);
+                    coinIconNode.setPosition(coinIconX, 0, 0);
+                }
+                if (coinValueNode?.isValid) {
+                    coinValueNode.getComponent(UITransform)?.setContentSize(valueW, panelH);
+                    coinValueNode.setPosition(coinValX, 0, 0);
+                }
+                if (diamondIconNode?.isValid) {
+                    diamondIconNode.active = true;
+                    diamondIconNode.getComponent(UITransform)?.setContentSize(iconSize, iconSize);
+                    diamondIconNode.setPosition(diamIconX, 0, 0);
+                }
+                if (diamondValueNode?.isValid) {
+                    diamondValueNode.getComponent(UITransform)?.setContentSize(valueW, panelH);
+                    diamondValueNode.setPosition(diamValX, 0, 0);
+                }
+
+                const fontSize = compact ? 20 : 24;
+                if (this._coinsLabel?.isValid) {
+                    const valueFontSize = Math.round(
+                        UIResponsive.clamp(Math.min(fontSize, valueW * 0.5), 16, 22)
+                    );
+                    this._coinsLabel.fontSize = valueFontSize;
+                    this._coinsLabel.lineHeight = valueFontSize + 4;
+                    this._coinsLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+                }
+                if (this._diamondsLabel?.isValid) {
+                    const valueFontSize = Math.round(
+                        UIResponsive.clamp(Math.min(fontSize, valueW * 0.5), 16, 22)
+                    );
+                    this._diamondsLabel.fontSize = valueFontSize;
+                    this._diamondsLabel.lineHeight = valueFontSize + 4;
+                    this._diamondsLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+                    this._diamondsLabel.node.active = true;
+                }
+                if (panelWidget) {
+                    panelWidget.enabled = true;
+                    panelWidget.isAlignTop = true;
+                    panelWidget.isAlignLeft = true;
+                    panelWidget.isAlignRight = false;
+                    panelWidget.isAlignBottom = false;
+                    panelWidget.isAlignHorizontalCenter = false;
+                    panelWidget.isAlignVerticalCenter = false;
+                    const topPad = Math.max(10, Math.round(padding.top * 0.45));
+                    const settingsBtnH = Math.round(
+                        UIResponsive.clamp(size.height * (compact ? 0.1 : 0.085), 48, 68)
+                    );
+                    panelWidget.top = Math.max(
+                        4,
+                        topPad + Math.round((settingsBtnH - panelH) * 0.5)
+                    );
+                    panelWidget.left = Math.max(10, Math.round(padding.left * 0.72));
+                    panelWidget.updateAlignment();
+                }
             }
         }
 
@@ -409,12 +619,34 @@ export class HUDStatusModule implements HUDModule {
             waveNode
                 .getComponent(UITransform)
                 ?.setContentSize(
-                    Math.round(UIResponsive.clamp(size.width * 0.42, 220, 460)),
-                    Math.round(UIResponsive.clamp(size.height * 0.1, 46, 74))
+                    Math.round(
+                        isTikTokPortrait
+                            ? UIResponsive.clamp(size.width * 0.36, 136, 172)
+                            : UIResponsive.clamp(size.width * 0.42, 220, 460)
+                    ),
+                    Math.round(
+                        isTikTokPortrait
+                            ? UIResponsive.clamp(size.height * 0.046, 28, 36)
+                            : UIResponsive.clamp(size.height * 0.1, 46, 74)
+                    )
                 );
             if (this._waveLabel) {
-                this._waveLabel.fontSize = compact ? 34 : 40;
+                this._waveLabel.fontSize = isTikTokPortrait ? 18 : compact ? 34 : 40;
                 this._waveLabel.lineHeight = this._waveLabel.fontSize + 6;
+                this._waveLabel.enableWrapText = !isTikTokPortrait;
+
+                const outline = this._waveLabel.node.getComponent(LabelOutline);
+                if (outline) {
+                    outline.width = isTikTokPortrait ? 2 : 5;
+                }
+                const shadow = this._waveLabel.node.getComponent(LabelShadow);
+                if (shadow) {
+                    shadow.enabled = !isTikTokPortrait;
+                    if (!isTikTokPortrait) {
+                        shadow.offset.set(2, -2);
+                        shadow.blur = 2;
+                    }
+                }
             }
             this._waveWidget.isAlignTop = true;
             this._waveWidget.isAlignHorizontalCenter = true;
@@ -422,21 +654,72 @@ export class HUDStatusModule implements HUDModule {
             this._waveWidget.isAlignRight = false;
             this._waveWidget.isAlignBottom = false;
             this._waveWidget.isAlignVerticalCenter = false;
-            this._waveWidget.top = topInset;
+            this._waveWidget.top = isTikTokPortrait
+                ? tiktokTopReserve + Math.max(4, Math.round(size.height * 0.055))
+                : topInset;
             this._waveWidget.horizontalCenter = 0;
             this._waveWidget.updateAlignment();
         }
 
         if (this._xpRootWidget) {
-            this._xpRootWidget.isAlignBottom = true;
-            this._xpRootWidget.isAlignHorizontalCenter = true;
-            this._xpRootWidget.isAlignTop = false;
-            this._xpRootWidget.isAlignLeft = false;
-            this._xpRootWidget.isAlignRight = false;
-            this._xpRootWidget.isAlignVerticalCenter = false;
-            this._xpRootWidget.bottom = bottomInset;
-            this._xpRootWidget.horizontalCenter = 0;
-            this._xpRootWidget.updateAlignment();
+            const tiktokWeaponIconSize = Math.round(
+                HUDStatusModule.TIKTOK_WEAPON_ICON_SIZE * HUDStatusModule.TIKTOK_WEAPON_ICON_SCALE
+            );
+            const xpWidth = isTikTokPortrait ? tiktokWeaponIconSize * 2 : 320;
+            const xpHeight = isTikTokPortrait
+                ? Math.round(UIResponsive.clamp(size.height * 0.018, 10, 13))
+                : 16;
+            this.updateXpGeometry(xpWidth, xpHeight, isTikTokPortrait);
+
+            if (this._levelLabel?.isValid) {
+                this._levelLabel.color = isTikTokPortrait
+                    ? new Color(255, 215, 80, 255)
+                    : new Color(255, 231, 132, 255);
+                const levelOutline = this._levelLabel.node.getComponent(LabelOutline);
+                if (levelOutline) {
+                    levelOutline.width = isTikTokPortrait ? 2 : 4;
+                    levelOutline.color = isTikTokPortrait
+                        ? new Color(40, 20, 0, 255)
+                        : new Color(40, 24, 8, 255);
+                }
+                const levelShadow = this._levelLabel.node.getComponent(LabelShadow);
+                if (levelShadow) {
+                    levelShadow.enabled = !isTikTokPortrait;
+                    if (!isTikTokPortrait) {
+                        levelShadow.offset.set(2, -2);
+                        levelShadow.blur = 2;
+                    }
+                }
+            }
+
+            if (isTikTokPortrait) {
+                const halfW = size.width * 0.5;
+                const halfH = size.height * 0.5;
+                const weaponBarWidth =
+                    tiktokWeaponIconSize * 2 +
+                    HUDStatusModule.TIKTOK_WEAPON_ICON_GAP +
+                    HUDStatusModule.TIKTOK_WEAPON_BAR_PADDING_X * 2;
+                const xpRootHeight = this._xpBarHeight + 34;
+                const bottomGap = Math.max(6, Math.round(padding.bottom * 0.12));
+
+                this._xpRootWidget.enabled = false;
+                this._xpRootWidget.node.setPosition(
+                    Math.round(-halfW + padding.left + weaponBarWidth * 0.5),
+                    Math.round(-halfH + bottomGap + xpRootHeight * 0.5),
+                    0
+                );
+            } else {
+                this._xpRootWidget.enabled = true;
+                this._xpRootWidget.isAlignBottom = true;
+                this._xpRootWidget.isAlignHorizontalCenter = true;
+                this._xpRootWidget.isAlignTop = false;
+                this._xpRootWidget.isAlignLeft = false;
+                this._xpRootWidget.isAlignRight = false;
+                this._xpRootWidget.isAlignVerticalCenter = false;
+                this._xpRootWidget.bottom = bottomInset;
+                this._xpRootWidget.horizontalCenter = 0;
+                this._xpRootWidget.updateAlignment();
+            }
         }
 
         if (this._desktopMoveHintWidget) {
@@ -458,10 +741,18 @@ export class HUDStatusModule implements HUDModule {
             this._baseHpLabel.node
                 .getComponent(UITransform)
                 ?.setContentSize(
-                    Math.round(UIResponsive.clamp(size.width * 0.5, 280, 560)),
-                    Math.round(UIResponsive.clamp(size.height * 0.1, 50, 76))
+                    Math.round(
+                        isTikTokPortrait
+                            ? UIResponsive.clamp(size.width * 0.56, 220, 360)
+                            : UIResponsive.clamp(size.width * 0.5, 280, 560)
+                    ),
+                    Math.round(
+                        isTikTokPortrait
+                            ? UIResponsive.clamp(size.height * 0.08, 40, 58)
+                            : UIResponsive.clamp(size.height * 0.1, 50, 76)
+                    )
                 );
-            this._baseHpLabel.fontSize = compact ? 26 : 30;
+            this._baseHpLabel.fontSize = isTikTokPortrait ? 22 : compact ? 26 : 30;
             this._baseHpLabel.lineHeight = this._baseHpLabel.fontSize + 6;
         }
 
@@ -469,10 +760,18 @@ export class HUDStatusModule implements HUDModule {
             this._buildingInfoLabel.node
                 .getComponent(UITransform)
                 ?.setContentSize(
-                    Math.round(UIResponsive.clamp(size.width * 0.82, 420, 1020)),
-                    Math.round(UIResponsive.clamp(size.height * 0.16, 70, 130))
+                    Math.round(
+                        isTikTokPortrait
+                            ? UIResponsive.clamp(size.width * 0.8, 260, 420)
+                            : UIResponsive.clamp(size.width * 0.82, 420, 1020)
+                    ),
+                    Math.round(
+                        isTikTokPortrait
+                            ? UIResponsive.clamp(size.height * 0.11, 52, 84)
+                            : UIResponsive.clamp(size.height * 0.16, 70, 130)
+                    )
                 );
-            this._buildingInfoLabel.fontSize = compact ? 32 : 40;
+            this._buildingInfoLabel.fontSize = isTikTokPortrait ? 24 : compact ? 32 : 40;
             this._buildingInfoLabel.lineHeight = this._buildingInfoLabel.fontSize + 6;
         }
     }

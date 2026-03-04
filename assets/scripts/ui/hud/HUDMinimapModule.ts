@@ -192,16 +192,18 @@ export class HUDMinimapModule implements HUDModule {
     private updateLayout(): void {
         if (!this._rootNode) return;
         const vis = UIResponsive.getVisibleSize();
-        const viewportW = Math.max(480, Math.round(vis.width));
-        const viewportH = Math.max(320, Math.round(vis.height));
-        const compact = viewportW < 920 || viewportH < 620;
+        const viewport = UIResponsive.getLayoutViewportSize(480, 320);
+        const viewportW = viewport.width;
+        const viewportH = viewport.height;
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
+        const compact = isTikTokPortrait || viewportW < 920 || viewportH < 620;
         const padding = UIResponsive.getControlPadding();
 
         this._mapSize = Math.round(
             UIResponsive.clamp(
-                Math.min(viewportW, viewportH) * (compact ? 0.22 : 0.18),
-                MINIMAP_MIN_SIZE,
-                MINIMAP_MAX_SIZE
+                Math.min(viewportW, viewportH) * (isTikTokPortrait ? 0.18 : compact ? 0.22 : 0.18),
+                isTikTokPortrait ? 92 : MINIMAP_MIN_SIZE,
+                isTikTokPortrait ? 136 : MINIMAP_MAX_SIZE
             )
         );
 
@@ -210,8 +212,21 @@ export class HUDMinimapModule implements HUDModule {
 
         const halfW = vis.width * 0.5;
         const halfH = vis.height * 0.5;
-        const topPad = Math.max(10, Math.round(padding.top * 0.45));
-        const rightPad = Math.max(10, Math.round(padding.right * 0.55));
+        const topPad = isTikTokPortrait
+            ? Math.max(84, Math.round(padding.top * 0.55), Math.round(vis.height * 0.12))
+            : Math.max(10, Math.round(padding.top * 0.45));
+        const rightPad = isTikTokPortrait
+            ? Math.max(4, Math.round(padding.right * 0.14))
+            : Math.max(10, Math.round(padding.right * 0.55));
+
+        if (isTikTokPortrait) {
+            this._rootNode.setPosition(
+                Math.round(halfW - rightPad - this._mapSize * 0.5),
+                Math.round(halfH - topPad - this._mapSize * 0.5),
+                0
+            );
+            return;
+        }
 
         // Position below settings button if available
         const topOffset = topPad;
@@ -220,23 +235,31 @@ export class HUDMinimapModule implements HUDModule {
             const btnW = btnTf ? Math.round(btnTf.contentSize.width) : 156;
             const btnH = btnTf ? btnTf.contentSize.height : 56;
             const btnPos = this._settingsButtonNode.position;
+            const gapBelowSettings = isTikTokPortrait ? 18 : GAP_BELOW_SETTINGS;
 
             // Keep minimap width aligned with settings button width.
             this._mapSize = Math.round(
-                UIResponsive.clamp(btnW, MINIMAP_MIN_SIZE, MINIMAP_MAX_SIZE)
+                isTikTokPortrait
+                    ? UIResponsive.clamp(btnW * 0.8, 86, 132)
+                    : UIResponsive.clamp(btnW, MINIMAP_MIN_SIZE, MINIMAP_MAX_SIZE)
             );
             if (rootTf) rootTf.setContentSize(this._mapSize, this._mapSize);
 
             // Settings button center Y is btnPos.y, its bottom edge:
             const btnBottom = btnPos.y - btnH * 0.5;
             // We want minimap top edge at btnBottom - gap
-            const minimapCenterY = btnBottom - GAP_BELOW_SETTINGS - this._mapSize * 0.5;
+            const minimapCenterY = btnBottom - gapBelowSettings - this._mapSize * 0.5;
             this._rootNode.setPosition(Math.round(btnPos.x), Math.round(minimapCenterY), 0);
         } else {
             // Fallback: top-right corner
             this._rootNode.setPosition(
                 Math.round(halfW - rightPad - this._mapSize * 0.5),
-                Math.round(halfH - topOffset - this._mapSize * 0.5),
+                Math.round(
+                    halfH -
+                        topOffset -
+                        this._mapSize * 0.5 -
+                        (isTikTokPortrait ? Math.round(vis.height * 0.04) : 0)
+                ),
                 0
             );
         }

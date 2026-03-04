@@ -621,23 +621,40 @@ export class HUDWaveNoticeModule implements HUDModule {
         const vis = UIResponsive.getVisibleSize();
         if (vis.width <= 0 || vis.height <= 0) return;
 
-        const viewportW = Math.max(480, Math.round(vis.width));
-        const viewportH = Math.max(320, Math.round(vis.height));
-        const compact = viewportW < 900 || viewportH < 620;
+        const viewport = UIResponsive.getLayoutViewportSize(480, 320);
+        const viewportW = viewport.width;
+        const viewportH = viewport.height;
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
+        const compact = isTikTokPortrait || viewportW < 900 || viewportH < 620;
         const padding = UIResponsive.getControlPadding();
+        const tiktokTopReserve = isTikTokPortrait
+            ? Math.max(84, Math.round(padding.top * 0.55), Math.round(vis.height * 0.12))
+            : 0;
+        const waveMinW = isTikTokPortrait ? 220 : WAVE_FORECAST_MIN_WIDTH;
+        const waveMaxW = isTikTokPortrait ? 340 : WAVE_FORECAST_MAX_WIDTH;
+        const waveMinH = isTikTokPortrait ? 52 : WAVE_FORECAST_MIN_HEIGHT;
+        const waveMaxH = isTikTokPortrait ? 84 : WAVE_FORECAST_MAX_HEIGHT;
+        const laneMinW = isTikTokPortrait ? 240 : LANE_DIALOG_MIN_WIDTH;
+        const laneMaxW = isTikTokPortrait ? 360 : LANE_DIALOG_MAX_WIDTH;
+        const laneMinH = isTikTokPortrait ? 58 : LANE_DIALOG_MIN_HEIGHT;
+        const laneMaxH = isTikTokPortrait ? 110 : LANE_DIALOG_MAX_HEIGHT;
+        const respawnMinW = isTikTokPortrait ? 260 : HERO_RESPAWN_MIN_WIDTH;
+        const respawnMaxW = isTikTokPortrait ? 420 : HERO_RESPAWN_MAX_WIDTH;
+        const respawnMinH = isTikTokPortrait ? 180 : HERO_RESPAWN_MIN_HEIGHT;
+        const respawnMaxH = isTikTokPortrait ? 300 : HERO_RESPAWN_MAX_HEIGHT;
 
         this._waveForecastWidth = Math.round(
             UIResponsive.clamp(
-                viewportW * (compact ? 0.82 : 0.6),
-                WAVE_FORECAST_MIN_WIDTH,
-                WAVE_FORECAST_MAX_WIDTH
+                viewportW * (isTikTokPortrait ? 0.64 : compact ? 0.82 : 0.6),
+                isTikTokPortrait ? 180 : waveMinW,
+                isTikTokPortrait ? 250 : waveMaxW
             )
         );
         this._waveForecastHeight = Math.round(
             UIResponsive.clamp(
-                viewportH * (compact ? 0.14 : 0.1),
-                WAVE_FORECAST_MIN_HEIGHT,
-                WAVE_FORECAST_MAX_HEIGHT
+                viewportH * (isTikTokPortrait ? 0.056 : compact ? 0.14 : 0.1),
+                isTikTokPortrait ? 34 : waveMinH,
+                isTikTokPortrait ? 48 : waveMaxH
             )
         );
 
@@ -646,7 +663,24 @@ export class HUDWaveNoticeModule implements HUDModule {
             ?.setContentSize(this._waveForecastWidth, this._waveForecastHeight);
         const waveWidget = this._waveForecastRoot?.getComponent(Widget);
         if (waveWidget) {
-            waveWidget.top = Math.max(10, Math.round(padding.top * 0.56));
+            if (isTikTokPortrait) {
+                waveWidget.isAlignTop = true;
+                waveWidget.isAlignLeft = true;
+                waveWidget.isAlignRight = false;
+                waveWidget.isAlignBottom = false;
+                waveWidget.isAlignHorizontalCenter = false;
+                waveWidget.isAlignVerticalCenter = false;
+                waveWidget.left = Math.max(10, Math.round(padding.left * 0.22));
+                waveWidget.top = Math.max(4, tiktokTopReserve - this._waveForecastHeight - 6);
+            } else {
+                waveWidget.isAlignTop = true;
+                waveWidget.isAlignHorizontalCenter = true;
+                waveWidget.isAlignLeft = false;
+                waveWidget.isAlignRight = false;
+                waveWidget.isAlignBottom = false;
+                waveWidget.isAlignVerticalCenter = false;
+                waveWidget.top = Math.max(10, Math.round(padding.top * 0.56));
+            }
             waveWidget.updateAlignment();
         }
         this._waveForecastLabel?.node
@@ -654,21 +688,21 @@ export class HUDWaveNoticeModule implements HUDModule {
             ?.setContentSize(this._waveForecastWidth - 44, this._waveForecastHeight - 12);
         if (this._waveForecastLabel) {
             this._waveForecastLabel.fontSize = Math.max(
-                22,
-                Math.min(34, Math.round(this._waveForecastHeight * 0.46))
+                isTikTokPortrait ? 16 : 22,
+                Math.min(isTikTokPortrait ? 22 : 34, Math.round(this._waveForecastHeight * 0.46))
             );
             this._waveForecastLabel.lineHeight = this._waveForecastLabel.fontSize + 6;
         }
         this.drawWaveForecastBackground(this._waveForecastIsBoss);
 
         this._laneUnlockDialogWidth = Math.round(
-            UIResponsive.clamp(viewportW * 0.84, LANE_DIALOG_MIN_WIDTH, LANE_DIALOG_MAX_WIDTH)
+            UIResponsive.clamp(viewportW * (isTikTokPortrait ? 0.84 : 0.84), laneMinW, laneMaxW)
         );
         this._laneUnlockDialogHeight = Math.round(
             UIResponsive.clamp(
-                viewportH * (compact ? 0.18 : 0.13),
-                LANE_DIALOG_MIN_HEIGHT,
-                LANE_DIALOG_MAX_HEIGHT
+                viewportH * (isTikTokPortrait ? 0.09 : compact ? 0.18 : 0.13),
+                laneMinH,
+                laneMaxH
             )
         );
         this._laneUnlockDialogRoot
@@ -676,7 +710,9 @@ export class HUDWaveNoticeModule implements HUDModule {
             ?.setContentSize(this._laneUnlockDialogWidth, this._laneUnlockDialogHeight);
         const laneWidget = this._laneUnlockDialogRoot?.getComponent(Widget);
         if (laneWidget) {
-            laneWidget.bottom = Math.max(16, Math.round(padding.bottom * 0.35));
+            laneWidget.bottom = isTikTokPortrait
+                ? Math.max(10, Math.round(padding.bottom * 0.24))
+                : Math.max(16, Math.round(padding.bottom * 0.35));
             laneWidget.updateAlignment();
         }
         this._laneUnlockDialogLabel?.node
@@ -684,8 +720,11 @@ export class HUDWaveNoticeModule implements HUDModule {
             ?.setContentSize(this._laneUnlockDialogWidth - 52, this._laneUnlockDialogHeight - 20);
         if (this._laneUnlockDialogLabel) {
             this._laneUnlockDialogLabel.fontSize = Math.max(
-                24,
-                Math.min(34, Math.round(this._laneUnlockDialogHeight * 0.32))
+                isTikTokPortrait ? 18 : 24,
+                Math.min(
+                    isTikTokPortrait ? 24 : 34,
+                    Math.round(this._laneUnlockDialogHeight * 0.32)
+                )
             );
             this._laneUnlockDialogLabel.lineHeight = this._laneUnlockDialogLabel.fontSize + 6;
         }
@@ -693,16 +732,16 @@ export class HUDWaveNoticeModule implements HUDModule {
 
         this._heroRespawnWidth = Math.round(
             UIResponsive.clamp(
-                viewportW * (compact ? 0.86 : 0.74),
-                HERO_RESPAWN_MIN_WIDTH,
-                HERO_RESPAWN_MAX_WIDTH
+                viewportW * (isTikTokPortrait ? 0.88 : compact ? 0.86 : 0.74),
+                respawnMinW,
+                respawnMaxW
             )
         );
         this._heroRespawnHeight = Math.round(
             UIResponsive.clamp(
-                viewportH * (compact ? 0.54 : 0.41),
-                HERO_RESPAWN_MIN_HEIGHT,
-                HERO_RESPAWN_MAX_HEIGHT
+                viewportH * (isTikTokPortrait ? 0.34 : compact ? 0.54 : 0.41),
+                respawnMinH,
+                respawnMaxH
             )
         );
         this._heroRespawnRoot
@@ -720,8 +759,8 @@ export class HUDWaveNoticeModule implements HUDModule {
         countNode?.setPosition(0, Math.round(this._heroRespawnHeight * 0.16), 0);
         if (this._heroRespawnCountdownLabel) {
             this._heroRespawnCountdownLabel.fontSize = Math.max(
-                84,
-                Math.min(138, Math.round(this._heroRespawnHeight * 0.47))
+                isTikTokPortrait ? 52 : 84,
+                Math.min(isTikTokPortrait ? 96 : 138, Math.round(this._heroRespawnHeight * 0.47))
             );
             this._heroRespawnCountdownLabel.lineHeight =
                 this._heroRespawnCountdownLabel.fontSize + 8;
@@ -737,8 +776,8 @@ export class HUDWaveNoticeModule implements HUDModule {
         msgNode?.setPosition(0, -Math.round(this._heroRespawnHeight * 0.29), 0);
         if (this._heroRespawnMessageLabel) {
             this._heroRespawnMessageLabel.fontSize = Math.max(
-                24,
-                Math.min(40, Math.round(this._heroRespawnHeight * 0.14))
+                isTikTokPortrait ? 18 : 24,
+                Math.min(isTikTokPortrait ? 30 : 40, Math.round(this._heroRespawnHeight * 0.14))
             );
             this._heroRespawnMessageLabel.lineHeight = this._heroRespawnMessageLabel.fontSize + 8;
         }

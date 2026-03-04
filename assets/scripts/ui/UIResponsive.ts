@@ -10,6 +10,8 @@ export type ScreenBounds = {
 export type RuntimeDisplayProfile = 'default' | 'tiktok_phone_portrait';
 
 export class UIResponsive {
+    private static readonly DESIGN_WIDTH = 1280;
+    private static readonly DESIGN_HEIGHT = 720;
     private static readonly DESIGN_SHORT_SIDE = 720;
     private static readonly MAX_SAFE_INSET_RATIO = 0.2;
     private static readonly TEMP_INPUT_MODE: 'touch' | 'desktop' | null = null;
@@ -52,9 +54,36 @@ export class UIResponsive {
         const size = this.getVisibleSize();
         const shortSide = Math.min(size.width, size.height);
         if (this.getRuntimeDisplayProfile() === 'tiktok_phone_portrait') {
-            return this.clamp((shortSide / this.DESIGN_SHORT_SIDE) * 1.18, 0.92, 1.22);
+            // Keep TikTok portrait controls smaller to avoid clipping on narrow phones.
+            return this.clamp((shortSide / this.DESIGN_SHORT_SIDE) * 0.9, 0.62, 0.84);
         }
         return this.clamp(shortSide / this.DESIGN_SHORT_SIDE, 0.82, 1.1);
+    }
+
+    public static isTikTokPhonePortraitProfile(): boolean {
+        return this.getRuntimeDisplayProfile() === 'tiktok_phone_portrait';
+    }
+
+    public static getLayoutViewportSize(
+        minWidth: number = 480,
+        minHeight: number = 320,
+        legacyMode: 'visible' | 'canvas' = 'visible'
+    ): { width: number; height: number } {
+        const profile = this.getRuntimeDisplayProfile();
+        if (profile !== 'tiktok_phone_portrait' && legacyMode === 'canvas') {
+            return {
+                width: Math.max(minWidth, this.DESIGN_WIDTH),
+                height: Math.max(minHeight, this.DESIGN_HEIGHT),
+            };
+        }
+
+        const visible = this.getVisibleSize();
+        const effectiveMinWidth = profile === 'tiktok_phone_portrait' ? 320 : minWidth;
+        const effectiveMinHeight = profile === 'tiktok_phone_portrait' ? 480 : minHeight;
+        return {
+            width: Math.max(effectiveMinWidth, Math.round(visible.width)),
+            height: Math.max(effectiveMinHeight, Math.round(visible.height)),
+        };
     }
 
     public static getControlPadding(): {
@@ -68,32 +97,44 @@ export class UIResponsive {
         const profile = this.getRuntimeDisplayProfile();
         const horizontal = Math.round(
             profile === 'tiktok_phone_portrait'
-                ? this.clamp(shortSide * 0.065, 26, 62)
+                ? this.clamp(shortSide * 0.06, 22, 44)
                 : this.clamp(shortSide * 0.08, 36, 84)
         );
         const bottom = Math.round(
             profile === 'tiktok_phone_portrait'
-                ? this.clamp(shortSide * 0.105, 44, 104)
+                ? this.clamp(shortSide * 0.11, 40, 90)
                 : this.clamp(shortSide * 0.09, 40, 96)
         );
         const top = Math.round(
             profile === 'tiktok_phone_portrait'
-                ? this.clamp(shortSide * 0.075, 28, 68)
+                ? this.clamp(shortSide * 0.09, 30, 64)
                 : this.clamp(shortSide * 0.05, 24, 52)
         );
         const safe = this.getSafeAreaInsets();
+        const extraTop =
+            profile === 'tiktok_phone_portrait'
+                ? Math.round(this.clamp(shortSide * 0.11, 34, 76))
+                : 0;
+        const extraRight =
+            profile === 'tiktok_phone_portrait'
+                ? Math.round(this.clamp(shortSide * 0.05, 12, 30))
+                : 0;
+        const extraBottom =
+            profile === 'tiktok_phone_portrait'
+                ? Math.round(this.clamp(shortSide * 0.03, 8, 24))
+                : 0;
 
         return {
             left: horizontal + safe.left,
-            right: horizontal + safe.right,
-            bottom: bottom + safe.bottom,
-            top: top + safe.top,
+            right: horizontal + safe.right + extraRight,
+            bottom: bottom + safe.bottom + extraBottom,
+            top: top + safe.top + extraTop,
         };
     }
 
     public static getGameplayCameraPreset(): { fov: number; offset: Vec3 } {
         if (this.getRuntimeDisplayProfile() === 'tiktok_phone_portrait') {
-            return { fov: 48, offset: new Vec3(0, 10.6, 12.4) };
+            return { fov: 54, offset: new Vec3(0, 12, 14.6) };
         }
         return { fov: 42, offset: new Vec3(0, 8.2, 9.8) };
     }

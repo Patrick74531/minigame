@@ -1,4 +1,4 @@
-import { Node, UITransform, Color, Graphics, Label, UIOpacity, view } from 'cc';
+import { Node, UITransform, Color, Graphics, Label, UIOpacity } from 'cc';
 import { Singleton } from '../core/base/Singleton';
 import { EventManager } from '../core/managers/EventManager';
 import { ServiceRegistry } from '../core/managers/ServiceRegistry';
@@ -6,6 +6,7 @@ import { GameEvents } from '../data/GameEvents';
 import { Localization } from '../core/i18n/Localization';
 import { SelectionCardTheme } from './SelectionCardTheme';
 import { ItemId, ITEM_DEFS } from '../gameplay/items/ItemDefs';
+import { UIResponsive } from './UIResponsive';
 
 const UI_LAYER = 33554432;
 const CARD_WIDTH = 220;
@@ -41,6 +42,7 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         if (!this._uiCanvas || this._isShowing) return;
         this._isShowing = true;
         const viewport = this.getViewportSize();
+        const padding = UIResponsive.getControlPadding();
 
         this._root = this.createOverlay(viewport.width, viewport.height);
         this._uiCanvas.addChild(this._root);
@@ -48,25 +50,61 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         this.createTitle(this._root, viewport.width, viewport.height);
 
         const totalWidth = items.length * CARD_WIDTH + (items.length - 1) * CARD_GAP;
+        const usePortraitTriangle =
+            UIResponsive.isTikTokPhonePortraitProfile() && items.length === 3;
+        const triangleRowGap = 32;
+        const containerWidth = usePortraitTriangle ? CARD_WIDTH * 2 + CARD_GAP : totalWidth;
+        const containerHeight = usePortraitTriangle
+            ? CARD_HEIGHT * 2 + triangleRowGap
+            : CARD_HEIGHT;
         const cardContainer = new Node('ItemCardContainer');
         cardContainer.layer = UI_LAYER;
-        cardContainer.addComponent(UITransform).setContentSize(totalWidth, CARD_HEIGHT);
+        cardContainer.addComponent(UITransform).setContentSize(containerWidth, containerHeight);
         this._root.addChild(cardContainer);
 
         const size = this._root.getComponent(UITransform)?.contentSize;
-        if (size && totalWidth > size.width - 100) {
-            const scale = (size.width - 100) / totalWidth;
+        if (size) {
+            const availableWidth = Math.max(
+                220,
+                size.width - padding.left - padding.right - (usePortraitTriangle ? 16 : 24)
+            );
+            const availableHeight = Math.max(
+                180,
+                size.height - padding.top - padding.bottom - (usePortraitTriangle ? 140 : 160)
+            );
+            const widthScale = availableWidth / containerWidth;
+            const heightScale = availableHeight / containerHeight;
+            const maxScale = usePortraitTriangle ? 1.18 : 1;
+            const scale = Math.min(maxScale, widthScale, heightScale);
             cardContainer.setScale(scale, scale, 1);
         }
+        cardContainer.setPosition(
+            0,
+            usePortraitTriangle ? -Math.round(viewport.height * 0.08) : 0,
+            0
+        );
 
         const startX = -totalWidth / 2 + CARD_WIDTH / 2;
+        const triangleBottomX = (CARD_WIDTH + CARD_GAP) * 0.5;
+        const triangleTopY = CARD_HEIGHT * 0.5 + triangleRowGap * 0.5;
+        const triangleBottomY = -(CARD_HEIGHT * 0.5 + triangleRowGap * 0.5);
         for (let i = 0; i < items.length; i++) {
             const itemId = items[i];
             const def = ITEM_DEFS[itemId];
             if (!def) continue;
 
             const cardNode = this.createCardNode(def, i);
-            cardNode.setPosition(startX + i * (CARD_WIDTH + CARD_GAP), -20, 0);
+            if (usePortraitTriangle) {
+                if (i === 0) {
+                    cardNode.setPosition(0, triangleTopY, 0);
+                } else if (i === 1) {
+                    cardNode.setPosition(-triangleBottomX, triangleBottomY, 0);
+                } else {
+                    cardNode.setPosition(triangleBottomX, triangleBottomY, 0);
+                }
+            } else {
+                cardNode.setPosition(startX + i * (CARD_WIDTH + CARD_GAP), -20, 0);
+            }
             cardContainer.addChild(cardNode);
             SelectionCardTheme.playCardReveal(cardNode, i);
         }
@@ -98,7 +136,8 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         titleNode.layer = UI_LAYER;
         parent.addChild(titleNode);
         titleNode.addComponent(UITransform).setContentSize(600, 50);
-        titleNode.setPosition(0, height * 0.5 - 70, 0);
+        const padding = UIResponsive.getControlPadding();
+        titleNode.setPosition(0, height * 0.5 - Math.max(68, padding.top + 24), 0);
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.item.select.title');
@@ -211,8 +250,8 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
     }
 
     private getViewportSize(): { width: number; height: number } {
-        const size = view.getVisibleSize();
-        return { width: size.width, height: size.height };
+        const viewport = UIResponsive.getLayoutViewportSize(480, 320);
+        return { width: viewport.width, height: viewport.height };
     }
 
     private hexToColor(hex: string): Color {

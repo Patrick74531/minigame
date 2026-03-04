@@ -18,6 +18,7 @@ import {
 import { Localization } from '../../core/i18n/Localization';
 import { applyLayerRecursive, HUD_UI_LAYER } from './HUDCommon';
 import type { HUDModule } from './HUDModule';
+import { UIResponsive } from '../UIResponsive';
 
 const GAME_OVER_DIALOG_MAX_WIDTH = 760;
 const GAME_OVER_DIALOG_MAX_HEIGHT = 386;
@@ -467,34 +468,42 @@ export class HUDGameOverModule implements HUDModule {
     private updateGameOverDialogLayout(): void {
         if (!this._gameOverRoot) return;
 
-        const canvasTransform = this._uiCanvas?.getComponent(UITransform);
-        const viewportW = Math.max(480, Math.round(canvasTransform?.contentSize.width ?? 1280));
-        const viewportH = Math.max(320, Math.round(canvasTransform?.contentSize.height ?? 720));
-        const compact = viewportW < 900;
+        const viewport = UIResponsive.getLayoutViewportSize(480, 320, 'canvas');
+        const viewportW = viewport.width;
+        const viewportH = viewport.height;
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
+        const compact = isTikTokPortrait || viewportW < 900;
+        const minDialogW = isTikTokPortrait ? 250 : GAME_OVER_DIALOG_MIN_WIDTH;
+        const minDialogH = isTikTokPortrait ? 180 : GAME_OVER_DIALOG_MIN_HEIGHT;
+        const minBtnW = isTikTokPortrait ? 132 : GAME_OVER_RESTART_BTN_MIN_WIDTH;
+        const minBtnH = isTikTokPortrait ? 44 : GAME_OVER_RESTART_BTN_MIN_HEIGHT;
 
         const dialogW = Math.round(
             Math.max(
-                GAME_OVER_DIALOG_MIN_WIDTH,
-                Math.min(GAME_OVER_DIALOG_MAX_WIDTH, viewportW * (compact ? 0.88 : 0.72))
+                minDialogW,
+                Math.min(
+                    GAME_OVER_DIALOG_MAX_WIDTH,
+                    viewportW * (isTikTokPortrait ? 0.86 : compact ? 0.88 : 0.72)
+                )
             )
         );
         const dialogH = Math.round(
             Math.max(
-                GAME_OVER_DIALOG_MIN_HEIGHT,
-                Math.min(GAME_OVER_DIALOG_MAX_HEIGHT, viewportH * (compact ? 0.52 : 0.5))
+                minDialogH,
+                Math.min(
+                    GAME_OVER_DIALOG_MAX_HEIGHT,
+                    viewportH * (isTikTokPortrait ? 0.36 : compact ? 0.52 : 0.5)
+                )
             )
         );
         const buttonW = Math.round(
             Math.max(
-                GAME_OVER_RESTART_BTN_MIN_WIDTH,
+                minBtnW,
                 Math.min(GAME_OVER_RESTART_BTN_MAX_WIDTH, dialogW * (compact ? 0.48 : 0.4))
             )
         );
         const buttonH = Math.round(
-            Math.max(
-                GAME_OVER_RESTART_BTN_MIN_HEIGHT,
-                Math.min(GAME_OVER_RESTART_BTN_MAX_HEIGHT, dialogH * 0.24)
-            )
+            Math.max(minBtnH, Math.min(GAME_OVER_RESTART_BTN_MAX_HEIGHT, dialogH * 0.24))
         );
 
         this._gameOverDialogWidth = dialogW;
@@ -517,8 +526,8 @@ export class HUDGameOverModule implements HUDModule {
         titleNode?.setPosition(0, Math.round(dialogH * 0.29), 0);
         if (this._gameOverTitleLabel) {
             this._gameOverTitleLabel.fontSize = Math.max(
-                36,
-                Math.min(54, Math.round(dialogH * 0.15))
+                isTikTokPortrait ? 24 : 36,
+                Math.min(isTikTokPortrait ? 36 : 54, Math.round(dialogH * 0.15))
             );
             this._gameOverTitleLabel.lineHeight = this._gameOverTitleLabel.fontSize + 8;
         }
@@ -533,8 +542,8 @@ export class HUDGameOverModule implements HUDModule {
         waveNode?.setPosition(0, Math.round(dialogH * 0.1), 0);
         if (this._gameOverWaveLabel) {
             this._gameOverWaveLabel.fontSize = Math.max(
-                22,
-                Math.min(28, Math.round(dialogH * 0.085))
+                isTikTokPortrait ? 16 : 22,
+                Math.min(isTikTokPortrait ? 22 : 28, Math.round(dialogH * 0.085))
             );
             this._gameOverWaveLabel.lineHeight = this._gameOverWaveLabel.fontSize + 8;
         }
@@ -549,8 +558,8 @@ export class HUDGameOverModule implements HUDModule {
         messageNode?.setPosition(0, -Math.round(dialogH * 0.06), 0);
         if (this._gameOverMessageLabel) {
             this._gameOverMessageLabel.fontSize = Math.max(
-                18,
-                Math.min(26, Math.round(dialogH * 0.072))
+                isTikTokPortrait ? 14 : 18,
+                Math.min(isTikTokPortrait ? 20 : 26, Math.round(dialogH * 0.072))
             );
             this._gameOverMessageLabel.lineHeight = this._gameOverMessageLabel.fontSize + 10;
         }
@@ -566,8 +575,8 @@ export class HUDGameOverModule implements HUDModule {
         diamondNode?.setPosition(0, -Math.round(dialogH * 0.2), 0);
         if (this._gameOverDiamondLabel) {
             this._gameOverDiamondLabel.fontSize = Math.max(
-                18,
-                Math.min(26, Math.round(dialogH * 0.074))
+                isTikTokPortrait ? 14 : 18,
+                Math.min(isTikTokPortrait ? 20 : 26, Math.round(dialogH * 0.074))
             );
             this._gameOverDiamondLabel.lineHeight = this._gameOverDiamondLabel.fontSize + 8;
         }

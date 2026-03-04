@@ -7,6 +7,7 @@ import { Localization } from '../core/i18n/Localization';
 import { GameConfig } from '../data/GameConfig';
 import { GameManager } from '../core/managers/GameManager';
 import { SelectionCardTheme } from './SelectionCardTheme';
+import { UIResponsive } from './UIResponsive';
 
 const UI_LAYER = 33554432;
 
@@ -47,6 +48,7 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
         if (!this._uiCanvas || this._isShowing) return;
         this._isShowing = true;
         const viewport = this.getViewportSize();
+        const padding = UIResponsive.getControlPadding();
 
         // 暂停游戏
         this.gameManager.pauseGame();
@@ -93,19 +95,55 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
         // 动态缩放适配
         const totalWidth =
             this.TOWER_TYPES.length * CARD_WIDTH + (this.TOWER_TYPES.length - 1) * CARD_GAP;
-        container.addComponent(UITransform).setContentSize(totalWidth, CARD_HEIGHT);
+        const usePortraitTriangle =
+            UIResponsive.isTikTokPhonePortraitProfile() && this.TOWER_TYPES.length === 3;
+        const triangleRowGap = 34;
+        const containerWidth = usePortraitTriangle ? CARD_WIDTH * 2 + CARD_GAP : totalWidth;
+        const containerHeight = usePortraitTriangle
+            ? CARD_HEIGHT * 2 + triangleRowGap
+            : CARD_HEIGHT;
+        container.addComponent(UITransform).setContentSize(containerWidth, containerHeight);
         const size = rootTransform.contentSize;
-        if (totalWidth > size.width - 100) {
-            const scale = (size.width - 100) / totalWidth;
-            container.setScale(scale, scale, 1);
-        }
+        const availableWidth = Math.max(
+            240,
+            size.width - padding.left - padding.right - (usePortraitTriangle ? 16 : 24)
+        );
+        const availableHeight = Math.max(
+            180,
+            size.height - padding.top - padding.bottom - (usePortraitTriangle ? 150 : 180)
+        );
+        const widthScale = availableWidth / containerWidth;
+        const heightScale = availableHeight / containerHeight;
+        const maxScale = usePortraitTriangle ? 1.15 : 1;
+        const scale = Math.min(maxScale, widthScale, heightScale);
+        container.setScale(scale, scale, 1);
+        container.setPosition(
+            0,
+            usePortraitTriangle
+                ? -Math.round(viewport.height * 0.08)
+                : Math.round(-padding.bottom * 0.04),
+            0
+        );
 
         const startX = -totalWidth / 2 + CARD_WIDTH / 2;
+        const triangleBottomX = (CARD_WIDTH + CARD_GAP) * 0.5;
+        const triangleTopY = CARD_HEIGHT * 0.5 + triangleRowGap * 0.5;
+        const triangleBottomY = -(CARD_HEIGHT * 0.5 + triangleRowGap * 0.5);
 
         this.TOWER_TYPES.forEach((type, i) => {
             const card = this.createCardNode(type);
             container.addChild(card);
-            card.setPosition(startX + i * (CARD_WIDTH + CARD_GAP), -20, 0);
+            if (usePortraitTriangle) {
+                if (i === 0) {
+                    card.setPosition(0, triangleTopY, 0);
+                } else if (i === 1) {
+                    card.setPosition(-triangleBottomX, triangleBottomY, 0);
+                } else {
+                    card.setPosition(triangleBottomX, triangleBottomY, 0);
+                }
+            } else {
+                card.setPosition(startX + i * (CARD_WIDTH + CARD_GAP), -20, 0);
+            }
             SelectionCardTheme.playCardReveal(card, i);
         });
     }
@@ -138,7 +176,10 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
         const widget = titleNode.addComponent(Widget);
         widget.isAlignTop = true;
         widget.isAlignHorizontalCenter = true;
-        widget.top = Math.round(Math.max(30, Math.min(120, viewportHeight * 0.14)));
+        const padding = UIResponsive.getControlPadding();
+        widget.top = Math.round(
+            Math.max(padding.top + 8, Math.min(160, viewportHeight * 0.14 + padding.top * 0.2))
+        );
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.tower.select.title') || 'Select Tower';
@@ -153,8 +194,6 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
             outlineColor: new Color(52, 26, 6, 255),
             outlineWidth: 5,
         });
-        titleNode.setPosition(0, 214, 0);
-
         const decoNode = new Node('TitleDeco');
         decoNode.layer = UI_LAYER;
         titleNode.addChild(decoNode);
@@ -170,11 +209,7 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
     }
 
     private getViewportSize(): { width: number; height: number } {
-        const size = this._uiCanvas?.getComponent(UITransform)?.contentSize;
-        return {
-            width: Math.max(480, Math.round(size?.width ?? 1280)),
-            height: Math.max(320, Math.round(size?.height ?? 720)),
-        };
+        return UIResponsive.getLayoutViewportSize(480, 320, 'canvas');
     }
 
     private createCardNode(buildingType: string): Node {

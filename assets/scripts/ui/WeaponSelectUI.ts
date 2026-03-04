@@ -19,6 +19,7 @@ import { HeroWeaponManager } from '../gameplay/weapons/HeroWeaponManager';
 import { WeaponType, WeaponDef } from '../gameplay/weapons/WeaponTypes';
 import { Localization } from '../core/i18n/Localization';
 import { SelectionCardTheme } from './SelectionCardTheme';
+import { UIResponsive } from './UIResponsive';
 
 const UI_LAYER = 33554432;
 
@@ -77,6 +78,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         if (!this._uiCanvas || this._isShowing) return;
         this._isShowing = true;
         const viewport = this.getViewportSize();
+        const padding = UIResponsive.getControlPadding();
 
         // 创建根节点（全屏遮罩）
         this._rootNode = new Node('WeaponSelectRoot');
@@ -111,6 +113,13 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
 
         // 卡牌
         const totalWidth = weapons.length * CARD_WIDTH + (weapons.length - 1) * CARD_GAP;
+        const usePortraitTriangle =
+            UIResponsive.isTikTokPhonePortraitProfile() && weapons.length === 3;
+        const triangleRowGap = 34;
+        const containerWidth = usePortraitTriangle ? CARD_WIDTH * 2 + CARD_GAP : totalWidth;
+        const containerHeight = usePortraitTriangle
+            ? CARD_HEIGHT * 2 + triangleRowGap
+            : CARD_HEIGHT;
 
         // Dynamic scaling if total width exceeds screen width
         const size = this._rootNode.getComponent(UITransform)?.contentSize;
@@ -118,19 +127,50 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         const cardContainer = new Node('CardContainer');
         cardContainer.layer = UI_LAYER;
         this._rootNode.addChild(cardContainer);
-        cardContainer.addComponent(UITransform).setContentSize(totalWidth, CARD_HEIGHT);
+        cardContainer.addComponent(UITransform).setContentSize(containerWidth, containerHeight);
 
-        if (size && totalWidth > size.width - 100) {
-            const scale = (size.width - 100) / totalWidth;
+        if (size) {
+            const availableWidth = Math.max(
+                240,
+                size.width - padding.left - padding.right - (usePortraitTriangle ? 16 : 24)
+            );
+            const availableHeight = Math.max(
+                180,
+                size.height - padding.top - padding.bottom - (usePortraitTriangle ? 150 : 180)
+            );
+            const widthScale = availableWidth / containerWidth;
+            const heightScale = availableHeight / containerHeight;
+            const maxScale = usePortraitTriangle ? 1.15 : 1;
+            const scale = Math.min(maxScale, widthScale, heightScale);
             cardContainer.setScale(scale, scale, 1);
         }
+        cardContainer.setPosition(
+            0,
+            usePortraitTriangle
+                ? -Math.round(viewport.height * 0.08)
+                : Math.round(-padding.bottom * 0.04),
+            0
+        );
 
         const startX = -totalWidth / 2 + CARD_WIDTH / 2;
+        const triangleBottomX = (CARD_WIDTH + CARD_GAP) * 0.5;
+        const triangleTopY = CARD_HEIGHT * 0.5 + triangleRowGap * 0.5;
+        const triangleBottomY = -(CARD_HEIGHT * 0.5 + triangleRowGap * 0.5);
 
         weapons.forEach((w, i) => {
             const card = this.createCardNode(w, i);
             cardContainer.addChild(card);
-            card.setPosition(startX + i * (CARD_WIDTH + CARD_GAP), -20, 0);
+            if (usePortraitTriangle) {
+                if (i === 0) {
+                    card.setPosition(0, triangleTopY, 0);
+                } else if (i === 1) {
+                    card.setPosition(-triangleBottomX, triangleBottomY, 0);
+                } else {
+                    card.setPosition(triangleBottomX, triangleBottomY, 0);
+                }
+            } else {
+                card.setPosition(startX + i * (CARD_WIDTH + CARD_GAP), -20, 0);
+            }
             SelectionCardTheme.playCardReveal(card, i);
         });
     }
@@ -163,7 +203,10 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         const widget = titleNode.addComponent(Widget);
         widget.isAlignTop = true;
         widget.isAlignHorizontalCenter = true;
-        widget.top = Math.round(Math.max(30, Math.min(120, viewportHeight * 0.14)));
+        const padding = UIResponsive.getControlPadding();
+        widget.top = Math.round(
+            Math.max(padding.top + 8, Math.min(160, viewportHeight * 0.14 + padding.top * 0.2))
+        );
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.weapon.select.title');
@@ -179,8 +222,6 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
             outlineWidth: 5,
             shadowColor: new Color(0, 0, 0, 210),
         });
-        titleNode.setPosition(0, 214, 0);
-
         const decoNode = new Node('TitleDeco');
         decoNode.layer = UI_LAYER;
         titleNode.addChild(decoNode);
@@ -196,11 +237,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
     }
 
     private getViewportSize(): { width: number; height: number } {
-        const size = this._uiCanvas?.getComponent(UITransform)?.contentSize;
-        return {
-            width: Math.max(480, Math.round(size?.width ?? 1280)),
-            height: Math.max(320, Math.round(size?.height ?? 720)),
-        };
+        return UIResponsive.getLayoutViewportSize(480, 320, 'canvas');
     }
 
     private createCardNode(weapon: { type: WeaponType; def: WeaponDef }, _index: number): Node {

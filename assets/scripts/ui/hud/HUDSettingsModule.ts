@@ -70,12 +70,23 @@ export class HUDSettingsModule implements HUDModule {
 
     public show(): void {
         if (!this._settingsButtonNode) return;
+        this.restoreInteractionState(this._settingsButtonNode);
         this.updateSettingsLayout();
         this._settingsButtonNode.active = true;
         this._settingsButtonNode.setScale(0.96, 0.96, 1);
         tween(this._settingsButtonNode)
             .to(0.3, { scale: new Vec3(1, 1, 1) })
             .start();
+    }
+
+    public setVisible(visible: boolean): void {
+        if (!this._settingsButtonNode) return;
+        if (!visible) {
+            this._settingsButtonNode.active = false;
+            this.hideSettingsPanel();
+            return;
+        }
+        this.show();
     }
 
     public cleanup(): void {
@@ -177,7 +188,7 @@ export class HUDSettingsModule implements HUDModule {
         blockerWidget.isAlignRight = true;
         blocker.addComponent(BlockInputEvents);
         blocker.on(
-            Node.EventType.TOUCH_END,
+            Node.EventType.TOUCH_START,
             () => {
                 this.hideSettingsPanel();
             },
@@ -508,11 +519,16 @@ export class HUDSettingsModule implements HUDModule {
         const clamped = Math.max(0, Math.min(1, ratio));
         const left = -slider.width / 2;
         const fillWidth = Math.max(0, Math.round(slider.width * clamped));
+        const trackH = Math.round(
+            slider.trackNode.getComponent(UITransform)?.contentSize.height ?? 18
+        );
+        const fillH = Math.max(8, trackH - 4);
+        const fillRadius = Math.max(4, Math.round(fillH * 0.5));
 
         slider.fillGraphics.clear();
         if (fillWidth > 0) {
             slider.fillGraphics.fillColor = new Color(82, 214, 255, 255);
-            slider.fillGraphics.roundRect(left, -7, fillWidth, 14, 7);
+            slider.fillGraphics.roundRect(left, -fillH * 0.5, fillWidth, fillH, fillRadius);
             slider.fillGraphics.fill();
         }
         slider.knobNode.setPosition(left + slider.width * clamped, 0, 0);
@@ -520,13 +536,15 @@ export class HUDSettingsModule implements HUDModule {
     }
 
     private drawSliderTrack(bg: Graphics, width: number): void {
+        const h = Math.round(bg.node.getComponent(UITransform)?.contentSize.height ?? 18);
+        const radius = Math.max(5, Math.round(h * 0.5));
         bg.clear();
         bg.fillColor = new Color(28, 42, 58, 238);
-        bg.roundRect(-width / 2, -9, width, 18, 9);
+        bg.roundRect(-width / 2, -h * 0.5, width, h, radius);
         bg.fill();
         bg.strokeColor = new Color(116, 194, 236, 220);
         bg.lineWidth = 2;
-        bg.roundRect(-width / 2, -9, width, 18, 9);
+        bg.roundRect(-width / 2, -h * 0.5, width, h, radius);
         bg.stroke();
     }
 
@@ -649,6 +667,8 @@ export class HUDSettingsModule implements HUDModule {
     private showSettingsPanel(): void {
         if (!this._settingsPanelRoot) return;
 
+        this.restoreInteractionState(this._settingsButtonNode);
+        this.restoreInteractionState(this._settingsPanelRoot);
         this.updateSettingsLayout();
         this.refreshSettingsPanelUI();
 
@@ -757,30 +777,69 @@ export class HUDSettingsModule implements HUDModule {
         setTimeout(refresh, 520);
     }
 
+    private restoreInteractionState(node: Node | null): void {
+        if (!node?.isValid) return;
+        const stack: Node[] = [node];
+        while (stack.length > 0) {
+            const current = stack.pop();
+            if (!current?.isValid) continue;
+            current.resumeSystemEvents(true);
+            const button = current.getComponent(Button);
+            if (button) {
+                button.enabled = true;
+                button.interactable = true;
+            }
+            for (const child of current.children) {
+                stack.push(child);
+            }
+        }
+    }
+
     private updateSettingsLayout(): void {
         if (!this._settingsButtonNode || !this._settingsPanelNode) {
             return;
         }
 
         const vis = UIResponsive.getVisibleSize();
-        const viewportW = Math.max(480, Math.round(vis.width));
-        const viewportH = Math.max(320, Math.round(vis.height));
-        const compact = viewportW < 920 || viewportH < 620;
+        const viewport = UIResponsive.getLayoutViewportSize(480, 320);
+        const viewportW = viewport.width;
+        const viewportH = viewport.height;
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
+        const compact = isTikTokPortrait || viewportW < 920 || viewportH < 620;
         const padding = UIResponsive.getControlPadding();
 
+        const halfW = vis.width * 0.5;
+        const halfH = vis.height * 0.5;
+
+        const mapTopPad = Math.max(
+            84,
+            Math.round(padding.top * 0.55),
+            Math.round(vis.height * 0.12)
+        );
+        const mapRightPad = Math.max(4, Math.round(padding.right * 0.14));
+        const tiktokMapSize = Math.round(
+            UIResponsive.clamp(Math.min(viewportW, viewportH) * 0.18, 92, 136)
+        );
+        const tiktokMapCenterX = Math.round(halfW - mapRightPad - tiktokMapSize * 0.5);
+        const tiktokMapCenterY = Math.round(halfH - mapTopPad - tiktokMapSize * 0.5);
+
         const buttonW = Math.round(
-            UIResponsive.clamp(
-                viewportW * (compact ? 0.21 : 0.16),
-                SETTINGS_BUTTON_MIN_WIDTH,
-                SETTINGS_BUTTON_MAX_WIDTH
-            )
+            isTikTokPortrait
+                ? tiktokMapSize
+                : UIResponsive.clamp(
+                      viewportW * (compact ? 0.21 : 0.16),
+                      SETTINGS_BUTTON_MIN_WIDTH,
+                      SETTINGS_BUTTON_MAX_WIDTH
+                  )
         );
         const buttonH = Math.round(
-            UIResponsive.clamp(
-                viewportH * (compact ? 0.1 : 0.085),
-                SETTINGS_BUTTON_MIN_HEIGHT,
-                SETTINGS_BUTTON_MAX_HEIGHT
-            )
+            isTikTokPortrait
+                ? UIResponsive.clamp(buttonW * 0.46, 42, 58)
+                : UIResponsive.clamp(
+                      viewportH * (compact ? 0.1 : 0.085),
+                      SETTINGS_BUTTON_MIN_HEIGHT,
+                      SETTINGS_BUTTON_MAX_HEIGHT
+                  )
         );
         const buttonTf = this._settingsButtonNode.getComponent(UITransform);
         buttonTf?.setContentSize(buttonW, buttonH);
@@ -788,20 +847,32 @@ export class HUDSettingsModule implements HUDModule {
         // Bypass Widget entirely — position directly relative to the visible viewport center.
         // UICanvas UITransform is hardcoded 1280×720, so Widget.isAlignRight would place
         // elements at canvas-edge ±640, while the camera only shows ±(vis.width/2).
-        const topPad = Math.max(10, Math.round(padding.top * 0.45));
-        const rightPad = Math.max(10, Math.round(padding.right * 0.55));
-        const halfW = vis.width * 0.5;
-        const halfH = vis.height * 0.5;
+        const topPad = isTikTokPortrait
+            ? Math.max(8, Math.round(padding.top * 0.3))
+            : Math.max(10, Math.round(padding.top * 0.45));
+        const rightPad = isTikTokPortrait
+            ? Math.max(14, Math.round(padding.right * 0.72))
+            : Math.max(10, Math.round(padding.right * 0.55));
 
         // Disable Widget entirely so its onEnable() cannot re-apply the original
         // isAlignTop/isAlignRight values and override our explicit setPosition.
         const buttonWidget = this._settingsButtonNode.getComponent(Widget);
         if (buttonWidget) buttonWidget.enabled = false;
-        this._settingsButtonNode.setPosition(
-            Math.round(halfW - rightPad - buttonW * 0.5),
-            Math.round(halfH - topPad - buttonH * 0.5),
-            0
-        );
+        if (isTikTokPortrait) {
+            const gapBelowMinimap = Math.max(4, Math.round(viewportH * 0.01));
+            const minimapBottom = tiktokMapCenterY - tiktokMapSize * 0.5;
+            this._settingsButtonNode.setPosition(
+                tiktokMapCenterX,
+                Math.round(minimapBottom - gapBelowMinimap - buttonH * 0.5),
+                0
+            );
+        } else {
+            this._settingsButtonNode.setPosition(
+                Math.round(halfW - rightPad - buttonW * 0.5),
+                Math.round(halfH - topPad - buttonH * 0.5),
+                0
+            );
+        }
         const buttonLabel = this._settingsButtonNode.getChildByName('SettingsButtonLabel');
         const buttonLabelTf = buttonLabel?.getComponent(UITransform);
         buttonLabelTf?.setContentSize(buttonW - 48, buttonH - 8);
@@ -809,7 +880,9 @@ export class HUDSettingsModule implements HUDModule {
             buttonLabel.setPosition(Math.round(buttonW * 0.09), 0, 0);
             const label = buttonLabel.getComponent(Label);
             if (label) {
-                label.fontSize = Math.max(22, Math.min(30, Math.round(buttonH * 0.5)));
+                label.fontSize = isTikTokPortrait
+                    ? Math.max(18, Math.min(24, Math.round(buttonH * 0.46)))
+                    : Math.max(22, Math.min(30, Math.round(buttonH * 0.5)));
                 label.lineHeight = label.fontSize + 4;
             }
         }
@@ -822,33 +895,50 @@ export class HUDSettingsModule implements HUDModule {
         if (this._settingsButtonBg) {
             this.drawSettingsButton(this._settingsButtonBg);
         }
+        const buttonParent = this._settingsButtonNode.parent;
+        if (buttonParent) {
+            this._settingsButtonNode.setSiblingIndex(buttonParent.children.length - 1);
+        }
 
         const panelW = Math.round(
-            UIResponsive.clamp(
-                viewportW * (compact ? 0.66 : 0.46),
-                SETTINGS_PANEL_MIN_WIDTH,
-                SETTINGS_PANEL_MAX_WIDTH
-            )
+            isTikTokPortrait
+                ? UIResponsive.clamp(viewportW * 0.84, 286, 420)
+                : UIResponsive.clamp(
+                      viewportW * (compact ? 0.66 : 0.46),
+                      SETTINGS_PANEL_MIN_WIDTH,
+                      SETTINGS_PANEL_MAX_WIDTH
+                  )
         );
         const desiredPanelH = Math.round(
-            UIResponsive.clamp(
-                viewportH * (compact ? 0.72 : 0.58),
-                SETTINGS_PANEL_MIN_HEIGHT,
-                SETTINGS_PANEL_MAX_HEIGHT
-            )
+            isTikTokPortrait
+                ? UIResponsive.clamp(viewportH * 0.54, 232, 390)
+                : UIResponsive.clamp(
+                      viewportH * (compact ? 0.72 : 0.58),
+                      SETTINGS_PANEL_MIN_HEIGHT,
+                      SETTINGS_PANEL_MAX_HEIGHT
+                  )
         );
-        const gap = compact ? 8 : 10;
-        const panelH = Math.max(SETTINGS_PANEL_MIN_HEIGHT, Math.min(desiredPanelH, viewportH - 16));
+        const gap = isTikTokPortrait ? 6 : compact ? 8 : 10;
+        const panelH = Math.max(SETTINGS_PANEL_MIN_HEIGHT, Math.min(desiredPanelH, viewportH - 20));
         this._settingsPanelNode.getComponent(UITransform)?.setContentSize(panelW, panelH);
         const panelWidget = this._settingsPanelNode.getComponent(Widget);
         if (panelWidget) panelWidget.enabled = false;
         // Panel sits directly below the button, right-aligned to the same edge.
         // panelRoot fills UICanvas (1280×720); local coords are same as UICanvas coords.
-        const panelTopFromCenter = halfH - topPad - buttonH - gap;
-        const panelY = Math.round(
-            Math.max(-(halfH - panelH * 0.5 - 8), panelTopFromCenter - panelH * 0.5)
+        const panelTopFromCenter = isTikTokPortrait
+            ? this._settingsButtonNode.position.y - buttonH * 0.5 - gap
+            : halfH - topPad - buttonH - gap;
+        const panelMinY = -(halfH - panelH * 0.5 - Math.max(10, Math.round(padding.bottom * 0.5)));
+        const panelMaxY = halfH - panelH * 0.5 - Math.max(8, Math.round(padding.top * 0.24));
+        const desiredPanelY = isTikTokPortrait
+            ? Math.min(panelTopFromCenter - panelH * 0.5, panelMaxY - Math.round(panelH * 0.05))
+            : panelTopFromCenter - panelH * 0.5;
+        const panelY = Math.round(UIResponsive.clamp(desiredPanelY, panelMinY, panelMaxY));
+        this._settingsPanelNode.setPosition(
+            Math.round(isTikTokPortrait ? 0 : halfW - rightPad - panelW * 0.5),
+            panelY,
+            0
         );
-        this._settingsPanelNode.setPosition(Math.round(halfW - rightPad - panelW * 0.5), panelY, 0);
         if (this._settingsPanelBg) {
             this.drawSettingsPanelBackground(this._settingsPanelBg);
         }
@@ -859,19 +949,23 @@ export class HUDSettingsModule implements HUDModule {
                 .getComponent(UITransform)
                 ?.setContentSize(
                     panelW - Math.max(138, Math.round(panelW * 0.27)),
-                    Math.max(48, Math.round(panelH * 0.12))
+                    Math.max(44, Math.round(panelH * (isTikTokPortrait ? 0.11 : 0.12)))
                 );
-            titleNode.setPosition(-Math.round(panelW * 0.12), Math.round(panelH * 0.31), 0);
+            titleNode.setPosition(-Math.round(panelW * 0.12), Math.round(panelH * 0.3), 0);
             const titleLabel = titleNode.getComponent(Label);
             if (titleLabel) {
-                titleLabel.fontSize = Math.max(28, Math.min(38, Math.round(panelH * 0.08)));
+                titleLabel.fontSize = isTikTokPortrait
+                    ? Math.max(24, Math.min(32, Math.round(panelH * 0.075)))
+                    : Math.max(28, Math.min(38, Math.round(panelH * 0.08)));
                 titleLabel.lineHeight = titleLabel.fontSize + 6;
             }
         }
 
         const closeNode = this._settingsPanelNode.getChildByName('SettingsCloseButton');
         if (closeNode) {
-            const closeSize = Math.max(40, Math.min(56, Math.round(panelH * 0.12)));
+            const closeSize = isTikTokPortrait
+                ? Math.max(36, Math.min(46, Math.round(panelH * 0.11)))
+                : Math.max(40, Math.min(56, Math.round(panelH * 0.12)));
             closeNode.getComponent(UITransform)?.setContentSize(closeSize, closeSize);
             closeNode.setPosition(panelW / 2 - closeSize * 0.72, panelH / 2 - closeSize * 0.72, 0);
             const closeIcon = closeNode.getChildByName('SettingsCloseIcon');
@@ -885,59 +979,92 @@ export class HUDSettingsModule implements HUDModule {
             }
         }
 
-        const rowWidth = panelW - Math.max(36, Math.round(panelW * 0.1));
-        const rowHeight = Math.max(72, Math.min(98, Math.round(panelH * 0.19)));
-        const rowBaseY = Math.round(panelH * 0.17);
-        const rowGap = Math.round(rowHeight * 0.93);
+        const rowWidth =
+            panelW - Math.max(30, Math.round(panelW * (isTikTokPortrait ? 0.14 : 0.1)));
+        const rowHeight = isTikTokPortrait
+            ? Math.max(52, Math.min(72, Math.round(panelH * 0.16)))
+            : Math.max(72, Math.min(98, Math.round(panelH * 0.19)));
+        const rowBaseY = Math.round(panelH * (isTikTokPortrait ? 0.12 : 0.17));
+        const rowGap = Math.round(rowHeight * (isTikTokPortrait ? 1.05 : 0.93));
 
-        this.layoutVolumeSlider(this._settingsBgmSlider, rowBaseY, rowWidth, rowHeight);
-        this.layoutVolumeSlider(this._settingsSfxSlider, rowBaseY - rowGap, rowWidth, rowHeight);
-        this.layoutLanguageRow(rowBaseY - rowGap * 2, rowWidth, rowHeight);
+        this.layoutVolumeSlider(
+            this._settingsBgmSlider,
+            rowBaseY,
+            rowWidth,
+            rowHeight,
+            isTikTokPortrait
+        );
+        this.layoutVolumeSlider(
+            this._settingsSfxSlider,
+            rowBaseY - rowGap,
+            rowWidth,
+            rowHeight,
+            isTikTokPortrait
+        );
+        this.layoutLanguageRow(rowBaseY - rowGap * 2, rowWidth, rowHeight, isTikTokPortrait);
     }
 
     private layoutVolumeSlider(
         slider: VolumeSliderView | null,
         posY: number,
         rowWidth: number,
-        rowHeight: number
+        rowHeight: number,
+        isTikTokPortrait: boolean
     ): void {
         if (!slider) return;
 
         slider.rowNode.getComponent(UITransform)?.setContentSize(rowWidth, rowHeight);
         slider.rowNode.setPosition(0, posY, 0);
 
-        const titleW = Math.max(156, Math.min(252, Math.round(rowWidth * 0.42)));
-        const valueW = Math.max(74, Math.min(108, Math.round(rowWidth * 0.18)));
-        const sliderW = Math.max(132, Math.min(340, rowWidth - titleW - valueW - 58));
+        const titleW = isTikTokPortrait
+            ? Math.max(84, Math.min(132, Math.round(rowWidth * 0.31)))
+            : Math.max(156, Math.min(252, Math.round(rowWidth * 0.42)));
+        const valueW = isTikTokPortrait
+            ? Math.max(44, Math.min(72, Math.round(rowWidth * 0.16)))
+            : Math.max(74, Math.min(108, Math.round(rowWidth * 0.18)));
+        const sliderGap = isTikTokPortrait ? 10 : 14;
+        const sliderW = isTikTokPortrait
+            ? Math.max(72, Math.min(220, rowWidth - titleW - valueW - 30))
+            : Math.max(132, Math.min(340, rowWidth - titleW - valueW - 58));
         slider.width = sliderW;
 
-        const left = -rowWidth / 2 + 8;
+        const left = -rowWidth / 2 + (isTikTokPortrait ? 4 : 8);
         const titleCenterX = left + titleW / 2;
-        const titleY = 0;
+        const titleY = isTikTokPortrait ? Math.round(rowHeight * 0.05) : 0;
         slider.titleNode
             .getComponent(UITransform)
             ?.setContentSize(titleW, Math.round(rowHeight * 0.52));
         slider.titleNode.setPosition(titleCenterX, titleY, 0);
-        slider.titleLabel.fontSize = Math.max(20, Math.min(28, Math.round(rowHeight * 0.33)));
-        slider.titleLabel.lineHeight = slider.titleLabel.fontSize + 6;
+        slider.titleLabel.fontSize = isTikTokPortrait
+            ? Math.max(16, Math.min(20, Math.round(rowHeight * 0.34)))
+            : Math.max(20, Math.min(28, Math.round(rowHeight * 0.33)));
+        slider.titleLabel.lineHeight = slider.titleLabel.fontSize + (isTikTokPortrait ? 4 : 6);
 
-        const trackLeft = left + titleW + 14;
+        const trackLeft = left + titleW + sliderGap;
         const trackCenterX = trackLeft + sliderW / 2;
-        const trackY = 0;
-        slider.trackNode.getComponent(UITransform)?.setContentSize(sliderW, 18);
+        const trackY = isTikTokPortrait ? -Math.round(rowHeight * 0.06) : 0;
+        const trackH = isTikTokPortrait ? 14 : 18;
+        slider.trackNode.getComponent(UITransform)?.setContentSize(sliderW, trackH);
         slider.trackNode.setPosition(trackCenterX, trackY, 0);
         this.drawSliderTrack(slider.trackGraphics, sliderW);
 
-        slider.hitNode.getComponent(UITransform)?.setContentSize(sliderW + 18, 36);
+        slider.hitNode
+            .getComponent(UITransform)
+            ?.setContentSize(sliderW + (isTikTokPortrait ? 14 : 18), isTikTokPortrait ? 30 : 36);
         slider.hitNode.setPosition(trackCenterX, trackY, 0);
 
-        const valueCenterX = rowWidth / 2 - valueW / 2 - 4;
+        const valueCenterX = rowWidth / 2 - valueW / 2 - (isTikTokPortrait ? 2 : 4);
         slider.valueNode
             .getComponent(UITransform)
             ?.setContentSize(valueW, Math.round(rowHeight * 0.5));
         slider.valueNode.setPosition(valueCenterX, titleY, 0);
-        slider.valueLabel.fontSize = Math.max(20, Math.min(26, Math.round(rowHeight * 0.31)));
-        slider.valueLabel.lineHeight = slider.valueLabel.fontSize + 6;
+        slider.valueLabel.fontSize = isTikTokPortrait
+            ? Math.max(15, Math.min(20, Math.round(rowHeight * 0.31)))
+            : Math.max(20, Math.min(26, Math.round(rowHeight * 0.31)));
+        slider.valueLabel.lineHeight = slider.valueLabel.fontSize + (isTikTokPortrait ? 4 : 6);
+        slider.valueLabel.horizontalAlign = isTikTokPortrait
+            ? Label.HorizontalAlign.CENTER
+            : Label.HorizontalAlign.RIGHT;
 
         this.redrawVolumeSlider(
             slider,
@@ -947,7 +1074,12 @@ export class HUDSettingsModule implements HUDModule {
         );
     }
 
-    private layoutLanguageRow(posY: number, rowWidth: number, rowHeight: number): void {
+    private layoutLanguageRow(
+        posY: number,
+        rowWidth: number,
+        rowHeight: number,
+        isTikTokPortrait: boolean
+    ): void {
         const row = this._settingsPanelNode?.getChildByName('SettingsLangRow');
         if (!row) return;
 
@@ -956,29 +1088,39 @@ export class HUDSettingsModule implements HUDModule {
 
         const titleNode = row.getChildByName('SettingsLangTitle');
         const titleLabel = titleNode?.getComponent(Label);
-        const titleW = Math.max(138, Math.min(224, Math.round(rowWidth * 0.36)));
+        const titleW = isTikTokPortrait
+            ? Math.max(80, Math.min(122, Math.round(rowWidth * 0.3)))
+            : Math.max(138, Math.min(224, Math.round(rowWidth * 0.36)));
         const titleY = 0;
-        const left = -rowWidth / 2 + 8;
+        const left = -rowWidth / 2 + (isTikTokPortrait ? 4 : 8);
         titleNode?.getComponent(UITransform)?.setContentSize(titleW, Math.round(rowHeight * 0.52));
         titleNode?.setPosition(left + titleW / 2, titleY, 0);
         if (titleLabel) {
-            titleLabel.fontSize = Math.max(20, Math.min(28, Math.round(rowHeight * 0.33)));
-            titleLabel.lineHeight = titleLabel.fontSize + 6;
+            titleLabel.fontSize = isTikTokPortrait
+                ? Math.max(16, Math.min(20, Math.round(rowHeight * 0.34)))
+                : Math.max(20, Math.min(28, Math.round(rowHeight * 0.33)));
+            titleLabel.lineHeight = titleLabel.fontSize + (isTikTokPortrait ? 4 : 6);
         }
 
         const container = row.getChildByName('LangBtnContainer');
         if (!container) return;
 
-        const containerW = Math.max(198, rowWidth - titleW - 34);
+        const containerW = isTikTokPortrait
+            ? Math.max(120, rowWidth - titleW - 24)
+            : Math.max(198, rowWidth - titleW - 34);
         container
             .getComponent(UITransform)
             ?.setContentSize(containerW, Math.round(rowHeight * 0.62));
-        const containerCenterX = left + titleW + 14 + containerW / 2;
+        const containerCenterX = left + titleW + (isTikTokPortrait ? 8 : 14) + containerW / 2;
         container.setPosition(containerCenterX, 0, 0);
 
-        const buttonGap = 14;
-        const buttonW = Math.max(92, Math.min(168, Math.round((containerW - buttonGap) * 0.5)));
-        const buttonH = Math.max(40, Math.min(54, Math.round(rowHeight * 0.62)));
+        const buttonGap = isTikTokPortrait ? 8 : 14;
+        const buttonW = isTikTokPortrait
+            ? Math.max(54, Math.min(110, Math.round((containerW - buttonGap) * 0.5)))
+            : Math.max(92, Math.min(168, Math.round((containerW - buttonGap) * 0.5)));
+        const buttonH = isTikTokPortrait
+            ? Math.max(32, Math.min(42, Math.round(rowHeight * 0.58)))
+            : Math.max(40, Math.min(54, Math.round(rowHeight * 0.62)));
         const halfDistance = Math.round((buttonW + buttonGap) * 0.5);
 
         const codes: Array<'zh' | 'en'> = ['zh', 'en'];
@@ -992,7 +1134,9 @@ export class HUDSettingsModule implements HUDModule {
             const label = labelNode?.getComponent(Label);
             labelNode?.getComponent(UITransform)?.setContentSize(buttonW - 10, buttonH - 8);
             if (label) {
-                label.fontSize = Math.max(20, Math.min(26, Math.round(buttonH * 0.48)));
+                label.fontSize = isTikTokPortrait
+                    ? Math.max(15, Math.min(20, Math.round(buttonH * 0.46)))
+                    : Math.max(20, Math.min(26, Math.round(buttonH * 0.48)));
                 label.lineHeight = label.fontSize + 4;
                 label.cacheMode = Label.CacheMode.NONE;
                 label.useSystemFont = true;
