@@ -1,9 +1,11 @@
 {
-  "ver": "4.0.24",
-  "importer": "typescript",
+  "ver": "0.0.1",
+  "importer": "*",
   "imported": true,
   "uuid": "2b1a3528-b9ef-459d-9078-b878599f302b",
-  "files": [],
+  "files": [
+    ".ts"
+  ],
   "subMetas": {},
   "userData": {}
 }

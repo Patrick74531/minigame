@@ -1,38 +1,12 @@
 {
-  "ver": "1.0.27",
-  "importer": "image",
+  "ver": "0.0.1",
+  "importer": "*",
   "imported": true,
   "uuid": "98621540-fb3c-4fcb-af2a-f0406abf2486",
   "files": [
-    ".json",
     ".webp"
   ],
-  "subMetas": {
-    "6c48a": {
-      "importer": "texture",
-      "uuid": "98621540-fb3c-4fcb-af2a-f0406abf2486@6c48a",
-      "displayName": "flying_ship_interceptor_bolt",
-      "id": "6c48a",
-      "name": "texture",
-      "userData": {
-        "wrapModeS": "repeat",
-        "wrapModeT": "repeat",
-        "minfilter": "linear",
-        "magfilter": "linear",
-        "mipfilter": "none",
-        "anisotropy": 0,
-        "isUuid": true,
-        "imageUuidOrDatabaseUri": "98621540-fb3c-4fcb-af2a-f0406abf2486",
-        "visible": false
-      },
-      "ver": "1.0.22",
-      "imported": true,
-      "files": [
-        ".json"
-      ],
-      "subMetas": {}
-    }
-  },
+  "subMetas": {},
   "userData": {
     "type": "texture",
     "fixAlphaTransparencyArtifacts": false,

@@ -473,17 +473,17 @@ export class HUDGameOverModule implements HUDModule {
         const viewportH = viewport.height;
         const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
         const compact = isTikTokPortrait || viewportW < 900;
-        const minDialogW = isTikTokPortrait ? 250 : GAME_OVER_DIALOG_MIN_WIDTH;
-        const minDialogH = isTikTokPortrait ? 180 : GAME_OVER_DIALOG_MIN_HEIGHT;
-        const minBtnW = isTikTokPortrait ? 132 : GAME_OVER_RESTART_BTN_MIN_WIDTH;
-        const minBtnH = isTikTokPortrait ? 44 : GAME_OVER_RESTART_BTN_MIN_HEIGHT;
+        const minDialogW = isTikTokPortrait ? 280 : GAME_OVER_DIALOG_MIN_WIDTH;
+        const minDialogH = isTikTokPortrait ? 240 : GAME_OVER_DIALOG_MIN_HEIGHT;
+        const minBtnW = isTikTokPortrait ? 156 : GAME_OVER_RESTART_BTN_MIN_WIDTH;
+        const minBtnH = isTikTokPortrait ? 46 : GAME_OVER_RESTART_BTN_MIN_HEIGHT;
 
         const dialogW = Math.round(
             Math.max(
                 minDialogW,
                 Math.min(
                     GAME_OVER_DIALOG_MAX_WIDTH,
-                    viewportW * (isTikTokPortrait ? 0.86 : compact ? 0.88 : 0.72)
+                    viewportW * (isTikTokPortrait ? 0.9 : compact ? 0.88 : 0.72)
                 )
             )
         );
@@ -492,18 +492,27 @@ export class HUDGameOverModule implements HUDModule {
                 minDialogH,
                 Math.min(
                     GAME_OVER_DIALOG_MAX_HEIGHT,
-                    viewportH * (isTikTokPortrait ? 0.36 : compact ? 0.52 : 0.5)
+                    viewportH * (isTikTokPortrait ? 0.44 : compact ? 0.52 : 0.5)
                 )
             )
         );
         const buttonW = Math.round(
             Math.max(
                 minBtnW,
-                Math.min(GAME_OVER_RESTART_BTN_MAX_WIDTH, dialogW * (compact ? 0.48 : 0.4))
+                Math.min(
+                    GAME_OVER_RESTART_BTN_MAX_WIDTH,
+                    dialogW * (isTikTokPortrait ? 0.58 : compact ? 0.48 : 0.4)
+                )
             )
         );
         const buttonH = Math.round(
-            Math.max(minBtnH, Math.min(GAME_OVER_RESTART_BTN_MAX_HEIGHT, dialogH * 0.24))
+            Math.max(
+                minBtnH,
+                Math.min(
+                    GAME_OVER_RESTART_BTN_MAX_HEIGHT,
+                    dialogH * (isTikTokPortrait ? 0.19 : 0.24)
+                )
+            )
         );
 
         this._gameOverDialogWidth = dialogW;
@@ -520,16 +529,23 @@ export class HUDGameOverModule implements HUDModule {
         titleNode
             ?.getComponent(UITransform)
             ?.setContentSize(
-                dialogW - Math.round(dialogW * 0.18),
-                Math.max(54, Math.round(dialogH * 0.21))
+                dialogW - Math.round(dialogW * (isTikTokPortrait ? 0.16 : 0.18)),
+                Math.max(
+                    isTikTokPortrait ? 46 : 54,
+                    Math.round(dialogH * (isTikTokPortrait ? 0.2 : 0.21))
+                )
             );
-        titleNode?.setPosition(0, Math.round(dialogH * 0.29), 0);
+        titleNode?.setPosition(0, Math.round(dialogH * (isTikTokPortrait ? 0.3 : 0.29)), 0);
         if (this._gameOverTitleLabel) {
             this._gameOverTitleLabel.fontSize = Math.max(
-                isTikTokPortrait ? 24 : 36,
-                Math.min(isTikTokPortrait ? 36 : 54, Math.round(dialogH * 0.15))
+                isTikTokPortrait ? 22 : 36,
+                Math.min(
+                    isTikTokPortrait ? 34 : 54,
+                    Math.round(dialogH * (isTikTokPortrait ? 0.105 : 0.15))
+                )
             );
-            this._gameOverTitleLabel.lineHeight = this._gameOverTitleLabel.fontSize + 8;
+            this._gameOverTitleLabel.lineHeight =
+                this._gameOverTitleLabel.fontSize + (isTikTokPortrait ? 6 : 8);
         }
 
         const waveNode = this._gameOverWaveLabel?.node;
@@ -537,31 +553,45 @@ export class HUDGameOverModule implements HUDModule {
             ?.getComponent(UITransform)
             ?.setContentSize(
                 dialogW - Math.round(dialogW * 0.14),
-                Math.max(36, Math.round(dialogH * 0.14))
+                Math.max(
+                    isTikTokPortrait ? 32 : 36,
+                    Math.round(dialogH * (isTikTokPortrait ? 0.13 : 0.14))
+                )
             );
-        waveNode?.setPosition(0, Math.round(dialogH * 0.1), 0);
+        waveNode?.setPosition(0, Math.round(dialogH * (isTikTokPortrait ? 0.12 : 0.1)), 0);
         if (this._gameOverWaveLabel) {
             this._gameOverWaveLabel.fontSize = Math.max(
-                isTikTokPortrait ? 16 : 22,
-                Math.min(isTikTokPortrait ? 22 : 28, Math.round(dialogH * 0.085))
+                isTikTokPortrait ? 15 : 22,
+                Math.min(
+                    isTikTokPortrait ? 24 : 28,
+                    Math.round(dialogH * (isTikTokPortrait ? 0.074 : 0.085))
+                )
             );
-            this._gameOverWaveLabel.lineHeight = this._gameOverWaveLabel.fontSize + 8;
+            this._gameOverWaveLabel.lineHeight =
+                this._gameOverWaveLabel.fontSize + (isTikTokPortrait ? 5 : 8);
         }
 
         const messageNode = this._gameOverMessageLabel?.node;
         messageNode
             ?.getComponent(UITransform)
             ?.setContentSize(
-                dialogW - Math.round(dialogW * 0.24),
-                Math.max(72, Math.round(dialogH * 0.26))
+                dialogW - Math.round(dialogW * (isTikTokPortrait ? 0.18 : 0.24)),
+                Math.max(
+                    isTikTokPortrait ? 66 : 72,
+                    Math.round(dialogH * (isTikTokPortrait ? 0.24 : 0.26))
+                )
             );
-        messageNode?.setPosition(0, -Math.round(dialogH * 0.06), 0);
+        messageNode?.setPosition(0, -Math.round(dialogH * (isTikTokPortrait ? 0.03 : 0.06)), 0);
         if (this._gameOverMessageLabel) {
             this._gameOverMessageLabel.fontSize = Math.max(
-                isTikTokPortrait ? 14 : 18,
-                Math.min(isTikTokPortrait ? 20 : 26, Math.round(dialogH * 0.072))
+                isTikTokPortrait ? 13 : 18,
+                Math.min(
+                    isTikTokPortrait ? 18 : 26,
+                    Math.round(dialogH * (isTikTokPortrait ? 0.062 : 0.072))
+                )
             );
-            this._gameOverMessageLabel.lineHeight = this._gameOverMessageLabel.fontSize + 10;
+            this._gameOverMessageLabel.lineHeight =
+                this._gameOverMessageLabel.fontSize + (isTikTokPortrait ? 6 : 10);
         }
 
         // Diamond reward row layout
@@ -570,30 +600,45 @@ export class HUDGameOverModule implements HUDModule {
             ?.getComponent(UITransform)
             ?.setContentSize(
                 dialogW - Math.round(dialogW * 0.14),
-                Math.max(30, Math.round(dialogH * 0.105))
+                Math.max(
+                    isTikTokPortrait ? 28 : 30,
+                    Math.round(dialogH * (isTikTokPortrait ? 0.1 : 0.105))
+                )
             );
-        diamondNode?.setPosition(0, -Math.round(dialogH * 0.2), 0);
+        diamondNode?.setPosition(0, -Math.round(dialogH * (isTikTokPortrait ? 0.21 : 0.2)), 0);
         if (this._gameOverDiamondLabel) {
             this._gameOverDiamondLabel.fontSize = Math.max(
-                isTikTokPortrait ? 14 : 18,
-                Math.min(isTikTokPortrait ? 20 : 26, Math.round(dialogH * 0.074))
+                isTikTokPortrait ? 13 : 18,
+                Math.min(
+                    isTikTokPortrait ? 18 : 26,
+                    Math.round(dialogH * (isTikTokPortrait ? 0.064 : 0.074))
+                )
             );
-            this._gameOverDiamondLabel.lineHeight = this._gameOverDiamondLabel.fontSize + 8;
+            this._gameOverDiamondLabel.lineHeight =
+                this._gameOverDiamondLabel.fontSize + (isTikTokPortrait ? 5 : 8);
         }
 
         if (this._gameOverButtonNode) {
             this._gameOverButtonNode.getComponent(UITransform)?.setContentSize(buttonW, buttonH);
-            this._gameOverButtonNode.setPosition(0, -Math.round(dialogH * 0.36), 0);
+            this._gameOverButtonNode.setPosition(
+                0,
+                -Math.round(dialogH * (isTikTokPortrait ? 0.37 : 0.36)),
+                0
+            );
         }
         this._gameOverButtonLabel?.node
             .getComponent(UITransform)
-            ?.setContentSize(buttonW - 24, buttonH - 10);
+            ?.setContentSize(
+                buttonW - (isTikTokPortrait ? 18 : 24),
+                buttonH - (isTikTokPortrait ? 6 : 10)
+            );
         if (this._gameOverButtonLabel) {
             this._gameOverButtonLabel.fontSize = Math.max(
-                26,
-                Math.min(34, Math.round(buttonH * 0.4))
+                isTikTokPortrait ? 20 : 26,
+                Math.min(isTikTokPortrait ? 28 : 34, Math.round(buttonH * 0.42))
             );
-            this._gameOverButtonLabel.lineHeight = this._gameOverButtonLabel.fontSize + 8;
+            this._gameOverButtonLabel.lineHeight =
+                this._gameOverButtonLabel.fontSize + (isTikTokPortrait ? 5 : 8);
         }
 
         if (this._gameOverPanelBg) {
@@ -621,18 +666,28 @@ export class HUDGameOverModule implements HUDModule {
             Tween.stopAllByTarget(this._gameOverButtonNode);
             this._gameOverButtonNode.setScale(1, 1, 1);
         }
+        if (this._gameOverRoot) {
+            Tween.stopAllByTarget(this._gameOverRoot);
+        }
+        if (this._gameOverOpacity) {
+            Tween.stopAllByTarget(this._gameOverOpacity);
+        }
+
+        if (this.isTikTokRuntime()) {
+            this.sanitizeCanvasBeforeSceneReload();
+            if (this.trySceneReloadToHome()) {
+                return;
+            }
+            this.restoreRestartButtonState();
+            return;
+        }
 
         if (this.tryReloadHostPage()) {
             return;
         }
 
         this.sanitizeCanvasBeforeSceneReload();
-
-        const startedPrimary = director.loadScene('scene');
-        if (startedPrimary !== false) return;
-
-        const startedBackup = director.loadScene('scene_recover');
-        if (startedBackup !== false) return;
+        if (this.trySceneReloadToHome()) return;
 
         if (this.tryRestartEngineProcess()) return;
 
@@ -651,6 +706,51 @@ export class HUDGameOverModule implements HUDModule {
         const reload = locationObj?.reload;
         if (typeof reload !== 'function') return false;
         reload.call(locationObj);
+        return true;
+    }
+
+    private isTikTokRuntime(): boolean {
+        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
+        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
+    }
+
+    private trySceneReloadToHome(): boolean {
+        setTimeout(() => {
+            let launched = false;
+            const markLaunched = () => {
+                launched = true;
+            };
+            const tryLoad = (sceneName: string): boolean => {
+                try {
+                    const started = director.loadScene(sceneName, markLaunched);
+                    return started !== false;
+                } catch (err) {
+                    console.warn(`[HUDGameOver] loadScene(${sceneName}) failed:`, err);
+                    return false;
+                }
+            };
+
+            const startedPrimary = tryLoad('scene');
+            if (!startedPrimary) {
+                const startedBackup = tryLoad('scene_recover');
+                if (!startedBackup) {
+                    this.restoreRestartButtonState();
+                }
+                return;
+            }
+
+            // Watchdog: if primary scene launch callback never fires, try recovery scene.
+            setTimeout(() => {
+                if (launched) return;
+                const currentScene = director.getScene()?.name ?? '';
+                if (currentScene === 'scene' || currentScene === 'scene_recover') return;
+                const startedBackup = tryLoad('scene_recover');
+                if (!startedBackup) {
+                    this.restoreRestartButtonState();
+                }
+            }, 1500);
+        }, 16);
+
         return true;
     }
 

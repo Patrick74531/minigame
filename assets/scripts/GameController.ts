@@ -215,7 +215,11 @@ export class GameController extends Component {
             document.removeEventListener('visibilitychange', this._visibilityHandler);
             this._visibilityHandler = null;
         }
-        SystemReset.shutdown();
+        if (SystemReset.consumeSceneHandoff()) {
+            console.debug('[SystemReset] Skip shutdown for scene handoff.');
+        } else {
+            SystemReset.shutdown();
+        }
     }
 
     protected start(): void {

@@ -586,12 +586,28 @@ export class HomePage extends Component {
         const shortSide = Math.min(size.width, size.height);
         const isTikTokPortraitProfile =
             UIResponsive.getRuntimeDisplayProfile() === 'tiktok_phone_portrait';
-        const buttonWidthFactor = isTikTokPortraitProfile ? 0.39 : 0.34;
-        const buttonHeightFactor = isTikTokPortraitProfile ? 0.105 : 0.09;
-        const buttonW = Math.round(UIResponsive.clamp(shortSide * buttonWidthFactor, 130, 320));
-        const buttonH = Math.round(UIResponsive.clamp(shortSide * buttonHeightFactor, 38, 84));
+        const buttonWidthFactor = isTikTokPortraitProfile ? 0.46 : 0.34;
+        const buttonHeightFactor = isTikTokPortraitProfile ? 0.095 : 0.09;
+        const buttonW = Math.round(
+            UIResponsive.clamp(
+                shortSide * buttonWidthFactor,
+                isTikTokPortraitProfile ? 168 : 130,
+                320
+            )
+        );
+        const buttonH = Math.round(
+            UIResponsive.clamp(
+                shortSide * buttonHeightFactor,
+                isTikTokPortraitProfile ? 44 : 38,
+                isTikTokPortraitProfile ? 68 : 84
+            )
+        );
         const gap = Math.round(
-            UIResponsive.clamp(shortSide * 0.022, 6, isTikTokPortraitProfile ? 20 : 24)
+            UIResponsive.clamp(
+                shortSide * (isTikTokPortraitProfile ? 0.017 : 0.022),
+                isTikTokPortraitProfile ? 8 : 6,
+                isTikTokPortraitProfile ? 14 : 24
+            )
         );
         const step = buttonH + gap;
         const hasContinue = !!this._continueBtn;
@@ -599,7 +615,7 @@ export class HomePage extends Component {
 
         // Button stack: continue(opt) > start > leaderboard > shop > subscribe(opt)
         const btnCount = (hasContinue ? 1 : 0) + 3 + (hasSubscribe ? 1 : 0);
-        const stackCenter = -step * 2.0;
+        const stackCenter = isTikTokPortraitProfile ? -Math.round(size.height * 0.06) : -step * 2.0;
 
         let slot = btnCount - 1;
         if (hasContinue) {
@@ -621,7 +637,13 @@ export class HomePage extends Component {
         const topSlot = btnCount - 1;
         const topBtnY = stackCenter + step * topSlot;
 
-        const titleFontSize = Math.round(UIResponsive.clamp(shortSide * 0.072, 36, 60));
+        const titleFontSize = Math.round(
+            UIResponsive.clamp(
+                shortSide * (isTikTokPortraitProfile ? 0.064 : 0.072),
+                isTikTokPortraitProfile ? 30 : 36,
+                isTikTokPortraitProfile ? 52 : 60
+            )
+        );
         const titleW = Math.round(Math.min(size.width - 40, 600));
         const titleH = titleFontSize + 16;
 
@@ -629,7 +651,14 @@ export class HomePage extends Component {
         const padding = UIResponsive.getControlPadding();
         const halfHeight = size.height * 0.5;
         const topSafeMargin =
-            padding.top + Math.round(UIResponsive.clamp(shortSide * 0.04, 14, 28));
+            padding.top +
+            Math.round(
+                UIResponsive.clamp(
+                    shortSide * (isTikTokPortraitProfile ? 0.05 : 0.04),
+                    isTikTokPortraitProfile ? 20 : 14,
+                    isTikTokPortraitProfile ? 36 : 28
+                )
+            );
         const maxTitleY = halfHeight - topSafeMargin - titleH * 0.5;
         const titleY = Math.min(desiredTitleY, maxTitleY);
 
@@ -668,6 +697,7 @@ export class HomePage extends Component {
 
     private layoutButton(btnNode: Node | null, width: number, height: number, y: number) {
         if (!btnNode) return;
+        const isTikTokPortraitProfile = UIResponsive.isTikTokPhonePortraitProfile();
         btnNode.getComponent(UITransform)?.setContentSize(width, height);
         btnNode.setPosition(0, y, 0);
         btnNode.getComponent(Widget)?.updateAlignment();
@@ -678,11 +708,25 @@ export class HomePage extends Component {
         }
 
         const labelNode = btnNode.getChildByName('Label');
-        labelNode?.getComponent(UITransform)?.setContentSize(Math.max(120, width - 32), height - 8);
+        labelNode
+            ?.getComponent(UITransform)
+            ?.setContentSize(
+                Math.max(
+                    isTikTokPortraitProfile ? 128 : 120,
+                    width - (isTikTokPortraitProfile ? 22 : 32)
+                ),
+                height - (isTikTokPortraitProfile ? 6 : 8)
+            );
         const label = labelNode?.getComponent(Label);
         if (label) {
-            label.fontSize = Math.round(UIResponsive.clamp(height * 0.42, 20, 36));
-            label.lineHeight = label.fontSize + 6;
+            label.fontSize = Math.round(
+                UIResponsive.clamp(
+                    height * (isTikTokPortraitProfile ? 0.37 : 0.42),
+                    isTikTokPortraitProfile ? 18 : 20,
+                    isTikTokPortraitProfile ? 30 : 36
+                )
+            );
+            label.lineHeight = label.fontSize + (isTikTokPortraitProfile ? 4 : 6);
         }
     }
 

@@ -1,10 +1,10 @@
 {
-  "ver": "1.1.50",
-  "importer": "prefab",
+  "ver": "0.0.1",
+  "importer": "*",
   "imported": true,
   "uuid": "40ab301e-0398-4370-8108-135c26f640b8",
   "files": [
-    ".json"
+    ".prefab"
   ],
   "subMetas": {},
   "userData": {

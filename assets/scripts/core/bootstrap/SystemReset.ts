@@ -27,6 +27,22 @@ import { ItemBarUI } from '../../ui/ItemBarUI';
  * 确保所有单例实例被销毁，以便场景重载后能创建全新的状态。
  */
 export class SystemReset {
+    private static _sceneHandoffInProgress = false;
+
+    public static markSceneHandoff(): void {
+        this._sceneHandoffInProgress = true;
+    }
+
+    public static clearSceneHandoff(): void {
+        this._sceneHandoffInProgress = false;
+    }
+
+    public static consumeSceneHandoff(): boolean {
+        const active = this._sceneHandoffInProgress;
+        this._sceneHandoffInProgress = false;
+        return active;
+    }
+
     /**
      * 销毁所有单例实例
      *

@@ -14,6 +14,7 @@ import {
 import type { LeaderboardEntry } from '../../core/reddit/RedditBridge';
 import { Localization } from '../../core/i18n/Localization';
 import { applyGameLabelStyle } from '../hud/HUDCommon';
+import { UIResponsive } from '../UIResponsive';
 
 const ROW_H = 56;
 const GOLD = new Color(255, 198, 88, 255);
@@ -34,14 +35,33 @@ export class LeaderboardPanel {
     private _panelW: number = 520;
     private _panelH: number = 600;
     private _showRedditPrefix: boolean = true;
+    private _isTikTokPortrait = false;
+    private _isCompact = false;
+    private _listWidth = 0;
+    private _rowHeight = ROW_H;
 
     constructor(parent: Node, onClose: () => void, showRedditPrefix: boolean = true) {
         this._uiLayer = parent.layer ?? Layers.Enum.UI_2D;
         this._onClose = onClose;
         this._showRedditPrefix = showRedditPrefix;
         const vs = view.getVisibleSize();
-        this._panelW = Math.min(520, Math.floor(vs.width * 0.88));
-        this._panelH = Math.min(620, Math.floor(vs.height * 0.88));
+        this._isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
+        this._isCompact = this._isTikTokPortrait || Math.min(vs.width, vs.height) < 700;
+        this._panelW = Math.round(
+            UIResponsive.clamp(
+                vs.width * (this._isTikTokPortrait ? 0.94 : 0.88),
+                this._isTikTokPortrait ? 300 : 360,
+                520
+            )
+        );
+        this._panelH = Math.round(
+            UIResponsive.clamp(
+                vs.height * (this._isTikTokPortrait ? 0.9 : 0.88),
+                this._isTikTokPortrait ? 500 : 430,
+                this._isTikTokPortrait ? 760 : 620
+            )
+        );
+        this._rowHeight = this._isTikTokPortrait ? 62 : this._isCompact ? 52 : ROW_H;
         this._root = this._buildPanel(parent);
     }
 
@@ -119,7 +139,10 @@ export class LeaderboardPanel {
         panelTf.setContentSize(this._panelW, this._panelH);
         const panelWidget = panel.addComponent(Widget);
         panelWidget.isAlignHorizontalCenter = panelWidget.isAlignVerticalCenter = true;
-        panelWidget.horizontalCenter = panelWidget.verticalCenter = 0;
+        panelWidget.horizontalCenter = 0;
+        panelWidget.verticalCenter = this._isTikTokPortrait
+            ? -Math.round(UIResponsive.getControlPadding().top * 0.18)
+            : 0;
         panelWidget.updateAlignment();
 
         const panelBg = panel.addComponent(Graphics);
@@ -139,42 +162,56 @@ export class LeaderboardPanel {
         titleNode.layer = this._uiLayer;
         panel.addChild(titleNode);
         const titleTf = titleNode.addComponent(UITransform);
-        titleTf.setContentSize(W - 40, 60);
-        titleNode.setPosition(0, H / 2 - 40, 0);
+        const titleH = this._isTikTokPortrait ? 54 : 60;
+        titleTf.setContentSize(W - (this._isTikTokPortrait ? 36 : 40), titleH);
+        titleNode.setPosition(0, H / 2 - (this._isTikTokPortrait ? 42 : 40), 0);
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.leaderboard.title');
-        label.fontSize = 36;
+        label.fontSize = Math.round(
+            UIResponsive.clamp(
+                H * (this._isTikTokPortrait ? 0.056 : 0.06),
+                this._isTikTokPortrait ? 26 : 30,
+                42
+            )
+        );
+        label.lineHeight = label.fontSize + 6;
         label.isBold = true;
         label.color = GOLD;
         label.horizontalAlign = Label.HorizontalAlign.CENTER;
         label.verticalAlign = Label.VerticalAlign.CENTER;
-        applyGameLabelStyle(label, { outlineWidth: 3, outlineColor: new Color(0, 0, 0, 200) });
+        label.overflow = Label.Overflow.SHRINK;
+        applyGameLabelStyle(label, {
+            outlineWidth: this._isTikTokPortrait ? 2 : 3,
+            outlineColor: new Color(0, 0, 0, 200),
+        });
 
         const divider = new Node('Divider');
         divider.layer = this._uiLayer;
         panel.addChild(divider);
         const dTf = divider.addComponent(UITransform);
-        dTf.setContentSize(W - 60, 2);
-        divider.setPosition(0, H / 2 - 72, 0);
+        const dividerW = W - (this._isTikTokPortrait ? 48 : 60);
+        dTf.setContentSize(dividerW, 2);
+        divider.setPosition(0, H / 2 - (this._isTikTokPortrait ? 74 : 72), 0);
         const dg = divider.addComponent(Graphics);
         dg.fillColor = GOLD;
-        dg.fillRect(-(W - 60) / 2, -1, W - 60, 2);
+        dg.fillRect(-dividerW / 2, -1, dividerW, 2);
         dg.fill();
     }
 
     private _buildList(panel: Node): void {
         const W = this._panelW;
         const H = this._panelH;
-        const listH = H - 150;
-        const listW = W - 32;
+        const listH = H - (this._isTikTokPortrait ? 188 : this._isCompact ? 162 : 150);
+        const listW = W - (this._isTikTokPortrait ? 20 : 32);
+        this._listWidth = listW;
 
         const scrollNode = new Node('Scroll');
         scrollNode.layer = this._uiLayer;
         panel.addChild(scrollNode);
         const scrollTf = scrollNode.addComponent(UITransform);
         scrollTf.setContentSize(listW, listH);
-        scrollNode.setPosition(0, -32, 0);
+        scrollNode.setPosition(0, this._isTikTokPortrait ? -24 : -32, 0);
 
         const scroll = scrollNode.addComponent(ScrollView);
         scroll.vertical = true;
@@ -191,9 +228,9 @@ export class LeaderboardPanel {
         const layout = content.addComponent(Layout);
         layout.type = Layout.Type.VERTICAL;
         layout.resizeMode = Layout.ResizeMode.CONTAINER;
-        layout.spacingY = 4;
-        layout.paddingTop = 4;
-        layout.paddingBottom = 4;
+        layout.spacingY = this._isTikTokPortrait ? 6 : 4;
+        layout.paddingTop = this._isTikTokPortrait ? 6 : 4;
+        layout.paddingBottom = this._isTikTokPortrait ? 6 : 4;
 
         scroll.content = content;
         this._listContent = content;
@@ -203,9 +240,10 @@ export class LeaderboardPanel {
         panel.addChild(statusNode);
         const sTf = statusNode.addComponent(UITransform);
         sTf.setContentSize(listW, Math.round(listH * 0.7));
-        statusNode.setPosition(0, -8, 0);
+        statusNode.setPosition(0, this._isTikTokPortrait ? -14 : -8, 0);
         this._statusLabel = statusNode.addComponent(Label);
-        this._statusLabel.fontSize = 22;
+        this._statusLabel.fontSize = this._isTikTokPortrait ? 18 : 22;
+        this._statusLabel.lineHeight = this._statusLabel.fontSize + 6;
         this._statusLabel.color = TEXT_DIM;
         this._statusLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._statusLabel.verticalAlign = Label.VerticalAlign.CENTER;
@@ -214,15 +252,33 @@ export class LeaderboardPanel {
     }
 
     private _buildRow(entry: LeaderboardEntry, idx: number): Node {
-        const listW = this._panelW - 32;
+        const listW = this._listWidth > 0 ? this._listWidth : this._panelW - 32;
+        const rowH = this._rowHeight;
+        const hideScoreInTikTokPortrait = this._isTikTokPortrait;
         const row = new Node(`Row_${idx}`);
         row.layer = this._uiLayer;
         const rowTf = row.addComponent(UITransform);
-        rowTf.setContentSize(listW, ROW_H);
+        rowTf.setContentSize(listW, rowH);
 
         const bg = row.addComponent(Graphics);
         const rowColor = idx % 2 === 0 ? ROW_ODD : ROW_EVEN;
-        this._drawRoundRect(bg, listW, ROW_H, 6, rowColor);
+        this._drawRoundRect(bg, listW, rowH, this._isTikTokPortrait ? 8 : 6, rowColor);
+
+        const innerPad = this._isTikTokPortrait ? 12 : 10;
+        const colGap = this._isTikTokPortrait ? 6 : 8;
+        const rankW = Math.round(UIResponsive.clamp(listW * 0.15, 44, 68));
+        const scoreW = hideScoreInTikTokPortrait
+            ? 0
+            : Math.round(UIResponsive.clamp(listW * 0.22, 96, 146));
+        const waveW = Math.round(
+            UIResponsive.clamp(listW * (this._isTikTokPortrait ? 0.16 : 0.18), 56, 90)
+        );
+        const scoreSectionW = hideScoreInTikTokPortrait ? 0 : scoreW + colGap;
+        const nameW = Math.max(
+            80,
+            listW - innerPad * 2 - rankW - waveW - scoreSectionW - colGap * 2
+        );
+        let cursor = -listW / 2 + innerPad;
 
         const rankColor =
             entry.rank === 1
@@ -233,35 +289,68 @@ export class LeaderboardPanel {
                     ? BRONZE
                     : TEXT_DIM;
 
-        const rankNode = this._makeLabel(`#${entry.rank}`, 22, rankColor, true);
-        rankNode.getComponent(UITransform)?.setContentSize(60, ROW_H);
-        rankNode.setPosition(-listW / 2 + 36, 0, 0);
+        const rankNode = this._makeLabel(
+            `#${entry.rank}`,
+            this._isTikTokPortrait ? 20 : 22,
+            rankColor,
+            true
+        );
+        rankNode.getComponent(UITransform)?.setContentSize(rankW, rowH);
+        rankNode.setPosition(cursor + rankW * 0.5, 0, 0);
         row.addChild(rankNode);
+        cursor += rankW + colGap;
 
-        const usernameNode = this._makeLabel(this._formatUsername(entry.username), 20, TEXT_WHITE);
-        usernameNode.getComponent(UITransform)?.setContentSize(200, ROW_H);
-        usernameNode.setPosition(-listW / 2 + 150, 0, 0);
+        const usernameNode = this._makeLabel(
+            this._formatUsername(entry.username),
+            this._isTikTokPortrait ? 18 : 20,
+            TEXT_WHITE,
+            false,
+            Label.HorizontalAlign.LEFT
+        );
+        usernameNode.getComponent(UITransform)?.setContentSize(nameW, rowH);
+        usernameNode.setPosition(cursor + nameW * 0.5, 0, 0);
         row.addChild(usernameNode);
+        cursor += nameW + colGap;
 
         const waveText = Localization.instance.t('ui.leaderboard.wave_short', {
             wave: String(entry.wave),
         });
-        const waveNode = this._makeLabel(waveText, 18, TEXT_DIM);
-        waveNode.getComponent(UITransform)?.setContentSize(100, ROW_H);
-        waveNode.setPosition(listW / 2 - 160, 0, 0);
+        const waveNode = this._makeLabel(
+            this._isTikTokPortrait ? `W${entry.wave}` : waveText,
+            this._isTikTokPortrait ? 13 : 18,
+            TEXT_DIM,
+            false,
+            Label.HorizontalAlign.CENTER
+        );
+        waveNode.getComponent(UITransform)?.setContentSize(waveW, rowH);
+        waveNode.setPosition(cursor + waveW * 0.5, 0, 0);
         row.addChild(waveNode);
+        cursor += waveW + (hideScoreInTikTokPortrait ? 0 : colGap);
 
-        const scoreStr = entry.score.toLocaleString();
-        const scoreNode = this._makeLabel(scoreStr, 22, GOLD, true);
-        scoreNode.getComponent(UITransform)?.setContentSize(110, ROW_H);
-        scoreNode.setPosition(listW / 2 - 60, 0, 0);
-        row.addChild(scoreNode);
+        if (!hideScoreInTikTokPortrait) {
+            const scoreStr = entry.score.toLocaleString();
+            const scoreNode = this._makeLabel(
+                scoreStr,
+                22,
+                GOLD,
+                true,
+                Label.HorizontalAlign.RIGHT
+            );
+            scoreNode.getComponent(UITransform)?.setContentSize(scoreW, rowH);
+            scoreNode.setPosition(cursor + scoreW * 0.5, 0, 0);
+            row.addChild(scoreNode);
+        }
 
         return row;
     }
 
     private _formatUsername(rawName: string): string {
         const name = (rawName ?? '').trim() || 'Player';
+        if (this._isTikTokPortrait) {
+            const plain = name.startsWith('u/') ? name.slice(2) : name;
+            if (plain.length <= 11) return plain;
+            return `${plain.slice(0, 10)}…`;
+        }
         if (!this._showRedditPrefix) return name;
         if (name.startsWith('u/')) return name;
         return `u/${name}`;
@@ -272,42 +361,56 @@ export class LeaderboardPanel {
         btnNode.layer = this._uiLayer;
         panel.addChild(btnNode);
         const btnTf = btnNode.addComponent(UITransform);
-        btnTf.setContentSize(180, 54);
-        btnNode.setPosition(0, -this._panelH / 2 + 36, 0);
+        const btnW = this._isTikTokPortrait
+            ? Math.round(UIResponsive.clamp(this._panelW * 0.62, 168, 240))
+            : 180;
+        const btnH = this._isTikTokPortrait ? 50 : 54;
+        btnTf.setContentSize(btnW, btnH);
+        btnNode.setPosition(0, -this._panelH / 2 + (this._isTikTokPortrait ? 50 : 36), 0);
 
         const btn = btnNode.addComponent(Button);
         btn.transition = Button.Transition.SCALE;
         btn.zoomScale = 0.95;
 
         const bg = btnNode.addComponent(Graphics);
-        this._drawRoundRect(bg, 180, 54, 10, GOLD);
+        this._drawRoundRect(bg, btnW, btnH, 10, GOLD);
 
         const lNode = new Node('L');
         lNode.layer = this._uiLayer;
         btnNode.addChild(lNode);
-        lNode.addComponent(UITransform)?.setContentSize(160, 48);
+        lNode.addComponent(UITransform)?.setContentSize(btnW - 20, btnH - 6);
         const l = lNode.addComponent(Label);
         l.string = Localization.instance.t('ui.leaderboard.close');
-        l.fontSize = 26;
+        l.fontSize = this._isTikTokPortrait ? 22 : 26;
+        l.lineHeight = l.fontSize + 6;
         l.isBold = true;
         l.color = new Color(18, 18, 36, 255);
         l.horizontalAlign = Label.HorizontalAlign.CENTER;
         l.verticalAlign = Label.VerticalAlign.CENTER;
+        l.overflow = Label.Overflow.SHRINK;
 
         btnNode.on(Button.EventType.CLICK, () => this._onClose?.(), this);
     }
 
-    private _makeLabel(text: string, fontSize: number, color: Color, bold = false): Node {
+    private _makeLabel(
+        text: string,
+        fontSize: number,
+        color: Color,
+        bold = false,
+        align: Label.HorizontalAlign = Label.HorizontalAlign.CENTER
+    ): Node {
         const n = new Node('Lbl');
         n.layer = this._uiLayer;
         n.addComponent(UITransform);
         const lbl = n.addComponent(Label);
         lbl.string = text;
         lbl.fontSize = fontSize;
+        lbl.lineHeight = fontSize + 4;
         lbl.isBold = bold;
         lbl.color = color;
-        lbl.horizontalAlign = Label.HorizontalAlign.CENTER;
+        lbl.horizontalAlign = align;
         lbl.verticalAlign = Label.VerticalAlign.CENTER;
+        lbl.enableWrapText = false;
         lbl.overflow = Label.Overflow.SHRINK;
         return n;
     }
