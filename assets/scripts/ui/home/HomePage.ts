@@ -22,6 +22,7 @@ import {
 } from 'cc';
 import { Localization } from '../../core/i18n/Localization';
 import { GameManager } from '../../core/managers/GameManager';
+import { EventManager } from '../../core/managers/EventManager';
 import { HUDSettingsModule } from '../hud/HUDSettingsModule';
 import { applyGameLabelStyle } from '../hud/HUDCommon';
 import { LocalizationComp } from '../LocalizationComp';
@@ -36,6 +37,7 @@ import { GameSaveManager } from '../../core/managers/GameSaveManager';
 import { DiamondService } from '../../core/diamond/DiamondService';
 import { ShopPanel } from './ShopPanel';
 import { UIFactory } from '../UIFactory';
+import { GameEvents } from '../../data/GameEvents';
 
 const { ccclass } = _decorator;
 
@@ -76,6 +78,7 @@ export class HomePage extends Component {
             this.refreshText();
         });
         this._settingsModule.initialize(this.node);
+        EventManager.instance.on(GameEvents.LANGUAGE_CHANGED, this.onLanguageChanged, this);
 
         view.on('canvas-resize', this.onCanvasResize, this);
         this.onCanvasResize();
@@ -89,6 +92,7 @@ export class HomePage extends Component {
 
     public onDestroy() {
         view.off('canvas-resize', this.onCanvasResize, this);
+        EventManager.instance.off(GameEvents.LANGUAGE_CHANGED, this.onLanguageChanged, this);
         this._settingsModule?.cleanup();
         if (this._bridgeListener) {
             this._socialBridge.removeListener(this._bridgeListener);
@@ -649,6 +653,10 @@ export class HomePage extends Component {
         refreshLabel(this._subscribeBtn, 'subscribe');
         refreshLabel(this._continueBtn, 'continue');
         refreshLabel(this._shopBtn, 'shop');
+    }
+
+    private onLanguageChanged(): void {
+        this.refreshText();
     }
 
     private _initSocialBridge(): void {
