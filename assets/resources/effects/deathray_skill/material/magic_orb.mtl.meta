@@ -1,10 +1,10 @@
 {
-  "ver": "0.0.1",
-  "importer": "*",
+  "ver": "1.0.21",
+  "importer": "material",
   "imported": true,
   "uuid": "66884006-5717-4487-89b9-084c6843fdfd",
   "files": [
-    ".mtl"
+    ".json"
   ],
   "subMetas": {},
   "userData": {}

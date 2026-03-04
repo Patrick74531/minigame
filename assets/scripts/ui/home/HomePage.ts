@@ -789,6 +789,9 @@ export class HomePage extends Component {
                         );
                     }
                 }
+                if (this._socialBridge.platform === 'tiktok') {
+                    this._socialBridge.requestLeaderboard();
+                }
                 break;
             case 'leaderboard':
                 this._leaderboardPanel?.showEntries(event.entries);
@@ -1456,21 +1459,60 @@ export class HomePage extends Component {
             }
         }
 
+        try {
+            localStorage.setItem('__gvr_tiktok_uid_v1', userId);
+            localStorage.setItem('__gvr_tiktok_identity_v1', payload);
+        } catch {
+            // ignore
+        }
+        try {
+            const ttHost = (globalThis as unknown as Record<string, unknown>)['tt'] as
+                | {
+                      setStorageSync?: (key: string, value: string) => void;
+                  }
+                | undefined;
+            if (ttHost?.setStorageSync) {
+                ttHost.setStorageSync('__gvr_tiktok_uid_v1', userId);
+                ttHost.setStorageSync('__gvr_tiktok_identity_v1', payload);
+            }
+        } catch {
+            // ignore
+        }
+
         console.log(
             `[HomePage] TikTok identity refreshed source=${source} userId=${userId} displayName=${displayName}`
         );
 
         // Force bridge sync so backend/player display_name is updated immediately.
         this._socialBridge.requestInit();
+        this._socialBridge.requestLeaderboard();
     }
 
     private _resolveTikTokApiBase(): string {
+        const localApiBaseKey = 'gvr.tiktok.api_base.v1';
+        const fallbackBases = [
+            'https://tiktok-leaderboard-prod.mineskystudio.workers.dev/api/tiktok',
+            'https://tiktok-leaderboard-staging.mineskystudio.workers.dev/api/tiktok',
+            'https://tiktok-leaderboard.mineskystudio.workers.dev/api/tiktok',
+        ];
         const read = (obj: Record<string, unknown> | null | undefined): string => {
             if (!obj) return '';
             const value = obj['__GVR_TIKTOK_API_BASE__'];
             if (typeof value !== 'string') return '';
             const normalized = value.trim();
             return normalized || '';
+        };
+        const readCandidates = (obj: Record<string, unknown> | null | undefined): string => {
+            if (!obj) return '';
+            const value = obj['__GVR_TIKTOK_API_BASE_CANDIDATES__'];
+            if (typeof value !== 'string') return '';
+            const normalized = value.trim();
+            if (!normalized) return '';
+            const list = normalized
+                .split(/[\n,;\s]+/g)
+                .map(item => item.trim())
+                .filter(Boolean);
+            return list[0] ?? '';
         };
 
         const g = globalThis as unknown as Record<string, unknown>;
@@ -1479,8 +1521,18 @@ export class HomePage extends Component {
         if (typeof window !== 'undefined') {
             const fromWindow = read(window as unknown as Record<string, unknown>);
             if (fromWindow) return fromWindow;
+            const fromWindowCandidates = readCandidates(window as unknown as Record<string, unknown>);
+            if (fromWindowCandidates) return fromWindowCandidates;
         }
-        return 'https://tiktok-leaderboard-prod.mineskystudio.workers.dev/api/tiktok';
+        const fromGlobalCandidates = readCandidates(g);
+        if (fromGlobalCandidates) return fromGlobalCandidates;
+        try {
+            const localBase = localStorage.getItem(localApiBaseKey);
+            if (typeof localBase === 'string' && localBase.trim()) return localBase.trim();
+        } catch {
+            // ignore
+        }
+        return fallbackBases[0];
     }
 
     private _extractTikTokAuthCode(raw: unknown): string {

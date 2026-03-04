@@ -439,6 +439,7 @@ export class EnemyPaperDollAnimator extends Component {
         const scored = this._budgetScored;
         let count = 0;
         for (const animator of this._instances) {
+            if (!animator || !animator.node) continue;
             if (!animator.enableExtremeCrowdMode) continue;
             if (!animator._isReady || !animator.node.isValid || !animator.node.activeInHierarchy) {
                 continue;

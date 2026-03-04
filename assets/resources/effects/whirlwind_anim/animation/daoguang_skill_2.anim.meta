@@ -1,10 +1,10 @@
 {
-  "ver": "0.0.1",
-  "importer": "*",
+  "ver": "2.0.4",
+  "importer": "animation-clip",
   "imported": true,
   "uuid": "0877820d-77e6-4add-a370-51dbf5921573",
   "files": [
-    ".anim"
+    ".bin"
   ],
   "subMetas": {},
   "userData": {

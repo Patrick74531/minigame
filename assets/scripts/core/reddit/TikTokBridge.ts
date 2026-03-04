@@ -17,9 +17,15 @@ export class TikTokBridge implements SocialBridge {
     private static readonly API_TIMEOUT_MS = 8000;
     private static readonly DEFAULT_API_BASE =
         'https://tiktok-leaderboard-prod.mineskystudio.workers.dev/api/tiktok';
+    private static readonly DEFAULT_API_BASE_CANDIDATES = [
+        'https://tiktok-leaderboard-prod.mineskystudio.workers.dev/api/tiktok',
+        'https://tiktok-leaderboard-staging.mineskystudio.workers.dev/api/tiktok',
+        'https://tiktok-leaderboard.mineskystudio.workers.dev/api/tiktok',
+    ];
     private static readonly STORAGE_LEADERBOARD_KEY = 'gvr.tiktok.leaderboard.v1';
     private static readonly STORAGE_USERNAME_KEY = 'gvr.tiktok.username';
     private static readonly STORAGE_DIAMONDS_KEY = 'gvr.tiktok.diamonds.v1';
+    private static readonly STORAGE_API_BASE_KEY = 'gvr.tiktok.api_base.v1';
 
     public readonly platform: RuntimePlatform = 'tiktok';
     public readonly supportsSubscribe: boolean = false;
@@ -29,6 +35,7 @@ export class TikTokBridge implements SocialBridge {
     private _username: string = 'TikTokPlayer';
     private _submitInFlight: boolean = false;
     private _leaderboardInFlight: boolean = false;
+    private _leaderboardRefreshPending: boolean = false;
     private _identityListenerBound: boolean = false;
     private _lastIdentityToken: string = '';
 
@@ -57,7 +64,7 @@ export class TikTokBridge implements SocialBridge {
         }
         this._lastIdentityToken = this._readInjectedTikTokToken() ?? '';
 
-        this._fetchJson(this._withApiBase('/init'), {}, { bustCache: true })
+        this._fetchJson('/init', {}, { bustCache: true })
             .then((data: unknown) => {
                 const d = this._unwrapApiData(data);
                 const username = this._extractString(d, ['username', 'displayName']);
@@ -70,6 +77,7 @@ export class TikTokBridge implements SocialBridge {
                     d['leaderboard'] ?? d['entries']
                 );
                 this._cachedLeaderboard = normalizedEntries ?? this._loadLocalLeaderboard();
+                this._persistCachedLeaderboard();
 
                 const diamonds = this._extractNumber(d, ['diamonds', 'balance']) ?? 0;
                 this._saveLocalDiamonds(diamonds);
@@ -87,6 +95,7 @@ export class TikTokBridge implements SocialBridge {
                     },
                 });
                 this._emit({ type: 'leaderboard', entries: this._cachedLeaderboard });
+                this._scheduleLeaderboardRefresh();
             })
             .catch((e: unknown) => {
                 console.warn('[TikTokBridge] requestInit failed:', e);
@@ -110,10 +119,10 @@ export class TikTokBridge implements SocialBridge {
         this._submitInFlight = true;
         const runId = this._generateRunId();
 
-        this._fetchJson(this._withApiBase('/submit-score'), {
+        this._fetchJson('/submit-score', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ score, wave, runId }),
+            body: JSON.stringify({ score, wave, runId, displayName: this._username }),
         })
             .then((data: unknown) => {
                 const d = this._unwrapApiData(data);
@@ -122,6 +131,7 @@ export class TikTokBridge implements SocialBridge {
                 );
                 if (normalizedEntries) {
                     this._cachedLeaderboard = normalizedEntries;
+                    this._persistCachedLeaderboard();
                     this._emit({ type: 'leaderboard', entries: this._cachedLeaderboard });
                 } else {
                     // Cloud response may omit full leaderboard; fetch it explicitly.
@@ -148,6 +158,7 @@ export class TikTokBridge implements SocialBridge {
                     score: apiScore ?? score,
                     isNewBest,
                 });
+                this._scheduleLeaderboardRefresh();
             })
             .catch((e: unknown) => {
                 console.warn('[TikTokBridge] submitScore failed:', e);
@@ -167,10 +178,14 @@ export class TikTokBridge implements SocialBridge {
     }
 
     public requestLeaderboard(): void {
-        if (this._leaderboardInFlight) return;
+        if (this._leaderboardInFlight) {
+            this._leaderboardRefreshPending = true;
+            return;
+        }
         this._leaderboardInFlight = true;
+        this._leaderboardRefreshPending = false;
 
-        this._fetchJson(this._withApiBase('/leaderboard'), {}, { bustCache: true })
+        this._fetchJson('/leaderboard', {}, { bustCache: true })
             .then((data: unknown) => {
                 const d = this._unwrapApiData(data);
                 const normalizedEntries = this._normalizeLeaderboardEntries(
@@ -178,9 +193,11 @@ export class TikTokBridge implements SocialBridge {
                 );
                 if (normalizedEntries) {
                     this._cachedLeaderboard = normalizedEntries;
+                    this._persistCachedLeaderboard();
                 } else {
                     this._cachedLeaderboard = this._loadLocalLeaderboard();
                 }
+                console.log(`[TikTokBridge] leaderboard ok entries=${this._cachedLeaderboard.length}`);
                 this._emit({ type: 'leaderboard', entries: this._cachedLeaderboard });
             })
             .catch(() => {
@@ -189,6 +206,10 @@ export class TikTokBridge implements SocialBridge {
             })
             .finally(() => {
                 this._leaderboardInFlight = false;
+                if (this._leaderboardRefreshPending) {
+                    this._leaderboardRefreshPending = false;
+                    this.requestLeaderboard();
+                }
             });
     }
 
@@ -201,50 +222,190 @@ export class TikTokBridge implements SocialBridge {
         init: RequestInit = {},
         options: { bustCache?: boolean } = {}
     ): Promise<unknown> {
-        const url = options.bustCache ? this._withCacheBust(path) : path;
-        const headers = new Headers(init.headers ?? undefined);
-        if (!headers.has('Accept')) {
-            headers.set('Accept', 'application/json');
-        }
-        this._applyTikTokAuthHeaders(headers);
-        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-        const timeoutId = controller
-            ? globalThis.setTimeout(() => controller.abort(), TikTokBridge.API_TIMEOUT_MS)
-            : 0;
-
-        return fetch(url, {
-            ...init,
-            headers,
-            credentials: 'omit',
-            cache: 'no-store',
-            signal: controller?.signal,
-        })
-            .then(r => {
-                if (!r.ok) {
-                    throw new Error(`HTTP ${r.status} ${r.statusText}`);
-                }
-                return r.json() as Promise<unknown>;
-            })
-            .finally(() => {
-                if (timeoutId) globalThis.clearTimeout(timeoutId);
-            });
-    }
-
-    private _withApiBase(path: string): string {
-        const baseValue = this._readRuntimeString('__GVR_TIKTOK_API_BASE__');
-        const base =
-            typeof baseValue === 'string' && baseValue.trim()
-                ? baseValue.trim()
-                : TikTokBridge.DEFAULT_API_BASE;
-        const normalizedBase = base.replace(/\/+$/, '');
+        const candidates = this._resolveApiBaseCandidates();
         const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-        if (!normalizedBase) return normalizedPath;
-        return `${normalizedBase}${normalizedPath}`;
+        const bustCache = options.bustCache === true;
+
+        const tryFetch = (index: number): Promise<unknown> => {
+            if (index >= candidates.length) {
+                throw new Error(`[TikTokBridge] no API base candidates for ${normalizedPath}`);
+            }
+
+            const base = candidates[index];
+            const divider = normalizedPath.includes('?') ? '&' : '?';
+            const url = `${base}${normalizedPath}${
+                bustCache ? `${divider}_ts=${Date.now()}` : ''
+            }`;
+
+            const headers = new Headers(init.headers ?? undefined);
+            if (!headers.has('Accept')) {
+                headers.set('Accept', 'application/json');
+            }
+            this._applyTikTokAuthHeaders(headers);
+
+            const controller =
+                typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const timeoutId = controller
+                ? globalThis.setTimeout(() => controller.abort(), TikTokBridge.API_TIMEOUT_MS)
+                : 0;
+
+            return fetch(url, {
+                ...init,
+                headers,
+                credentials: 'omit',
+                cache: 'no-store',
+                signal: controller?.signal,
+            })
+                .catch((err: unknown) => {
+                    if (this._isDomainListBlockedError(err) && index + 1 < candidates.length) {
+                        console.warn(
+                            `[TikTokBridge] domain blocked, fallback ${base} -> ${candidates[index + 1]}`
+                        );
+                        return tryFetch(index + 1);
+                    }
+                    throw new Error(`[TikTokBridge] fetch failed: ${url} :: ${String(err)}`);
+                })
+                .then(r => {
+                    if (!r.ok) {
+                        throw new Error(`[TikTokBridge] HTTP ${r.status} ${r.statusText} @ ${url}`);
+                    }
+                    this._savePreferredApiBase(base);
+                    return r.json() as Promise<unknown>;
+                })
+                .finally(() => {
+                    if (timeoutId) globalThis.clearTimeout(timeoutId);
+                });
+        };
+
+        return tryFetch(0);
     }
 
-    private _withCacheBust(path: string): string {
-        const divider = path.includes('?') ? '&' : '?';
-        return `${path}${divider}_ts=${Date.now()}`;
+    private _resolveApiBaseCandidates(): string[] {
+        const out: string[] = [];
+        this._appendUniqueApiBase(out, this._readRuntimeString('__GVR_TIKTOK_API_BASE__'));
+        this._appendUniqueApiBase(out, this._loadPreferredApiBase());
+        const runtimeList = this._readRuntimeString('__GVR_TIKTOK_API_BASE_CANDIDATES__');
+        if (runtimeList) {
+            const items = runtimeList
+                .split(/[\n,;\s]+/g)
+                .map(item => item.trim())
+                .filter(Boolean);
+            for (const item of items) {
+                this._appendUniqueApiBase(out, item);
+            }
+        }
+        for (const item of TikTokBridge.DEFAULT_API_BASE_CANDIDATES) {
+            this._appendUniqueApiBase(out, item);
+        }
+        if (out.length === 0) {
+            this._appendUniqueApiBase(out, TikTokBridge.DEFAULT_API_BASE);
+        }
+        return out;
+    }
+
+    private _appendUniqueApiBase(list: string[], input: string | null): void {
+        const normalized = this._normalizeApiBase(input);
+        if (!normalized) return;
+        if (list.includes(normalized)) return;
+        list.push(normalized);
+    }
+
+    private _normalizeApiBase(input: string | null): string | null {
+        if (!input) return null;
+        const trimmed = input.trim();
+        if (!trimmed) return null;
+        if (!/^https?:\/\//i.test(trimmed)) return null;
+
+        try {
+            const parsed = new URL(trimmed);
+            const pathname = parsed.pathname || '';
+            const lowerPath = pathname.toLowerCase();
+            const apiRoot = '/api/tiktok';
+            const apiIndex = lowerPath.indexOf(apiRoot);
+            const normalizedPath =
+                apiIndex >= 0
+                    ? pathname.slice(0, apiIndex + apiRoot.length)
+                    : pathname && pathname !== '/'
+                      ? pathname.replace(/\/+$/, '')
+                      : apiRoot;
+            return `${parsed.origin}${normalizedPath}`.replace(/\/+$/, '');
+        } catch {
+            return trimmed.replace(/\/+$/, '');
+        }
+    }
+
+    private _loadPreferredApiBase(): string | null {
+        try {
+            const raw = localStorage.getItem(TikTokBridge.STORAGE_API_BASE_KEY);
+            return this._normalizeApiBase(raw);
+        } catch {
+            return null;
+        }
+    }
+
+    private _savePreferredApiBase(base: string): void {
+        const normalized = this._normalizeApiBase(base);
+        if (!normalized) return;
+        try {
+            localStorage.setItem(TikTokBridge.STORAGE_API_BASE_KEY, normalized);
+        } catch {
+            // ignore
+        }
+    }
+
+    private _isDomainListBlockedError(err: unknown): boolean {
+        const texts = this._collectErrorTexts(err);
+        for (const text of texts) {
+            if (text.includes('url not in domain list') || text.includes('domain list')) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private _scheduleLeaderboardRefresh(): void {
+        const refresh = () => this.requestLeaderboard();
+        try {
+            globalThis.setTimeout(refresh, 250);
+            globalThis.setTimeout(refresh, 1200);
+        } catch {
+            refresh();
+        }
+    }
+
+    private _collectErrorTexts(err: unknown): string[] {
+        const texts: string[] = [];
+        const push = (value: unknown): void => {
+            if (typeof value !== 'string') return;
+            const normalized = value.trim().toLowerCase();
+            if (!normalized) return;
+            if (!texts.includes(normalized)) texts.push(normalized);
+        };
+
+        push(String(err ?? ''));
+        if (!err || typeof err !== 'object') return texts;
+
+        const root = err as Record<string, unknown>;
+        push(root['message']);
+        push(root['errMsg']);
+        push(root['errorMessage']);
+        push(root['stack']);
+
+        const nested = root['error'];
+        if (nested && typeof nested === 'object') {
+            const nestedRoot = nested as Record<string, unknown>;
+            push(nestedRoot['message']);
+            push(nestedRoot['errMsg']);
+            push(nestedRoot['errorMessage']);
+            push(nestedRoot['stack']);
+        }
+
+        try {
+            push(JSON.stringify(err));
+        } catch {
+            // ignore
+        }
+        return texts;
     }
 
     private _readInjectedTikTokName(): string | null {
@@ -560,6 +721,15 @@ export class TikTokBridge implements SocialBridge {
         }
     }
 
+    private _persistCachedLeaderboard(): void {
+        const localList: TikTokLocalLeaderboardEntry[] = this._cachedLeaderboard.map(entry => ({
+            username: entry.username,
+            score: entry.score,
+            wave: entry.wave,
+        }));
+        this._saveLocalLeaderboard(localList);
+    }
+
     private _emit(event: RedditBridgeCallback): void {
         for (const listener of this._listeners) {
             try {
@@ -570,4 +740,3 @@ export class TikTokBridge implements SocialBridge {
         }
     }
 }
-

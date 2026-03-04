@@ -8,8 +8,14 @@ export type DiamondChangeListener = (balance: number) => void;
 
 const PENDING_SETTLE_KEY = 'gvr.pendingSettle';
 const LOCAL_BALANCE_KEY = 'gvr.tiktok.diamonds.v1';
+const TIKTOK_API_BASE_STORAGE_KEY = 'gvr.tiktok.api_base.v1';
 const TIKTOK_DEFAULT_API_BASE =
     'https://tiktok-leaderboard-prod.mineskystudio.workers.dev/api/tiktok';
+const TIKTOK_API_BASE_CANDIDATES = [
+    'https://tiktok-leaderboard-prod.mineskystudio.workers.dev/api/tiktok',
+    'https://tiktok-leaderboard-staging.mineskystudio.workers.dev/api/tiktok',
+    'https://tiktok-leaderboard.mineskystudio.workers.dev/api/tiktok',
+];
 
 interface PendingSettle {
     runId: string;
@@ -55,7 +61,7 @@ export class DiamondService {
 
     /** Refresh balance from server */
     public refreshBalance(): void {
-        this._fetchApi(this._resolveDiamondPath(`/balance?_ts=${Date.now()}`), {})
+        this._fetchDiamondApi(`/balance?_ts=${Date.now()}`, {})
             .then((data: unknown) => {
                 const d = this._unwrapApiData(data) as { balance?: number };
                 if (typeof d.balance === 'number') {
@@ -88,7 +94,7 @@ export class DiamondService {
         // Persist to localStorage first so scene-reload can't lose the settlement
         DiamondService.savePendingSettlement(runId, wave);
 
-        this._fetchApi(this._resolveDiamondPath('/settle-run'), {
+        this._fetchDiamondApi('/settle-run', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ runId, wave }),
@@ -147,7 +153,7 @@ export class DiamondService {
 
         this._buyInFlight = true;
 
-        this._fetchApi(this._resolveDiamondPath('/buy-item'), {
+        this._fetchDiamondApi('/buy-item', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ itemId }),
@@ -248,15 +254,37 @@ export class DiamondService {
             });
     }
 
-    private _resolveDiamondPath(path: string): string {
+    private _fetchDiamondApi(path: string, init: RequestInit): Promise<unknown> {
         const normalizedPath = path.startsWith('/') ? path : `/${path}`;
         if (!this._isTikTokRuntime()) {
-            return `/api/diamond${normalizedPath}`;
+            return this._fetchApi(`/api/diamond${normalizedPath}`, init);
         }
 
-        const base = this._readTikTokApiBase();
-        const normalizedBase = base.replace(/\/+$/, '');
-        return `${normalizedBase}/diamond${normalizedPath}`;
+        const candidates = this._resolveTikTokApiBaseCandidates();
+        const tryFetch = (index: number): Promise<unknown> => {
+            if (index >= candidates.length) {
+                throw new Error(`[DiamondService] no API base candidates for ${normalizedPath}`);
+            }
+
+            const base = candidates[index];
+            const url = `${base}/diamond${normalizedPath}`;
+            return this._fetchApi(url, init)
+                .then(data => {
+                    this._savePreferredTikTokApiBase(base);
+                    return data;
+                })
+                .catch((err: unknown) => {
+                    if (this._isDomainListBlockedError(err) && index + 1 < candidates.length) {
+                        console.warn(
+                            `[DiamondService] domain blocked, fallback ${base} -> ${candidates[index + 1]}`
+                        );
+                        return tryFetch(index + 1);
+                    }
+                    throw err;
+                });
+        };
+
+        return tryFetch(0);
     }
 
     private _isTikTokRuntime(): boolean {
@@ -271,9 +299,124 @@ export class DiamondService {
         }
     }
 
-    private _readTikTokApiBase(): string {
-        const base = this._readRuntimeString('__GVR_TIKTOK_API_BASE__');
-        return base ?? TIKTOK_DEFAULT_API_BASE;
+    private _resolveTikTokApiBaseCandidates(): string[] {
+        const out: string[] = [];
+        this._appendUniqueApiBase(out, this._readRuntimeString('__GVR_TIKTOK_API_BASE__'));
+        this._appendUniqueApiBase(out, this._loadPreferredTikTokApiBase());
+
+        const runtimeCandidates = this._readRuntimeString('__GVR_TIKTOK_API_BASE_CANDIDATES__');
+        if (runtimeCandidates) {
+            const parts = runtimeCandidates
+                .split(/[\n,;\s]+/g)
+                .map(item => item.trim())
+                .filter(Boolean);
+            for (const part of parts) {
+                this._appendUniqueApiBase(out, part);
+            }
+        }
+
+        for (const candidate of TIKTOK_API_BASE_CANDIDATES) {
+            this._appendUniqueApiBase(out, candidate);
+        }
+        if (out.length === 0) {
+            this._appendUniqueApiBase(out, TIKTOK_DEFAULT_API_BASE);
+        }
+        return out;
+    }
+
+    private _appendUniqueApiBase(list: string[], input: string | null): void {
+        const normalized = this._normalizeApiBase(input);
+        if (!normalized) return;
+        if (list.includes(normalized)) return;
+        list.push(normalized);
+    }
+
+    private _normalizeApiBase(input: string | null): string | null {
+        if (!input) return null;
+        const trimmed = input.trim();
+        if (!trimmed) return null;
+        if (!/^https?:\/\//i.test(trimmed)) return null;
+
+        try {
+            const parsed = new URL(trimmed);
+            const pathname = parsed.pathname || '';
+            const lowerPath = pathname.toLowerCase();
+            const apiRoot = '/api/tiktok';
+            const apiIndex = lowerPath.indexOf(apiRoot);
+            const normalizedPath =
+                apiIndex >= 0
+                    ? pathname.slice(0, apiIndex + apiRoot.length)
+                    : pathname && pathname !== '/'
+                      ? pathname.replace(/\/+$/, '')
+                      : apiRoot;
+            return `${parsed.origin}${normalizedPath}`.replace(/\/+$/, '');
+        } catch {
+            return trimmed.replace(/\/+$/, '');
+        }
+    }
+
+    private _loadPreferredTikTokApiBase(): string | null {
+        try {
+            const raw = localStorage.getItem(TIKTOK_API_BASE_STORAGE_KEY);
+            return this._normalizeApiBase(raw);
+        } catch {
+            return null;
+        }
+    }
+
+    private _savePreferredTikTokApiBase(base: string): void {
+        const normalized = this._normalizeApiBase(base);
+        if (!normalized) return;
+        try {
+            localStorage.setItem(TIKTOK_API_BASE_STORAGE_KEY, normalized);
+        } catch {
+            // ignore
+        }
+    }
+
+    private _isDomainListBlockedError(err: unknown): boolean {
+        const texts = this._collectErrorTexts(err);
+        for (const text of texts) {
+            if (text.includes('url not in domain list') || text.includes('domain list')) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private _collectErrorTexts(err: unknown): string[] {
+        const texts: string[] = [];
+        const push = (value: unknown): void => {
+            if (typeof value !== 'string') return;
+            const normalized = value.trim().toLowerCase();
+            if (!normalized) return;
+            if (!texts.includes(normalized)) texts.push(normalized);
+        };
+
+        push(String(err ?? ''));
+        if (!err || typeof err !== 'object') return texts;
+
+        const root = err as Record<string, unknown>;
+        push(root['message']);
+        push(root['errMsg']);
+        push(root['errorMessage']);
+        push(root['stack']);
+
+        const nested = root['error'];
+        if (nested && typeof nested === 'object') {
+            const nestedRoot = nested as Record<string, unknown>;
+            push(nestedRoot['message']);
+            push(nestedRoot['errMsg']);
+            push(nestedRoot['errorMessage']);
+            push(nestedRoot['stack']);
+        }
+
+        try {
+            push(JSON.stringify(err));
+        } catch {
+            // ignore
+        }
+        return texts;
     }
 
     private _readInjectedTikTokToken(): string | null {
