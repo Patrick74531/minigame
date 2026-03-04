@@ -12,8 +12,19 @@
   // ║  • Touch events proxied: portrait (tx,ty) → landscape (H-ty, tx).           ║
   // ╚══════════════════════════════════════════════════════════════════════════════╝
   (function () {
-    var W = window.innerWidth, H = window.innerHeight;
-    var shouldForceLandscape = W < H;
+    var W = Number(window.innerWidth) || 0;
+    var H = Number(window.innerHeight) || 0;
+    if (!(W > 0 && H > 0)) return;
+    var ua = (navigator.userAgent || '').toLowerCase();
+    var isMobileUA = /android|iphone|ipad|ipod|mobile/.test(ua);
+    var hasTouch = false;
+    try {
+      hasTouch = typeof navigator.maxTouchPoints === 'number'
+        ? navigator.maxTouchPoints > 0
+        : ('ontouchstart' in window);
+    } catch (_e) {}
+    // Only force-rotate in touch/mobile-like hosts to avoid desktop WebView regressions.
+    var shouldForceLandscape = W < H && (isMobileUA || hasTouch) && Math.max(W, H) <= 1400;
     window.__BOOT_FORCE_LANDSCAPE__ = shouldForceLandscape;
     if (!shouldForceLandscape) return;
     document.documentElement.classList.add('boot-force-landscape');
@@ -112,6 +123,11 @@
   var _hideScheduled = false;
   var _progressTimer = 0;
   var _fallbackHideTimer = 0;
+  var _typedArrayRecoverFlag = '__gvr_typed_array_recover_v1';
+  var _typedArrayRecoverUsed = false;
+  try {
+    _typedArrayRecoverUsed = sessionStorage.getItem(_typedArrayRecoverFlag) === '1';
+  } catch (_e) {}
 
   // ── Re-entry fix ──────────────────────────────────────────────────────────────
   // DevVit keeps the WebView alive between sessions. If the user was away for
@@ -146,6 +162,41 @@
 
   function byId(id) {
     return document.getElementById(id);
+  }
+
+  function clearTypedArrayRecoverFlag() {
+    try {
+      sessionStorage.removeItem(_typedArrayRecoverFlag);
+    } catch (_e) {}
+    _typedArrayRecoverUsed = false;
+  }
+
+  function maybeRecoverTypedArray(message) {
+    var raw = String(message || '');
+    var lower = raw.toLowerCase();
+    if (lower.indexOf('typed array') === -1 && lower.indexOf('arraybuffer') === -1) {
+      return false;
+    }
+    if (_typedArrayRecoverUsed) return false;
+
+    _typedArrayRecoverUsed = true;
+    try {
+      sessionStorage.setItem(_typedArrayRecoverFlag, '1');
+    } catch (_e) {}
+
+    appendError('[boot] typed-array recovery: reload once');
+    setSplashText('资源加载异常，正在自动重试...');
+    setTimeout(function () {
+      try {
+        var url = new URL(location.href);
+        url.searchParams.set('__gvr_retry', 'typed-array');
+        url.searchParams.set('__gvr_ts', String(Date.now()));
+        location.replace(url.toString());
+      } catch (_e2) {
+        location.reload();
+      }
+    }, 80);
+    return true;
   }
 
   function mountSplash() {
@@ -191,6 +242,7 @@
   function hideSplash() {
     if (_splashHidden) return;
     _splashHidden = true;
+    clearTypedArrayRecoverFlag();
     clearInterval(_progressTimer);
     clearTimeout(_fallbackHideTimer);
     setSplashProgress(100);
@@ -241,7 +293,9 @@
       var item = arguments[i];
       parts.push(String(item && item.stack ? item.stack : item));
     }
-    appendError('[console.error] ' + parts.join(' | '));
+    var msg = parts.join(' | ');
+    appendError('[console.error] ' + msg);
+    maybeRecoverTypedArray(msg);
     if (originalConsoleError) {
       originalConsoleError.apply(console, arguments);
     }
@@ -249,12 +303,17 @@
 
   window.addEventListener('error', function (event) {
     var msg = event && (event.message || (event.error && event.error.stack));
-    if (msg) appendError('[window.error] ' + msg);
+    if (msg) {
+      appendError('[window.error] ' + msg);
+      maybeRecoverTypedArray(msg);
+    }
   });
 
   window.addEventListener('unhandledrejection', function (event) {
     var reason = event && event.reason;
-    appendError('[unhandledrejection] ' + String(reason && reason.stack ? reason.stack : reason));
+    var msg = String(reason && reason.stack ? reason.stack : reason);
+    appendError('[unhandledrejection] ' + msg);
+    maybeRecoverTypedArray(msg);
   });
 
   mountSplash();
@@ -288,7 +347,9 @@
       }, 25000);
     })
     .catch(function (err) {
-      appendError('[System.import] ' + String(err && err.stack ? err.stack : err));
+      var msg = String(err && err.stack ? err.stack : err);
+      appendError('[System.import] ' + msg);
+      maybeRecoverTypedArray(msg);
       console.error(err);
       setSplashText('加载失败，请重试。');
     });
