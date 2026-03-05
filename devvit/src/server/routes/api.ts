@@ -6,8 +6,12 @@ import { context, redis, reddit } from '@devvit/web/server';
 const RANK_KEY = 'leaderboard:scores';
 const META_KEY = 'leaderboard:meta';
 const FOLLOW_KEY = 'leaderboard:followers';
+const PLAY_COUNT_KEY = 'leaderboard:playcount';
 const RATE_LIMIT_PREFIX = 'ratelimit:submit:';
 const LEADERBOARD_SIZE = 10;
+const DEFAULT_STATS_LEADERBOARD_LIMIT = 200;
+const DEFAULT_STATS_PLAY_COUNT_LIMIT = 200;
+const MAX_QUERY_LIMIT = 5000;
 
 // ── Diamond system keys ────────────────────────────────────────────────────────
 const DIAMOND_BALANCE_PREFIX = 'diamond:balance:';
@@ -31,8 +35,14 @@ interface LeaderboardEntry {
     wave: number;
 }
 
-async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
-    const members = await redis.zRange(RANK_KEY, 0, LEADERBOARD_SIZE - 1, {
+interface PlayCountEntry {
+    username: string;
+    playCount: number;
+}
+
+async function fetchLeaderboard(limit: number = LEADERBOARD_SIZE): Promise<LeaderboardEntry[]> {
+    if (!Number.isFinite(limit) || limit <= 0) return [];
+    const members = await redis.zRange(RANK_KEY, 0, limit - 1, {
         reverse: true,
         by: 'rank',
     });
@@ -56,6 +66,62 @@ async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
     });
 }
 
+async function fetchPlayCounts(
+    options: { reverse?: boolean; limit?: number } = {}
+): Promise<PlayCountEntry[]> {
+    const reverse = options.reverse ?? true;
+    const stop = typeof options.limit === 'number' && options.limit > 0 ? options.limit - 1 : -1;
+    const rows = await redis.zRange(PLAY_COUNT_KEY, 0, stop, {
+        by: 'rank',
+        reverse,
+    });
+    return (rows ?? []).map(row => {
+        const r = row as { member: string; score: number };
+        return {
+            username: r.member,
+            playCount: Math.max(0, Math.round(r.score)),
+        };
+    });
+}
+
+async function recordPlayCount(username: string): Promise<number | null> {
+    try {
+        const next = await redis.zIncrBy(PLAY_COUNT_KEY, username, 1);
+        return Math.max(0, Math.round(next));
+    } catch (error) {
+        console.warn('[stats] recordPlayCount failed:', error);
+        return null;
+    }
+}
+
+async function buildStatsSummary() {
+    const [uniquePlayers, playCounts] = await Promise.all([
+        redis.zCard(RANK_KEY),
+        fetchPlayCounts({ reverse: false }),
+    ]);
+
+    let totalRuns = 0;
+    let repeatPlayers = 0;
+    let singleRunPlayers = 0;
+    for (const row of playCounts) {
+        totalRuns += row.playCount;
+        if (row.playCount > 1) repeatPlayers += 1;
+        else if (row.playCount === 1) singleRunPlayers += 1;
+    }
+
+    const trackedPlayers = playCounts.length;
+    const untrackedPlayers = Math.max(0, uniquePlayers - trackedPlayers);
+
+    return {
+        uniquePlayers,
+        trackedPlayers,
+        untrackedPlayers,
+        repeatPlayers,
+        singleRunPlayers,
+        totalRuns,
+    };
+}
+
 export const api = new Hono();
 
 function jsonNoCache(c: Context, payload: unknown, status: number = 200) {
@@ -73,6 +139,13 @@ function isValidInt(v: unknown): v is number {
     return typeof v === 'number' && Number.isFinite(v) && Number.isInteger(v) && v >= 0;
 }
 
+function parseLimitQuery(raw: string | undefined, fallback: number): number {
+    if (!raw) return fallback;
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+    return Math.min(parsed, MAX_QUERY_LIMIT);
+}
+
 async function checkRateLimit(username: string): Promise<boolean> {
     const key = `${RATE_LIMIT_PREFIX}${username}`;
     try {
@@ -87,9 +160,13 @@ async function checkRateLimit(username: string): Promise<boolean> {
 
 api.get('/init', async c => {
     try {
+        const leaderboardLimit = parseLimitQuery(
+            c.req.query('leaderboardLimit') ?? c.req.query('limit'),
+            LEADERBOARD_SIZE
+        );
         const [username, leaderboard] = await Promise.all([
             reddit.getCurrentUsername(),
-            fetchLeaderboard(),
+            fetchLeaderboard(leaderboardLimit),
         ]);
 
         const resolvedUsername = username ?? 'Anonymous';
@@ -106,6 +183,7 @@ api.get('/init', async c => {
             isSubscribed,
             subredditName: context.subredditName ?? '',
             leaderboard,
+            leaderboardLimit,
             diamonds,
         });
     } catch (error) {
@@ -116,6 +194,10 @@ api.get('/init', async c => {
 
 api.post('/submit-score', async c => {
     try {
+        const leaderboardLimit = parseLimitQuery(
+            c.req.query('leaderboardLimit') ?? c.req.query('limit'),
+            LEADERBOARD_SIZE
+        );
         const username = await reddit.getCurrentUsername();
         if (!username) {
             return jsonError(c, 401, 'Not logged in');
@@ -157,13 +239,17 @@ api.post('/submit-score', async c => {
             });
         }
 
-        const leaderboard = await fetchLeaderboard();
+        const playCount = await recordPlayCount(username);
+
+        const leaderboard = await fetchLeaderboard(leaderboardLimit);
         const rankIdx = leaderboard.findIndex(e => e.username === username);
 
         return jsonNoCache(c, {
             rank: rankIdx >= 0 ? rankIdx + 1 : LEADERBOARD_SIZE + 1,
             score,
             isNewBest,
+            playCount,
+            leaderboardLimit,
             leaderboard,
         });
     } catch (error) {
@@ -174,11 +260,45 @@ api.post('/submit-score', async c => {
 
 api.get('/leaderboard', async c => {
     try {
-        const leaderboard = await fetchLeaderboard();
-        return jsonNoCache(c, { entries: leaderboard });
+        const limit = parseLimitQuery(c.req.query('limit'), LEADERBOARD_SIZE);
+        const leaderboard = await fetchLeaderboard(limit);
+        return jsonNoCache(c, { entries: leaderboard, limit });
     } catch (error) {
         console.error('[api/leaderboard] error:', error);
         return jsonNoCache(c, { entries: [] });
+    }
+});
+
+api.get('/stats', async c => {
+    try {
+        const leaderboardLimit = parseLimitQuery(
+            c.req.query('leaderboardLimit') ?? c.req.query('limit'),
+            DEFAULT_STATS_LEADERBOARD_LIMIT
+        );
+        const playCountLimit = parseLimitQuery(
+            c.req.query('playCountLimit'),
+            DEFAULT_STATS_PLAY_COUNT_LIMIT
+        );
+        const [summary, leaderboard, playCounts] = await Promise.all([
+            buildStatsSummary(),
+            fetchLeaderboard(leaderboardLimit),
+            fetchPlayCounts({ reverse: true, limit: playCountLimit }),
+        ]);
+
+        return jsonNoCache(c, {
+            metrics: summary,
+            leaderboard,
+            playCounts,
+            limits: {
+                leaderboardLimit,
+                playCountLimit,
+                maxQueryLimit: MAX_QUERY_LIMIT,
+            },
+            generatedAt: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('[api/stats] error:', error);
+        return jsonError(c, 500, 'Internal server error');
     }
 });
 

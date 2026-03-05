@@ -10,6 +10,7 @@
         "format:check": "prettier --check \"assets/scripts/**/*.ts\"",
         "prepare": "husky",
         "patch": "node devvit/scripts/patch-csp.cjs",
+        "stats:dashboard": "node scripts/generate_stats_dashboard.mjs",
         "build": "npm run build:reddit",
         "build:reddit": "bash scripts/build_reddit_package.sh --source-build-dir build/reddit-web --output-webroot devvit/webroot --no-optimize-source-assets --cocos-build-opts \"stage=build;buildPath=project://build;outputName=reddit-web\"",
         "build:tiktok:native": "bash scripts/build_tiktok_native_package.sh --output-name tiktok-native",

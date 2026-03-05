@@ -46,6 +46,7 @@ A tower-defense mini game built with Cocos Creator 3.8, deployed as a Reddit Dev
 | GET | `/api/init` | Returns current user info, subscription state, and leaderboard |
 | POST | `/api/submit-score` | Submits a score (keeps personal best only). Rate-limited. |
 | GET | `/api/leaderboard` | Returns top 10 leaderboard entries |
+| GET | `/api/stats` | Returns aggregate gameplay stats and play-count snapshot |
 | POST | `/api/subscribe` | Marks user as a follower |
 | POST | `/internal/menu/create-post` | Creates a new game post (menu action) |
 

@@ -46,6 +46,7 @@ export interface SocialBridge {
 }
 
 let _instance: RedditBridge | null = null;
+const REDDIT_LEADERBOARD_LIMIT = 100;
 
 export class RedditBridge {
     private static readonly API_TIMEOUT_MS = 8000;
@@ -98,7 +99,7 @@ export class RedditBridge {
         // Always attempt — mobile Devvit WebView may have hostname='localhost'
         // (Devvit's embedded HTTP server) which static detection misclassifies as dev.
         // Confirm the environment on first successful response instead.
-        this._fetchJson('/api/init', {}, { bustCache: true })
+        this._fetchJson(`/api/init?leaderboardLimit=${REDDIT_LEADERBOARD_LIMIT}`, {}, { bustCache: true })
             .then((data: unknown) => {
                 this._isRedditEnvironment = true;
                 const d = data as {
@@ -138,7 +139,7 @@ export class RedditBridge {
 
         // Always attempt — by game-over time, requestInit has confirmed the environment.
         // On non-Devvit environments fetch will fail and be caught gracefully.
-        this._fetchJson('/api/submit-score', {
+        this._fetchJson(`/api/submit-score?leaderboardLimit=${REDDIT_LEADERBOARD_LIMIT}`, {
             method: 'POST',
             keepalive: true,
             headers: { 'Content-Type': 'application/json' },
@@ -181,7 +182,7 @@ export class RedditBridge {
         // Always attempt — same reason as requestInit: mobile may have hostname='localhost'
         // causing _isRedditEnvironment=false even though the server is reachable.
         // Fall back to cache only if the fetch actually fails.
-        this._fetchJson('/api/leaderboard', {}, { bustCache: true })
+        this._fetchJson(`/api/leaderboard?limit=${REDDIT_LEADERBOARD_LIMIT}`, {}, { bustCache: true })
             .then((data: unknown) => {
                 const d = data as { entries?: LeaderboardEntry[] };
                 const entries = d.entries ?? [];
