@@ -5,10 +5,12 @@ import {
     LabelOutline,
     LabelShadow,
     Node,
+    UIOpacity,
     UITransform,
     Vec3,
     tween,
 } from 'cc';
+import { UIResponsive } from './UIResponsive';
 
 export type LabelThemeOptions = {
     fontSize?: number;
@@ -29,6 +31,18 @@ export type AdButtonOptions = {
     width?: number;
     height?: number;
     fontSize?: number;
+};
+
+export type GrantToken = {
+    text: string;
+    color?: Color;
+};
+
+export type GrantAnimationOptions = {
+    message: string;
+    tokens: GrantToken[];
+    targetNodeName?: string;
+    fallbackTarget?: { x: number; y: number };
 };
 
 export class SelectionCardTheme {
@@ -357,5 +371,164 @@ export class SelectionCardTheme {
             Math.round(a.b + (b.b - a.b) * clamped),
             Math.round(a.a + (b.a - a.a) * clamped)
         );
+    }
+
+    public static playGrantAnimation(parent: Node, options: GrantAnimationOptions): void {
+        if (!parent?.isValid || !options || options.tokens.length <= 0) return;
+        const parentTf = parent.getComponent(UITransform);
+        const width = parentTf?.contentSize.width ?? 1280;
+        const height = parentTf?.contentSize.height ?? 720;
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
+        const padding = UIResponsive.getControlPadding();
+
+        const overlay = new Node('GrantAnimOverlay');
+        overlay.layer = parent.layer;
+        parent.addChild(overlay);
+        overlay.addComponent(UITransform).setContentSize(width, height);
+        overlay.addComponent(UIOpacity).opacity = 255;
+
+        const messageNode = new Node('GrantAnimMessage');
+        messageNode.layer = overlay.layer;
+        overlay.addChild(messageNode);
+        const messageWidth = Math.round(
+            Math.max(
+                isTikTokPortrait ? 300 : 360,
+                Math.min(
+                    width - padding.left - padding.right - (isTikTokPortrait ? 20 : 48),
+                    width * (isTikTokPortrait ? 0.9 : 0.72)
+                )
+            )
+        );
+        const messageHeight = isTikTokPortrait ? 110 : 68;
+        messageNode.addComponent(UITransform).setContentSize(messageWidth, messageHeight);
+        const topOffset = Math.round(
+            Math.max(
+                padding.top + (isTikTokPortrait ? 20 : 16),
+                height * (isTikTokPortrait ? 0.065 : 0.1)
+            )
+        );
+        messageNode.setPosition(0, Math.round(height * 0.5 - topOffset - messageHeight * 0.5), 0);
+        const messageLabel = messageNode.addComponent(Label);
+        messageLabel.string = options.message;
+        messageLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        messageLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        messageLabel.enableWrapText = true;
+        messageLabel.overflow = Label.Overflow.RESIZE_HEIGHT;
+        this.applyLabelTheme(messageLabel, {
+            fontSize: isTikTokPortrait ? 20 : 24,
+            lineHeight: isTikTokPortrait ? 26 : 30,
+            color: new Color(255, 244, 214, 255),
+            bold: true,
+            outlineColor: new Color(10, 18, 30, 255),
+            outlineWidth: 2,
+        });
+
+        const target = this.resolveGrantTarget(parent, options, width, height);
+        const centerY = Math.round(height * -0.03);
+        const startSpan = Math.min(240, 76 * Math.max(1, options.tokens.length - 1));
+        const baseX = -startSpan * 0.5;
+
+        options.tokens.forEach((token, index) => {
+            const tokenNode = new Node(`GrantToken_${index}`);
+            tokenNode.layer = overlay.layer;
+            overlay.addChild(tokenNode);
+            tokenNode.addComponent(UITransform).setContentSize(54, 54);
+            tokenNode.setScale(0.2, 0.2, 1);
+            tokenNode.setPosition(
+                baseX + (startSpan * index) / Math.max(1, options.tokens.length - 1),
+                centerY,
+                0
+            );
+
+            const g = tokenNode.addComponent(Graphics);
+            const accent = token.color ?? new Color(255, 205, 96, 255);
+            g.fillColor = new Color(18, 24, 38, 244);
+            g.roundRect(-27, -27, 54, 54, 14);
+            g.fill();
+            g.strokeColor = accent;
+            g.lineWidth = 2;
+            g.roundRect(-27, -27, 54, 54, 14);
+            g.stroke();
+
+            const textNode = new Node('TokenText');
+            textNode.layer = overlay.layer;
+            tokenNode.addChild(textNode);
+            textNode.addComponent(UITransform).setContentSize(48, 48);
+            const textLabel = textNode.addComponent(Label);
+            textLabel.string = token.text;
+            textLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+            textLabel.verticalAlign = Label.VerticalAlign.CENTER;
+            textLabel.overflow = Label.Overflow.SHRINK;
+            this.applyLabelTheme(textLabel, {
+                fontSize: 22,
+                lineHeight: 26,
+                color: new Color(255, 255, 255, 255),
+                bold: true,
+                outlineColor: new Color(8, 12, 24, 255),
+                outlineWidth: 1,
+            });
+
+            const jitterX = (index - (options.tokens.length - 1) * 0.5) * 8;
+            const jitterY = ((index % 2) * 2 - 1) * 8;
+            tween(tokenNode)
+                .delay(index * 0.06)
+                .to(0.16, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+                .to(
+                    0.42,
+                    {
+                        position: new Vec3(target.x + jitterX, target.y + jitterY, 0),
+                        scale: new Vec3(0.26, 0.26, 1),
+                    },
+                    { easing: 'quadIn' }
+                )
+                .call(() => tokenNode.destroy())
+                .start();
+        });
+
+        tween(overlay)
+            .delay(1.1)
+            .call(() => {
+                if (!overlay.isValid) return;
+                overlay.destroy();
+            })
+            .start();
+    }
+
+    private static resolveGrantTarget(
+        parent: Node,
+        options: GrantAnimationOptions,
+        width: number,
+        height: number
+    ): { x: number; y: number } {
+        if (options.fallbackTarget) {
+            const fallback = options.fallbackTarget;
+            if (!options.targetNodeName) {
+                return { x: fallback.x, y: fallback.y };
+            }
+        }
+
+        if (options.targetNodeName) {
+            const targetNode = this.findNodeByName(parent, options.targetNodeName);
+            const parentTf = parent.getComponent(UITransform);
+            if (targetNode && targetNode.isValid && parentTf) {
+                const world = targetNode.worldPosition;
+                const local = parentTf.convertToNodeSpaceAR(world);
+                return { x: local.x, y: local.y };
+            }
+        }
+
+        if (options.fallbackTarget) return options.fallbackTarget;
+        return { x: 0, y: -height * 0.32 + Math.min(120, width * 0.06) };
+    }
+
+    private static findNodeByName(root: Node, targetName: string): Node | null {
+        if (!root?.isValid) return null;
+        if (root.name === targetName) return root;
+        const children = root.children;
+        for (const child of children) {
+            const found = this.findNodeByName(child, targetName);
+            if (found) return found;
+        }
+        return null;
     }
 }

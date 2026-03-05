@@ -4,7 +4,7 @@ import { EventManager } from '../core/managers/EventManager';
 import { ServiceRegistry } from '../core/managers/ServiceRegistry';
 import { GameEvents } from '../data/GameEvents';
 import { Localization } from '../core/i18n/Localization';
-import { SelectionCardTheme } from './SelectionCardTheme';
+import { SelectionCardTheme, type GrantToken } from './SelectionCardTheme';
 import { ItemId, ITEM_DEFS } from '../gameplay/items/ItemDefs';
 import { UIResponsive } from './UIResponsive';
 import { TikTokAdService } from '../core/ads/TikTokAdService';
@@ -44,6 +44,13 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
 
     public showCards(items: ItemId[]): void {
         if (!this._uiCanvas || this._isShowing) return;
+        if (
+            SelectionCardTheme.isTikTokRuntime() &&
+            TikTokAdService.isSessionSlotUnlocked('item_card')
+        ) {
+            this.grantAllItemsAndPlayFeedback(items);
+            return;
+        }
         this._isShowing = true;
         this._offeredItems = [...items];
         const viewport = this.getViewportSize();
@@ -149,13 +156,13 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         );
         SelectionCardTheme.createAdButton(
             this._root!,
-            Localization.instance.t('ui.ad.get_all_items'),
+            Localization.instance.t('ui.ad.unlock_run_all_items'),
             { x: 0, y: adBtnY },
             () => this.onAdButtonTapped(),
             {
                 width: adBtnWidth,
                 height: 56,
-                fontSize: 17,
+                fontSize: 15,
             }
         );
     }
@@ -334,12 +341,45 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
                 }
                 return;
             }
+            TikTokAdService.unlockSessionSlot('item_card');
+            const offered = [...this._offeredItems];
             const itemService =
                 ServiceRegistry.get<ItemService>('ItemService') ?? ItemService.instance;
             itemService.addAllItems(this._offeredItems);
             this.hideCards();
+            this.playItemGrantAnimation(offered);
             const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
             gm.resumeGame();
+        });
+    }
+
+    private grantAllItemsAndPlayFeedback(items: ItemId[]): void {
+        if (items.length <= 0) return;
+        const itemService = ServiceRegistry.get<ItemService>('ItemService') ?? ItemService.instance;
+        itemService.addAllItems(items);
+        this.playItemGrantAnimation(items);
+        const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+        gm.resumeGame();
+    }
+
+    private playItemGrantAnimation(items: ItemId[]): void {
+        if (!this._uiCanvas || !this._uiCanvas.isValid || items.length <= 0) return;
+        const tokens: GrantToken[] = items.map(itemId => {
+            const def = ITEM_DEFS[itemId];
+            return {
+                text: def?.iconSymbol ?? '+',
+                color: this.hexToColor(def?.iconColor ?? '#A8CCFF'),
+            };
+        });
+        const viewport = this.getViewportSize();
+        SelectionCardTheme.playGrantAnimation(this._uiCanvas, {
+            message: Localization.instance.t('ui.ad.auto_grant.items'),
+            tokens,
+            targetNodeName: 'ItemBar',
+            fallbackTarget: {
+                x: -Math.round(viewport.width * 0.34),
+                y: -Math.round(viewport.height * 0.24),
+            },
         });
     }
 

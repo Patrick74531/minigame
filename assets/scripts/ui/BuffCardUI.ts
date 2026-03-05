@@ -10,7 +10,7 @@ import {
 } from '../gameplay/roguelike/BuffCardService';
 import { GameConfig } from '../data/GameConfig';
 import { Localization } from '../core/i18n/Localization';
-import { SelectionCardTheme } from './SelectionCardTheme';
+import { SelectionCardTheme, type GrantToken } from './SelectionCardTheme';
 import { UIResponsive } from './UIResponsive';
 import { TikTokAdService } from '../core/ads/TikTokAdService';
 
@@ -75,6 +75,13 @@ export class BuffCardUI {
 
     public showCards(cards: BuffCardDef[]): void {
         if (!this._uiCanvas || this._isShowing) return;
+        if (
+            SelectionCardTheme.isTikTokRuntime() &&
+            TikTokAdService.isSessionSlotUnlocked('hero_attr_card')
+        ) {
+            this.applyAllBuffsAndPlayFeedback(cards);
+            return;
+        }
         this._isShowing = true;
         const viewport = this.getViewportSize();
         const padding = UIResponsive.getControlPadding();
@@ -188,13 +195,13 @@ export class BuffCardUI {
         );
         SelectionCardTheme.createAdButton(
             this._root!,
-            Localization.instance.t('ui.ad.get_all_buffs'),
+            Localization.instance.t('ui.ad.unlock_run_all_buffs'),
             { x: 0, y: adBtnY },
             () => this.onAdButtonTapped(),
             {
                 width: adBtnWidth,
                 height: 56,
-                fontSize: 17,
+                fontSize: 15,
             }
         );
     }
@@ -421,10 +428,45 @@ export class BuffCardUI {
                 }
                 return;
             }
+            TikTokAdService.unlockSessionSlot('hero_attr_card');
+            const cards = [...this.buffCardService.pendingCards];
             this.buffCardService.applyAllPendingCards();
             this.hideCards();
             this.gameManager.resumeGame();
+            this.playBuffGrantAnimation(cards);
         });
+    }
+
+    private applyAllBuffsAndPlayFeedback(cards: BuffCardDef[]): void {
+        if (cards.length <= 0) return;
+        this.buffCardService.applyAllPendingCards();
+        this.playBuffGrantAnimation(cards);
+    }
+
+    private playBuffGrantAnimation(cards: BuffCardDef[]): void {
+        if (!this._uiCanvas || !this._uiCanvas.isValid || cards.length <= 0) return;
+        const tokens: GrantToken[] = cards.map(card => ({
+            text: this.getBuffTokenText(card),
+            color: this.hexToColor(GameConfig.BUFF_CARDS.RARITY_COLORS[card.rarity] ?? '#4A9FD9'),
+        }));
+        const viewport = this.getViewportSize();
+        SelectionCardTheme.playGrantAnimation(this._uiCanvas, {
+            message: Localization.instance.t('ui.ad.auto_grant.buffs'),
+            tokens,
+            fallbackTarget: { x: 0, y: -Math.round(viewport.height * 0.34) },
+        });
+    }
+
+    private getBuffTokenText(card: BuffCardDef): string {
+        const effect = card.effects;
+        if (effect.attack) return 'ATK';
+        if (effect.maxHp) return 'HP';
+        if (effect.attackRange) return 'RNG';
+        if (effect.attackInterval) return 'SPD';
+        if (effect.moveSpeed) return 'MOV';
+        if (effect.critRate) return 'CRT';
+        if (effect.critDamage) return 'DMG';
+        return '+';
     }
 
     // === 属性格式化 ===

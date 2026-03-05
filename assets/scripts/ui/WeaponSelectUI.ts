@@ -18,7 +18,7 @@ import { GameEvents } from '../data/GameEvents';
 import { HeroWeaponManager } from '../gameplay/weapons/HeroWeaponManager';
 import { WeaponType, WeaponDef } from '../gameplay/weapons/WeaponTypes';
 import { Localization } from '../core/i18n/Localization';
-import { SelectionCardTheme } from './SelectionCardTheme';
+import { SelectionCardTheme, type GrantToken } from './SelectionCardTheme';
 import { UIResponsive } from './UIResponsive';
 import { TikTokAdService } from '../core/ads/TikTokAdService';
 import { AirdropService } from '../gameplay/airdrop/AirdropService';
@@ -79,6 +79,13 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
 
     public showCards(weapons: { type: WeaponType; def: WeaponDef }[]): void {
         if (!this._uiCanvas || this._isShowing) return;
+        if (
+            SelectionCardTheme.isTikTokRuntime() &&
+            TikTokAdService.isSessionSlotUnlocked('weapon_draw')
+        ) {
+            this.grantAllWeaponsAndPlayFeedback(weapons.map(item => item.type));
+            return;
+        }
         this._isShowing = true;
         this._offeredWeaponTypes = weapons.map(w => w.type);
         const viewport = this.getViewportSize();
@@ -213,13 +220,13 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         );
         SelectionCardTheme.createAdButton(
             this._rootNode!,
-            Localization.instance.t('ui.ad.get_all_weapons'),
+            Localization.instance.t('ui.ad.unlock_run_all_weapons'),
             { x: 0, y: adBtnY },
             () => this.onAdButtonTapped(),
             {
                 width: adBtnWidth,
                 height: 56,
-                fontSize: 17,
+                fontSize: 15,
             }
         );
     }
@@ -436,15 +443,57 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
                 }
                 return;
             }
-            const granted = this.airdropService.claimAllPendingWeapons();
-            if (granted <= 0) {
-                const manager = HeroWeaponManager.instance;
-                for (const weaponType of this._offeredWeaponTypes) {
-                    manager.addWeapon(weaponType);
-                }
-            }
+            TikTokAdService.unlockSessionSlot('weapon_draw');
+            const offered = [...this._offeredWeaponTypes];
+            this.grantAllWeapons(offered);
             this.hideCards();
+            this.playWeaponGrantAnimation(offered);
         });
+    }
+
+    private grantAllWeaponsAndPlayFeedback(weaponTypes: WeaponType[]): void {
+        if (weaponTypes.length <= 0) return;
+        this.grantAllWeapons(weaponTypes);
+        this.playWeaponGrantAnimation(weaponTypes);
+    }
+
+    private grantAllWeapons(weaponTypes: WeaponType[]): void {
+        const granted = this.airdropService.claimAllPendingWeapons();
+        if (granted > 0) return;
+        const manager = HeroWeaponManager.instance;
+        for (const weaponType of weaponTypes) {
+            manager.addWeapon(weaponType);
+        }
+    }
+
+    private playWeaponGrantAnimation(weaponTypes: WeaponType[]): void {
+        if (!this._uiCanvas || !this._uiCanvas.isValid) return;
+        const manager = HeroWeaponManager.instance;
+        const tokens: GrantToken[] = weaponTypes.map(type => {
+            const def = manager.getWeaponDef(type);
+            const accent = def ? this.hexToColor(def.iconColor) : new Color(255, 205, 96, 255);
+            return {
+                text: this.getWeaponTokenText(type),
+                color: accent,
+            };
+        });
+        const viewport = this.getViewportSize();
+        SelectionCardTheme.playGrantAnimation(this._uiCanvas, {
+            message: Localization.instance.t('ui.ad.auto_grant.weapons'),
+            tokens,
+            targetNodeName: 'WeaponBar',
+            fallbackTarget: {
+                x: -Math.round(viewport.width * 0.36),
+                y: -Math.round(viewport.height * 0.36),
+            },
+        });
+    }
+
+    private getWeaponTokenText(type: WeaponType): string {
+        if (type === WeaponType.MACHINE_GUN) return 'MG';
+        if (type === WeaponType.FLAMETHROWER) return 'FL';
+        if (type === WeaponType.CANNON) return 'CN';
+        return 'GW';
     }
 
     // === Icon Loading Logic (Copied from WeaponBarUI) ===

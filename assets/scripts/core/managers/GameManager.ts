@@ -4,6 +4,7 @@ import { EventManager } from './EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { GameConfig } from '../../data/GameConfig';
 import { ServiceRegistry } from './ServiceRegistry';
+import { TikTokAdService } from '../ads/TikTokAdService';
 
 const { ccclass, property } = _decorator;
 
@@ -95,6 +96,7 @@ export class GameManager extends Singleton<GameManager>() {
         this._pauseRequestCount = 0;
         PhysicsSystem.instance.enable = true;
         this._coins = GameConfig.ECONOMY.INITIAL_COINS;
+        TikTokAdService.resetSessionUnlocks();
 
         this.eventManager.emit(GameEvents.GAME_START);
     }

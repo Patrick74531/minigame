@@ -8,7 +8,7 @@ import {
     type TowerUpgradeCardDef,
 } from '../gameplay/roguelike/TowerUpgradeCardService';
 import { Localization } from '../core/i18n/Localization';
-import { SelectionCardTheme } from './SelectionCardTheme';
+import { SelectionCardTheme, type GrantToken } from './SelectionCardTheme';
 import { UIResponsive } from './UIResponsive';
 import { TikTokAdService } from '../core/ads/TikTokAdService';
 
@@ -64,6 +64,14 @@ export class TowerUpgradeCardUI {
 
     public showCards(cards: TowerUpgradeCardDef[], buildingId: string): void {
         if (!this._uiCanvas || this._isShowing) return;
+        if (
+            SelectionCardTheme.isTikTokRuntime() &&
+            TikTokAdService.isSessionSlotUnlocked('tower_attr_card')
+        ) {
+            this.towerUpgradeCardService.applyAllCards();
+            this.playTowerUpgradeGrantAnimation(cards);
+            return;
+        }
         this._isShowing = true;
         this._activeBuildingId = buildingId;
 
@@ -172,13 +180,13 @@ export class TowerUpgradeCardUI {
         );
         SelectionCardTheme.createAdButton(
             this._root!,
-            Localization.instance.t('ui.ad.get_all_upgrades'),
+            Localization.instance.t('ui.ad.unlock_run_all_tower_upgrades'),
             { x: 0, y: adBtnY },
             () => this.onAdButtonTapped(),
             {
                 width: adBtnWidth,
                 height: 56,
-                fontSize: 17,
+                fontSize: 15,
             }
         );
     }
@@ -415,10 +423,39 @@ export class TowerUpgradeCardUI {
                 }
                 return;
             }
+            TikTokAdService.unlockSessionSlot('tower_attr_card');
+            const cards = [...this.towerUpgradeCardService.pendingCards];
             this.towerUpgradeCardService.applyAllCards();
             this.hideCards();
             this.gameManager.resumeGame();
+            this.playTowerUpgradeGrantAnimation(cards);
         });
+    }
+
+    private playTowerUpgradeGrantAnimation(cards: TowerUpgradeCardDef[]): void {
+        if (!this._uiCanvas || !this._uiCanvas.isValid || cards.length <= 0) return;
+        const tokens: GrantToken[] = cards.map(card => ({
+            text: this.getTowerUpgradeTokenText(card.stat),
+            color: this.getTowerUpgradeTokenColor(card.stat),
+        }));
+        const viewport = this.getViewportSize();
+        SelectionCardTheme.playGrantAnimation(this._uiCanvas, {
+            message: Localization.instance.t('ui.ad.auto_grant.tower_upgrades'),
+            tokens,
+            fallbackTarget: { x: 0, y: -Math.round(viewport.height * 0.28) },
+        });
+    }
+
+    private getTowerUpgradeTokenText(stat: 'attack' | 'range' | 'speed'): string {
+        if (stat === 'attack') return 'ATK';
+        if (stat === 'range') return 'RNG';
+        return 'SPD';
+    }
+
+    private getTowerUpgradeTokenColor(stat: 'attack' | 'range' | 'speed'): Color {
+        if (stat === 'attack') return new Color(255, 126, 88, 255);
+        if (stat === 'range') return new Color(88, 198, 255, 255);
+        return new Color(120, 224, 156, 255);
     }
 
     private formatValue(value: number): string {

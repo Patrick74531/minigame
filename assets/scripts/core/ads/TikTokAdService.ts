@@ -8,6 +8,19 @@ import { TikTokRewardAdSlot, TIKTOK_REWARDED_AD_PLACEMENTS } from '../reddit/Tik
 export class TikTokAdService {
     private static _lastCloseRewarded = false;
     private static _lastCloseHandled = false;
+    private static _sessionUnlockSlots: Set<TikTokRewardAdSlot> = new Set();
+
+    public static resetSessionUnlocks(): void {
+        this._sessionUnlockSlots.clear();
+    }
+
+    public static unlockSessionSlot(slot: TikTokRewardAdSlot): void {
+        this._sessionUnlockSlots.add(slot);
+    }
+
+    public static isSessionSlotUnlocked(slot: TikTokRewardAdSlot): boolean {
+        return this._sessionUnlockSlots.has(slot);
+    }
 
     public static wasLastAdCancelled(): boolean {
         return this._lastCloseHandled && !this._lastCloseRewarded;
