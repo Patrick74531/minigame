@@ -163,6 +163,7 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.shop.bought': '购买成功！',
         'ui.shop.insufficient': '钻石不足',
         'ui.shop.error': '购买失败',
+        'ui.shop.limitReached': '已达本局预购上限（{max}）',
         'ui.gameOver.diamonds': '◆ +{earned} 钻石',
 
         'ui.loading.tip.move': '用摇杆或WASD键移动奶奶，她会自动向最近的敌人开火！',
@@ -411,6 +412,7 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.shop.bought': 'Purchased!',
         'ui.shop.insufficient': 'Not Enough',
         'ui.shop.error': 'Failed',
+        'ui.shop.limitReached': 'Pre-buy limit reached ({max})',
         'ui.gameOver.diamonds': '◆ +{earned} Gems',
 
         'ui.loading.tip.move':

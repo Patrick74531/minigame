@@ -363,6 +363,35 @@ export class ShopPanel {
         btnH: number,
         btnR: number
     ): void {
+        const resetBuyButton = () => {
+            if (!label.isValid) return;
+            label.string = `◆ ${ITEM_PRICE}`;
+            label.color = Color.WHITE;
+            bg.clear();
+            bg.fillColor = new Color(72, 192, 96, 255);
+            bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, btnR);
+            bg.fill();
+            bg.strokeColor = new Color(255, 255, 255, 180);
+            bg.lineWidth = 2;
+            bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, btnR);
+            bg.stroke();
+        };
+
+        if (!ShopInventoryStore.canAddItems()) {
+            label.string = Localization.instance.t('ui.shop.limitReached', {
+                max: String(ShopInventoryStore.MAX_PRE_GAME_ITEMS),
+            });
+            label.color = new Color(255, 100, 100, 255);
+            bg.clear();
+            bg.fillColor = new Color(180, 50, 50, 255);
+            bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, btnR);
+            bg.fill();
+            setTimeout(() => {
+                resetBuyButton();
+            }, 1200);
+            return;
+        }
+
         const ds = DiamondService.instance;
         if (ds.balance < ITEM_PRICE) {
             // Flash red
@@ -373,17 +402,7 @@ export class ShopPanel {
             bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, btnR);
             bg.fill();
             setTimeout(() => {
-                if (!label.isValid) return;
-                label.string = `◆ ${ITEM_PRICE}`;
-                label.color = Color.WHITE;
-                bg.clear();
-                bg.fillColor = new Color(72, 192, 96, 255);
-                bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, btnR);
-                bg.fill();
-                bg.strokeColor = new Color(255, 255, 255, 180);
-                bg.lineWidth = 2;
-                bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, btnR);
-                bg.stroke();
+                resetBuyButton();
             }, 1200);
             return;
         }
@@ -392,14 +411,23 @@ export class ShopPanel {
         label.string = '...';
         ds.buyItem(itemId, (success, balance, error) => {
             if (!label.isValid) return;
+            void balance;
             if (success) {
-                ShopInventoryStore.addItem(itemId);
+                const added = ShopInventoryStore.addItem(itemId);
+                if (!added) {
+                    label.string = Localization.instance.t('ui.shop.limitReached', {
+                        max: String(ShopInventoryStore.MAX_PRE_GAME_ITEMS),
+                    });
+                    label.color = new Color(255, 100, 100, 255);
+                    setTimeout(() => {
+                        resetBuyButton();
+                    }, 1500);
+                    return;
+                }
                 label.string = Localization.instance.t('ui.shop.bought');
                 label.color = new Color(160, 255, 160, 255);
                 setTimeout(() => {
-                    if (!label.isValid) return;
-                    label.string = `◆ ${ITEM_PRICE}`;
-                    label.color = Color.WHITE;
+                    resetBuyButton();
                 }, 1500);
             } else {
                 label.string =
@@ -408,9 +436,7 @@ export class ShopPanel {
                         : Localization.instance.t('ui.shop.error');
                 label.color = new Color(255, 100, 100, 255);
                 setTimeout(() => {
-                    if (!label.isValid) return;
-                    label.string = `◆ ${ITEM_PRICE}`;
-                    label.color = Color.WHITE;
+                    resetBuyButton();
                 }, 1500);
             }
         });

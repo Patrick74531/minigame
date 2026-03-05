@@ -444,7 +444,7 @@ const BASE = {
             coinDropMultiplier: 3.0,
         },
         flyingRanged: {
-            attackRange: 5.8,
+            attackRange: 4.06,
             aggroRange: 8.0,
             projectileSpeed: 11,
             projectileLifetime: 2.2,
