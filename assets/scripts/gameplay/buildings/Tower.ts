@@ -20,6 +20,7 @@ import { GameEvents } from '../../data/GameEvents';
 import { EffectFactory } from '../effects/EffectFactory';
 import { WeaponVFX } from '../weapons/WeaponVFX';
 import { GameConfig } from '../../data/GameConfig';
+import { HealthBar } from '../../ui/HealthBar';
 
 const { ccclass, property } = _decorator;
 type RouteLane = 'top' | 'mid' | 'bottom';
@@ -100,6 +101,11 @@ export class Tower extends Building {
     private _healPercentPerSecond: number = 0;
     private _healInterval: number = 2;
     private _healTimer: number = 0;
+    private _focusedUpgradeCounts: Record<TowerFocusedUpgradeStat, number> = {
+        attack: 0,
+        range: 0,
+        speed: 0,
+    };
 
     private _attackTimer: number = 0;
     private _target: Node | null = null;
@@ -110,6 +116,12 @@ export class Tower extends Building {
 
     @property
     public rotationSpeed: number = 5;
+
+    protected initialize(): void {
+        super.initialize();
+        this._focusedUpgradeCounts = { attack: 0, range: 0, speed: 0 };
+        this.syncFocusedUpgradeBadges();
+    }
 
     public setTowerHealConfig(healPercent: number, healInterval: number): void {
         this._healPercentPerSecond = Math.max(0, healPercent);
@@ -243,18 +255,17 @@ export class Tower extends Building {
             this.attackDamage = Math.floor(
                 this.attackDamage * this.resolveFocusedAttackMultiplier()
             );
-            return;
-        }
-
-        if (stat === 'range') {
+        } else if (stat === 'range') {
             const prevRange = this.attackRange;
             const scaledRange = prevRange * this.resolveFocusedRangeMultiplier();
             const minGain = Tower.MIN_RANGE_GAIN_PER_LEVEL * Tower.FOCUSED_UPGRADE_SCALE;
             this.attackRange = Math.max(scaledRange, prevRange + minGain);
-            return;
+        } else {
+            this.attackInterval = this.attackInterval * this.resolveFocusedIntervalMultiplier();
         }
 
-        this.attackInterval = this.attackInterval * this.resolveFocusedIntervalMultiplier();
+        this._focusedUpgradeCounts[stat] = (this._focusedUpgradeCounts[stat] ?? 0) + 1;
+        this.syncFocusedUpgradeBadges();
     }
 
     public getFocusedUpgradePreview(stat: TowerFocusedUpgradeStat): {
@@ -283,6 +294,16 @@ export class Tower extends Building {
 
     private resolveFocusedIntervalMultiplier(): number {
         return Tower.scaleReductionMultiplier(this.intervalMultiplier);
+    }
+
+    private syncFocusedUpgradeBadges(): void {
+        const healthBar = this.node.getComponent(HealthBar);
+        if (!healthBar) return;
+        healthBar.setTowerFocusedBuffCounts({
+            attack: this._focusedUpgradeCounts.attack,
+            range: this._focusedUpgradeCounts.range,
+            speed: this._focusedUpgradeCounts.speed,
+        });
     }
 
     private static scalePositiveMultiplier(baseMultiplier: number): number {
