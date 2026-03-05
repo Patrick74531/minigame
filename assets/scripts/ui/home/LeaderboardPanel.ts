@@ -9,6 +9,7 @@ import {
     Layers,
     ScrollView,
     Layout,
+    Mask,
     view,
 } from 'cc';
 import type { LeaderboardEntry } from '../../core/reddit/RedditBridge';
@@ -39,6 +40,9 @@ export class LeaderboardPanel {
     private _isCompact = false;
     private _listWidth = 0;
     private _rowHeight = ROW_H;
+    private _listViewportHeight = 0;
+    private _listLayout: Layout | null = null;
+    private _listScroll: ScrollView | null = null;
 
     constructor(parent: Node, onClose: () => void, showRedditPrefix: boolean = true) {
         this._uiLayer = parent.layer ?? Layers.Enum.UI_2D;
@@ -93,8 +97,10 @@ export class LeaderboardPanel {
         }
         if (!this._listContent) return;
         this._listContent.removeAllChildren();
+        this._resetListScrollPosition();
 
-        if (entries.length === 0) {
+        const displayEntries = this._normalizeEntriesForDisplay(entries);
+        if (displayEntries.length === 0) {
             if (this._statusLabel) {
                 this._statusLabel.string = Localization.instance.t('ui.leaderboard.empty');
                 this._statusLabel.overflow = Label.Overflow.NONE;
@@ -103,10 +109,11 @@ export class LeaderboardPanel {
             return;
         }
 
-        entries.forEach((entry, idx) => {
+        displayEntries.forEach((entry, idx) => {
             const row = this._buildRow(entry, idx);
             this._listContent!.addChild(row);
         });
+        this._resetListScrollPosition();
     }
 
     public destroy(): void {
@@ -205,25 +212,29 @@ export class LeaderboardPanel {
         const listH = H - (this._isTikTokPortrait ? 188 : this._isCompact ? 162 : 150);
         const listW = W - (this._isTikTokPortrait ? 20 : 32);
         this._listWidth = listW;
+        this._listViewportHeight = listH;
 
-        const scrollNode = new Node('Scroll');
-        scrollNode.layer = this._uiLayer;
-        panel.addChild(scrollNode);
-        const scrollTf = scrollNode.addComponent(UITransform);
-        scrollTf.setContentSize(listW, listH);
-        scrollNode.setPosition(0, this._isTikTokPortrait ? -24 : -32, 0);
+        const viewportNode = new Node('ScrollViewport');
+        viewportNode.layer = this._uiLayer;
+        panel.addChild(viewportNode);
+        const viewportTf = viewportNode.addComponent(UITransform);
+        viewportTf.setContentSize(listW, listH);
+        viewportNode.setPosition(0, this._isTikTokPortrait ? -24 : -32, 0);
+        viewportNode.addComponent(Mask);
 
-        const scroll = scrollNode.addComponent(ScrollView);
+        const scroll = viewportNode.addComponent(ScrollView);
         scroll.vertical = true;
         scroll.horizontal = false;
         scroll.inertia = true;
         scroll.brake = 0.75;
+        this._listScroll = scroll;
 
         const content = new Node('Content');
         content.layer = this._uiLayer;
-        scrollNode.addChild(content);
+        viewportNode.addChild(content);
         const contentTf = content.addComponent(UITransform);
-        contentTf.setContentSize(listW, 0);
+        contentTf.setContentSize(listW, listH);
+        content.setPosition(0, 0, 0);
 
         const layout = content.addComponent(Layout);
         layout.type = Layout.Type.VERTICAL;
@@ -231,6 +242,7 @@ export class LeaderboardPanel {
         layout.spacingY = this._isTikTokPortrait ? 6 : 4;
         layout.paddingTop = this._isTikTokPortrait ? 6 : 4;
         layout.paddingBottom = this._isTikTokPortrait ? 6 : 4;
+        this._listLayout = layout;
 
         scroll.content = content;
         this._listContent = content;
@@ -420,5 +432,37 @@ export class LeaderboardPanel {
         g.fillColor = fillColor;
         g.roundRect(-w / 2, -h / 2, w, h, r);
         g.fill();
+    }
+
+    private _normalizeEntriesForDisplay(entries: LeaderboardEntry[]): LeaderboardEntry[] {
+        if (!Array.isArray(entries) || entries.length === 0) return [];
+        const normalized = entries
+            .filter(entry => entry && Number.isFinite(entry.score))
+            .map((entry, index) => ({
+                rank:
+                    typeof entry.rank === 'number' && Number.isFinite(entry.rank) && entry.rank > 0
+                        ? Math.max(1, Math.floor(entry.rank))
+                        : index + 1,
+                username: (entry.username ?? '').trim() || 'Player',
+                wave:
+                    typeof entry.wave === 'number' && Number.isFinite(entry.wave)
+                        ? Math.max(0, Math.floor(entry.wave))
+                        : 0,
+                score: Math.max(0, Math.floor(entry.score)),
+            }));
+        normalized.sort((a, b) => a.rank - b.rank || b.score - a.score);
+        return normalized.slice(0, 100);
+    }
+
+    private _resetListScrollPosition(): void {
+        if (!this._listContent) return;
+        this._listLayout?.updateLayout();
+        const contentTf = this._listContent.getComponent(UITransform);
+        if (!contentTf) return;
+        const contentH = Math.max(contentTf.height, this._listViewportHeight);
+        contentTf.setContentSize(this._listWidth, contentH);
+        this._listContent.setPosition(0, (this._listViewportHeight - contentH) / 2, 0);
+        this._listScroll?.stopAutoScroll();
+        this._listScroll?.scrollToTop(0);
     }
 }
