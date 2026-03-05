@@ -121,6 +121,24 @@ export class AirdropService extends Singleton<AirdropService>() {
         this.gameManager.resumeGame();
     }
 
+    /**
+     * 广告奖励：领取当前待选武器的全部条目
+     * @returns 成功发放的武器数量
+     */
+    public claimAllPendingWeapons(): number {
+        if (this._pendingWeapons.length === 0) return 0;
+
+        let granted = 0;
+        for (const weaponId of this._pendingWeapons) {
+            HeroWeaponManager.instance.addWeapon(weaponId);
+            granted++;
+        }
+
+        this._pendingWeapons = [];
+        this.gameManager.resumeGame();
+        return granted;
+    }
+
     // === 工具 ===
 
     private get eventManager(): EventManager {

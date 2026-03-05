@@ -59,7 +59,9 @@ export class ScreenShake {
 
     private static ensureBound(): void {
         if (!this._follow && this._cameraNode) {
-            const comp = this._cameraNode.getComponent('CameraFollow') as unknown as HasOffset | null;
+            const comp = this._cameraNode.getComponent(
+                'CameraFollow'
+            ) as unknown as HasOffset | null;
             this._follow = comp;
         }
     }

@@ -7,9 +7,11 @@ const { ccclass, property } = _decorator;
 export class LocalizationComp extends Component {
     @property
     public key: string = '';
-    
-    start() { this.refresh(); }
-    
+
+    start() {
+        this.refresh();
+    }
+
     refresh() {
         const label = this.getComponent(Label);
         if (label && this.key) {

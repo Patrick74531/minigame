@@ -20,6 +20,8 @@ import { WeaponType, WeaponDef } from '../gameplay/weapons/WeaponTypes';
 import { Localization } from '../core/i18n/Localization';
 import { SelectionCardTheme } from './SelectionCardTheme';
 import { UIResponsive } from './UIResponsive';
+import { TikTokAdService } from '../core/ads/TikTokAdService';
+import { AirdropService } from '../gameplay/airdrop/AirdropService';
 
 const UI_LAYER = 33554432;
 
@@ -36,6 +38,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
     private _uiCanvas: Node | null = null;
     private _rootNode: Node | null = null;
     private _isShowing: boolean = false;
+    private _offeredWeaponTypes: WeaponType[] = [];
 
     // Icon loading cache
     private _iconFrameCache: Map<string, SpriteFrame> = new Map();
@@ -77,8 +80,10 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
     public showCards(weapons: { type: WeaponType; def: WeaponDef }[]): void {
         if (!this._uiCanvas || this._isShowing) return;
         this._isShowing = true;
+        this._offeredWeaponTypes = weapons.map(w => w.type);
         const viewport = this.getViewportSize();
         const padding = UIResponsive.getControlPadding();
+        const isPortraitTikTok = UIResponsive.isTikTokPhonePortraitProfile();
 
         // 创建根节点（全屏遮罩）
         this._rootNode = new Node('WeaponSelectRoot');
@@ -113,8 +118,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
 
         // 卡牌
         const totalWidth = weapons.length * CARD_WIDTH + (weapons.length - 1) * CARD_GAP;
-        const usePortraitTriangle =
-            UIResponsive.isTikTokPhonePortraitProfile() && weapons.length === 3;
+        const usePortraitTriangle = isPortraitTikTok && weapons.length === 3;
         const triangleRowGap = 34;
         const containerWidth = usePortraitTriangle ? CARD_WIDTH * 2 + CARD_GAP : totalWidth;
         const containerHeight = usePortraitTriangle
@@ -129,6 +133,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         this._rootNode.addChild(cardContainer);
         cardContainer.addComponent(UITransform).setContentSize(containerWidth, containerHeight);
 
+        let cardScale = 1;
         if (size) {
             const availableWidth = Math.max(
                 240,
@@ -142,15 +147,13 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
             const heightScale = availableHeight / containerHeight;
             const maxScale = usePortraitTriangle ? 1.15 : 1;
             const scale = Math.min(maxScale, widthScale, heightScale);
+            cardScale = scale;
             cardContainer.setScale(scale, scale, 1);
         }
-        cardContainer.setPosition(
-            0,
-            usePortraitTriangle
-                ? -Math.round(viewport.height * 0.08)
-                : Math.round(-padding.bottom * 0.04),
-            0
-        );
+        const cardContainerY = usePortraitTriangle
+            ? -Math.round(viewport.height * 0.08)
+            : Math.round(-padding.bottom * 0.04);
+        cardContainer.setPosition(0, cardContainerY, 0);
 
         const startX = -totalWidth / 2 + CARD_WIDTH / 2;
         const triangleBottomX = (CARD_WIDTH + CARD_GAP) * 0.5;
@@ -173,6 +176,52 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
             }
             SelectionCardTheme.playCardReveal(card, i);
         });
+
+        // 广告按钮（仅 TikTok 环境）
+        const titleHeight = Math.round(
+            Math.max(
+                isPortraitTikTok ? 58 : 64,
+                Math.min(
+                    isPortraitTikTok ? 96 : 90,
+                    viewport.height * (isPortraitTikTok ? 0.1 : 0.11)
+                )
+            )
+        );
+        const titleTop = Math.round(
+            Math.max(
+                padding.top + 8,
+                Math.min(
+                    isPortraitTikTok ? 120 : 160,
+                    viewport.height * (isPortraitTikTok ? 0.1 : 0.14) + padding.top * 0.2
+                )
+            )
+        );
+        const titleBottomY = viewport.height * 0.5 - titleTop - titleHeight;
+        const cardTopY = usePortraitTriangle
+            ? cardContainerY + (triangleTopY + CARD_HEIGHT * 0.5) * cardScale
+            : cardContainerY + (-20 + CARD_HEIGHT * 0.5) * cardScale;
+        const titleToCardGap = titleBottomY - cardTopY;
+        const adBtnY = Math.round(cardTopY + (titleToCardGap > 80 ? titleToCardGap * 0.5 : 40));
+        const adBtnWidth = Math.round(
+            Math.max(
+                260,
+                Math.min(
+                    viewport.width - padding.left - padding.right - 24,
+                    (CARD_WIDTH * 2 + CARD_GAP) * cardScale
+                )
+            )
+        );
+        SelectionCardTheme.createAdButton(
+            this._rootNode!,
+            Localization.instance.t('ui.ad.get_all_weapons'),
+            { x: 0, y: adBtnY },
+            () => this.onAdButtonTapped(),
+            {
+                width: adBtnWidth,
+                height: 56,
+                fontSize: 17,
+            }
+        );
     }
 
     private hideCards(): void {
@@ -181,6 +230,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
             this._rootNode = null;
         }
         this._isShowing = false;
+        this._offeredWeaponTypes = [];
         // Clear waiting sets to avoid memory leaks if sprites are destroyed
         this._iconWaiting.clear();
         this._iconLoading.clear();
@@ -189,13 +239,30 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
     // === UI 构建 ===
 
     private createTitle(root: Node, viewportWidth: number, viewportHeight: number): void {
+        const isPortraitTikTok = UIResponsive.isTikTokPhonePortraitProfile();
         const titleNode = new Node('Title');
         titleNode.layer = UI_LAYER;
         titleNode
             .addComponent(UITransform)
             .setContentSize(
-                Math.round(Math.max(420, Math.min(880, viewportWidth * 0.72))),
-                Math.round(Math.max(64, Math.min(90, viewportHeight * 0.11)))
+                Math.round(
+                    Math.max(
+                        isPortraitTikTok ? 320 : 420,
+                        Math.min(
+                            isPortraitTikTok ? 860 : 880,
+                            viewportWidth * (isPortraitTikTok ? 0.9 : 0.72)
+                        )
+                    )
+                ),
+                Math.round(
+                    Math.max(
+                        isPortraitTikTok ? 58 : 64,
+                        Math.min(
+                            isPortraitTikTok ? 96 : 90,
+                            viewportHeight * (isPortraitTikTok ? 0.1 : 0.11)
+                        )
+                    )
+                )
             );
         root.addChild(titleNode);
 
@@ -205,21 +272,27 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         widget.isAlignHorizontalCenter = true;
         const padding = UIResponsive.getControlPadding();
         widget.top = Math.round(
-            Math.max(padding.top + 8, Math.min(160, viewportHeight * 0.14 + padding.top * 0.2))
+            Math.max(
+                padding.top + 8,
+                Math.min(
+                    isPortraitTikTok ? 120 : 160,
+                    viewportHeight * (isPortraitTikTok ? 0.1 : 0.14) + padding.top * 0.2
+                )
+            )
         );
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.weapon.select.title');
         label.overflow = Label.Overflow.SHRINK;
         SelectionCardTheme.applyLabelTheme(label, {
-            fontSize: 48,
-            lineHeight: 54,
+            fontSize: isPortraitTikTok ? 34 : 48,
+            lineHeight: isPortraitTikTok ? 40 : 54,
             color: new Color(255, 214, 92, 255),
             bold: true,
             hAlign: Label.HorizontalAlign.CENTER,
             vAlign: Label.VerticalAlign.CENTER,
             outlineColor: new Color(52, 26, 6, 255),
-            outlineWidth: 5,
+            outlineWidth: isPortraitTikTok ? 4 : 5,
             shadowColor: new Color(0, 0, 0, 210),
         });
         const decoNode = new Node('TitleDeco');
@@ -353,6 +426,22 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         return cardNode;
     }
 
+    private onAdButtonTapped(): void {
+        if (!this._isShowing || this._offeredWeaponTypes.length === 0) return;
+
+        TikTokAdService.showRewardedAd('weapon_draw').then(rewarded => {
+            if (!rewarded) return;
+            const granted = this.airdropService.claimAllPendingWeapons();
+            if (granted <= 0) {
+                const manager = HeroWeaponManager.instance;
+                for (const weaponType of this._offeredWeaponTypes) {
+                    manager.addWeapon(weaponType);
+                }
+            }
+            this.hideCards();
+        });
+    }
+
     // === Icon Loading Logic (Copied from WeaponBarUI) ===
 
     private loadWeaponIcon(sprite: Sprite, path: string): void {
@@ -471,5 +560,9 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
 
     private get eventManager(): EventManager {
         return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
+    }
+
+    private get airdropService(): AirdropService {
+        return ServiceRegistry.get<AirdropService>('AirdropService') ?? AirdropService.instance;
     }
 }

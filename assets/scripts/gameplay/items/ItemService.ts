@@ -136,6 +136,21 @@ export class ItemService extends Singleton<ItemService>() {
         gm.resumeGame();
     }
 
+    /**
+     * 将指定的所有道具加入背包（广告奖励用）
+     * @param items 要添加的道具 ID 列表
+     * @returns 成功添加的道具数量
+     */
+    public addAllItems(items: ItemId[]): number {
+        let added = 0;
+        for (const id of items) {
+            if (!ITEM_DEFS[id]) continue;
+            this.addItem(id);
+            added++;
+        }
+        return added;
+    }
+
     private get eventManager(): EventManager {
         return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }

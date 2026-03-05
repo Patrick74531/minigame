@@ -25,10 +25,116 @@ export type LabelThemeOptions = {
     shadowBlur?: number;
 };
 
+export type AdButtonOptions = {
+    width?: number;
+    height?: number;
+    fontSize?: number;
+};
+
 export class SelectionCardTheme {
-    private static isTikTokRuntime(): boolean {
+    public static isTikTokRuntime(): boolean {
         const g = globalThis as any;
         return g?.__GVR_PLATFORM__ === 'tiktok' || typeof g?.tt !== 'undefined';
+    }
+
+    /**
+     * 创建广告按钮（游戏风格，带广告图标）。
+     * 仅在 TikTok 环境下可见。
+     * @param parent 父节点
+     * @param text   按钮文字
+     * @param pos    按钮中心位置
+     * @param onTap  点击回调
+     * @returns 按钮节点（可用于后续销毁），非 TikTok 环境返回 null
+     */
+    public static createAdButton(
+        parent: Node,
+        text: string,
+        pos: { x: number; y: number },
+        onTap: () => void,
+        options?: AdButtonOptions
+    ): Node | null {
+        if (!this.isTikTokRuntime()) return null;
+
+        const BTN_W = Math.round(Math.max(220, options?.width ?? 280));
+        const BTN_H = Math.round(Math.max(46, options?.height ?? 52));
+        const RADIUS = 14;
+        const fontSize = Math.max(16, options?.fontSize ?? 18);
+
+        const btn = new Node('AdButton');
+        btn.layer = parent.layer;
+        parent.addChild(btn);
+        btn.addComponent(UITransform).setContentSize(BTN_W, BTN_H);
+        btn.setPosition(pos.x, pos.y, 0);
+
+        // 按钮背景
+        const g = btn.addComponent(Graphics);
+        const baseColor = new Color(46, 196, 88, 255);
+        g.fillColor = baseColor;
+        g.roundRect(-BTN_W / 2, -BTN_H / 2, BTN_W, BTN_H, RADIUS);
+        g.fill();
+        // 内发光边框
+        g.strokeColor = new Color(140, 255, 170, 200);
+        g.lineWidth = 2;
+        g.roundRect(-BTN_W / 2 + 1, -BTN_H / 2 + 1, BTN_W - 2, BTN_H - 2, RADIUS - 1);
+        g.stroke();
+        // 外边框
+        g.strokeColor = new Color(20, 80, 40, 220);
+        g.lineWidth = 2.5;
+        g.roundRect(-BTN_W / 2, -BTN_H / 2, BTN_W, BTN_H, RADIUS);
+        g.stroke();
+
+        // 广告图标 ▶
+        const iconNode = new Node('AdIcon');
+        iconNode.layer = btn.layer;
+        btn.addChild(iconNode);
+        iconNode.addComponent(UITransform).setContentSize(30, 30);
+        iconNode.setPosition(-BTN_W / 2 + 28, 0, 0);
+        const iconLabel = iconNode.addComponent(Label);
+        iconLabel.string = '▶';
+        iconLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        iconLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this.applyLabelTheme(iconLabel, {
+            fontSize: Math.max(16, fontSize - 1),
+            lineHeight: Math.max(20, fontSize + 2),
+            color: new Color(255, 255, 255, 255),
+            outlineWidth: 0,
+        });
+
+        // 按钮文字
+        const labelNode = new Node('AdLabel');
+        labelNode.layer = btn.layer;
+        btn.addChild(labelNode);
+        labelNode.addComponent(UITransform).setContentSize(BTN_W - 60, BTN_H - 8);
+        labelNode.setPosition(12, 0, 0);
+        const label = labelNode.addComponent(Label);
+        label.string = text;
+        label.horizontalAlign = Label.HorizontalAlign.CENTER;
+        label.verticalAlign = Label.VerticalAlign.CENTER;
+        label.overflow = Label.Overflow.SHRINK;
+        label.enableWrapText = false;
+        this.applyLabelTheme(label, {
+            fontSize,
+            lineHeight: Math.max(22, fontSize + 4),
+            color: new Color(255, 255, 255, 255),
+            bold: true,
+            outlineColor: new Color(10, 60, 24, 255),
+            outlineWidth: 2,
+            shadowColor: new Color(0, 0, 0, 120),
+            shadowOffsetY: -1,
+        });
+
+        // 点击交互
+        this.bindCardClick(btn, onTap);
+
+        // 入场动画
+        btn.setScale(0, 0, 1);
+        tween(btn)
+            .delay(0.35)
+            .to(0.22, { scale: new Vec3(1.06, 1.06, 1) }, { easing: 'backOut' })
+            .to(0.1, { scale: new Vec3(1, 1, 1) })
+            .start();
+
+        return btn;
     }
 
     public static drawOverlayMask(bg: Graphics, width: number, height: number): void {

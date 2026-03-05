@@ -10,6 +10,7 @@ import {
 import { Localization } from '../core/i18n/Localization';
 import { SelectionCardTheme } from './SelectionCardTheme';
 import { UIResponsive } from './UIResponsive';
+import { TikTokAdService } from '../core/ads/TikTokAdService';
 
 const UI_LAYER = 33554432;
 const CARD_WIDTH = 258;
@@ -68,6 +69,7 @@ export class TowerUpgradeCardUI {
 
         const viewport = this.getViewportSize();
         const padding = UIResponsive.getControlPadding();
+        const isPortraitTikTok = UIResponsive.isTikTokPhonePortraitProfile();
         this.gameManager.pauseGame();
 
         this._root = this.createOverlay(viewport.width, viewport.height);
@@ -75,8 +77,7 @@ export class TowerUpgradeCardUI {
         this.createTitle(this._root, viewport.width, viewport.height);
 
         const totalWidth = cards.length * CARD_WIDTH + (cards.length - 1) * CARD_GAP;
-        const usePortraitTriangle =
-            UIResponsive.isTikTokPhonePortraitProfile() && cards.length === 3;
+        const usePortraitTriangle = isPortraitTikTok && cards.length === 3;
         const triangleRowGap = 34;
         const containerWidth = usePortraitTriangle ? CARD_WIDTH * 2 + CARD_GAP : totalWidth;
         const containerHeight = usePortraitTriangle
@@ -89,6 +90,7 @@ export class TowerUpgradeCardUI {
         this._root.addChild(cardContainer);
 
         const size = this._root.getComponent(UITransform)?.contentSize;
+        let cardScale = 1;
         if (size) {
             const availableWidth = Math.max(
                 240,
@@ -102,16 +104,14 @@ export class TowerUpgradeCardUI {
             const heightScale = availableHeight / containerHeight;
             const maxScale = usePortraitTriangle ? 1.15 : 1;
             const scale = Math.min(maxScale, widthScale, heightScale);
+            cardScale = scale;
             cardContainer.setScale(scale, scale, 1);
         }
 
-        cardContainer.setPosition(
-            0,
-            usePortraitTriangle
-                ? -Math.round(viewport.height * 0.08)
-                : Math.round(-padding.bottom * 0.04),
-            0
-        );
+        const cardContainerY = usePortraitTriangle
+            ? -Math.round(viewport.height * 0.08)
+            : Math.round(-padding.bottom * 0.04);
+        cardContainer.setPosition(0, cardContainerY, 0);
 
         const startX = -totalWidth / 2 + CARD_WIDTH / 2;
         const triangleBottomX = (CARD_WIDTH + CARD_GAP) * 0.5;
@@ -135,6 +135,52 @@ export class TowerUpgradeCardUI {
             cardContainer.addChild(cardNode);
             SelectionCardTheme.playCardReveal(cardNode, i);
         }
+
+        // 广告按钮（仅 TikTok 环境）
+        const titleHeight = Math.round(
+            Math.max(
+                isPortraitTikTok ? 58 : 64,
+                Math.min(
+                    isPortraitTikTok ? 96 : 90,
+                    viewport.height * (isPortraitTikTok ? 0.1 : 0.11)
+                )
+            )
+        );
+        const titleTop = Math.round(
+            Math.max(
+                padding.top + 8,
+                Math.min(
+                    isPortraitTikTok ? 120 : 160,
+                    viewport.height * (isPortraitTikTok ? 0.1 : 0.14) + padding.top * 0.2
+                )
+            )
+        );
+        const titleBottomY = viewport.height * 0.5 - titleTop - titleHeight;
+        const cardTopY = usePortraitTriangle
+            ? cardContainerY + (triangleTopY + CARD_HEIGHT * 0.5) * cardScale
+            : cardContainerY + (-20 + CARD_HEIGHT * 0.5) * cardScale;
+        const titleToCardGap = titleBottomY - cardTopY;
+        const adBtnY = Math.round(cardTopY + (titleToCardGap > 80 ? titleToCardGap * 0.5 : 40));
+        const adBtnWidth = Math.round(
+            Math.max(
+                260,
+                Math.min(
+                    viewport.width - padding.left - padding.right - 24,
+                    (CARD_WIDTH * 2 + CARD_GAP) * cardScale
+                )
+            )
+        );
+        SelectionCardTheme.createAdButton(
+            this._root!,
+            Localization.instance.t('ui.ad.get_all_upgrades'),
+            { x: 0, y: adBtnY },
+            () => this.onAdButtonTapped(),
+            {
+                width: adBtnWidth,
+                height: 56,
+                fontSize: 17,
+            }
+        );
     }
 
     public hideCards(): void {
@@ -176,6 +222,7 @@ export class TowerUpgradeCardUI {
     }
 
     private createTitle(parent: Node, viewportWidth: number, viewportHeight: number): void {
+        const isPortraitTikTok = UIResponsive.isTikTokPhonePortraitProfile();
         const titleNode = new Node('TowerUpgradeTitle');
         titleNode.layer = UI_LAYER;
         parent.addChild(titleNode);
@@ -183,22 +230,38 @@ export class TowerUpgradeCardUI {
         titleNode
             .addComponent(UITransform)
             .setContentSize(
-                Math.round(Math.max(420, Math.min(920, viewportWidth * 0.76))),
-                Math.round(Math.max(64, Math.min(90, viewportHeight * 0.11)))
+                Math.round(
+                    Math.max(
+                        isPortraitTikTok ? 320 : 420,
+                        Math.min(
+                            isPortraitTikTok ? 900 : 920,
+                            viewportWidth * (isPortraitTikTok ? 0.92 : 0.76)
+                        )
+                    )
+                ),
+                Math.round(
+                    Math.max(
+                        isPortraitTikTok ? 58 : 64,
+                        Math.min(
+                            isPortraitTikTok ? 96 : 90,
+                            viewportHeight * (isPortraitTikTok ? 0.1 : 0.11)
+                        )
+                    )
+                )
             );
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.tower.upgrade.select.title');
         label.overflow = Label.Overflow.SHRINK;
         SelectionCardTheme.applyLabelTheme(label, {
-            fontSize: 46,
-            lineHeight: 52,
+            fontSize: isPortraitTikTok ? 32 : 46,
+            lineHeight: isPortraitTikTok ? 38 : 52,
             color: new Color(255, 218, 112, 255),
             bold: true,
             hAlign: Label.HorizontalAlign.CENTER,
             vAlign: Label.VerticalAlign.CENTER,
             outlineColor: new Color(46, 24, 8, 255),
-            outlineWidth: 5,
+            outlineWidth: isPortraitTikTok ? 4 : 5,
         });
 
         const widget = titleNode.addComponent(Widget);
@@ -206,7 +269,13 @@ export class TowerUpgradeCardUI {
         widget.isAlignHorizontalCenter = true;
         const padding = UIResponsive.getControlPadding();
         widget.top = Math.round(
-            Math.max(padding.top + 8, Math.min(160, viewportHeight * 0.14 + padding.top * 0.2))
+            Math.max(
+                padding.top + 8,
+                Math.min(
+                    isPortraitTikTok ? 120 : 160,
+                    viewportHeight * (isPortraitTikTok ? 0.1 : 0.14) + padding.top * 0.2
+                )
+            )
         );
 
         const decoNode = new Node('TitleDeco');
@@ -333,6 +402,17 @@ export class TowerUpgradeCardUI {
         this.eventManager.emit(GameEvents.TOWER_UPGRADE_CARD_PICKED, {
             buildingId,
             stat: card.stat,
+        });
+    }
+
+    private onAdButtonTapped(): void {
+        if (!this._isShowing || !this._activeBuildingId) return;
+
+        TikTokAdService.showRewardedAd('tower_attr_card').then(rewarded => {
+            if (!rewarded) return;
+            this.towerUpgradeCardService.applyAllCards();
+            this.hideCards();
+            this.gameManager.resumeGame();
         });
     }
 

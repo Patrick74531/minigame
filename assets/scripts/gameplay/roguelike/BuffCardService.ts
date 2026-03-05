@@ -221,6 +221,23 @@ export class BuffCardService extends Singleton<BuffCardService>() {
         return arr;
     }
 
+    /**
+     * 应用所有待选卡牌（广告奖励用）
+     * @returns 成功应用的卡牌数量
+     */
+    public applyAllPendingCards(): number {
+        if (this._pendingCards.length === 0) return 0;
+
+        let applied = 0;
+        for (const card of this._pendingCards) {
+            if (this.applyCard(card.id)) {
+                applied++;
+            }
+        }
+        this._pendingCards = [];
+        return applied;
+    }
+
     private get eventManager(): EventManager {
         return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }

@@ -7,6 +7,9 @@ import { Localization } from '../core/i18n/Localization';
 import { SelectionCardTheme } from './SelectionCardTheme';
 import { ItemId, ITEM_DEFS } from '../gameplay/items/ItemDefs';
 import { UIResponsive } from './UIResponsive';
+import { TikTokAdService } from '../core/ads/TikTokAdService';
+import { ItemService } from '../gameplay/items/ItemService';
+import { GameManager } from '../core/managers/GameManager';
 
 const UI_LAYER = 33554432;
 const CARD_WIDTH = 220;
@@ -22,6 +25,7 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
     private _uiCanvas: Node | null = null;
     private _root: Node | null = null;
     private _isShowing: boolean = false;
+    private _offeredItems: ItemId[] = [];
 
     public initialize(uiCanvas: Node): void {
         this._uiCanvas = uiCanvas;
@@ -41,6 +45,7 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
     public showCards(items: ItemId[]): void {
         if (!this._uiCanvas || this._isShowing) return;
         this._isShowing = true;
+        this._offeredItems = [...items];
         const viewport = this.getViewportSize();
         const padding = UIResponsive.getControlPadding();
 
@@ -108,6 +113,17 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
             cardContainer.addChild(cardNode);
             SelectionCardTheme.playCardReveal(cardNode, i);
         }
+
+        // 广告按钮（仅 TikTok 环境）
+        const adBtnY = usePortraitTriangle
+            ? -Math.round(viewport.height * 0.08) - containerHeight * 0.5 - 46
+            : -CARD_HEIGHT * 0.5 - 46;
+        SelectionCardTheme.createAdButton(
+            this._root!,
+            Localization.instance.t('ui.ad.get_all_items'),
+            { x: 0, y: adBtnY },
+            () => this.onAdButtonTapped()
+        );
     }
 
     public hideCards(): void {
@@ -116,6 +132,7 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         }
         this._root = null;
         this._isShowing = false;
+        this._offeredItems = [];
     }
 
     private createOverlay(width: number, height: number): Node {
@@ -247,6 +264,20 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
     private onCardSelected(itemId: ItemId): void {
         this.eventManager.emit(GameEvents.ITEM_CARD_PICKED, { itemId });
         this.hideCards();
+    }
+
+    private onAdButtonTapped(): void {
+        if (!this._isShowing || this._offeredItems.length === 0) return;
+
+        TikTokAdService.showRewardedAd('item_card').then(rewarded => {
+            if (!rewarded) return;
+            const itemService =
+                ServiceRegistry.get<ItemService>('ItemService') ?? ItemService.instance;
+            itemService.addAllItems(this._offeredItems);
+            this.hideCards();
+            const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+            gm.resumeGame();
+        });
     }
 
     private getViewportSize(): { width: number; height: number } {

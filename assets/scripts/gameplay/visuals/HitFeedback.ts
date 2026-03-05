@@ -124,7 +124,10 @@ export class HitFeedback extends Component {
                             flashMat.setProperty('baseColor', this._activeFlashColor);
                         }
                         if (pass.getHandle('emissive') !== 0) {
-                            flashMat.setProperty('emissive', this.resolveEmissiveFlashColor(intensity));
+                            flashMat.setProperty(
+                                'emissive',
+                                this.resolveEmissiveFlashColor(intensity)
+                            );
                         }
                     }
 

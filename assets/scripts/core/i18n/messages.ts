@@ -228,6 +228,12 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.item.confirm.message': '确定要使用 [{name}] 吗？\n\n{description}',
         'ui.item.confirm.yes': '确认使用',
         'ui.item.confirm.no': '取消',
+
+        'ui.ad.get_all': '看广告领取全部',
+        'ui.ad.get_all_weapons': '看广告领取全部武器',
+        'ui.ad.get_all_buffs': '看广告领取全部增益',
+        'ui.ad.get_all_upgrades': '看广告领取全部强化',
+        'ui.ad.get_all_items': '看广告领取全部道具',
     },
     en: {
         'building.barracks.name': 'Goose Shed',
@@ -474,5 +480,11 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.item.confirm.message': 'Use [{name}]?\n\n{description}',
         'ui.item.confirm.yes': 'Confirm',
         'ui.item.confirm.no': 'Cancel',
+
+        'ui.ad.get_all': 'Watch Ad to Get All',
+        'ui.ad.get_all_weapons': 'Watch Ad for All Weapons',
+        'ui.ad.get_all_buffs': 'Watch Ad for All Buffs',
+        'ui.ad.get_all_upgrades': 'Watch Ad for All Upgrades',
+        'ui.ad.get_all_items': 'Watch Ad for All Items',
     },
 };

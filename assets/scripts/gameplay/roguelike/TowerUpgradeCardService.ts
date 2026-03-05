@@ -154,6 +154,28 @@ export class TowerUpgradeCardService extends Singleton<TowerUpgradeCardService>(
         return null;
     }
 
+    /**
+     * 应用所有待选塔升级卡（广告奖励用）
+     * @returns 成功应用的卡牌数量
+     */
+    public applyAllCards(): number {
+        if (!this._activeTowerId || this._pendingCards.length === 0) return 0;
+
+        const tower = this.resolveTowerById(this._activeTowerId);
+        if (!tower) return 0;
+
+        let applied = 0;
+        for (const card of this._pendingCards) {
+            tower.applyFocusedUpgrade(card.stat);
+            applied++;
+        }
+
+        this._pendingCards = [];
+        this._activeTowerId = null;
+        this.tryOpenNextChoice();
+        return applied;
+    }
+
     private get eventManager(): EventManager {
         return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }

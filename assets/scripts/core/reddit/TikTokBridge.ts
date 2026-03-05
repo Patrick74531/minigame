@@ -203,7 +203,9 @@ export class TikTokBridge implements SocialBridge {
                 } else {
                     this._cachedLeaderboard = this._loadLocalLeaderboard();
                 }
-                console.log(`[TikTokBridge] leaderboard ok entries=${this._cachedLeaderboard.length}`);
+                console.log(
+                    `[TikTokBridge] leaderboard ok entries=${this._cachedLeaderboard.length}`
+                );
                 this._emit({ type: 'leaderboard', entries: this._cachedLeaderboard });
             })
             .catch(() => {
@@ -239,9 +241,7 @@ export class TikTokBridge implements SocialBridge {
 
             const base = candidates[index];
             const divider = normalizedPath.includes('?') ? '&' : '?';
-            const url = `${base}${normalizedPath}${
-                bustCache ? `${divider}_ts=${Date.now()}` : ''
-            }`;
+            const url = `${base}${normalizedPath}${bustCache ? `${divider}_ts=${Date.now()}` : ''}`;
 
             const headers = new Headers(init.headers ?? undefined);
             if (!headers.has('Accept')) {

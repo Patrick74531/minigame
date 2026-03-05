@@ -57,11 +57,11 @@ export class CannonBehavior extends WeaponBehavior {
         if (toLen < 0.001) return;
         const dirX = toX / toLen;
         const dirZ = toZ / toLen;
-        
+
         // FORWARD cross UP: (dirX, 0, dirZ) x (0, 1, 0) = (-dirZ, 0, dirX)
         const rightX = -dirZ;
         const rightZ = dirX;
-        
+
         const spawnPos = new Vec3(
             ownerPos.x + dirX * spawnForward + rightX * spawnRight,
             spawnY,

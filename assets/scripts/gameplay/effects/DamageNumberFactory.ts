@@ -49,7 +49,9 @@ class DamageNumberFacing extends Component {
         const cameras = scene.getComponentsInChildren(Camera);
         if (cameras.length <= 0) return null;
 
-        const activeCamera = cameras.find(cam => cam.enabledInHierarchy && cam.node.activeInHierarchy);
+        const activeCamera = cameras.find(
+            cam => cam.enabledInHierarchy && cam.node.activeInHierarchy
+        );
         this._cameraNode = (activeCamera ?? cameras[0]).node;
         return this._cameraNode;
     }

@@ -1,8 +1,4 @@
-export type TikTokRewardAdSlot =
-    | 'weapon_draw'
-    | 'hero_attr_card'
-    | 'tower_attr_card'
-    | 'item_card';
+export type TikTokRewardAdSlot = 'weapon_draw' | 'hero_attr_card' | 'tower_attr_card' | 'item_card';
 
 export interface TikTokRewardAdPlacementConfig {
     slot: TikTokRewardAdSlot;
