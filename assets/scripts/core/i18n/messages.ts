@@ -234,6 +234,7 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.ad.get_all_buffs': '看广告领取全部增益',
         'ui.ad.get_all_upgrades': '看广告领取全部强化',
         'ui.ad.get_all_items': '看广告领取全部道具',
+        'ui.ad.not_rewarded': '广告未看完，未获得奖励',
     },
     en: {
         'building.barracks.name': 'Goose Shed',
@@ -486,5 +487,6 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.ad.get_all_buffs': 'Watch Ad for All Buffs',
         'ui.ad.get_all_upgrades': 'Watch Ad for All Upgrades',
         'ui.ad.get_all_items': 'Watch Ad for All Items',
+        'ui.ad.not_rewarded': 'Ad not completed. Reward not granted.',
     },
 };

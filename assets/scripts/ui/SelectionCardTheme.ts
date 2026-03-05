@@ -123,8 +123,31 @@ export class SelectionCardTheme {
             shadowOffsetY: -1,
         });
 
-        // 点击交互
-        this.bindCardClick(btn, onTap);
+        // 按钮交互：允许重复点击（广告取消后可再次尝试）
+        let tapping = false;
+        btn.on(Node.EventType.TOUCH_START, () => {
+            if (tapping) return;
+            btn.setScale(0.97, 0.97, 1);
+        });
+        btn.on(Node.EventType.TOUCH_CANCEL, () => {
+            if (tapping) return;
+            btn.setScale(1, 1, 1);
+        });
+        btn.on(Node.EventType.TOUCH_END, () => {
+            if (tapping) return;
+            tapping = true;
+            tween(btn)
+                .to(0.08, { scale: new Vec3(1.04, 1.04, 1) })
+                .to(0.08, { scale: new Vec3(1, 1, 1) })
+                .call(() => {
+                    try {
+                        onTap();
+                    } finally {
+                        tapping = false;
+                    }
+                })
+                .start();
+        });
 
         // 入场动画
         btn.setScale(0, 0, 1);

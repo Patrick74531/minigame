@@ -26,6 +26,7 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
     private _chestPrefab: Prefab | null = null;
     private _isLoading: boolean = false;
     private _activeChests: Node[] = [];
+    private _pendingChestDrops: Vec3[] = [];
     /** 已进入磁吸阶段的宝箱集合（停掉浮动 tween） */
     private _magnetized: WeakSet<Node> = new WeakSet();
 
@@ -33,6 +34,7 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
         this._coinContainer = coinContainer;
         this._heroNode = heroNode;
         this._activeChests = [];
+        this._pendingChestDrops = [];
         this._magnetized = new WeakSet();
         this.loadChestPrefab();
         this.eventManager.on(GameEvents.BOSS_CHEST_DROP, this.onBossChestDrop, this);
@@ -51,6 +53,7 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
             }
         }
         this._activeChests = [];
+        this._pendingChestDrops = [];
         this._magnetized = new WeakSet();
         this._coinContainer = null;
         this._heroNode = null;
@@ -106,12 +109,21 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
 
     private onBossChestDrop(data: { position: Vec3 }): void {
         if (!this._coinContainer) return;
-        this.spawnChest(data.position);
+        if (this._chestPrefab) {
+            this.spawnChest(data.position);
+            return;
+        }
+
+        // 首次未加载完成时先排队，避免直接显示 fallback 方块。
+        this._pendingChestDrops.push(new Vec3(data.position.x, data.position.y, data.position.z));
+        if (!this._isLoading) {
+            this.loadChestPrefab();
+        }
     }
 
-    private spawnChest(pos: Vec3): void {
+    private spawnChest(pos: Vec3, forceFallback: boolean = false): void {
         let node: Node;
-        if (this._chestPrefab) {
+        if (!forceFallback && this._chestPrefab) {
             node = instantiate(this._chestPrefab);
             node.setScale(1.8, 1.8, 1.8);
         } else {
@@ -166,16 +178,30 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
     private tryLoadPrefab(candidates: string[], index: number): void {
         if (index >= candidates.length) {
             this._isLoading = false;
+            this.flushPendingChests(true);
             return;
         }
         resources.load(candidates[index], Prefab, (err, prefab) => {
             if (!err && prefab) {
                 this._chestPrefab = prefab;
                 this._isLoading = false;
+                this.flushPendingChests(false);
                 return;
             }
+            console.warn(
+                `[ChestDropManager] Failed to load chest prefab at "${candidates[index]}":`,
+                err
+            );
             this.tryLoadPrefab(candidates, index + 1);
         });
+    }
+
+    private flushPendingChests(forceFallback: boolean): void {
+        if (this._pendingChestDrops.length === 0 || !this._coinContainer) return;
+        const pending = this._pendingChestDrops.splice(0, this._pendingChestDrops.length);
+        for (const pos of pending) {
+            this.spawnChest(pos, forceFallback);
+        }
     }
 
     private get eventManager(): EventManager {

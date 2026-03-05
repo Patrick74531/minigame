@@ -409,7 +409,12 @@ export class TowerUpgradeCardUI {
         if (!this._isShowing || !this._activeBuildingId) return;
 
         TikTokAdService.showRewardedAd('tower_attr_card').then(rewarded => {
-            if (!rewarded) return;
+            if (!rewarded) {
+                if (TikTokAdService.wasLastAdCancelled()) {
+                    TikTokAdService.showToast(Localization.instance.t('ui.ad.not_rewarded'));
+                }
+                return;
+            }
             this.towerUpgradeCardService.applyAllCards();
             this.hideCards();
             this.gameManager.resumeGame();

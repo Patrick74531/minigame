@@ -48,6 +48,7 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         this._offeredItems = [...items];
         const viewport = this.getViewportSize();
         const padding = UIResponsive.getControlPadding();
+        const isPortraitTikTok = UIResponsive.isTikTokPhonePortraitProfile();
 
         this._root = this.createOverlay(viewport.width, viewport.height);
         this._uiCanvas.addChild(this._root);
@@ -55,8 +56,7 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         this.createTitle(this._root, viewport.width, viewport.height);
 
         const totalWidth = items.length * CARD_WIDTH + (items.length - 1) * CARD_GAP;
-        const usePortraitTriangle =
-            UIResponsive.isTikTokPhonePortraitProfile() && items.length === 3;
+        const usePortraitTriangle = isPortraitTikTok && items.length === 3;
         const triangleRowGap = 32;
         const containerWidth = usePortraitTriangle ? CARD_WIDTH * 2 + CARD_GAP : totalWidth;
         const containerHeight = usePortraitTriangle
@@ -68,6 +68,7 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         this._root.addChild(cardContainer);
 
         const size = this._root.getComponent(UITransform)?.contentSize;
+        let cardScale = 1;
         if (size) {
             const availableWidth = Math.max(
                 220,
@@ -81,13 +82,11 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
             const heightScale = availableHeight / containerHeight;
             const maxScale = usePortraitTriangle ? 1.18 : 1;
             const scale = Math.min(maxScale, widthScale, heightScale);
+            cardScale = scale;
             cardContainer.setScale(scale, scale, 1);
         }
-        cardContainer.setPosition(
-            0,
-            usePortraitTriangle ? -Math.round(viewport.height * 0.08) : 0,
-            0
-        );
+        const cardContainerY = usePortraitTriangle ? -Math.round(viewport.height * 0.08) : 0;
+        cardContainer.setPosition(0, cardContainerY, 0);
 
         const startX = -totalWidth / 2 + CARD_WIDTH / 2;
         const triangleBottomX = (CARD_WIDTH + CARD_GAP) * 0.5;
@@ -115,14 +114,49 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         }
 
         // 广告按钮（仅 TikTok 环境）
-        const adBtnY = usePortraitTriangle
-            ? -Math.round(viewport.height * 0.08) - containerHeight * 0.5 - 46
-            : -CARD_HEIGHT * 0.5 - 46;
+        const titleHeight = Math.round(
+            Math.max(
+                isPortraitTikTok ? 56 : 48,
+                Math.min(
+                    isPortraitTikTok ? 90 : 64,
+                    viewport.height * (isPortraitTikTok ? 0.095 : 0.09)
+                )
+            )
+        );
+        const titleTop = Math.round(
+            Math.max(
+                padding.top + 8,
+                Math.min(
+                    isPortraitTikTok ? 120 : 96,
+                    viewport.height * (isPortraitTikTok ? 0.1 : 0.12) + padding.top * 0.2
+                )
+            )
+        );
+        const titleBottomY = viewport.height * 0.5 - titleTop - titleHeight;
+        const cardTopY = usePortraitTriangle
+            ? cardContainerY + (triangleTopY + CARD_HEIGHT * 0.5) * cardScale
+            : cardContainerY + (-20 + CARD_HEIGHT * 0.5) * cardScale;
+        const titleToCardGap = titleBottomY - cardTopY;
+        const adBtnY = Math.round(cardTopY + (titleToCardGap > 80 ? titleToCardGap * 0.5 : 40));
+        const adBtnWidth = Math.round(
+            Math.max(
+                240,
+                Math.min(
+                    viewport.width - padding.left - padding.right - 24,
+                    (CARD_WIDTH * 2 + CARD_GAP) * cardScale
+                )
+            )
+        );
         SelectionCardTheme.createAdButton(
             this._root!,
             Localization.instance.t('ui.ad.get_all_items'),
             { x: 0, y: adBtnY },
-            () => this.onAdButtonTapped()
+            () => this.onAdButtonTapped(),
+            {
+                width: adBtnWidth,
+                height: 56,
+                fontSize: 17,
+            }
         );
     }
 
@@ -148,22 +182,46 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         return root;
     }
 
-    private createTitle(parent: Node, _width: number, height: number): void {
+    private createTitle(parent: Node, width: number, height: number): void {
+        const isPortraitTikTok = UIResponsive.isTikTokPhonePortraitProfile();
         const titleNode = new Node('ItemTitle');
         titleNode.layer = UI_LAYER;
         parent.addChild(titleNode);
-        titleNode.addComponent(UITransform).setContentSize(600, 50);
+        const titleWidth = Math.round(
+            Math.max(
+                isPortraitTikTok ? 320 : 420,
+                Math.min(isPortraitTikTok ? 860 : 760, width * (isPortraitTikTok ? 0.9 : 0.7))
+            )
+        );
+        const titleHeight = Math.round(
+            Math.max(
+                isPortraitTikTok ? 56 : 48,
+                Math.min(isPortraitTikTok ? 90 : 64, height * (isPortraitTikTok ? 0.095 : 0.09))
+            )
+        );
+        titleNode.addComponent(UITransform).setContentSize(titleWidth, titleHeight);
         const padding = UIResponsive.getControlPadding();
-        titleNode.setPosition(0, height * 0.5 - Math.max(68, padding.top + 24), 0);
+        const titleTop = Math.round(
+            Math.max(
+                padding.top + 8,
+                Math.min(
+                    isPortraitTikTok ? 120 : 96,
+                    height * (isPortraitTikTok ? 0.1 : 0.12) + padding.top * 0.2
+                )
+            )
+        );
+        titleNode.setPosition(0, height * 0.5 - titleTop - titleHeight * 0.5, 0);
 
         const label = titleNode.addComponent(Label);
         label.string = Localization.instance.t('ui.item.select.title');
         label.horizontalAlign = Label.HorizontalAlign.CENTER;
         label.verticalAlign = Label.VerticalAlign.CENTER;
+        label.overflow = Label.Overflow.SHRINK;
+        label.enableWrapText = false;
 
         SelectionCardTheme.applyLabelTheme(label, {
-            fontSize: 28,
-            lineHeight: 36,
+            fontSize: isPortraitTikTok ? 24 : 28,
+            lineHeight: isPortraitTikTok ? 30 : 36,
             color: new Color(255, 244, 214, 255),
             bold: true,
             outlineColor: new Color(10, 18, 30, 255),
@@ -270,7 +328,12 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         if (!this._isShowing || this._offeredItems.length === 0) return;
 
         TikTokAdService.showRewardedAd('item_card').then(rewarded => {
-            if (!rewarded) return;
+            if (!rewarded) {
+                if (TikTokAdService.wasLastAdCancelled()) {
+                    TikTokAdService.showToast(Localization.instance.t('ui.ad.not_rewarded'));
+                }
+                return;
+            }
             const itemService =
                 ServiceRegistry.get<ItemService>('ItemService') ?? ItemService.instance;
             itemService.addAllItems(this._offeredItems);

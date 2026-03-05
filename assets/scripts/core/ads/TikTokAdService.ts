@@ -6,7 +6,39 @@ import { TikTokRewardAdSlot, TIKTOK_REWARDED_AD_PLACEMENTS } from '../reddit/Tik
  * 仅在 TikTok Minis 环境下可用。
  */
 export class TikTokAdService {
-    private static _adInstances: Map<string, any> = new Map();
+    private static _lastCloseRewarded = false;
+    private static _lastCloseHandled = false;
+
+    public static wasLastAdCancelled(): boolean {
+        return this._lastCloseHandled && !this._lastCloseRewarded;
+    }
+
+    private static markCloseResult(rewarded: boolean): void {
+        this._lastCloseHandled = true;
+        this._lastCloseRewarded = rewarded;
+    }
+
+    private static markNonCloseFailure(): void {
+        this._lastCloseHandled = false;
+        this._lastCloseRewarded = false;
+    }
+
+    private static handleAdError(err: any, slot: TikTokRewardAdSlot): void {
+        const errorCode = Number(err?.errorCode);
+        const subErrorCode = Number(err?.subErrorCode);
+
+        if (errorCode === 20003 && subErrorCode === 20001) {
+            this.showToast(
+                'Ad placement inactive. Please enable this placement in TikTok Console.'
+            );
+            console.warn(
+                `[TikTokAdService] Placement inactive for slot=${slot}. Check Monetization > In-App Ads > Ad placements.`
+            );
+            return;
+        }
+
+        this.showToast('Ad is temporarily unavailable. Please try again later.');
+    }
 
     private static offIfPossible(
         adInstance: any,
@@ -57,6 +89,24 @@ export class TikTokAdService {
         return typeof g?.tt?.createRewardedVideoAd === 'function';
     }
 
+    /** 在 TikTok 端显示轻提示 */
+    public static showToast(message: string): void {
+        const g = globalThis as any;
+        try {
+            if (typeof g?.tt?.showToast === 'function') {
+                g.tt.showToast({
+                    title: message,
+                    icon: 'none',
+                    duration: 1500,
+                });
+                return;
+            }
+        } catch (err) {
+            console.warn('[TikTokAdService] showToast failed:', err);
+        }
+        console.warn(`[TikTokAdService] ${message}`);
+    }
+
     /**
      * 展示激励广告并等待结果
      * @param slot 广告位标识
@@ -64,8 +114,10 @@ export class TikTokAdService {
      */
     public static showRewardedAd(slot: TikTokRewardAdSlot): Promise<boolean> {
         return new Promise<boolean>(resolve => {
+            this.markNonCloseFailure();
             if (!this.isAdAvailable()) {
                 console.warn('[TikTokAdService] Ad SDK not available');
+                this.showToast('Ad is temporarily unavailable. Please try again later.');
                 resolve(false);
                 return;
             }
@@ -73,6 +125,7 @@ export class TikTokAdService {
             const placementId = TIKTOK_REWARDED_AD_PLACEMENTS[slot];
             if (!placementId) {
                 console.warn(`[TikTokAdService] No placement ID for slot: ${slot}`);
+                this.showToast('Ad placement is not configured yet.');
                 resolve(false);
                 return;
             }
@@ -80,12 +133,8 @@ export class TikTokAdService {
             const tt = (globalThis as any).tt;
 
             try {
-                // 复用或创建广告实例
-                let adInstance = this._adInstances.get(slot);
-                if (!adInstance) {
-                    adInstance = tt.createRewardedVideoAd({ adUnitId: placementId });
-                    this._adInstances.set(slot, adInstance);
-                }
+                // TikTok rewardedVideoAd 实例只能展示一次；每次展示都新建实例
+                const adInstance = tt.createRewardedVideoAd({ adUnitId: placementId });
 
                 let settled = false;
                 const settleOnce = (rewarded: boolean) => {
@@ -99,6 +148,7 @@ export class TikTokAdService {
                     this.offIfPossible(adInstance, 'offClose', onClose);
                     this.offIfPossible(adInstance, 'offError', onError);
                     const rewarded = res?.isEnded === true;
+                    this.markCloseResult(rewarded);
                     console.log(`[TikTokAdService] Ad closed, rewarded=${rewarded}, slot=${slot}`);
                     settleOnce(rewarded);
                 };
@@ -106,7 +156,9 @@ export class TikTokAdService {
                 const onError = (err: any) => {
                     this.offIfPossible(adInstance, 'offClose', onClose);
                     this.offIfPossible(adInstance, 'offError', onError);
+                    this.markNonCloseFailure();
                     console.error(`[TikTokAdService] Ad error for slot=${slot}:`, err);
+                    this.handleAdError(err, slot);
                     settleOnce(false);
                 };
 
@@ -121,14 +173,18 @@ export class TikTokAdService {
                 this.showWithBestEffort(adInstance).catch((err: any) => {
                     this.offIfPossible(adInstance, 'offClose', onClose);
                     this.offIfPossible(adInstance, 'offError', onError);
+                    this.markNonCloseFailure();
                     console.error(
                         `[TikTokAdService] Failed to load/show ad for slot=${slot}:`,
                         err
                     );
+                    this.handleAdError(err, slot);
                     settleOnce(false);
                 });
             } catch (err) {
+                this.markNonCloseFailure();
                 console.error(`[TikTokAdService] Exception for slot=${slot}:`, err);
+                this.handleAdError(err, slot);
                 resolve(false);
             }
         });

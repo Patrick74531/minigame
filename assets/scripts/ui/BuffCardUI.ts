@@ -415,7 +415,12 @@ export class BuffCardUI {
         if (!this._isShowing) return;
 
         TikTokAdService.showRewardedAd('hero_attr_card').then(rewarded => {
-            if (!rewarded) return;
+            if (!rewarded) {
+                if (TikTokAdService.wasLastAdCancelled()) {
+                    TikTokAdService.showToast(Localization.instance.t('ui.ad.not_rewarded'));
+                }
+                return;
+            }
             this.buffCardService.applyAllPendingCards();
             this.hideCards();
             this.gameManager.resumeGame();

@@ -430,7 +430,12 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         if (!this._isShowing || this._offeredWeaponTypes.length === 0) return;
 
         TikTokAdService.showRewardedAd('weapon_draw').then(rewarded => {
-            if (!rewarded) return;
+            if (!rewarded) {
+                if (TikTokAdService.wasLastAdCancelled()) {
+                    TikTokAdService.showToast(Localization.instance.t('ui.ad.not_rewarded'));
+                }
+                return;
+            }
             const granted = this.airdropService.claimAllPendingWeapons();
             if (granted <= 0) {
                 const manager = HeroWeaponManager.instance;
