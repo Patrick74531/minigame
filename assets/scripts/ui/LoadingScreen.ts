@@ -202,25 +202,66 @@ export class LoadingScreen extends Component {
         sprite.type = Sprite.Type.SIMPLE;
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
 
-        // Load homepage background
-        resources.load('ui/homepage', Texture2D, (err, tex) => {
-            if (!err && tex && bg.isValid) {
-                const sf = new SpriteFrame();
-                sf.texture = tex;
+        const defaultPath = 'ui/homepage';
+        const preferredPath = UIResponsive.isTikTokPhonePortraitProfile()
+            ? 'ui/homepage_tiktok_portrait'
+            : defaultPath;
+
+        this._loadBackgroundSpriteFrame(
+            preferredPath,
+            sf => {
+                if (!bg.isValid) return;
                 sprite.spriteFrame = sf;
-            } else if (err) {
-                resources.load('ui/homepage', ImageAsset, (err2, img) => {
-                    if (err2 || !img || !bg.isValid) return;
-                    const t = new Texture2D();
-                    t.image = img;
-                    const sf = new SpriteFrame();
-                    sf.texture = t;
-                    sprite.spriteFrame = sf;
-                });
+            },
+            err => {
+                if (preferredPath === defaultPath) {
+                    console.warn('[LoadingScreen] Failed to load homepage background', err);
+                    return;
+                }
+                this._loadBackgroundSpriteFrame(
+                    defaultPath,
+                    sf => {
+                        if (!bg.isValid) return;
+                        sprite.spriteFrame = sf;
+                    },
+                    fallbackErr => {
+                        console.warn(
+                            '[LoadingScreen] Failed to load TikTok portrait background',
+                            fallbackErr ?? err
+                        );
+                    }
+                );
             }
-        });
+        );
 
         return bg;
+    }
+
+    private _loadBackgroundSpriteFrame(
+        path: string,
+        onSuccess: (spriteFrame: SpriteFrame) => void,
+        onFail: (err: unknown) => void
+    ): void {
+        resources.load(path, Texture2D, (textureErr, texture) => {
+            if (!textureErr && texture) {
+                const sf = new SpriteFrame();
+                sf.texture = texture;
+                onSuccess(sf);
+                return;
+            }
+
+            resources.load(path, ImageAsset, (imageErr, imageAsset) => {
+                if (!imageErr && imageAsset) {
+                    const fallbackTexture = new Texture2D();
+                    fallbackTexture.image = imageAsset;
+                    const sf = new SpriteFrame();
+                    sf.texture = fallbackTexture;
+                    onSuccess(sf);
+                    return;
+                }
+                onFail(imageErr ?? textureErr);
+            });
+        });
     }
 
     private _buildBar(parent: Node, sz: { w: number; h: number }, centerY: number): void {

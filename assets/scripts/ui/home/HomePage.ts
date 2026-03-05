@@ -263,45 +263,34 @@ export class HomePage extends Component {
             return;
         }
 
-        resources.load('ui/homepage', Texture2D, (textureErr, texture) => {
-            if (!textureErr && texture) {
-                this.applyBackgroundTexture(texture);
-                return;
-            }
-
-            resources.load('ui/homepage', ImageAsset, (imageErr, imageAsset) => {
-                if (!imageErr && imageAsset) {
-                    const fallbackTexture = new Texture2D();
-                    fallbackTexture.image = imageAsset;
-                    this.applyBackgroundTexture(fallbackTexture);
-                } else {
-                    console.warn('Failed to load homepage background', imageErr ?? textureErr);
-                }
-            });
+        this.loadBackgroundFromResources('ui/homepage', err => {
+            console.warn('Failed to load homepage background', err);
         });
     }
 
     private loadTikTokBackgroundTexture(): void {
-        const path = 'ui/homepage';
+        const defaultPath = 'ui/homepage';
+        const portraitPath = 'ui/homepage_tiktok_portrait';
+        const preferredPath = UIResponsive.isTikTokPhonePortraitProfile()
+            ? portraitPath
+            : defaultPath;
+
         this.ensureResourcesBundleForTikTok()
             .then(bundle => {
-                bundle.load(path, Texture2D, (textureErr, texture) => {
-                    if (!textureErr && texture) {
-                        this.applyBackgroundTexture(texture);
+                this.loadBackgroundFromBundle(bundle, preferredPath, err => {
+                    if (preferredPath === defaultPath) {
+                        console.warn(
+                            'Failed to load homepage background from TikTok resources bundle',
+                            err
+                        );
                         return;
                     }
 
-                    bundle.load(path, ImageAsset, (imageErr, imageAsset) => {
-                        if (!imageErr && imageAsset) {
-                            const fallbackTexture = new Texture2D();
-                            fallbackTexture.image = imageAsset;
-                            this.applyBackgroundTexture(fallbackTexture);
-                        } else {
-                            console.warn(
-                                'Failed to load homepage background from TikTok resources bundle',
-                                imageErr ?? textureErr
-                            );
-                        }
+                    this.loadBackgroundFromBundle(bundle, defaultPath, fallbackErr => {
+                        console.warn(
+                            'Failed to load homepage background from TikTok resources bundle',
+                            fallbackErr ?? err
+                        );
                     });
                 });
             })
@@ -311,25 +300,61 @@ export class HomePage extends Component {
                     err
                 );
                 // Fallback to the default resources API.
-                resources.load(path, Texture2D, (textureErr, texture) => {
-                    if (!textureErr && texture) {
-                        this.applyBackgroundTexture(texture);
+                this.loadBackgroundFromResources(preferredPath, preferredErr => {
+                    if (preferredPath === defaultPath) {
+                        console.warn('Failed to load homepage background', preferredErr);
                         return;
                     }
-                    resources.load(path, ImageAsset, (imageErr, imageAsset) => {
-                        if (!imageErr && imageAsset) {
-                            const fallbackTexture = new Texture2D();
-                            fallbackTexture.image = imageAsset;
-                            this.applyBackgroundTexture(fallbackTexture);
-                        } else {
-                            console.warn(
-                                'Failed to load homepage background',
-                                imageErr ?? textureErr
-                            );
-                        }
+                    this.loadBackgroundFromResources(defaultPath, fallbackErr => {
+                        console.warn(
+                            'Failed to load homepage background',
+                            fallbackErr ?? preferredErr
+                        );
                     });
                 });
             });
+    }
+
+    private loadBackgroundFromResources(path: string, onFail: (err: unknown) => void): void {
+        resources.load(path, Texture2D, (textureErr, texture) => {
+            if (!textureErr && texture) {
+                this.applyBackgroundTexture(texture);
+                return;
+            }
+
+            resources.load(path, ImageAsset, (imageErr, imageAsset) => {
+                if (!imageErr && imageAsset) {
+                    const fallbackTexture = new Texture2D();
+                    fallbackTexture.image = imageAsset;
+                    this.applyBackgroundTexture(fallbackTexture);
+                    return;
+                }
+                onFail(imageErr ?? textureErr);
+            });
+        });
+    }
+
+    private loadBackgroundFromBundle(
+        bundle: AssetManager.Bundle,
+        path: string,
+        onFail: (err: unknown) => void
+    ): void {
+        bundle.load(path, Texture2D, (textureErr, texture) => {
+            if (!textureErr && texture) {
+                this.applyBackgroundTexture(texture);
+                return;
+            }
+
+            bundle.load(path, ImageAsset, (imageErr, imageAsset) => {
+                if (!imageErr && imageAsset) {
+                    const fallbackTexture = new Texture2D();
+                    fallbackTexture.image = imageAsset;
+                    this.applyBackgroundTexture(fallbackTexture);
+                    return;
+                }
+                onFail(imageErr ?? textureErr);
+            });
+        });
     }
 
     private ensureResourcesBundleForTikTok(): Promise<AssetManager.Bundle> {
@@ -1521,7 +1546,9 @@ export class HomePage extends Component {
         if (typeof window !== 'undefined') {
             const fromWindow = read(window as unknown as Record<string, unknown>);
             if (fromWindow) return fromWindow;
-            const fromWindowCandidates = readCandidates(window as unknown as Record<string, unknown>);
+            const fromWindowCandidates = readCandidates(
+                window as unknown as Record<string, unknown>
+            );
             if (fromWindowCandidates) return fromWindowCandidates;
         }
         const fromGlobalCandidates = readCandidates(g);
