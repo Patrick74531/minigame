@@ -4,6 +4,10 @@ import type {
     RuntimePlatform,
     SocialBridge,
 } from './RedditBridge';
+import {
+    getAllTikTokRewardedAdPlacements,
+    injectTikTokRewardedAdPlacementsToGlobal,
+} from './TikTokAdsConfig';
 
 type BridgeListener = (event: RedditBridgeCallback) => void;
 
@@ -54,6 +58,8 @@ export class TikTokBridge implements SocialBridge {
 
     public requestInit(): void {
         this._ensureIdentityReadyListener();
+        injectTikTokRewardedAdPlacementsToGlobal();
+        this._logRewardedAdPlacements();
 
         const injectedName = this._readInjectedTikTokName();
         if (injectedName) {
@@ -728,6 +734,14 @@ export class TikTokBridge implements SocialBridge {
             wave: entry.wave,
         }));
         this._saveLocalLeaderboard(localList);
+    }
+
+    private _logRewardedAdPlacements(): void {
+        const summary = getAllTikTokRewardedAdPlacements()
+            .map(entry => `${entry.slot}=${entry.placementId}`)
+            .join(', ');
+        if (!summary) return;
+        console.log(`[TikTokBridge] rewarded ad placements: ${summary}`);
     }
 
     private _emit(event: RedditBridgeCallback): void {

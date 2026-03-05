@@ -915,6 +915,31 @@ write_ttmg_dev_config() {
 EOF_JSON
 }
 
+apply_tiktok_app_id() {
+  local package_dir="$1"
+  local app_id="$2"
+  if [ -z "$app_id" ]; then
+    return 0
+  fi
+  local config_path="${package_dir}/project.config.json"
+  if [ ! -f "$config_path" ]; then
+    warn "Skip appid injection: ${config_path} not found."
+    return 0
+  fi
+
+  PROJECT_CONFIG_PATH="$config_path" TIKTOK_APP_ID_VALUE="$app_id" node <<'NODE'
+const fs = require('fs');
+const p = process.env.PROJECT_CONFIG_PATH;
+const appId = process.env.TIKTOK_APP_ID_VALUE;
+const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+data.appid = appId;
+if (!data.projectname) data.projectname = 'kingshit';
+fs.writeFileSync(p, `${JSON.stringify(data)}\n`);
+NODE
+
+  log "Applied TikTok appid to project.config.json: ${app_id}"
+}
+
 SKIP_COCOS_BUILD=0
 SOURCE_BUILD_DIR=""
 OUTPUT_PACKAGE_DIR="dist/tiktok-package/native"
@@ -930,6 +955,7 @@ SUBPACKAGE_NAME="gamecore"
 ENABLE_DEFERRED_RESOURCES_SPLIT=1
 DEFERRED_RESOURCES_SUBPACKAGE_NAME="resources"
 TIKTOK_API_BASE="${TIKTOK_API_BASE:-https://tiktok-leaderboard-prod.mineskystudio.workers.dev/api/tiktok}"
+TIKTOK_APP_ID="${TIKTOK_APP_ID:-}"
 
 usage() {
   cat <<'EOF_USAGE'
@@ -952,6 +978,7 @@ Options:
   --no-deferred-resources-split   Keep resources bundle in startup subpackage.
   --deferred-resources-name <n>   Deferred resources subpackage name. Default: resources
   --tiktok-api-base <url>         Inject window.__GVR_TIKTOK_API_BASE__ into package game.js
+  --tiktok-app-id <id>            Set project.config.json appid in packaged output.
   -h, --help                      Show this help.
 EOF_USAGE
 }
@@ -973,6 +1000,7 @@ while [ $# -gt 0 ]; do
     --no-deferred-resources-split) ENABLE_DEFERRED_RESOURCES_SPLIT=0 ;;
     --deferred-resources-name) DEFERRED_RESOURCES_SUBPACKAGE_NAME="$2"; shift ;;
     --tiktok-api-base) TIKTOK_API_BASE="$2"; shift ;;
+    --tiktok-app-id) TIKTOK_APP_ID="$2"; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "Unknown option: $1" ;;
   esac
@@ -1046,6 +1074,7 @@ fi
 
 log "Packaging from $SOURCE_BUILD_DIR"
 copy_dir_clean "$SOURCE_BUILD_DIR" "$OUTPUT_PACKAGE_DIR"
+apply_tiktok_app_id "$OUTPUT_PACKAGE_DIR" "$TIKTOK_APP_ID"
 find "$OUTPUT_PACKAGE_DIR" -type f \( -name "*.map" -o -name ".DS_Store" \) -delete
 
 if [ "$ENABLE_SUBPACKAGE_SPLIT" -eq 1 ]; then
