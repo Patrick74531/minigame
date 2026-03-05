@@ -213,7 +213,7 @@ export class BuildingManager {
             return;
         }
 
-        this._activeBuildings.push(buildingComp);
+        this.registerBuilding(buildingComp);
 
         // Link Building back to Pad for upgrades
         pad.onBuildingCreated(buildingComp);
@@ -267,6 +267,12 @@ export class BuildingManager {
 
     public get activeBuildings(): Building[] {
         return this._activeBuildings;
+    }
+
+    public registerBuilding(building: Building): void {
+        if (!building || !building.node || !building.node.isValid) return;
+        if (this._activeBuildings.includes(building)) return;
+        this._activeBuildings.push(building);
     }
 
     public get unitContainer(): Node | null {
@@ -663,9 +669,7 @@ export class BuildingManager {
             building.restoreToFullHealth();
             building.node.active = true;
 
-            if (!this._activeBuildings.includes(building)) {
-                this._activeBuildings.push(building);
-            }
+            this.registerBuilding(building);
 
             pad.initForExistingBuilding(building, Math.max(0, Math.floor(record.nextUpgradeCost)));
             pad.placeUpgradeZoneInFront(building.node, true);
@@ -722,9 +726,7 @@ export class BuildingManager {
             building.currentHp = Math.max(1, Math.floor(state.hpRatio * building.maxHp));
             building.node.active = true;
 
-            if (!this._activeBuildings.includes(building)) {
-                this._activeBuildings.push(building);
-            }
+            this.registerBuilding(building);
             pad.initForExistingBuilding(building, state.nextUpgradeCost);
             pad.placeUpgradeZoneInFront(building.node, true);
             pad.node.active = false;

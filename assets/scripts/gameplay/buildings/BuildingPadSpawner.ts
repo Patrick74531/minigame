@@ -188,6 +188,7 @@ export class BuildingPadSpawner {
                 );
                 continue;
             }
+            buildingManager.registerBuilding(building);
 
             const nextUpgradeCost = this.resolveInitialUpgradeCost();
             pad.initForExistingBuilding(building, nextUpgradeCost);
