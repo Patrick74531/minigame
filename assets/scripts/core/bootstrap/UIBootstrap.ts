@@ -3,6 +3,7 @@ import { UIFactory } from '../../ui/UIFactory';
 import { Joystick } from '../../ui/Joystick';
 import { HUDManager } from '../../ui/HUDManager';
 import { BuffCardUI } from '../../ui/BuffCardUI';
+import { TowerUpgradeCardUI } from '../../ui/TowerUpgradeCardUI';
 import { WeaponSelectUI } from '../../ui/WeaponSelectUI';
 import { WeaponBarUI } from '../../ui/WeaponBarUI';
 import { TowerSelectUI } from '../../ui/TowerSelectUI';
@@ -30,6 +31,7 @@ export class UIBootstrap {
 
         UIBootstrap.hudManager.initialize(canvas);
         UIBootstrap.buffCardUI.initialize(canvas);
+        UIBootstrap.towerUpgradeCardUI.initialize(canvas);
         UIBootstrap.weaponSelectUI.initialize(canvas);
         UIBootstrap.weaponBarUI.initialize(canvas);
         UIBootstrap.towerSelectUI.initialize(canvas);
@@ -47,6 +49,13 @@ export class UIBootstrap {
 
     private static get weaponSelectUI(): WeaponSelectUI {
         return ServiceRegistry.get<WeaponSelectUI>('WeaponSelectUI') ?? WeaponSelectUI.instance;
+    }
+
+    private static get towerUpgradeCardUI(): TowerUpgradeCardUI {
+        return (
+            ServiceRegistry.get<TowerUpgradeCardUI>('TowerUpgradeCardUI') ??
+            TowerUpgradeCardUI.instance
+        );
     }
 
     private static get towerSelectUI(): TowerSelectUI {

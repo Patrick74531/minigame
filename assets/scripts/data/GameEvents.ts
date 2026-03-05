@@ -86,6 +86,10 @@ export const GameEvents = {
     BUFF_CARDS_DRAWN: 'BUFF_CARDS_DRAWN',
     /** 玩家选择了一张增益卡牌 { cardId: string } */
     BUFF_CARD_PICKED: 'BUFF_CARD_PICKED',
+    /** 防御塔升级卡牌已抽取完毕，可展示选择界面 { buildingId: string, count: number } */
+    TOWER_UPGRADE_CARDS_DRAWN: 'TOWER_UPGRADE_CARDS_DRAWN',
+    /** 玩家选择了一张防御塔升级卡牌 { buildingId: string, stat: 'attack'|'range'|'speed' } */
+    TOWER_UPGRADE_CARD_PICKED: 'TOWER_UPGRADE_CARD_PICKED',
 
     // === 空投武器系统 ===
     /** 空投生成 { wave: number, position: Vec3 } */
@@ -196,6 +200,14 @@ export type GameEventPayloads = {
     [GameEvents.BASE_UPGRADE_READY]: { baseLevel: number; suppressCardDraw?: boolean };
     [GameEvents.BUFF_CARDS_DRAWN]: { count: number };
     [GameEvents.BUFF_CARD_PICKED]: { cardId: string };
+    [GameEvents.TOWER_UPGRADE_CARDS_DRAWN]: {
+        buildingId: string;
+        count: number;
+    };
+    [GameEvents.TOWER_UPGRADE_CARD_PICKED]: {
+        buildingId: string;
+        stat: 'attack' | 'range' | 'speed';
+    };
     [GameEvents.AIRDROP_SPAWNED]: { wave: number; position: Vec3 };
     [GameEvents.AIRDROP_OPENED]: void;
     [GameEvents.WEAPONS_OFFERED]: { weapons: string[] };

@@ -28,6 +28,7 @@ type TowerLanePolicy = {
     allowTopLane: boolean;
     allowBottomLane: boolean;
 };
+export type TowerFocusedUpgradeStat = 'attack' | 'range' | 'speed';
 
 /**
  * 防御塔
@@ -50,6 +51,7 @@ export class Tower extends Building {
     private static readonly TOWER_MG_MUZZLE_FALLBACK_Y = Tower.TOWER_MG.MUZZLE_FALLBACK_Y;
     private static readonly TOWER_MG_MUZZLE_TOP_INSET = Tower.TOWER_MG.MUZZLE_TOP_INSET;
     private static readonly MIN_RANGE_GAIN_PER_LEVEL = 0.35;
+    private static readonly FOCUSED_UPGRADE_SCALE = 2;
     private static _lanePolylines: Record<RouteLane, Array<{ x: number; z: number }>> | null = null;
 
     @property
@@ -229,16 +231,70 @@ export class Tower extends Building {
         const upgraded = super.upgrade();
         if (!upgraded) return false;
 
-        this.attackDamage = Math.floor(this.attackDamage * this.attackMultiplier);
-        const prevRange = this.attackRange;
-        const scaledRange = prevRange * this.rangeMultiplier;
-        this.attackRange = Math.max(scaledRange, prevRange + Tower.MIN_RANGE_GAIN_PER_LEVEL);
-        this.attackInterval = this.attackInterval * this.intervalMultiplier;
         if (this.chainRangePerLevel > 0) {
             this.chainRange += this.chainRangePerLevel;
         }
 
         return true;
+    }
+
+    public applyFocusedUpgrade(stat: TowerFocusedUpgradeStat): void {
+        if (stat === 'attack') {
+            this.attackDamage = Math.floor(
+                this.attackDamage * this.resolveFocusedAttackMultiplier()
+            );
+            return;
+        }
+
+        if (stat === 'range') {
+            const prevRange = this.attackRange;
+            const scaledRange = prevRange * this.resolveFocusedRangeMultiplier();
+            const minGain = Tower.MIN_RANGE_GAIN_PER_LEVEL * Tower.FOCUSED_UPGRADE_SCALE;
+            this.attackRange = Math.max(scaledRange, prevRange + minGain);
+            return;
+        }
+
+        this.attackInterval = this.attackInterval * this.resolveFocusedIntervalMultiplier();
+    }
+
+    public getFocusedUpgradePreview(stat: TowerFocusedUpgradeStat): {
+        multiply: number;
+        minRangeGain?: number;
+    } {
+        if (stat === 'attack') {
+            return { multiply: this.resolveFocusedAttackMultiplier() };
+        }
+        if (stat === 'range') {
+            return {
+                multiply: this.resolveFocusedRangeMultiplier(),
+                minRangeGain: Tower.MIN_RANGE_GAIN_PER_LEVEL * Tower.FOCUSED_UPGRADE_SCALE,
+            };
+        }
+        return { multiply: this.resolveFocusedIntervalMultiplier() };
+    }
+
+    private resolveFocusedAttackMultiplier(): number {
+        return Tower.scalePositiveMultiplier(this.attackMultiplier);
+    }
+
+    private resolveFocusedRangeMultiplier(): number {
+        return Tower.scalePositiveMultiplier(this.rangeMultiplier);
+    }
+
+    private resolveFocusedIntervalMultiplier(): number {
+        return Tower.scaleReductionMultiplier(this.intervalMultiplier);
+    }
+
+    private static scalePositiveMultiplier(baseMultiplier: number): number {
+        if (!Number.isFinite(baseMultiplier)) return 1;
+        const increase = Math.max(0, baseMultiplier - 1);
+        return 1 + increase * Tower.FOCUSED_UPGRADE_SCALE;
+    }
+
+    private static scaleReductionMultiplier(baseMultiplier: number): number {
+        if (!Number.isFinite(baseMultiplier)) return 1;
+        const reduction = Math.max(0, 1 - baseMultiplier);
+        return Math.max(0.05, 1 - reduction * Tower.FOCUSED_UPGRADE_SCALE);
     }
 
     private shoot(target: Node): void {

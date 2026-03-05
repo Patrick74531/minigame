@@ -139,6 +139,7 @@ export class GameController extends Component {
 
         // Initialize roguelike card system
         this._services.buffCardService.initialize();
+        this._services.towerUpgradeCardService.initialize();
 
         // Initialize item system (boss chest drops)
         this._services.itemService.initialize();
@@ -195,7 +196,9 @@ export class GameController extends Component {
         this._services.effectManager.cleanup();
         this._services.coinDropManager.cleanup();
         this._services.buffCardService.cleanup();
+        this._services.towerUpgradeCardService.cleanup();
         this._services.buffCardUI.cleanup();
+        this._services.towerUpgradeCardUI.cleanup();
         this._services.heroWeaponManager.cleanup();
         this._services.airdropService.cleanup();
         this._services.weaponSelectUI.cleanup();

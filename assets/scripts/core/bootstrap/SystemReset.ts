@@ -5,6 +5,7 @@ import { WaveService } from '../managers/WaveService';
 import { PoolManager } from '../managers/PoolManager';
 import { HUDManager } from '../../ui/HUDManager';
 import { BuffCardUI } from '../../ui/BuffCardUI';
+import { TowerUpgradeCardUI } from '../../ui/TowerUpgradeCardUI';
 import { TowerSelectUI } from '../../ui/TowerSelectUI';
 import { WeaponSelectUI } from '../../ui/WeaponSelectUI';
 import { WeaponBarUI } from '../../ui/WeaponBarUI';
@@ -13,6 +14,7 @@ import { BuildingRegistry } from '../../gameplay/buildings/BuildingRegistry';
 import { WaveManager } from '../../gameplay/wave/WaveManager';
 import { CoinDropManager } from '../../gameplay/economy/CoinDropManager';
 import { BuffCardService } from '../../gameplay/roguelike/BuffCardService';
+import { TowerUpgradeCardService } from '../../gameplay/roguelike/TowerUpgradeCardService';
 import { HeroWeaponManager } from '../../gameplay/weapons/HeroWeaponManager';
 import { AirdropService } from '../../gameplay/airdrop/AirdropService';
 import { HeroLevelSystem } from '../../gameplay/units/HeroLevelSystem';
@@ -66,6 +68,7 @@ export class SystemReset {
         CoinDropManager.destroyInstance();
         HeroLevelSystem.destroyInstance();
         BuffCardService.destroyInstance();
+        TowerUpgradeCardService.destroyInstance();
         HeroWeaponManager.destroyInstance();
         AirdropService.destroyInstance();
 
@@ -76,6 +79,7 @@ export class SystemReset {
         // UI
         HUDManager.destroyInstance();
         BuffCardUI.destroyInstance();
+        TowerUpgradeCardUI.destroyInstance();
         TowerSelectUI.destroyInstance();
         WeaponSelectUI.destroyInstance();
         WeaponBarUI.destroyInstance();

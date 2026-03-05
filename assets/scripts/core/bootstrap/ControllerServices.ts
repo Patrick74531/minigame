@@ -10,6 +10,8 @@ import { WaveManager } from '../../gameplay/wave/WaveManager';
 import { CoinDropManager } from '../../gameplay/economy/CoinDropManager';
 import { BuffCardService } from '../../gameplay/roguelike/BuffCardService';
 import { BuffCardUI } from '../../ui/BuffCardUI';
+import { TowerUpgradeCardService } from '../../gameplay/roguelike/TowerUpgradeCardService';
+import { TowerUpgradeCardUI } from '../../ui/TowerUpgradeCardUI';
 import { HeroWeaponManager } from '../../gameplay/weapons/HeroWeaponManager';
 import { AirdropService } from '../../gameplay/airdrop/AirdropService';
 import { WeaponSelectUI } from '../../ui/WeaponSelectUI';
@@ -66,6 +68,20 @@ export class ControllerServices {
 
     public get buffCardUI(): BuffCardUI {
         return ServiceRegistry.get<BuffCardUI>('BuffCardUI') ?? BuffCardUI.instance;
+    }
+
+    public get towerUpgradeCardService(): TowerUpgradeCardService {
+        return (
+            ServiceRegistry.get<TowerUpgradeCardService>('TowerUpgradeCardService') ??
+            TowerUpgradeCardService.instance
+        );
+    }
+
+    public get towerUpgradeCardUI(): TowerUpgradeCardUI {
+        return (
+            ServiceRegistry.get<TowerUpgradeCardUI>('TowerUpgradeCardUI') ??
+            TowerUpgradeCardUI.instance
+        );
     }
 
     public get heroWeaponManager(): HeroWeaponManager {
