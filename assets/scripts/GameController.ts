@@ -74,6 +74,7 @@ export class GameController extends Component {
     private _deferStartupLoadsForTikTok: boolean = false;
     private _deferRuntimeMediaBootstrapForTikTok: boolean = false;
     private _runtimeMediaBootstrapped: boolean = false;
+    private _runtimeAudioBootstrapped: boolean = false;
 
     // === 生命周期 ===
 
@@ -248,6 +249,9 @@ export class GameController extends Component {
                 this._services.itemCardUI.initialize(this._uiCanvas!);
                 this._services.itemBarUI.initialize(this._uiCanvas!);
             },
+            onAudioPreferenceSelected: (enabled: boolean) => {
+                this.applyAudioPreference(enabled);
+            },
         };
         GameStartFlow.run(ctx);
     }
@@ -362,8 +366,34 @@ export class GameController extends Component {
         this._runtimeMediaBootstrapped = true;
 
         WeaponVFX.initialize();
+    }
+
+    private bootstrapRuntimeAudioSystems(): void {
+        if (this._runtimeAudioBootstrapped) return;
+        this._runtimeAudioBootstrapped = true;
         AudioSettingsManager.instance.initialize(this.node);
         WeaponSFXManager.initialize(this.node);
+    }
+
+    private applyAudioPreference(enabled: boolean): void {
+        if (enabled) {
+            const audio = AudioSettingsManager.instance;
+            if (audio.bgmVolume <= 0.001 && audio.sfxVolume <= 0.001) {
+                audio.setBgmVolume(0.3);
+                audio.setSfxVolume(0.3);
+            }
+            this.bootstrapRuntimeAudioSystems();
+            WeaponSFXManager.refreshVolumes();
+            return;
+        }
+
+        AudioSettingsManager.instance.setBgmVolume(0);
+        AudioSettingsManager.instance.setSfxVolume(0);
+        if (!this._runtimeAudioBootstrapped) return;
+
+        WeaponSFXManager.cleanup();
+        AudioSettingsManager.instance.cleanup();
+        this._runtimeAudioBootstrapped = false;
     }
 
     // === 升级 VFX ===

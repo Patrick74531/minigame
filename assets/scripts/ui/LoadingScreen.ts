@@ -1,5 +1,7 @@
 import {
     _decorator,
+    BlockInputEvents,
+    Button,
     Component,
     Node,
     Sprite,
@@ -35,6 +37,10 @@ const TIP_KEYS = [
     'ui.loading.tip.spa',
     'ui.loading.tip.lanes',
 ];
+const AUDIO_PROMPT_TITLE_KEY = 'ui.loading.audio_prompt.title';
+const AUDIO_PROMPT_BODY_KEY = 'ui.loading.audio_prompt.body';
+const AUDIO_PROMPT_ENABLE_KEY = 'ui.loading.audio_prompt.enable';
+const AUDIO_PROMPT_DISABLE_KEY = 'ui.loading.audio_prompt.disable';
 
 /**
  * LoadingScreen
@@ -64,6 +70,10 @@ export class LoadingScreen extends Component {
     private _elapsed = 0;
 
     private _uiLayer = Layers.Enum.UI_2D;
+    private _audioPromptOverlay: Node | null = null;
+    private _audioChoicePromise: Promise<boolean> | null = null;
+    private _audioChoiceResolver: ((enabled: boolean) => void) | null = null;
+    private _audioChoiceResolved = false;
 
     // ── Public API ─────────────────────────────────────────────────────────
 
@@ -91,16 +101,30 @@ export class LoadingScreen extends Component {
         this._tryComplete();
     }
 
+    public waitForAudioChoice(): Promise<boolean> {
+        return this._ensureAudioChoicePromise();
+    }
+
     // ── Lifecycle ──────────────────────────────────────────────────────────
 
     protected onLoad(): void {
         this._buildUI();
         this._shuffleTips();
         this._showTip(0);
+        this._ensureAudioChoicePromise();
+        this._buildAudioPrompt();
         this.scheduleOnce(() => {
             this._minDurationElapsed = true;
             this._tryComplete();
         }, this.MIN_DURATION);
+    }
+
+    protected onDestroy(): void {
+        if (this._audioChoiceResolved) return;
+        this._audioChoiceResolved = true;
+        const resolver = this._audioChoiceResolver;
+        this._audioChoiceResolver = null;
+        resolver?.(false);
     }
 
     protected update(dt: number): void {
@@ -314,6 +338,217 @@ export class LoadingScreen extends Component {
         lbl.enableWrapText = true;
         applyGameLabelStyle(lbl, { outlineWidth: 2, outlineColor: new Color(0, 0, 0, 200) });
         this._tipLabel = lbl;
+    }
+
+    private _buildAudioPrompt(): void {
+        if (this._audioPromptOverlay && this._audioPromptOverlay.isValid) return;
+
+        const sz = this._canvasSize();
+        const shortSide = Math.max(1, Math.min(sz.w, sz.h));
+        const aspect = sz.w / Math.max(1, sz.h);
+        const isPortrait = sz.h >= sz.w;
+        const useVerticalButtons = isPortrait || aspect <= 1.25;
+
+        const overlay = new Node('AudioPromptOverlay');
+        overlay.layer = this._uiLayer;
+        this.node.addChild(overlay);
+        overlay.addComponent(UITransform).setContentSize(sz.w, sz.h);
+        const ow = overlay.addComponent(Widget);
+        ow.isAlignTop = ow.isAlignBottom = ow.isAlignLeft = ow.isAlignRight = true;
+        ow.top = ow.bottom = ow.left = ow.right = 0;
+        overlay.addComponent(BlockInputEvents);
+        const og = overlay.addComponent(Graphics);
+        og.fillColor = new Color(0, 0, 0, 188);
+        og.rect(-sz.w / 2, -sz.h / 2, sz.w, sz.h);
+        og.fill();
+        this._audioPromptOverlay = overlay;
+
+        const panel = new Node('AudioPromptPanel');
+        panel.layer = this._uiLayer;
+        overlay.addChild(panel);
+        const panelW = Math.round(
+            UIResponsive.clamp(isPortrait ? sz.w * 0.88 : shortSide * 0.92, 280, 720)
+        );
+        const panelH = Math.round(
+            UIResponsive.clamp(isPortrait ? sz.h * 0.38 : sz.h * 0.46, 220, 400)
+        );
+        panel.addComponent(UITransform).setContentSize(panelW, panelH);
+        panel.setPosition(0, 0, 0);
+        const pg = panel.addComponent(Graphics);
+        const radius = Math.max(14, Math.round(panelH * 0.1));
+        pg.fillColor = new Color(20, 24, 40, 246);
+        pg.roundRect(-panelW / 2, -panelH / 2, panelW, panelH, radius);
+        pg.fill();
+        pg.strokeColor = new Color(255, 214, 120, 220);
+        pg.lineWidth = Math.max(2, Math.round(panelH * 0.01));
+        pg.roundRect(-panelW / 2, -panelH / 2, panelW, panelH, radius);
+        pg.stroke();
+
+        const titleNode = new Node('AudioPromptTitle');
+        titleNode.layer = this._uiLayer;
+        panel.addChild(titleNode);
+        titleNode
+            .addComponent(UITransform)
+            .setContentSize(panelW - 42, Math.round(UIResponsive.clamp(panelH * 0.22, 46, 92)));
+        titleNode.setPosition(0, Math.round(panelH * 0.28), 0);
+        const titleLabel = titleNode.addComponent(Label);
+        titleLabel.string = Localization.instance.t(AUDIO_PROMPT_TITLE_KEY);
+        titleLabel.fontSize = Math.round(UIResponsive.clamp(shortSide * 0.06, 22, 44));
+        titleLabel.lineHeight = titleLabel.fontSize + 6;
+        titleLabel.isBold = true;
+        titleLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        titleLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        titleLabel.color = new Color(255, 236, 184, 255);
+        titleLabel.overflow = Label.Overflow.SHRINK;
+        applyGameLabelStyle(titleLabel, { outlineWidth: 3, outlineColor: new Color(0, 0, 0, 180) });
+
+        const bodyNode = new Node('AudioPromptBody');
+        bodyNode.layer = this._uiLayer;
+        panel.addChild(bodyNode);
+        bodyNode
+            .addComponent(UITransform)
+            .setContentSize(panelW - 56, Math.round(UIResponsive.clamp(panelH * 0.35, 78, 180)));
+        bodyNode.setPosition(0, Math.round(panelH * 0.03), 0);
+        const bodyLabel = bodyNode.addComponent(Label);
+        bodyLabel.string = Localization.instance.t(AUDIO_PROMPT_BODY_KEY);
+        bodyLabel.fontSize = Math.round(UIResponsive.clamp(shortSide * 0.038, 15, 30));
+        bodyLabel.lineHeight = bodyLabel.fontSize + 7;
+        bodyLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        bodyLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        bodyLabel.color = new Color(236, 244, 255, 255);
+        bodyLabel.overflow = Label.Overflow.RESIZE_HEIGHT;
+        bodyLabel.enableWrapText = true;
+        applyGameLabelStyle(bodyLabel, { outlineWidth: 2, outlineColor: new Color(0, 0, 0, 172) });
+
+        const btnHeight = Math.round(UIResponsive.clamp(shortSide * 0.09, 42, 72));
+        if (useVerticalButtons) {
+            const btnW = Math.round(UIResponsive.clamp(panelW * 0.8, 180, panelW - 30));
+            const gap = Math.round(UIResponsive.clamp(shortSide * 0.03, 10, 20));
+            const firstY = -Math.round(panelH * 0.2);
+            this._createAudioPromptButton(
+                panel,
+                'EnableAudioBtn',
+                Localization.instance.t(AUDIO_PROMPT_ENABLE_KEY),
+                btnW,
+                btnHeight,
+                0,
+                firstY,
+                new Color(74, 198, 114, 255),
+                () => this._resolveAudioChoice(true)
+            );
+            this._createAudioPromptButton(
+                panel,
+                'DisableAudioBtn',
+                Localization.instance.t(AUDIO_PROMPT_DISABLE_KEY),
+                btnW,
+                btnHeight,
+                0,
+                firstY - btnHeight - gap,
+                new Color(78, 92, 116, 255),
+                () => this._resolveAudioChoice(false)
+            );
+            return;
+        }
+
+        const btnGap = Math.round(UIResponsive.clamp(panelW * 0.08, 20, 56));
+        const btnW = Math.round((panelW - btnGap * 3) * 0.5);
+        const btnY = -Math.round(panelH * 0.26);
+        this._createAudioPromptButton(
+            panel,
+            'EnableAudioBtn',
+            Localization.instance.t(AUDIO_PROMPT_ENABLE_KEY),
+            btnW,
+            btnHeight,
+            -(btnW * 0.5 + btnGap * 0.5),
+            btnY,
+            new Color(74, 198, 114, 255),
+            () => this._resolveAudioChoice(true)
+        );
+        this._createAudioPromptButton(
+            panel,
+            'DisableAudioBtn',
+            Localization.instance.t(AUDIO_PROMPT_DISABLE_KEY),
+            btnW,
+            btnHeight,
+            btnW * 0.5 + btnGap * 0.5,
+            btnY,
+            new Color(78, 92, 116, 255),
+            () => this._resolveAudioChoice(false)
+        );
+    }
+
+    private _createAudioPromptButton(
+        parent: Node,
+        name: string,
+        text: string,
+        width: number,
+        height: number,
+        x: number,
+        y: number,
+        bgColor: Color,
+        onClick: () => void
+    ): Node {
+        const btn = new Node(name);
+        btn.layer = this._uiLayer;
+        parent.addChild(btn);
+        btn.addComponent(UITransform).setContentSize(width, height);
+        btn.setPosition(x, y, 0);
+
+        const bg = btn.addComponent(Graphics);
+        const radius = Math.max(10, Math.round(height * 0.24));
+        bg.fillColor = bgColor;
+        bg.roundRect(-width / 2, -height / 2, width, height, radius);
+        bg.fill();
+        bg.strokeColor = new Color(255, 255, 255, 180);
+        bg.lineWidth = Math.max(1.5, Math.round(height * 0.04));
+        bg.roundRect(-width / 2, -height / 2, width, height, radius);
+        bg.stroke();
+
+        const labelNode = new Node('Label');
+        labelNode.layer = this._uiLayer;
+        btn.addChild(labelNode);
+        labelNode.addComponent(UITransform).setContentSize(width - 10, height - 4);
+        const label = labelNode.addComponent(Label);
+        label.string = text;
+        label.fontSize = Math.round(UIResponsive.clamp(height * 0.4, 16, 30));
+        label.lineHeight = label.fontSize + 4;
+        label.isBold = true;
+        label.horizontalAlign = Label.HorizontalAlign.CENTER;
+        label.verticalAlign = Label.VerticalAlign.CENTER;
+        label.color = new Color(250, 250, 250, 255);
+        label.overflow = Label.Overflow.SHRINK;
+        applyGameLabelStyle(label, { outlineWidth: 2, outlineColor: new Color(0, 0, 0, 160) });
+
+        const button = btn.addComponent(Button);
+        button.transition = Button.Transition.SCALE;
+        btn.on(Button.EventType.CLICK, onClick, this);
+        return btn;
+    }
+
+    private _ensureAudioChoicePromise(): Promise<boolean> {
+        if (this._audioChoicePromise) return this._audioChoicePromise;
+        this._audioChoicePromise = new Promise<boolean>(resolve => {
+            this._audioChoiceResolver = resolve;
+        });
+        return this._audioChoicePromise;
+    }
+
+    private _resolveAudioChoice(enabled: boolean): void {
+        if (this._audioChoiceResolved) return;
+        this._audioChoiceResolved = true;
+        const resolver = this._audioChoiceResolver;
+        this._audioChoiceResolver = null;
+        resolver?.(enabled);
+
+        const overlay = this._audioPromptOverlay;
+        this._audioPromptOverlay = null;
+        if (!overlay || !overlay.isValid) return;
+        tween(overlay)
+            .to(0.14, { scale: new Vec3(1.02, 1.02, 1) })
+            .call(() => {
+                if (overlay.isValid) overlay.destroy();
+            })
+            .start();
     }
 
     private _shuffleTips(): void {

@@ -35,6 +35,7 @@ export type StartContext = {
         ui: Node;
     };
     onSpawned?: (base: Node, hero: Node) => void;
+    onAudioPreferenceSelected?: (enabled: boolean) => void;
     showHomePage?: boolean;
     saveData?: GameSaveDataV2 | null;
 };
@@ -99,37 +100,56 @@ export class GameStartFlow {
         const screen = LoadingScreen.show(ctx.containers.ui, () => {
             GameResourceLoader.loadPhase2();
         });
-
-        GameResourceLoader.loadPhase1((loaded, total) => {
-            if (screen.isValid) screen.setProgress(loaded, total);
-        })
-            .then(() => {
-                // Phase 1 in CPU memory. Start game NOW while loading screen covers the scene.
-                // The 3D scene renders behind the loading screen, uploading GPU textures.
-                this.startGame(ctx);
-                this.gameManager.startGame();
-                // Restore coins/score AFTER gameManager.startGame() which resets them to INITIAL_COINS.
-                if (ctx.saveData) {
-                    this.gameManager.setCoins(ctx.saveData.coins);
-                    this.gameManager.setScore(ctx.saveData.score);
-                }
-                // GPU warmup: wait 1.0 s (~60 frames) for textures to upload before revealing scene.
-                if (screen.isValid) {
-                    screen.scheduleOnce(() => {
-                        if (screen.isValid) screen.signalReadyToClose();
-                    }, 1.0);
-                }
+        const audioChoicePromise: Promise<boolean> = screen
+            .waitForAudioChoice()
+            .then(enabled => {
+                ctx.onAudioPreferenceSelected?.(enabled);
+                return enabled;
             })
-            .catch(() => {
-                // On any load error still enter game
-                this.startGame(ctx);
-                this.gameManager.startGame();
-                if (ctx.saveData) {
-                    this.gameManager.setCoins(ctx.saveData.coins);
-                    this.gameManager.setScore(ctx.saveData.score);
-                }
-                if (screen.isValid) screen.signalReadyToClose();
+            .catch(err => {
+                console.warn(
+                    '[GameStartFlow] Failed to resolve audio preference. Fallback to disabled.',
+                    err
+                );
+                ctx.onAudioPreferenceSelected?.(false);
+                return false;
             });
+
+        const phase1ReadyPromise: Promise<boolean> = GameResourceLoader.loadPhase1(
+            (loaded, total) => {
+                if (screen.isValid) screen.setProgress(loaded, total);
+            }
+        )
+            .then(() => true)
+            .catch(err => {
+                console.warn(
+                    '[GameStartFlow] Phase1 resource load failed, continue to gameplay.',
+                    err
+                );
+                return false;
+            });
+
+        Promise.all([phase1ReadyPromise, audioChoicePromise]).then(([phase1Ready]) => {
+            // Phase 1 in CPU memory. Start game NOW while loading screen covers the scene.
+            // The 3D scene renders behind the loading screen, uploading GPU textures.
+            this.startGame(ctx);
+            this.gameManager.startGame();
+            // Restore coins/score AFTER gameManager.startGame() which resets them to INITIAL_COINS.
+            if (ctx.saveData) {
+                this.gameManager.setCoins(ctx.saveData.coins);
+                this.gameManager.setScore(ctx.saveData.score);
+            }
+            if (!screen.isValid) return;
+            if (phase1Ready) {
+                // GPU warmup: wait 1.0 s (~60 frames) for textures to upload before revealing scene.
+                screen.scheduleOnce(() => {
+                    if (screen.isValid) screen.signalReadyToClose();
+                }, 1.0);
+                return;
+            }
+            // If phase 1 failed, avoid extra warmup delay and reveal immediately.
+            screen.signalReadyToClose();
+        });
     }
 
     private static ensureTikTokResourcesBundleReady(): Promise<void> {

@@ -169,6 +169,11 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.loading.tip.farm': '金矿稳定产出金币，越早建越快积累建造资源。',
         'ui.loading.tip.spa': '温泉可以治疗英雄，血量低时别忘了靠近补血！',
         'ui.loading.tip.lanes': '敌人会从中、上、下三条路线入侵，合理分配防御力量。',
+        'ui.loading.audio_prompt.title': '是否开启音效？',
+        'ui.loading.audio_prompt.body':
+            '已进入加载阶段。你可以现在决定本局是否播放背景音乐与战斗音效。',
+        'ui.loading.audio_prompt.enable': '开启音效',
+        'ui.loading.audio_prompt.disable': '静音开始',
 
         'enemy.archetype.boss_robot_flying': '飞行机甲',
         'enemy.archetype.boss_robot_large': '巨型机甲',
@@ -400,6 +405,11 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.loading.tip.spa': 'Hot Springs heal Grandma. Swing by when your health gets low!',
         'ui.loading.tip.lanes':
             'Enemies attack from Center, Top, and Bottom lanes. Spread your defenses wisely.',
+        'ui.loading.audio_prompt.title': 'Enable audio for this run?',
+        'ui.loading.audio_prompt.body':
+            'Loading has started. Choose whether this run should play BGM and battle sound effects.',
+        'ui.loading.audio_prompt.enable': 'Enable Audio',
+        'ui.loading.audio_prompt.disable': 'Start Muted',
 
         'enemy.archetype.boss_robot_flying': 'Flying Warbot',
         'enemy.archetype.boss_robot_large': 'Titan Warbot',

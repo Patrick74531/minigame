@@ -68,6 +68,16 @@ export class AudioSettingsManager {
         this._bgmVolume = this.clampVolume(value);
         this.saveVolume(STORAGE_KEY_BGM, this._bgmVolume);
         this.applyBgmVolume();
+        if (this._bgmVolume <= 0) {
+            if (this._bgmSource && this._bgmSource.isValid && this._bgmSource.playing) {
+                this._bgmSource.stop();
+            }
+            return;
+        }
+
+        this.ensureRoot();
+        this.ensureBgmSource();
+        this.ensureBgmClipLoaded();
     }
 
     public setSfxVolume(value: number): void {

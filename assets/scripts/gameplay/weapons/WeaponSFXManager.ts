@@ -70,10 +70,15 @@ export class WeaponSFXManager {
         this._ensureRoot(parent);
         this._ensureAllSources();
         this.refreshVolumes();
-        this._preloadAllClips();
+        if (this.isSfxAudible()) {
+            this._preloadAllClips();
+        }
     }
 
     public static refreshVolumes(): void {
+        if (!this.isSfxAudible()) {
+            this.stopAllLoops();
+        }
         const keys: WeaponSfxKey[] = ['fire', 'gun', 'laser', 'disturb', 'chainsaw'];
         for (const key of keys) {
             const source = this._sources[key];
@@ -122,6 +127,10 @@ export class WeaponSFXManager {
         isAttacking: boolean
     ): void {
         if (!owner || !owner.isValid) return;
+        if (!this.isSfxAudible()) {
+            this.stopAllLoops(owner);
+            return;
+        }
         this._ensureRoot();
 
         const desiredKey =
@@ -169,6 +178,7 @@ export class WeaponSFXManager {
     }
 
     public static playOneShot(key: WeaponSfxKey): void {
+        if (!this.isSfxAudible()) return;
         this._ensureRoot();
         const source = this._getOrCreateSource(key);
         const clip = this._clips[key];
@@ -286,6 +296,7 @@ export class WeaponSFXManager {
     }
 
     private static _ensureLoopPlaying(key: LoopSfxKey): void {
+        if (!this.isSfxAudible()) return;
         const source = this._getOrCreateSource(key);
         const clip = this._clips[key];
         if (!source) return;
@@ -305,5 +316,9 @@ export class WeaponSFXManager {
     private static resolveEffectiveVolume(key: WeaponSfxKey): number {
         const globalSfx = AudioSettingsManager.instance.sfxVolume;
         return Math.max(0, Math.min(1, this.VOLUMES[key] * globalSfx));
+    }
+
+    private static isSfxAudible(): boolean {
+        return AudioSettingsManager.instance.sfxVolume > 0.001;
     }
 }
