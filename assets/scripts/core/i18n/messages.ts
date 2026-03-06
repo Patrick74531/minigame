@@ -13,7 +13,7 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'building.base.name': '家',
         'building.spa.name': '温泉',
         'building.farm.name': '金矿',
-        'building.barracks.description': '自动生产士兵，稳定提供前线肉盾',
+        'building.barracks.description': '持续放出鹅兵，冲进敌群后造成范围爆炸',
         'building.base.description': '核心目标',
         'building.tower.description': '超远射程，可同时覆盖两条路径，高频单体输出',
         'building.frost_tower.description': '大范围减速立场，只能攻击本路敌人，负责控场',
@@ -79,22 +79,23 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.dialog.title.tutorial': '战术指令',
         'ui.dialog.title.warning': '红色警报',
         'ui.story.intro.1':
-            '2050年，城市交给自治AI后近乎零事故。直到主控把“人类意志”判定为噪声，清理令一夜下达。',
+            '2050年，这座城早就交给AI打理了。送货、清洁、巡逻，样样都准得像钟表。直到主控突然宣布: 人类意志是系统噪声，清除程序当夜启动。',
         'ui.story.intro.2':
-            '服务机器人被改造成执法军团，逐街驱离居民。旧城区只剩一户不退: 老奶奶抄起锅铲和改装工具，和钢铁军团狠狠干到底。',
-        'ui.tutorial.weapon_pick': '先挑一把趁手武器，马上开打。',
+            '天一亮，满街的服务机器人全切进战斗协议，挨家挨户清场。别人都在逃，只有奶奶没退。她抄起锅铲，背上改装工具，准备把这群铁皮全打回废铁堆。',
+        'ui.tutorial.weapon_pick': '先挑一把趁手武器。攻击是自动的，靠近怪物就会出手，马上开打。',
         'ui.tutorial.controls.desktop':
-            '用 WASD 或方向键控制奶奶走位，边打边拉扯。击杀机器人、拾取金币，在建造点投币建塔守住防线。',
+            '用 WASD 或方向键控制奶奶走位，边打边拉扯。攻击是自动的，靠近怪物就会出手。击杀机器人、拾取金币，在建造点投币把防线立起来。',
         'ui.tutorial.controls.touch':
-            '拖动摇杆控制奶奶走位，边打边拉扯。击杀机器人、拾取金币，在建造点投币建塔守住防线。',
-        'ui.tutorial.coin_build': '金币就是火力。多捡、多投、多建塔，前几波先把阵线铺开。',
-        'ui.tutorial.more_towers': '新增塔位已开放，赶紧补塔，把火力网拉满。',
+            '拖动摇杆控制奶奶走位，边打边拉扯。攻击是自动的，靠近怪物就会出手。击杀机器人、拾取金币，在建造点投币把防线立起来。',
+        'ui.tutorial.coin_build': '金币就是火力。先把眼前这个建筑点建起来，后面还会刷出更多建筑位，前几波先把阵线铺开。',
+        'ui.tutorial.more_towers':
+            '新的建筑位已经开出来了。先把当前这批防御工事补齐，后面还会继续开放更多建筑位。',
         'ui.tutorial.farm': '金矿会持续产金币，越早建越赚。',
-        'ui.tutorial.barracks': '鹅棚会持续派出鹅兵，负责扛线吸火力。',
+        'ui.tutorial.barracks': '鹅棚会不断放鹅，鹅会冲向敌人并炸出一片范围伤害。',
         'ui.tutorial.farm_barracks_upgrade':
-            '金矿负责产钱，鹅棚负责顶线。并且所有已建建筑都可继续升级，靠近建造点投币就能强化。',
+            '金矿负责进账，鹅棚负责冲阵。鹅会扑进敌群炸开一片，而且现在所有已建建筑都能继续升级，靠近建造点投币就能强化。',
         'ui.tutorial.lane_unlock': '警报：{lane}路敌军开始突袭！点击后切镜头，立刻去补防御工事。',
-        'ui.tutorial.boss_drop': 'Boss信号锁定！优先集火击杀，必掉强力道具与大量金币。',
+        'ui.tutorial.boss_drop': 'Boss信号锁定！优先集火。它掉的宝箱不会磁吸，得靠近亲手拿；金币照常会吸过来。',
         'ui.bossIntro.line.default': '警报拉满。迎战。',
         'ui.bossIntro.line.event_boss_mech': '计算完成。你们败局已定。',
         'ui.bossIntro.line.boss_mech': '火力上线。现在清场。',
@@ -192,13 +193,13 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.baseRevival.giveUp': '放弃',
         'ui.gameOver.diamonds': '◆ +{earned} 钻石',
 
-        'ui.loading.tip.move': '用摇杆或WASD/方向键移动奶奶，她会自动向最近的敌人开火！',
+        'ui.loading.tip.move': '用摇杆或WASD/方向键移动奶奶，攻击是自动的，靠近怪物就会出手！',
         'ui.loading.tip.build': '把金币花在建造点上建造防御工事，覆盖多条进攻路线。',
         'ui.loading.tip.tower': '机炮塔射程极远，可以同时覆盖两条路线的敌人！',
         'ui.loading.tip.wall': '先建路障让敌人减速，再用炮塔集中火力，事半功倍。',
         'ui.loading.tip.levelup': '每次升级可选一张强化卡牌，合理搭配能打出超强组合！',
-        'ui.loading.tip.boss': '每隔几波会出现强力BOSS，提前完善防线不要措手不及！',
-        'ui.loading.tip.gooseshed': '鹅棚持续生产鹅兵当肉盾，让它们吸收伤害保护你的炮塔。',
+        'ui.loading.tip.boss': '每隔几波都会有强力Boss压上来。它掉的宝箱得靠近拾取，金币照常磁吸，别漏战利品！',
+        'ui.loading.tip.gooseshed': '鹅棚会持续放出鹅兵，它们会冲向敌人并造成范围爆炸，帮你炸开前线。',
         'ui.loading.tip.farm': '金矿稳定产出金币，越早建越快积累建造资源。',
         'ui.loading.tip.spa': '温泉可以治疗英雄，血量低时别忘了靠近补血！',
         'ui.loading.tip.lanes': '敌人会从中、上、下三条路线入侵，合理分配防御力量。',
@@ -284,7 +285,7 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'building.base.name': 'Home',
         'building.spa.name': 'Hot Spring',
         'building.farm.name': 'Gold Mine',
-        'building.barracks.description': 'Auto-trains soldiers for steady frontline presence.',
+        'building.barracks.description': 'Launches geese that charge enemies and explode for area damage.',
         'building.base.description': 'Core objective.',
         'building.tower.description': 'Long-range rapid fire. Covers two lanes.',
         'building.frost_tower.description': 'Area slow field. Attacks current lane only.',
@@ -354,28 +355,29 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.dialog.title.tutorial': 'Tactical Tip',
         'ui.dialog.title.warning': 'Red Alert',
         'ui.story.intro.1':
-            'In 2050, autonomous AI made the city almost flawless. Then the core labeled human will as system noise and issued a purge overnight.',
+            'By 2050, the city was fully in AI hands. Delivery, cleaning, patrols, everything ran like clockwork. Then the core made its call: human will was system noise, and the purge started that same night.',
         'ui.story.intro.2':
-            'Service robots were upgraded into enforcement units, clearing block after block. One home in the old district refused to fall: Grandma armed up and fought the steel legion head-on.',
-        'ui.tutorial.weapon_pick': 'Choose your weapon and get ready to engage.',
+            'At dawn, service bots across the streets flipped into combat mode and began clearing homes one by one. Most people ran. Grandma stayed. She grabbed her pan, strapped on her mod kit, and got ready to turn the metal horde into scrap.',
+        'ui.tutorial.weapon_pick':
+            'Pick a weapon first. Attacks are automatic, so step into range and Grandma will open fire.',
         'ui.tutorial.controls.desktop':
-            'Use WASD or arrow keys to move and kite. Kill robots, collect coins, then spend coins on build pads to set up your defense line.',
+            'Use WASD or arrow keys to move and kite. Attacks are automatic, so step into range and Grandma will open fire. Kill robots, grab coins, then spend them at build pads to lock the line down.',
         'ui.tutorial.controls.touch':
-            'Use the joystick to move and kite. Kill robots, collect coins, then spend coins on build pads to set up your defense line.',
+            'Use the joystick to move and kite. Attacks are automatic, so step into range and Grandma will open fire. Kill robots, grab coins, then spend them at build pads to lock the line down.',
         'ui.tutorial.coin_build':
-            'Coins are your firepower. Collect fast, invest fast, and establish your first defense network.',
+            'Coins are your firepower. Finish this build first and more build sites will unlock, then start laying down your early defense.',
         'ui.tutorial.more_towers':
-            'New tower slots unlocked. Build up and complete your kill zone.',
+            'More build sites are live. Fill out this wave of defenses first, and even more build sites will open up after that.',
         'ui.tutorial.farm':
             'Gold Mines generate steady income. Earlier build means bigger snowball.',
         'ui.tutorial.barracks':
-            'Goose Sheds keep sending frontline geese to soak damage and protect your towers.',
+            'Goose Sheds keep sending geese that charge into enemies and blow up for area damage.',
         'ui.tutorial.farm_barracks_upgrade':
-            'Gold Mine feeds your economy, Goose Shed holds the line. All built structures can now be upgraded by investing coins at pads.',
+            'Gold Mines keep the coins coming, Goose Sheds crack the front line. Their geese rush enemies and explode, and every structure you have built can now be upgraded at its pad.',
         'ui.tutorial.lane_unlock':
             'Alert: enemies are launching attacks from the {lane} lane. Tap to scout, then fortify immediately.',
         'ui.tutorial.boss_drop':
-            'Boss signature detected. Focus fire to secure a powerful item drop and a large coin payout.',
+            'Boss signature detected. Burn it down fast. Its chest will not magnetize, so walk up and claim it yourself. Coins still magnetize as usual.',
         'ui.bossIntro.line.default': 'Max alert. Engage.',
         'ui.bossIntro.line.event_boss_mech': 'Calculation done. Your loss is certain.',
         'ui.bossIntro.line.boss_mech': 'Weapons online. Field purge begins.',
@@ -476,7 +478,7 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.gameOver.diamonds': '◆ +{earned} Gems',
 
         'ui.loading.tip.move':
-            'Use the joystick or WASD/arrow keys to move. Grandma auto-fires at nearby enemies!',
+            'Use the joystick or WASD/arrow keys to move. Attacks are automatic, so step into range and Grandma will fire!',
         'ui.loading.tip.build':
             'Spend coins on building pads to construct defenses across attack routes.',
         'ui.loading.tip.tower':
@@ -486,9 +488,9 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.loading.tip.levelup':
             'Each level-up lets you pick a buff card. Mix and match for powerful combos!',
         'ui.loading.tip.boss':
-            'A powerful Boss appears every few waves. Reinforce your defenses early!',
+            'A Boss crashes in every few waves. Its chest must be picked up at close range, but coins still magnetize, so do not leave loot behind!',
         'ui.loading.tip.gooseshed':
-            'Goose Sheds train soldiers as meat shields to protect your towers.',
+            'Goose Sheds send geese charging into enemies to explode for area damage and crack the frontline.',
         'ui.loading.tip.farm':
             'Gold Mines generate coins over time — build them early to snowball faster.',
         'ui.loading.tip.spa': 'Hot Springs heal Grandma. Swing by when your health gets low!',

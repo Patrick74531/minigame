@@ -5,15 +5,9 @@ import { EventManager } from '../../core/managers/EventManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../data/GameEvents';
 
-const CHEST_COLLECT_RADIUS = 2.0;
-const CHEST_MAGNET_RANGE = 5.0;
-const CHEST_MAGNET_SPEED = 12;
+const CHEST_COLLECT_RADIUS = 0.7;
 const CHEST_FLOAT_SPEED = 2.0;
 const CHEST_FLOAT_AMPLITUDE = 0.3;
-
-// 复用临时向量，避免每帧 GC
-const _tmpDir = new Vec3();
-const _tmpPos = new Vec3();
 
 /**
  * ChestDropManager
@@ -27,15 +21,12 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
     private _isLoading: boolean = false;
     private _activeChests: Node[] = [];
     private _pendingChestDrops: Vec3[] = [];
-    /** 已进入磁吸阶段的宝箱集合（停掉浮动 tween） */
-    private _magnetized: WeakSet<Node> = new WeakSet();
 
     public initialize(coinContainer: Node, heroNode: Node | null): void {
         this._coinContainer = coinContainer;
         this._heroNode = heroNode;
         this._activeChests = [];
         this._pendingChestDrops = [];
-        this._magnetized = new WeakSet();
         this.loadChestPrefab();
         this.eventManager.on(GameEvents.BOSS_CHEST_DROP, this.onBossChestDrop, this);
     }
@@ -54,14 +45,13 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
         }
         this._activeChests = [];
         this._pendingChestDrops = [];
-        this._magnetized = new WeakSet();
         this._coinContainer = null;
         this._heroNode = null;
     }
 
     // === 每帧更新（由 GameController 调用） ===
 
-    public update(dt: number): void {
+    public update(_dt: number): void {
         if (!this._heroNode || !this._heroNode.isValid) return;
         if (this._activeChests.length === 0) return;
 
@@ -78,22 +68,6 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
 
             if (dist < CHEST_COLLECT_RADIUS) {
                 this.collectChest(chest, i);
-                continue;
-            }
-
-            if (dist < CHEST_MAGNET_RANGE) {
-                // 首次进入磁吸范围时停掉浮动 tween，避免位置冲突
-                if (!this._magnetized.has(chest)) {
-                    Tween.stopAllByTarget(chest);
-                    this._magnetized.add(chest);
-                }
-                Vec3.subtract(_tmpDir, heroPos, chestPos);
-                _tmpDir.y = 0;
-                _tmpDir.normalize();
-                _tmpDir.multiplyScalar(CHEST_MAGNET_SPEED * dt);
-                Vec3.add(_tmpPos, chestPos, _tmpDir);
-                _tmpPos.y = chestPos.y;
-                chest.setWorldPosition(_tmpPos);
             }
         }
     }
