@@ -22,6 +22,7 @@ import { getSocialBridge, type SocialBridge } from '../core/reddit/RedditBridge'
 import { DiamondService } from '../core/diamond/DiamondService';
 import { GameManager } from '../core/managers/GameManager';
 import { Hero } from '../gameplay/units/Hero';
+import { PendingScoreSubmissionStore } from '../core/settlement/PendingScoreSubmissionStore';
 
 /**
  * HUD 管理器
@@ -332,8 +333,15 @@ export class HUDManager {
     private settleCurrentRun(wave: number): void {
         if (this._runSettled) return;
         this._runSettled = true;
-        this._socialBridge.submitScore(wave * 100, wave);
         const runId = DiamondService.generateRunId();
+        const score = wave * 100;
+        PendingScoreSubmissionStore.save({
+            platform: this._socialBridge.platform,
+            runId,
+            score,
+            wave,
+        });
+        this._socialBridge.submitScore(score, wave, runId);
         DiamondService.instance.settleRun(wave, runId, (earned, _balance) => {
             if (earned > 0) {
                 this._gameOverModule.showDiamondReward(earned);

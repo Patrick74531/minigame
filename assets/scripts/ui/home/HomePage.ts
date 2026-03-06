@@ -38,6 +38,7 @@ import { DiamondService } from '../../core/diamond/DiamondService';
 import { ShopPanel } from './ShopPanel';
 import { UIFactory } from '../UIFactory';
 import { GameEvents } from '../../data/GameEvents';
+import { PendingScoreSubmissionStore } from '../../core/settlement/PendingScoreSubmissionStore';
 
 const { ccclass } = _decorator;
 
@@ -811,6 +812,18 @@ export class HomePage extends Component {
                                 DiamondService.instance.refreshBalance();
                                 this._updateDiamondDisplay();
                             }
+                        );
+                    }
+                }
+                {
+                    const pendingScore = PendingScoreSubmissionStore.peekAll(
+                        this._socialBridge.platform
+                    )[0];
+                    if (pendingScore && pendingScore.wave >= 0 && pendingScore.score >= 0) {
+                        this._socialBridge.submitScore(
+                            pendingScore.score,
+                            pendingScore.wave,
+                            pendingScore.runId
                         );
                     }
                 }

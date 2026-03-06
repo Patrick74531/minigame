@@ -7,6 +7,7 @@ const RANK_KEY = 'leaderboard:scores';
 const META_KEY = 'leaderboard:meta';
 const FOLLOW_KEY = 'leaderboard:followers';
 const PLAY_COUNT_KEY = 'leaderboard:playcount';
+const SCORE_RUN_PREFIX = 'leaderboard:run:';
 const RATE_LIMIT_PREFIX = 'ratelimit:submit:';
 const LEADERBOARD_SIZE = 10;
 const DEFAULT_STATS_LEADERBOARD_LIMIT = 200;
@@ -27,6 +28,7 @@ const DIAMOND_DAILY_PREFIX = 'diamond:daily:';
 const MAX_SCORE = 999_999_999;
 const MAX_WAVE = 9_999;
 const RATE_LIMIT_WINDOW_SEC = 10;
+const SCORE_RUN_EXPIRATION_DAYS = 30;
 
 interface LeaderboardEntry {
     rank: number;
@@ -210,9 +212,10 @@ api.post('/submit-score', async c => {
             return jsonError(c, 400, 'Invalid JSON body');
         }
 
-        const payload = body as { score?: unknown; wave?: unknown };
+        const payload = body as { score?: unknown; wave?: unknown; runId?: unknown };
         const score = payload.score;
         const wave = payload.wave;
+        const runId = payload.runId;
 
         // ── Input validation ─────────────────────────────────────────────
         if (!isValidInt(score) || score > MAX_SCORE) {
@@ -220,6 +223,19 @@ api.post('/submit-score', async c => {
         }
         if (!isValidInt(wave) || wave > MAX_WAVE) {
             return jsonError(c, 400, `Invalid wave: must be integer 0–${MAX_WAVE}`);
+        }
+        if (
+            runId !== undefined &&
+            (typeof runId !== 'string' || runId.length < 8 || runId.length > 128)
+        ) {
+            return jsonError(c, 400, 'Invalid runId');
+        }
+
+        if (typeof runId === 'string') {
+            const existingRun = await redis.get(`${SCORE_RUN_PREFIX}${username}:${runId}`);
+            if (existingRun) {
+                return jsonNoCache(c, JSON.parse(existingRun));
+            }
         }
 
         // ── Rate limiting ────────────────────────────────────────────────
@@ -244,14 +260,24 @@ api.post('/submit-score', async c => {
         const leaderboard = await fetchLeaderboard(leaderboardLimit);
         const rankIdx = leaderboard.findIndex(e => e.username === username);
 
-        return jsonNoCache(c, {
+        const response = {
             rank: rankIdx >= 0 ? rankIdx + 1 : LEADERBOARD_SIZE + 1,
             score,
             isNewBest,
             playCount,
             leaderboardLimit,
             leaderboard,
-        });
+        };
+
+        if (typeof runId === 'string') {
+            await redis.set(`${SCORE_RUN_PREFIX}${username}:${runId}`, JSON.stringify(response), {
+                expiration: new Date(
+                    Date.now() + SCORE_RUN_EXPIRATION_DAYS * 24 * 60 * 60 * 1000
+                ),
+            });
+        }
+
+        return jsonNoCache(c, response);
     } catch (error) {
         console.error('[api/submit-score] error:', error);
         return jsonError(c, 500, 'Internal server error');

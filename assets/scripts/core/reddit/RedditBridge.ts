@@ -1,4 +1,5 @@
 import { TikTokBridge } from './TikTokBridge';
+import { PendingScoreSubmissionStore } from '../settlement/PendingScoreSubmissionStore';
 export interface LeaderboardEntry {
     rank: number;
     username: string;
@@ -40,7 +41,7 @@ export interface SocialBridge {
     addListener(listener: BridgeListener): void;
     removeListener(listener: BridgeListener): void;
     requestInit(): void;
-    submitScore(score: number, wave: number): void;
+    submitScore(score: number, wave: number, runId?: string): void;
     requestLeaderboard(): void;
     requestSubscribe(): void;
 }
@@ -99,7 +100,11 @@ export class RedditBridge {
         // Always attempt — mobile Devvit WebView may have hostname='localhost'
         // (Devvit's embedded HTTP server) which static detection misclassifies as dev.
         // Confirm the environment on first successful response instead.
-        this._fetchJson(`/api/init?leaderboardLimit=${REDDIT_LEADERBOARD_LIMIT}`, {}, { bustCache: true })
+        this._fetchJson(
+            `/api/init?leaderboardLimit=${REDDIT_LEADERBOARD_LIMIT}`,
+            {},
+            { bustCache: true }
+        )
             .then((data: unknown) => {
                 this._isRedditEnvironment = true;
                 const d = data as {
@@ -129,13 +134,14 @@ export class RedditBridge {
             });
     }
 
-    public submitScore(score: number, wave: number): void {
+    public submitScore(score: number, wave: number, runId?: string): void {
         // Concurrent protection: drop duplicate calls while one is in-flight
         if (this._submitInFlight) {
             console.warn('[RedditBridge] submitScore skipped — request already in flight');
             return;
         }
         this._submitInFlight = true;
+        const submitRunId = runId?.trim() || undefined;
 
         // Always attempt — by game-over time, requestInit has confirmed the environment.
         // On non-Devvit environments fetch will fail and be caught gracefully.
@@ -143,7 +149,7 @@ export class RedditBridge {
             method: 'POST',
             keepalive: true,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ score, wave }),
+            body: JSON.stringify({ score, wave, runId: submitRunId }),
         })
             .then((data: unknown) => {
                 const d = data as {
@@ -164,6 +170,9 @@ export class RedditBridge {
                     score: d.score ?? score,
                     isNewBest: d.isNewBest ?? false,
                 });
+                if (submitRunId) {
+                    PendingScoreSubmissionStore.clear(submitRunId);
+                }
             })
             .catch((e: unknown) => {
                 console.warn('[RedditBridge] submitScore failed:', e);
@@ -182,7 +191,11 @@ export class RedditBridge {
         // Always attempt — same reason as requestInit: mobile may have hostname='localhost'
         // causing _isRedditEnvironment=false even though the server is reachable.
         // Fall back to cache only if the fetch actually fails.
-        this._fetchJson(`/api/leaderboard?limit=${REDDIT_LEADERBOARD_LIMIT}`, {}, { bustCache: true })
+        this._fetchJson(
+            `/api/leaderboard?limit=${REDDIT_LEADERBOARD_LIMIT}`,
+            {},
+            { bustCache: true }
+        )
             .then((data: unknown) => {
                 const d = data as { entries?: LeaderboardEntry[] };
                 const entries = d.entries ?? [];
@@ -330,8 +343,8 @@ class RedditBridgeAdapter implements SocialBridge {
         RedditBridge.instance.requestInit();
     }
 
-    public submitScore(score: number, wave: number): void {
-        RedditBridge.instance.submitScore(score, wave);
+    public submitScore(score: number, wave: number, runId?: string): void {
+        RedditBridge.instance.submitScore(score, wave, runId);
     }
 
     public requestLeaderboard(): void {

@@ -8,6 +8,7 @@ import {
     getAllTikTokRewardedAdPlacements,
     injectTikTokRewardedAdPlacementsToGlobal,
 } from './TikTokAdsConfig';
+import { PendingScoreSubmissionStore } from '../settlement/PendingScoreSubmissionStore';
 
 type BridgeListener = (event: RedditBridgeCallback) => void;
 
@@ -120,15 +121,16 @@ export class TikTokBridge implements SocialBridge {
             });
     }
 
-    public submitScore(score: number, wave: number): void {
+    public submitScore(score: number, wave: number, runId?: string): void {
         if (this._submitInFlight) return;
         this._submitInFlight = true;
-        const runId = this._generateRunId();
+        const submitRunId = runId?.trim() || this._generateRunId();
 
         this._fetchJson('/submit-score', {
             method: 'POST',
+            keepalive: true,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ score, wave, runId, displayName: this._username }),
+            body: JSON.stringify({ score, wave, runId: submitRunId, displayName: this._username }),
         })
             .then((data: unknown) => {
                 const d = this._unwrapApiData(data);
@@ -164,6 +166,7 @@ export class TikTokBridge implements SocialBridge {
                     score: apiScore ?? score,
                     isNewBest,
                 });
+                PendingScoreSubmissionStore.clear(submitRunId);
                 this._scheduleLeaderboardRefresh();
             })
             .catch((e: unknown) => {
