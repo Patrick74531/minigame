@@ -8,12 +8,19 @@ import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameManager } from '../../core/managers/GameManager';
+import { GameConfig } from '../../data/GameConfig';
 
 const { ccclass } = _decorator;
 
 interface DestroyedBuildingRecord {
     buildingTypeId: string;
     level: number;
+    nextUpgradeCost: number;
+}
+
+interface PadPeakRecord {
+    buildingTypeId: string;
+    maxLevel: number;
     nextUpgradeCost: number;
 }
 
@@ -61,6 +68,7 @@ export class BuildingManager {
     private _midSupportRevealToken: number = 0;
     private _midUpgradePadsUnlockedAfterCinematic: boolean = false;
     private _destroyedBuildingRecords: Map<string, DestroyedBuildingRecord> = new Map();
+    private _padPeakRecords: Map<string, PadPeakRecord> = new Map();
 
     public static get instance(): BuildingManager {
         if (!this._instance) {
@@ -92,10 +100,12 @@ export class BuildingManager {
         this._midSupportRevealToken = 0;
         this._midUpgradePadsUnlockedAfterCinematic = false;
         this._destroyedBuildingRecords.clear();
+        this._padPeakRecords.clear();
 
         // 监听建造完成事件
         this.eventManager.on(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
         this.eventManager.on(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
+        this.eventManager.on(GameEvents.BUILDING_UPGRADED, this.onBuildingUpgraded, this);
         this.eventManager.on(GameEvents.WAVE_START, this.onWaveStart, this);
         this.eventManager.on(GameEvents.WAVE_COMPLETE, this.onWaveComplete, this);
         this.eventManager.on(
@@ -217,6 +227,12 @@ export class BuildingManager {
 
         // Link Building back to Pad for upgrades
         pad.onBuildingCreated(buildingComp);
+        this.rememberPadPeak(
+            pad,
+            buildingComp.buildingTypeId,
+            buildingComp.level,
+            Math.max(0, Math.floor(pad.nextUpgradeCost))
+        );
         pad.placeUpgradeZoneInFront(buildingNode);
         this.tryUnlockPadsAfterTriggerBuild(data.padNode);
         this.refreshUpgradePadVisibilityGate();
@@ -239,6 +255,7 @@ export class BuildingManager {
     public cleanup(): void {
         this.eventManager.off(GameEvents.BUILDING_CONSTRUCTED, this.onBuildingConstructed, this);
         this.eventManager.off(GameEvents.BUILDING_DESTROYED, this.onBuildingDestroyed, this);
+        this.eventManager.off(GameEvents.BUILDING_UPGRADED, this.onBuildingUpgraded, this);
         this.eventManager.off(GameEvents.WAVE_START, this.onWaveStart, this);
         this.eventManager.off(GameEvents.WAVE_COMPLETE, this.onWaveComplete, this);
         this.eventManager.off(
@@ -263,6 +280,7 @@ export class BuildingManager {
         this._midSupportRevealToken += 1;
         this._midUpgradePadsUnlockedAfterCinematic = false;
         this._destroyedBuildingRecords.clear();
+        this._padPeakRecords.clear();
     }
 
     public get activeBuildings(): Building[] {
@@ -307,6 +325,12 @@ export class BuildingManager {
             if (building.node.uuid !== data.buildingId) continue;
 
             if (building.buildingType !== BuildingType.BASE) {
+                this.rememberPadPeak(
+                    pad,
+                    building.buildingTypeId,
+                    building.level,
+                    Math.max(0, Math.floor(pad.nextUpgradeCost))
+                );
                 this._destroyedBuildingRecords.set(pad.node.uuid, {
                     buildingTypeId: building.buildingTypeId,
                     level: Math.max(1, Math.floor(building.level)),
@@ -321,6 +345,26 @@ export class BuildingManager {
             }
         }
         this.refreshUpgradePadVisibilityGate();
+    }
+
+    private onBuildingUpgraded(data: { buildingId: string; level: number }): void {
+        const buildingId = (data.buildingId || '').trim();
+        if (!buildingId) return;
+
+        for (const pad of this._pads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            const building = pad.getAssociatedBuilding();
+            if (!building || !building.node || !building.node.isValid) continue;
+            if (building.node.uuid !== buildingId) continue;
+
+            this.rememberPadPeak(
+                pad,
+                building.buildingTypeId,
+                Math.max(1, Math.floor(data.level || building.level)),
+                Math.max(0, Math.floor(pad.nextUpgradeCost))
+            );
+            return;
+        }
     }
 
     private tryUnlockPadsAfterTriggerBuild(triggerPadNode: Node): void {
@@ -686,9 +730,128 @@ export class BuildingManager {
             pad.placeUpgradeZoneInFront(building.node, true);
             pad.node.active = false;
             this.tryUnlockPadsAfterTriggerBuild(pad.node);
+            this.rememberPadPeak(
+                pad,
+                building.buildingTypeId,
+                building.level,
+                Math.max(0, Math.floor(record.nextUpgradeCost))
+            );
             this._destroyedBuildingRecords.delete(padUuid);
         }
 
+        this.refreshUpgradePadVisibilityGate();
+    }
+
+    /**
+     * 基地重建专用：补齐所有非基地建筑，并恢复到该点位历史最高等级。
+     */
+    public rebuildAllBuildingsToPeakLevels(): void {
+        this.restoreActiveNonBaseBuildingsToFullHealth();
+        if (!this._buildingContainer) return;
+
+        for (const pad of this._pads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+
+            const padDefaultTypeId = (pad.buildingTypeId || '').trim();
+            if (!padDefaultTypeId || padDefaultTypeId === BuildingType.BASE || padDefaultTypeId === 'base') {
+                continue;
+            }
+
+            let building = pad.getAssociatedBuilding();
+            const peakRecord = this.resolvePeakRecordForPad(pad);
+            // Never-built pad: keep it untouched (e.g. unopened lanes / unplaced towers).
+            if (!building && !peakRecord) {
+                continue;
+            }
+
+            const targetTypeId = (
+                peakRecord?.buildingTypeId ||
+                building?.buildingTypeId ||
+                padDefaultTypeId
+            ).trim();
+            if (!targetTypeId || targetTypeId === BuildingType.BASE || targetTypeId === 'base') {
+                continue;
+            }
+
+            const targetLevel = Math.max(1, Math.floor(peakRecord?.maxLevel ?? 1));
+            let targetNextUpgradeCost = Math.max(0, Math.floor(peakRecord?.nextUpgradeCost ?? 0));
+
+            if (building && building.node && building.node.isValid) {
+                if (building.buildingType === BuildingType.BASE) continue;
+
+                const cappedTargetLevel = Math.min(
+                    targetLevel,
+                    Math.max(1, Math.floor(building.maxLevel || targetLevel))
+                );
+                const originalLevel = building.level;
+                if (cappedTargetLevel > building.level) {
+                    building.restoreToLevel(cappedTargetLevel);
+                }
+                building.restoreToFullHealth();
+
+                if (targetNextUpgradeCost <= 0) {
+                    targetNextUpgradeCost = Math.max(0, Math.floor(pad.nextUpgradeCost));
+                }
+                if (targetNextUpgradeCost <= 0) {
+                    targetNextUpgradeCost = this.resolveUpgradeCostForLevel(building.level);
+                }
+                if (building.level > originalLevel) {
+                    pad.initForExistingBuilding(building, targetNextUpgradeCost);
+                    pad.placeUpgradeZoneInFront(building.node, true);
+                    pad.node.active = false;
+                    this.tryUnlockPadsAfterTriggerBuild(pad.node);
+                }
+                this.rememberPadPeak(
+                    pad,
+                    building.buildingTypeId,
+                    building.level,
+                    targetNextUpgradeCost
+                );
+                continue;
+            }
+
+            const pos = pad.getBuildWorldPosition();
+            const angle = pad.node.eulerAngles.y;
+            const buildingNode = BuildingFactory.createBuilding(
+                this._buildingContainer,
+                pos.x,
+                pos.z,
+                targetTypeId,
+                this._unitContainer ?? undefined,
+                angle
+            );
+            if (!buildingNode) continue;
+
+            building = buildingNode.getComponent(Building);
+            if (!building) {
+                buildingNode.destroy();
+                continue;
+            }
+
+            const cappedTargetLevel = Math.min(
+                targetLevel,
+                Math.max(1, Math.floor(building.maxLevel || targetLevel))
+            );
+            if (cappedTargetLevel > 1) {
+                building.restoreToLevel(cappedTargetLevel);
+            }
+            building.restoreToFullHealth();
+            building.node.active = true;
+
+            this.registerBuilding(building);
+
+            if (targetNextUpgradeCost <= 0) {
+                targetNextUpgradeCost = this.resolveUpgradeCostForLevel(building.level);
+            }
+            pad.initForExistingBuilding(building, targetNextUpgradeCost);
+            pad.placeUpgradeZoneInFront(building.node, true);
+            pad.node.active = false;
+            this.tryUnlockPadsAfterTriggerBuild(pad.node);
+            this.rememberPadPeak(pad, building.buildingTypeId, building.level, targetNextUpgradeCost);
+        }
+
+        this._destroyedBuildingRecords.clear();
+        this.markMidSupportAsRevealedIfBuilt();
         this.refreshUpgradePadVisibilityGate();
     }
 
@@ -741,6 +904,12 @@ export class BuildingManager {
             pad.initForExistingBuilding(building, state.nextUpgradeCost);
             pad.placeUpgradeZoneInFront(building.node, true);
             pad.node.active = false;
+            this.rememberPadPeak(
+                pad,
+                building.buildingTypeId,
+                building.level,
+                Math.max(0, Math.floor(state.nextUpgradeCost))
+            );
 
             this.tryUnlockPadsAfterTriggerBuild(pad.node);
         }
@@ -773,6 +942,126 @@ export class BuildingManager {
             if (!building.isAlive) continue;
             if (building.buildingType === BuildingType.BASE) continue;
             building.restoreToFullHealth();
+        }
+    }
+
+    private resolvePeakRecordForPad(pad: BuildingPad): PadPeakRecord | null {
+        if (!pad || !pad.node || !pad.node.isValid) return null;
+
+        const padUuid = pad.node.uuid;
+        const peak = this._padPeakRecords.get(padUuid);
+        const destroyed = this._destroyedBuildingRecords.get(padUuid);
+        if (!peak && !destroyed) return null;
+
+        const peakLevel = Math.max(1, Math.floor(peak?.maxLevel ?? 1));
+        const destroyedLevel = Math.max(1, Math.floor(destroyed?.level ?? 1));
+
+        if (!peak || destroyedLevel > peakLevel) {
+            const preferredType = (destroyed?.buildingTypeId || peak?.buildingTypeId || '').trim();
+            return preferredType
+                ? {
+                      buildingTypeId: preferredType,
+                      maxLevel: Math.max(peakLevel, destroyedLevel),
+                      nextUpgradeCost: Math.max(
+                          0,
+                          Math.floor(peak?.nextUpgradeCost ?? 0),
+                          Math.floor(destroyed?.nextUpgradeCost ?? 0)
+                      ),
+                  }
+                : null;
+        }
+
+        return {
+            buildingTypeId: peak.buildingTypeId,
+            maxLevel: peakLevel,
+            nextUpgradeCost: Math.max(
+                0,
+                Math.floor(peak.nextUpgradeCost),
+                Math.floor(destroyed?.nextUpgradeCost ?? 0)
+            ),
+        };
+    }
+
+    private rememberPadPeak(
+        pad: BuildingPad | null | undefined,
+        buildingTypeId: string,
+        level: number,
+        nextUpgradeCost: number
+    ): void {
+        if (!pad || !pad.node || !pad.node.isValid) return;
+
+        const normalizedTypeId = (buildingTypeId || '').trim();
+        if (
+            !normalizedTypeId ||
+            normalizedTypeId === BuildingType.BASE ||
+            normalizedTypeId === 'base'
+        ) {
+            return;
+        }
+
+        const safeLevel = Math.max(1, Math.floor(level));
+        const safeCost = Math.max(0, Math.floor(nextUpgradeCost));
+        const padUuid = pad.node.uuid;
+        const previous = this._padPeakRecords.get(padUuid);
+
+        if (!previous || safeLevel > previous.maxLevel) {
+            this._padPeakRecords.set(padUuid, {
+                buildingTypeId: normalizedTypeId,
+                maxLevel: safeLevel,
+                nextUpgradeCost: safeCost,
+            });
+            return;
+        }
+
+        if (safeLevel === previous.maxLevel) {
+            this._padPeakRecords.set(padUuid, {
+                buildingTypeId: previous.buildingTypeId || normalizedTypeId,
+                maxLevel: previous.maxLevel,
+                nextUpgradeCost: Math.max(previous.nextUpgradeCost, safeCost),
+            });
+        }
+    }
+
+    private resolveUpgradeCostForLevel(level: number): number {
+        const startCost =
+            GameConfig.BUILDING.UPGRADE_COST?.START_COST ??
+            GameConfig.BUILDING.BASE_UPGRADE?.START_COST ??
+            20;
+        const costMultiplier =
+            GameConfig.BUILDING.UPGRADE_COST?.COST_MULTIPLIER ??
+            GameConfig.BUILDING.BASE_UPGRADE?.COST_MULTIPLIER ??
+            GameConfig.BUILDING.DEFAULT_COST_MULTIPLIER ??
+            1.35;
+
+        let nextCost = Math.max(1, Math.floor(startCost));
+        const steps = Math.max(0, Math.floor(level) - 1);
+        for (let i = 0; i < steps; i++) {
+            nextCost = Math.max(1, Math.ceil(nextCost * costMultiplier));
+        }
+        return nextCost;
+    }
+
+    private markMidSupportAsRevealedIfBuilt(): void {
+        const hasMidSupport = this._pads.some(pad => {
+            if (!pad || !pad.node || !pad.node.isValid) return false;
+            if (!BuildingManager.MID_SUPPORT_BUILDING_TYPES.has(pad.buildingTypeId)) return false;
+            const support = pad.getAssociatedBuilding();
+            return !!support?.node?.isValid;
+        });
+        if (!hasMidSupport) return;
+
+        this._midSupportBuildingsRevealed = true;
+        this._midUpgradePadsUnlockedAfterCinematic = true;
+        this._stage3SequenceTriggered = true;
+        this._stage3PadsBuilt = true;
+
+        for (const pad of this._pads) {
+            if (!pad || !pad.node || !pad.node.isValid) continue;
+            if (!BuildingManager.MID_SUPPORT_BUILDING_TYPES.has(pad.buildingTypeId)) continue;
+            const support = pad.getAssociatedBuilding();
+            if (support?.node?.isValid) {
+                support.node.active = true;
+            }
         }
     }
 

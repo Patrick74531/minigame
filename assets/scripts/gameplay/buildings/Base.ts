@@ -183,7 +183,9 @@ export class Base extends Building {
 
         // Restore all buildings via BuildingManager
         const bm = ServiceRegistry.get<any>('BuildingManager');
-        if (bm && bm.rebuildDestroyedBuildingsToRecordedLevels) {
+        if (bm && bm.rebuildAllBuildingsToPeakLevels) {
+            bm.rebuildAllBuildingsToPeakLevels();
+        } else if (bm && bm.rebuildDestroyedBuildingsToRecordedLevels) {
             bm.rebuildDestroyedBuildingsToRecordedLevels();
         }
 
