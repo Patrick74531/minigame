@@ -37,6 +37,7 @@ export class TowerUpgradeCardUI {
     private _activeBuildingId: string | null = null;
     private _pendingBuildingId: string | null = null;
     private _pendingShowTimer: ReturnType<typeof setTimeout> | null = null;
+    private _pausedByTowerUpgradeCard: boolean = false;
 
     public get isShowing(): boolean {
         return this._isShowing;
@@ -58,6 +59,7 @@ export class TowerUpgradeCardUI {
         this._pendingBuildingId = null;
         this._uiCanvas = null;
         this._activeBuildingId = null;
+        this.resumeIfPausedByTowerUpgradeCard();
     }
 
     private onTowerUpgradeCardsDrawn(data: { buildingId: string; count: number }): void {
@@ -122,6 +124,8 @@ export class TowerUpgradeCardUI {
 
     public showCards(cards: TowerUpgradeCardDef[], buildingId: string): void {
         if (!this._uiCanvas || this._isShowing) return;
+        const resolvedBuildingId = buildingId || this.towerUpgradeCardService.activeTowerId || '';
+        if (!resolvedBuildingId) return;
         if (
             SelectionCardTheme.isTikTokRuntime() &&
             TikTokAdService.isSessionSlotUnlocked('tower_attr_card')
@@ -131,12 +135,12 @@ export class TowerUpgradeCardUI {
             return;
         }
         this._isShowing = true;
-        this._activeBuildingId = buildingId;
+        this._activeBuildingId = resolvedBuildingId;
 
         const viewport = this.getViewportSize();
         const padding = UIResponsive.getControlPadding();
         const isPortraitTikTok = UIResponsive.isTikTokPhonePortraitProfile();
-        this.gameManager.pauseGame();
+        this.pauseByTowerUpgradeCardIfNeeded();
 
         this._root = this.createOverlay(viewport.width, viewport.height);
         this._uiCanvas.addChild(this._root);
@@ -257,6 +261,9 @@ export class TowerUpgradeCardUI {
         this._isShowing = false;
         this._activeBuildingId = null;
         this.tryShowPending();
+        if (!this._isShowing) {
+            this.resumeIfPausedByTowerUpgradeCard();
+        }
     }
 
     private createOverlay(viewportWidth: number, viewportHeight: number): Node {
@@ -463,13 +470,12 @@ export class TowerUpgradeCardUI {
         if (!this._activeBuildingId) return;
         const buildingId = this._activeBuildingId;
 
-        this.hideCards();
-        this.gameManager.resumeGame();
-
         this.eventManager.emit(GameEvents.TOWER_UPGRADE_CARD_PICKED, {
             buildingId,
             stat: card.stat,
         });
+
+        this.hideCards();
     }
 
     private onAdButtonTapped(): void {
@@ -486,9 +492,20 @@ export class TowerUpgradeCardUI {
             const cards = [...this.towerUpgradeCardService.pendingCards];
             this.towerUpgradeCardService.applyAllCards();
             this.hideCards();
-            this.gameManager.resumeGame();
             this.playTowerUpgradeGrantAnimation(cards);
         });
+    }
+
+    private pauseByTowerUpgradeCardIfNeeded(): void {
+        if (this._pausedByTowerUpgradeCard) return;
+        this.gameManager.pauseGame();
+        this._pausedByTowerUpgradeCard = true;
+    }
+
+    private resumeIfPausedByTowerUpgradeCard(): void {
+        if (!this._pausedByTowerUpgradeCard) return;
+        this._pausedByTowerUpgradeCard = false;
+        this.gameManager.resumeGame();
     }
 
     private playTowerUpgradeGrantAnimation(cards: TowerUpgradeCardDef[]): void {

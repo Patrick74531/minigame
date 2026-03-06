@@ -286,12 +286,9 @@ export class Joystick extends Component {
         const halfH = area.height * 0.5;
         const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
         const zoneRight = -halfW + area.width * JOYSTICK_ZONE_WIDTH_RATIO;
-        const zoneLeft = halfW - area.width * JOYSTICK_ZONE_WIDTH_RATIO;
         const zoneTop = -halfH + area.height * JOYSTICK_ZONE_HEIGHT_RATIO;
         if (isTikTokPortrait) {
-            return (
-                local.x >= zoneLeft && local.x <= halfW && local.y >= -halfH && local.y <= zoneTop
-            );
+            return local.x >= -halfW && local.x <= halfW && local.y >= -halfH && local.y <= zoneTop;
         }
 
         return local.x >= -halfW && local.x <= zoneRight && local.y >= -halfH && local.y <= zoneTop;
