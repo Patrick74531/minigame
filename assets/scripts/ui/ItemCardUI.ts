@@ -10,6 +10,10 @@ import { UIResponsive } from './UIResponsive';
 import { TikTokAdService } from '../core/ads/TikTokAdService';
 import { ItemService } from '../gameplay/items/ItemService';
 import { GameManager } from '../core/managers/GameManager';
+import { WeaponSelectUI } from './WeaponSelectUI';
+import { BuffCardUI } from './BuffCardUI';
+import { TowerUpgradeCardUI } from './TowerUpgradeCardUI';
+import { TowerSelectUI } from './TowerSelectUI';
 
 const UI_LAYER = 33554432;
 const CARD_WIDTH = 220;
@@ -26,6 +30,12 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
     private _root: Node | null = null;
     private _isShowing: boolean = false;
     private _offeredItems: ItemId[] = [];
+    private _pendingItems: ItemId[] | null = null;
+    private _pendingShowTimer: ReturnType<typeof setTimeout> | null = null;
+
+    public get isShowing(): boolean {
+        return this._isShowing;
+    }
 
     public initialize(uiCanvas: Node): void {
         this._uiCanvas = uiCanvas;
@@ -35,15 +45,20 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
     public cleanup(): void {
         this.eventManager.off(GameEvents.ITEM_CARDS_OFFERED, this.onItemsOffered, this);
         this.hideCards();
+        this.clearPendingShowTimer();
+        this._pendingItems = null;
         this._uiCanvas = null;
     }
 
     private onItemsOffered(data: { items: string[] }): void {
-        this.showCards(data.items as ItemId[]);
+        const valid = (data.items as ItemId[]).filter(id => !!ITEM_DEFS[id]);
+        if (valid.length <= 0) return;
+        this._pendingItems = valid;
+        this.tryShowPendingItems();
     }
 
     public showCards(items: ItemId[]): void {
-        if (!this._uiCanvas || this._isShowing) return;
+        if (!this._uiCanvas || this._isShowing || items.length <= 0) return;
         if (
             SelectionCardTheme.isTikTokRuntime() &&
             TikTokAdService.isSessionSlotUnlocked('item_card')
@@ -174,6 +189,53 @@ export class ItemCardUI extends Singleton<ItemCardUI>() {
         this._root = null;
         this._isShowing = false;
         this._offeredItems = [];
+        this.tryShowPendingItems();
+    }
+
+    private tryShowPendingItems(): void {
+        if (!this._pendingItems || this._pendingItems.length <= 0) return;
+        if (this._isShowing) return;
+        if (this.isDialogueBusy() || this.isOtherModalShowing()) {
+            this.schedulePendingShow();
+            return;
+        }
+
+        const items = [...this._pendingItems];
+        this._pendingItems = null;
+        this.clearPendingShowTimer();
+        this.showCards(items);
+    }
+
+    private schedulePendingShow(): void {
+        if (this._pendingShowTimer !== null) return;
+        this._pendingShowTimer = setTimeout(() => {
+            this._pendingShowTimer = null;
+            this.tryShowPendingItems();
+        }, 80);
+    }
+
+    private clearPendingShowTimer(): void {
+        if (this._pendingShowTimer === null) return;
+        clearTimeout(this._pendingShowTimer);
+        this._pendingShowTimer = null;
+    }
+
+    private isDialogueBusy(): boolean {
+        const hud = ServiceRegistry.get<{
+            isDialogueBusy?: () => boolean;
+            isRevivalShowing?: () => boolean;
+        }>('HUDManager');
+        if (hud?.isDialogueBusy?.()) return true;
+        if (hud?.isRevivalShowing?.()) return true;
+        return false;
+    }
+
+    private isOtherModalShowing(): boolean {
+        if (WeaponSelectUI.instance?.isShowing) return true;
+        if (BuffCardUI.instance?.isShowing) return true;
+        if (TowerUpgradeCardUI.instance?.isShowing) return true;
+        if (TowerSelectUI.instance?.isShowing) return true;
+        return false;
     }
 
     private createOverlay(width: number, height: number): Node {

@@ -18,11 +18,15 @@ import {
 } from './hud/HUDBossIntroModule';
 import { HUDCameraCinematicService } from './hud/HUDCameraCinematicService';
 import { HUDMinimapModule } from './hud/HUDMinimapModule';
+import { HUDDialogueModule, type HUDDialogueRequest } from './hud/HUDDialogueModule';
 import { getSocialBridge, type SocialBridge } from '../core/reddit/RedditBridge';
 import { DiamondService } from '../core/diamond/DiamondService';
 import { GameManager } from '../core/managers/GameManager';
 import { Hero } from '../gameplay/units/Hero';
 import { PendingScoreSubmissionStore } from '../core/settlement/PendingScoreSubmissionStore';
+import { Localization } from '../core/i18n/Localization';
+import { UIResponsive } from './UIResponsive';
+import { TikTokAdService } from '../core/ads/TikTokAdService';
 
 /**
  * HUD 管理器
@@ -58,11 +62,18 @@ export class HUDManager {
     });
     private readonly _bossIntroModule = new HUDBossIntroModule();
     private readonly _minimapModule = new HUDMinimapModule();
+    private readonly _dialogueModule = new HUDDialogueModule();
     private readonly _cameraCinematicService = new HUDCameraCinematicService();
     private readonly _socialBridge: SocialBridge = getSocialBridge();
     private _runSettled: boolean = false;
     private _revivalDecisionPending: boolean = false;
     private _revivalWave: number = 0;
+    private _storyIntroShown: boolean = false;
+    private _weaponGuideShown: boolean = false;
+    private _coinBuildGuideShown: boolean = false;
+    private _moreTowersGuideShown: boolean = false;
+    private _controlGuideShown: boolean = false;
+    private _midSupportGuideShown: boolean = false;
 
     /**
      * 初始化 HUD
@@ -71,10 +82,12 @@ export class HUDManager {
         this._uiCanvas = uiCanvas;
         this._runSettled = false;
         this.clearRevivalDecisionState();
+        this.resetTutorialFlags();
 
         this.destroyLegacyHudNodes(uiCanvas);
 
         this._cameraCinematicService.initialize(uiCanvas);
+        this._dialogueModule.initialize(uiCanvas);
         this._statusModule.initialize(uiCanvas);
         this._waveNoticeModule.initialize(uiCanvas);
         this._bossIntroModule.initialize(uiCanvas);
@@ -104,6 +117,7 @@ export class HUDManager {
         this.safeRefresh('waveNotice', () => this._waveNoticeModule.onLanguageChanged?.());
         this.safeRefresh('gameOver', () => this._gameOverModule.onLanguageChanged?.());
         this.safeRefresh('bossIntro', () => this._bossIntroModule.onLanguageChanged());
+        this.safeRefresh('dialogue', () => this._dialogueModule.onLanguageChanged?.());
     }
 
     private safeRefresh(name: string, fn: () => void): void {
@@ -128,6 +142,7 @@ export class HUDManager {
         uiCanvas.getChildByName('SettingsPanelRoot')?.destroy();
         uiCanvas.getChildByName('XpBarRoot')?.destroy();
         uiCanvas.getChildByName('MinimapRoot')?.destroy();
+        uiCanvas.getChildByName('HUDDialogueRoot')?.destroy();
         uiCanvas.getChildByName('UICamera')?.getChildByName('BossIntroModelStage')?.destroy();
     }
 
@@ -149,7 +164,10 @@ export class HUDManager {
         );
         this.eventManager.on(GameEvents.GAME_OVER, this.onGameOver, this);
         this.eventManager.on(GameEvents.BASE_REVIVAL_AVAILABLE, this.onBaseRevivalAvailable, this);
+        this.eventManager.on(GameEvents.COIN_COLLECTED, this.onCoinCollected, this);
         this.eventManager.on(GameEvents.COIN_CHANGED, this.onCoinChanged, this);
+        this.eventManager.on(GameEvents.WEAPON_PICKED, this.onWeaponPicked, this);
+        this.eventManager.on(GameEvents.TOWER_PADS_EXPANDED, this.onTowerPadsExpanded, this);
         this.eventManager.on(GameEvents.LANGUAGE_CHANGED, this.onLanguageChanged, this);
     }
 
@@ -217,6 +235,60 @@ export class HUDManager {
         this._statusModule.updateXpBar(currentXp, maxXp, level);
     }
 
+    public runWeaponOfferPrelude(onContinue: () => void): void {
+        const requests: HUDDialogueRequest[] = [];
+        const isEarlyRun = this.waveService.currentWave <= 1;
+
+        if (isEarlyRun && !this._storyIntroShown) {
+            this._storyIntroShown = true;
+            requests.push(
+                {
+                    titleKey: 'ui.dialog.title.story',
+                    bodyKey: 'ui.story.intro.1',
+                },
+                {
+                    titleKey: 'ui.dialog.title.story',
+                    bodyKey: 'ui.story.intro.2',
+                }
+            );
+        }
+
+        if (isEarlyRun && !this._weaponGuideShown) {
+            this._weaponGuideShown = true;
+            requests.push({
+                titleKey: 'ui.dialog.title.tutorial',
+                bodyKey: 'ui.tutorial.weapon_pick',
+            });
+        }
+
+        if (requests.length <= 0) {
+            onContinue();
+            return;
+        }
+
+        this._dialogueModule.enqueueSequence(requests, onContinue);
+    }
+
+    public isDialogueBusy(): boolean {
+        return this._dialogueModule.isBusy();
+    }
+
+    public isRevivalShowing(): boolean {
+        return this._gameOverModule.isRevivalShowing;
+    }
+
+    /**
+     * Continue-from-save should not replay early run tutorials.
+     * Keep combat warning dialogs (boss/lane) unaffected.
+     */
+    public suppressBasicTutorialDialogsForContinue(): void {
+        this._storyIntroShown = true;
+        this._weaponGuideShown = true;
+        this._coinBuildGuideShown = true;
+        this._moreTowersGuideShown = true;
+        this._controlGuideShown = true;
+    }
+
     private setJoystickInputEnabled(enabled: boolean): void {
         if (!this._uiCanvas) return;
         if (!this._joystickRef || !this._joystickRef.node || !this._joystickRef.node.isValid) {
@@ -270,8 +342,43 @@ export class HUDManager {
         this.updateXpBar(0, 1, data.level);
     }
 
+    private onCoinCollected(_data: { amount: number }): void {
+        if (!this._weaponGuideShown) return;
+        if (this._coinBuildGuideShown) return;
+        if (this.waveService.currentWave > 3) return;
+
+        this._coinBuildGuideShown = true;
+        this._dialogueModule.enqueue({
+            titleKey: 'ui.dialog.title.tutorial',
+            bodyKey: 'ui.tutorial.coin_build',
+        });
+    }
+
     private onCoinChanged(data: { current: number }): void {
         this._statusModule.updateCoinDisplay(data.current);
+    }
+
+    private onWeaponPicked(): void {
+        if (this._controlGuideShown) return;
+        this._controlGuideShown = true;
+
+        const isTouch = UIResponsive.shouldUseTouchControls();
+        this._dialogueModule.enqueue({
+            titleKey: 'ui.dialog.title.tutorial',
+            bodyKey: isTouch ? 'ui.tutorial.controls.touch' : 'ui.tutorial.controls.desktop',
+        });
+    }
+
+    private onTowerPadsExpanded(data: { count: number }): void {
+        if (!this._weaponGuideShown) return;
+        if (!data || data.count <= 0) return;
+        if (this._moreTowersGuideShown) return;
+
+        this._moreTowersGuideShown = true;
+        this._dialogueModule.enqueue({
+            titleKey: 'ui.dialog.title.tutorial',
+            bodyKey: 'ui.tutorial.more_towers',
+        });
     }
 
     private onGameOver(data: { victory: boolean }): void {
@@ -298,24 +405,43 @@ export class HUDManager {
     private onBaseRevivalAvailable(data: { wave: number }): void {
         this._revivalDecisionPending = true;
         this._revivalWave = this.resolveWaveForSettlement(data.wave, 1);
-        this._gameOverModule.showBaseRevival(
-            this._revivalWave,
-            () => {
-                const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
-                this.resumeGameFully(gm);
-                const heroNode = gm.hero;
-                const hero = heroNode?.isValid ? heroNode.getComponent(Hero) : null;
-                hero?.forceReviveAtInitialSpawn();
 
-                // Rebuild: emit BASE_REVIVED (Base listens and restores HP + buildings)
-                this.clearRevivalDecisionState();
-                this.eventManager.emit(GameEvents.BASE_REVIVED);
-                this.setJoystickInputEnabled(true);
-            },
-            () => {
-                this.finalizeRevivalAsGiveUp(true);
+        const tryRebuild = () => {
+            if (this._socialBridge.platform !== 'tiktok') {
+                this.applyBaseRebuild();
+                return;
             }
-        );
+            TikTokAdService.showRewardedAd('rebuild').then(rewarded => {
+                if (rewarded) {
+                    this.applyBaseRebuild();
+                    return;
+                }
+                if (TikTokAdService.wasLastAdCancelled()) {
+                    TikTokAdService.showToast(Localization.instance.t('ui.ad.not_rewarded'));
+                }
+                if (!this._revivalDecisionPending) return;
+                this._gameOverModule.showBaseRevival(this._revivalWave, tryRebuild, giveUp);
+            });
+        };
+
+        const giveUp = () => {
+            this.finalizeRevivalAsGiveUp(true);
+        };
+
+        this._gameOverModule.showBaseRevival(this._revivalWave, tryRebuild, giveUp);
+    }
+
+    private applyBaseRebuild(): void {
+        const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+        this.resumeGameFully(gm);
+        const heroNode = gm.hero;
+        const hero = heroNode?.isValid ? heroNode.getComponent(Hero) : null;
+        hero?.forceReviveAtInitialSpawn();
+
+        // Rebuild: emit BASE_REVIVED (Base listens and restores HP + buildings)
+        this.clearRevivalDecisionState();
+        this.eventManager.emit(GameEvents.BASE_REVIVED);
+        this.setJoystickInputEnabled(true);
     }
 
     private finalizeRevivalAsGiveUp(triggerGameOver: boolean): void {
@@ -360,6 +486,23 @@ export class HUDManager {
         this._revivalWave = 0;
     }
 
+    private resetTutorialFlags(): void {
+        this._storyIntroShown = false;
+        this._weaponGuideShown = false;
+        this._coinBuildGuideShown = false;
+        this._moreTowersGuideShown = false;
+        this._controlGuideShown = false;
+        this._midSupportGuideShown = false;
+    }
+
+    private resolveLocalizedByKey(key: string, fallback: string): string {
+        const localized = Localization.instance.t(key);
+        if (localized.startsWith('[[')) {
+            return fallback;
+        }
+        return localized;
+    }
+
     private resumeGameFully(gm: GameManager): void {
         for (let i = 0; i < 6 && !gm.isPlaying; i++) {
             gm.resumeGame();
@@ -367,14 +510,32 @@ export class HUDManager {
     }
 
     private onBossIntro(data: HUDBossIntroPayload): void {
-        this._bossIntroModule.showBossIntro(data, bossNode => {
-            this._cameraCinematicService.playBossCinematic(bossNode);
+        this._dialogueModule.enqueue({
+            titleKey: 'ui.dialog.title.warning',
+            bodyKey: 'ui.tutorial.boss_drop',
+            onConfirm: () => {
+                this._bossIntroModule.showBossIntro(data, bossNode => {
+                    this._cameraCinematicService.playBossCinematic(bossNode);
+                });
+            },
         });
     }
 
     private onLaneUnlockImminent(data: HUDLaneUnlockImminentPayload): void {
-        this._waveNoticeModule.showLaneUnlockImminent(data, (focus, padFocus, holdSeconds) => {
-            this._cameraCinematicService.playLaneUnlockCinematic(focus, padFocus, holdSeconds);
+        const laneName = this.resolveLocalizedByKey(`ui.laneRoute.${data.lane}`, data.lane);
+        const holdSeconds = Math.max(0.8, data.remainSeconds ?? 2.4);
+        this._dialogueModule.enqueue({
+            titleKey: 'ui.dialog.title.warning',
+            bodyKey: 'ui.tutorial.lane_unlock',
+            bodyParams: { lane: laneName },
+            onConfirm: () => {
+                if (!data.focusPosition) return;
+                this._cameraCinematicService.playLaneUnlockCinematic(
+                    data.focusPosition,
+                    data.padFocusPosition,
+                    holdSeconds
+                );
+            },
         });
     }
 
@@ -384,16 +545,34 @@ export class HUDManager {
             this.eventManager.emit(GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FINISHED);
             return;
         }
+        const holdSeconds = Math.max(0, data?.holdSeconds ?? 3);
+        const playCinematic = () => {
+            this._cameraCinematicService.playFocusCinematic(
+                focus,
+                holdSeconds,
+                () => {
+                    this.eventManager.emit(GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FINISHED);
+                },
+                () => {
+                    this.eventManager.emit(GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FOCUS_REACHED);
+                }
+            );
+        };
 
-        this._cameraCinematicService.playFocusCinematic(
-            focus,
-            Math.max(0, data?.holdSeconds ?? 3),
-            () => {
-                this.eventManager.emit(GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FINISHED);
-            },
-            () => {
-                this.eventManager.emit(GameEvents.MID_SUPPORT_REVEAL_CINEMATIC_FOCUS_REACHED);
-            }
+        if (this._midSupportGuideShown) {
+            playCinematic();
+            return;
+        }
+
+        this._midSupportGuideShown = true;
+        this._dialogueModule.enqueueSequence(
+            [
+                {
+                    titleKey: 'ui.dialog.title.tutorial',
+                    bodyKey: 'ui.tutorial.farm_barracks_upgrade',
+                },
+            ],
+            playCinematic
         );
     }
 
@@ -414,11 +593,13 @@ export class HUDManager {
         this._bossIntroModule.cleanup();
         this._waveNoticeModule.cleanup();
         this._statusModule.cleanup();
+        this._dialogueModule.cleanup();
         this._cameraCinematicService.cleanup();
 
         this._joystickRef = null;
         this._uiCanvas = null;
         this.clearRevivalDecisionState();
+        this.resetTutorialFlags();
         this._runSettled = false;
     }
 
@@ -429,6 +610,7 @@ export class HUDManager {
         this._bossIntroModule.onCanvasResize?.();
         this._gameOverModule.onCanvasResize?.();
         this._minimapModule.onCanvasResize?.();
+        this._dialogueModule.onCanvasResize?.();
     }
 
     private get eventManager(): EventManager {

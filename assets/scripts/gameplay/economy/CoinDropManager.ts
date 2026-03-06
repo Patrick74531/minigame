@@ -13,8 +13,8 @@ import { Enemy } from '../units/Enemy';
 export class CoinDropManager {
     private static readonly REGULAR_DROP_COINS = 3;
     private static readonly ELITE_DROP_COINS = 15;
-    private static readonly BOSS_DROP_COINS_STEP = 50;
-    private static readonly BOSS_DROP_MULTIPLIER = 3;
+    private static readonly BOSS_DROP_BASE_COINS = 100;
+    private static readonly BOSS_DROP_STEP_COINS = 100;
     private static readonly DROP_SPREAD_RADIUS = 0.42;
 
     private static _instance: CoinDropManager | null = null;
@@ -58,6 +58,10 @@ export class CoinDropManager {
         // Boss → 掉落宝箱而非金币
         if (data.enemySpawnType === 'boss') {
             this._bossKillCount += 1;
+            const totalCoins =
+                CoinDropManager.BOSS_DROP_BASE_COINS +
+                (this._bossKillCount - 1) * CoinDropManager.BOSS_DROP_STEP_COINS;
+            this.spawnCoinBurst(data.position.x, data.position.z, totalCoins);
             this.eventManager.emit(GameEvents.BOSS_CHEST_DROP, {
                 position: new Vec3(data.position.x, 0.5, data.position.z),
             });
@@ -78,6 +82,18 @@ export class CoinDropManager {
                 data.position.z + jitter.z,
                 1
             );
+        }
+    }
+
+    private spawnCoinBurst(centerX: number, centerZ: number, totalCoins: number): void {
+        if (!this._coinContainer) return;
+        const safeTotal = Math.max(0, Math.floor(totalCoins));
+        if (safeTotal <= 0) return;
+        const spreadMultiplier = Math.min(2.6, 1 + safeTotal / 120);
+
+        for (let i = 0; i < safeTotal; i++) {
+            const jitter = this.resolveDropJitter(i, safeTotal, spreadMultiplier);
+            CoinFactory.createCoin(this._coinContainer, centerX + jitter.x, centerZ + jitter.z, 1);
         }
     }
 
@@ -102,13 +118,18 @@ export class CoinDropManager {
         return CoinDropManager.REGULAR_DROP_COINS;
     }
 
-    private resolveDropJitter(index: number, total: number): { x: number; z: number } {
+    private resolveDropJitter(
+        index: number,
+        total: number,
+        spreadMultiplier: number = 1
+    ): { x: number; z: number } {
         if (total <= 1) {
             return { x: 0, z: 0 };
         }
         const ratio = index / total;
         const angle = ratio * Math.PI * 2 + Math.random() * 0.25;
-        const radius = CoinDropManager.DROP_SPREAD_RADIUS * (0.35 + Math.random() * 0.65);
+        const radius =
+            CoinDropManager.DROP_SPREAD_RADIUS * spreadMultiplier * (0.35 + Math.random() * 0.65);
         return {
             x: Math.cos(angle) * radius,
             z: Math.sin(angle) * radius,

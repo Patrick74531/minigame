@@ -176,13 +176,47 @@ export class SelectionCardTheme {
 
     public static drawOverlayMask(bg: Graphics, width: number, height: number): void {
         bg.clear();
-        bg.fillColor = new Color(5, 10, 18, 182);
-        bg.rect(-width * 0.5, -height * 0.5, width, height);
-        bg.fill();
+        const halfW = width * 0.5;
+        const halfH = height * 0.5;
+        const corner = Math.round(Math.max(42, Math.min(96, Math.min(width, height) * 0.1)));
+        const inset = 20;
 
-        bg.strokeColor = new Color(108, 190, 244, 48);
-        bg.lineWidth = 1.5;
-        bg.rect(-width * 0.5 + 14, -height * 0.5 + 14, width - 28, height - 28);
+        // No fullscreen dim layer; only draw decorative frame corners.
+        bg.strokeColor = new Color(102, 212, 255, 86);
+        bg.lineWidth = 3;
+
+        // top-left
+        bg.moveTo(-halfW + inset, halfH - inset - corner);
+        bg.lineTo(-halfW + inset, halfH - inset);
+        bg.lineTo(-halfW + inset + corner, halfH - inset);
+        bg.stroke();
+
+        // top-right
+        bg.moveTo(halfW - inset - corner, halfH - inset);
+        bg.lineTo(halfW - inset, halfH - inset);
+        bg.lineTo(halfW - inset, halfH - inset - corner);
+        bg.stroke();
+
+        // bottom-left
+        bg.moveTo(-halfW + inset, -halfH + inset + corner);
+        bg.lineTo(-halfW + inset, -halfH + inset);
+        bg.lineTo(-halfW + inset + corner, -halfH + inset);
+        bg.stroke();
+
+        // bottom-right
+        bg.moveTo(halfW - inset - corner, -halfH + inset);
+        bg.lineTo(halfW - inset, -halfH + inset);
+        bg.lineTo(halfW - inset, -halfH + inset + corner);
+        bg.stroke();
+
+        const centerLineW = Math.round(Math.max(140, Math.min(280, width * 0.24)));
+        bg.strokeColor = new Color(255, 194, 102, 96);
+        bg.lineWidth = 2;
+        bg.moveTo(-centerLineW * 0.5, halfH - inset - 2);
+        bg.lineTo(centerLineW * 0.5, halfH - inset - 2);
+        bg.stroke();
+        bg.moveTo(-centerLineW * 0.5, -halfH + inset + 2);
+        bg.lineTo(centerLineW * 0.5, -halfH + inset + 2);
         bg.stroke();
     }
 
@@ -195,22 +229,53 @@ export class SelectionCardTheme {
     ): void {
         const outerRadius = 18;
         const innerRadius = 14;
+        const halfW = width * 0.5;
+        const halfH = height * 0.5;
+        const inset = 8;
+        const edgeInset = 13;
+        const headerBottomY = halfH - headerHeight;
 
         bg.clear();
 
-        bg.fillColor = new Color(12, 20, 34, 244);
+        // Base armor plate.
+        bg.fillColor = new Color(8, 16, 30, 248);
         bg.roundRect(-width * 0.5, -height * 0.5, width, height, outerRadius);
         bg.fill();
 
-        bg.fillColor = new Color(30, 48, 70, 120);
-        bg.roundRect(-width * 0.5 + 8, -height * 0.5 + 8, width - 16, height - 16, innerRadius);
+        // Inner body.
+        bg.fillColor = new Color(14, 28, 48, 236);
+        bg.roundRect(
+            -width * 0.5 + inset,
+            -height * 0.5 + inset,
+            width - inset * 2,
+            height - inset * 2,
+            innerRadius
+        );
         bg.fill();
 
+        // Accent wash to avoid flat looking cards.
+        bg.fillColor = new Color(
+            Math.round(accent.r * 0.34),
+            Math.round(accent.g * 0.34),
+            Math.round(accent.b * 0.34),
+            52
+        );
+        bg.roundRect(
+            -width * 0.5 + edgeInset,
+            -height * 0.5 + edgeInset,
+            width - edgeInset * 2,
+            height - edgeInset * 2,
+            innerRadius - 2
+        );
+        bg.fill();
+
+        // Outer frame.
         bg.strokeColor = this.blendColor(accent, new Color(255, 232, 184, 255), 0.22);
         bg.lineWidth = 3.2;
         bg.roundRect(-width * 0.5, -height * 0.5, width, height, outerRadius);
         bg.stroke();
 
+        // Header strip.
         const headerColor = this.blendColor(accent, new Color(255, 176, 86, 255), 0.2);
         bg.fillColor = headerColor;
         bg.roundRect(-width * 0.5, height * 0.5 - headerHeight, width, headerHeight, outerRadius);
@@ -219,9 +284,38 @@ export class SelectionCardTheme {
         bg.rect(-width * 0.5, height * 0.5 - headerHeight, width, outerRadius);
         bg.fill();
 
+        // Header divider.
+        bg.strokeColor = this.blendColor(accent, new Color(255, 242, 210, 255), 0.35);
+        bg.lineWidth = 2;
+        bg.moveTo(-halfW + 16, headerBottomY);
+        bg.lineTo(halfW - 16, headerBottomY);
+        bg.stroke();
+
+        // Inner frame.
         bg.strokeColor = new Color(255, 244, 214, 160);
         bg.lineWidth = 1.2;
         bg.roundRect(-width * 0.5 + 7, -height * 0.5 + 7, width - 14, height - 14, innerRadius);
+        bg.stroke();
+
+        // Corner trims.
+        const trimLen = Math.min(24, Math.round(width * 0.1));
+        bg.strokeColor = this.blendColor(accent, new Color(130, 236, 255, 255), 0.42);
+        bg.lineWidth = 2;
+        bg.moveTo(-halfW + 10, halfH - 10 - trimLen);
+        bg.lineTo(-halfW + 10, halfH - 10);
+        bg.lineTo(-halfW + 10 + trimLen, halfH - 10);
+        bg.stroke();
+        bg.moveTo(halfW - 10 - trimLen, halfH - 10);
+        bg.lineTo(halfW - 10, halfH - 10);
+        bg.lineTo(halfW - 10, halfH - 10 - trimLen);
+        bg.stroke();
+        bg.moveTo(-halfW + 10, -halfH + 10 + trimLen);
+        bg.lineTo(-halfW + 10, -halfH + 10);
+        bg.lineTo(-halfW + 10 + trimLen, -halfH + 10);
+        bg.stroke();
+        bg.moveTo(halfW - 10 - trimLen, -halfH + 10);
+        bg.lineTo(halfW - 10, -halfH + 10);
+        bg.lineTo(halfW - 10, -halfH + 10 + trimLen);
         bg.stroke();
     }
 

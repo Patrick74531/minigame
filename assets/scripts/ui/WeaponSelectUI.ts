@@ -39,11 +39,17 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
     private _rootNode: Node | null = null;
     private _isShowing: boolean = false;
     private _offeredWeaponTypes: WeaponType[] = [];
+    private _pendingWeapons: { type: WeaponType; def: WeaponDef }[] | null = null;
+    private _pendingShowTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Icon loading cache
     private _iconFrameCache: Map<string, SpriteFrame> = new Map();
     private _iconLoading: Set<string> = new Set();
     private _iconWaiting: Map<string, Set<Sprite>> = new Map();
+
+    public get isShowing(): boolean {
+        return this._isShowing;
+    }
 
     public initialize(uiCanvas: Node): void {
         this._uiCanvas = uiCanvas;
@@ -54,6 +60,8 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
     public cleanup(): void {
         this.eventManager.off(GameEvents.WEAPONS_OFFERED, this.onWeaponsOffered, this);
         this.hideCards();
+        this.clearPendingTimer();
+        this._pendingWeapons = null;
         this._iconFrameCache.clear();
         this._iconLoading.clear();
         this._iconWaiting.clear();
@@ -71,7 +79,11 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
             if (def) defs.push({ type: id, def });
         }
         if (defs.length === 0) return;
-
+        const runPrelude = this.hudTutorialRunner;
+        if (runPrelude) {
+            runPrelude(() => this.showCards(defs));
+            return;
+        }
         this.showCards(defs);
     }
 
@@ -79,6 +91,13 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
 
     public showCards(weapons: { type: WeaponType; def: WeaponDef }[]): void {
         if (!this._uiCanvas || this._isShowing) return;
+        if (this.isDialogueBusy() || this.isOtherModalShowing()) {
+            this._pendingWeapons = weapons;
+            this.schedulePendingRetry();
+            return;
+        }
+        this._pendingWeapons = null;
+        this.clearPendingTimer();
         if (
             SelectionCardTheme.isTikTokRuntime() &&
             TikTokAdService.isSessionSlotUnlocked('weapon_draw')
@@ -241,6 +260,56 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         // Clear waiting sets to avoid memory leaks if sprites are destroyed
         this._iconWaiting.clear();
         this._iconLoading.clear();
+        this.tryShowPending();
+    }
+
+    private tryShowPending(): void {
+        if (!this._pendingWeapons || this._pendingWeapons.length <= 0) return;
+        if (this._isShowing) return;
+        if (this.isDialogueBusy() || this.isOtherModalShowing()) {
+            this.schedulePendingRetry();
+            return;
+        }
+        const weapons = this._pendingWeapons;
+        this._pendingWeapons = null;
+        this.clearPendingTimer();
+        this.showCards(weapons);
+    }
+
+    private schedulePendingRetry(): void {
+        if (this._pendingShowTimer !== null) return;
+        this._pendingShowTimer = setTimeout(() => {
+            this._pendingShowTimer = null;
+            this.tryShowPending();
+        }, 80);
+    }
+
+    private clearPendingTimer(): void {
+        if (this._pendingShowTimer === null) return;
+        clearTimeout(this._pendingShowTimer);
+        this._pendingShowTimer = null;
+    }
+
+    private isDialogueBusy(): boolean {
+        const hud = ServiceRegistry.get<{
+            isDialogueBusy?: () => boolean;
+            isRevivalShowing?: () => boolean;
+        }>('HUDManager');
+        if (hud?.isDialogueBusy?.()) return true;
+        if (hud?.isRevivalShowing?.()) return true;
+        return false;
+    }
+
+    private isOtherModalShowing(): boolean {
+        const b = ServiceRegistry.get<{ isShowing?: boolean }>('BuffCardUI');
+        if (b?.isShowing) return true;
+        const i = ServiceRegistry.get<{ isShowing?: boolean }>('ItemCardUI');
+        if (i?.isShowing) return true;
+        const t = ServiceRegistry.get<{ isShowing?: boolean }>('TowerUpgradeCardUI');
+        if (t?.isShowing) return true;
+        const ts = ServiceRegistry.get<{ isShowing?: boolean }>('TowerSelectUI');
+        if (ts?.isShowing) return true;
+        return false;
     }
 
     // === UI 构建 ===
@@ -448,6 +517,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
             this.grantAllWeapons(offered);
             this.hideCards();
             this.playWeaponGrantAnimation(offered);
+            this.emitSyntheticWeaponPicked(offered);
         });
     }
 
@@ -455,6 +525,7 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         if (weaponTypes.length <= 0) return;
         this.grantAllWeapons(weaponTypes);
         this.playWeaponGrantAnimation(weaponTypes);
+        this.emitSyntheticWeaponPicked(weaponTypes);
     }
 
     private grantAllWeapons(weaponTypes: WeaponType[]): void {
@@ -494,6 +565,12 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         if (type === WeaponType.FLAMETHROWER) return 'FL';
         if (type === WeaponType.CANNON) return 'CN';
         return 'GW';
+    }
+
+    private emitSyntheticWeaponPicked(weaponTypes: WeaponType[]): void {
+        const first = weaponTypes[0];
+        if (!first) return;
+        this.eventManager.emit(GameEvents.WEAPON_PICKED, { weaponId: first });
     }
 
     // === Icon Loading Logic (Copied from WeaponBarUI) ===
@@ -618,5 +695,15 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
 
     private get airdropService(): AirdropService {
         return ServiceRegistry.get<AirdropService>('AirdropService') ?? AirdropService.instance;
+    }
+
+    private get hudTutorialRunner(): ((onContinue: () => void) => void) | null {
+        const hud = ServiceRegistry.get<{ runWeaponOfferPrelude?: (cb: () => void) => void }>(
+            'HUDManager'
+        );
+        if (!hud || typeof hud.runWeaponOfferPrelude !== 'function') {
+            return null;
+        }
+        return hud.runWeaponOfferPrelude.bind(hud);
     }
 }

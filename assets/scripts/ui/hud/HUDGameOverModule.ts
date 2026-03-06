@@ -67,6 +67,10 @@ export class HUDGameOverModule implements HUDModule {
     // Callback invoked when player actually presses restart (for deferred settlement)
     private _onBeforeRestart: (() => void) | null = null;
 
+    public get isRevivalShowing(): boolean {
+        return !!this._revivalRoot?.active;
+    }
+
     public constructor(private readonly _setInputEnabled: (enabled: boolean) => void) {}
 
     public initialize(uiCanvas: Node): void {
@@ -859,7 +863,10 @@ export class HUDGameOverModule implements HUDModule {
             });
         }
         if (this._revivalRebuildBtnLabel) {
-            this._revivalRebuildBtnLabel.string = Localization.instance.t('ui.baseRevival.rebuild');
+            const rebuildKey = this.isTikTokRuntime()
+                ? 'ui.baseRevival.rebuild_tiktok'
+                : 'ui.baseRevival.rebuild';
+            this._revivalRebuildBtnLabel.string = Localization.instance.t(rebuildKey);
         }
         if (this._revivalGiveUpBtnLabel) {
             this._revivalGiveUpBtnLabel.string = Localization.instance.t('ui.baseRevival.giveUp');
@@ -1054,8 +1061,11 @@ export class HUDGameOverModule implements HUDModule {
         );
         const panelH = Math.round(
             Math.max(
-                isTikTokPortrait ? 220 : 220,
-                Math.min(300, viewportH * (isTikTokPortrait ? 0.32 : compact ? 0.36 : 0.4))
+                isTikTokPortrait ? 280 : 220,
+                Math.min(
+                    isTikTokPortrait ? 380 : 300,
+                    viewportH * (isTikTokPortrait ? 0.38 : compact ? 0.36 : 0.4)
+                )
             )
         );
 
@@ -1069,22 +1079,20 @@ export class HUDGameOverModule implements HUDModule {
 
         // Title
         const titleNode = this._revivalTitleLabel?.node;
-        titleNode
-            ?.getComponent(UITransform)
-            ?.setContentSize(panelW - 40, Math.round(panelH * 0.22));
-        titleNode?.setPosition(0, Math.round(panelH * 0.3), 0);
+        titleNode?.getComponent(UITransform)?.setContentSize(panelW - 40, Math.round(panelH * 0.2));
+        titleNode?.setPosition(0, Math.round(panelH * 0.32), 0);
         if (this._revivalTitleLabel) {
             this._revivalTitleLabel.fontSize = Math.max(
                 isTikTokPortrait ? 20 : 28,
-                Math.min(isTikTokPortrait ? 30 : 36, Math.round(panelH * 0.14))
+                Math.min(isTikTokPortrait ? 30 : 36, Math.round(panelH * 0.12))
             );
             this._revivalTitleLabel.lineHeight = this._revivalTitleLabel.fontSize + 8;
         }
 
         // Message
         const msgNode = this._revivalMessageLabel?.node;
-        msgNode?.getComponent(UITransform)?.setContentSize(panelW - 40, Math.round(panelH * 0.28));
-        msgNode?.setPosition(0, Math.round(panelH * 0.06), 0);
+        msgNode?.getComponent(UITransform)?.setContentSize(panelW - 40, Math.round(panelH * 0.24));
+        msgNode?.setPosition(0, Math.round(panelH * 0.1), 0);
         if (this._revivalMessageLabel) {
             this._revivalMessageLabel.fontSize = Math.max(
                 isTikTokPortrait ? 13 : 16,
@@ -1102,10 +1110,14 @@ export class HUDGameOverModule implements HUDModule {
         const rowRebuildBtnW = Math.round(Math.max(108, singleRowBudget * 0.6));
         const rowGiveUpBtnW = Math.round(Math.max(86, singleRowBudget * 0.4));
         const stackBtnW = Math.max(120, panelW - sideInset * 2);
-        const btnH = Math.round(Math.max(36, panelH * (stackButtons ? 0.17 : 0.18)));
+        const btnH = Math.round(Math.max(36, panelH * (stackButtons ? 0.14 : 0.18)));
         const rowBtnY = -Math.round(panelH * 0.31);
-        const stackPrimaryY = -Math.round(panelH * 0.24);
-        const stackSecondaryY = stackPrimaryY - btnH - Math.max(8, Math.round(panelH * 0.04));
+
+        // Stacked layout: compute from panel bottom up to guarantee buttons stay within bounds
+        const bottomMargin = Math.max(12, Math.round(panelH * 0.05));
+        const stackSpacingV = Math.max(8, Math.round(panelH * 0.03));
+        const stackGiveUpY = -Math.round(panelH / 2) + bottomMargin + Math.round(btnH / 2);
+        const stackRebuildY = stackGiveUpY + btnH + stackSpacingV;
 
         const rebuildBtnW = stackButtons ? stackBtnW : rowRebuildBtnW;
         const giveUpBtnW = stackButtons ? stackBtnW : rowGiveUpBtnW;
@@ -1115,8 +1127,8 @@ export class HUDGameOverModule implements HUDModule {
         const giveUpX = stackButtons
             ? 0
             : (rebuildBtnW + giveUpBtnW + btnSpacing) / 2 - giveUpBtnW / 2;
-        const rebuildY = stackButtons ? stackPrimaryY : rowBtnY;
-        const giveUpY = stackButtons ? stackSecondaryY : rowBtnY;
+        const rebuildY = stackButtons ? stackRebuildY : rowBtnY;
+        const giveUpY = stackButtons ? stackGiveUpY : rowBtnY;
 
         if (this._revivalRebuildBtnNode) {
             this._revivalRebuildBtnNode

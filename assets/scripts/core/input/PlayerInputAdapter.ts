@@ -4,8 +4,13 @@ import { Hero } from '../../gameplay/units/Hero';
 import { GameManager } from '../managers/GameManager';
 import { ServiceRegistry } from '../managers/ServiceRegistry';
 import { HeroWeaponManager } from '../../gameplay/weapons/HeroWeaponManager';
+import { UIResponsive } from '../../ui/UIResponsive';
 
 const { ccclass } = _decorator;
+const ARROW_LEFT = 37 as KeyCode;
+const ARROW_UP = 38 as KeyCode;
+const ARROW_RIGHT = 39 as KeyCode;
+const ARROW_DOWN = 40 as KeyCode;
 
 /**
  * PlayerInputAdapter
@@ -47,13 +52,18 @@ export class PlayerInputAdapter extends Component {
     }
 
     private updateKeyboardVector(): void {
+        if (!this.isDesktopKeyboardEnabled()) {
+            this._keyboardInput.set(0, 0);
+            return;
+        }
+
         let x = 0;
         let y = 0;
 
-        if (this._keysPressed.has(KeyCode.KEY_W)) y += 1;
-        if (this._keysPressed.has(KeyCode.KEY_S)) y -= 1;
-        if (this._keysPressed.has(KeyCode.KEY_A)) x -= 1;
-        if (this._keysPressed.has(KeyCode.KEY_D)) x += 1;
+        if (this._keysPressed.has(KeyCode.KEY_W) || this._keysPressed.has(ARROW_UP)) y += 1;
+        if (this._keysPressed.has(KeyCode.KEY_S) || this._keysPressed.has(ARROW_DOWN)) y -= 1;
+        if (this._keysPressed.has(KeyCode.KEY_A) || this._keysPressed.has(ARROW_LEFT)) x -= 1;
+        if (this._keysPressed.has(KeyCode.KEY_D) || this._keysPressed.has(ARROW_RIGHT)) x += 1;
 
         this._keyboardInput.set(x, y);
         if (x !== 0 && y !== 0) {
@@ -103,13 +113,17 @@ export class PlayerInputAdapter extends Component {
         if (!heroComp) return;
 
         // Prioritize keyboard input
-        if (this._keyboardInput.lengthSqr() > 0.01) {
+        if (this.isDesktopKeyboardEnabled() && this._keyboardInput.lengthSqr() > 0.01) {
             heroComp.setInput(this._keyboardInput);
         } else if (this._joystick) {
             heroComp.setInput(this._joystick.inputVector);
         } else {
             heroComp.setInput(Vec2.ZERO);
         }
+    }
+
+    private isDesktopKeyboardEnabled(): boolean {
+        return !UIResponsive.shouldUseTouchControls();
     }
 
     private get gameManager(): GameManager {

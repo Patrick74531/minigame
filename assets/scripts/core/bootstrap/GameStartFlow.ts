@@ -236,6 +236,8 @@ export class GameStartFlow {
 
         // Suppress the unconditional GAME_START weapon offer — player already has weapons.
         AirdropService.instance.suppressInitialOffer();
+        // Continue flow should not replay early-run tutorial dialogs.
+        HUDManager.instance.suppressBasicTutorialDialogsForContinue();
 
         HeroLevelSystem.instance.restoreState(save.heroLevel, save.heroXp);
 
@@ -258,6 +260,7 @@ export class GameStartFlow {
             if (targetBaseLevel > baseComp.level) {
                 baseComp.restoreToLevel(targetBaseLevel);
             }
+            baseComp.restoreRevivalState(Boolean(save.baseRevivalUsed));
             baseComp.syncUpgradePadForCurrentLevel();
             // Replay base-upgrade side effects (hero/barracks scaling) without opening buff-card UI.
             this.eventManager.emit(GameEvents.BASE_UPGRADE_READY, {

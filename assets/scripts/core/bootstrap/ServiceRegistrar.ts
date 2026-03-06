@@ -19,6 +19,8 @@ import { HeroWeaponManager } from '../../gameplay/weapons/HeroWeaponManager';
 import { AirdropService } from '../../gameplay/airdrop/AirdropService';
 import { WeaponSelectUI } from '../../ui/WeaponSelectUI';
 import { WeaponBarUI } from '../../ui/WeaponBarUI';
+import { ItemCardUI } from '../../ui/ItemCardUI';
+import { TowerSelectUI } from '../../ui/TowerSelectUI';
 
 /**
  * ServiceRegistrar
@@ -55,5 +57,7 @@ export class ServiceRegistrar {
         ServiceRegistry.register('AirdropService', AirdropService.instance);
         ServiceRegistry.register('WeaponSelectUI', WeaponSelectUI.instance);
         ServiceRegistry.register('WeaponBarUI', WeaponBarUI.instance);
+        ServiceRegistry.register('ItemCardUI', ItemCardUI.instance);
+        ServiceRegistry.register('TowerSelectUI', TowerSelectUI.instance);
     }
 }

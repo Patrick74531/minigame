@@ -21,6 +21,15 @@ export class Base extends Building {
     private _revivalUsed: boolean = false;
     private _awaitingRevival: boolean = false;
 
+    public get revivalUsed(): boolean {
+        return this._revivalUsed;
+    }
+
+    public restoreRevivalState(revivalUsed: boolean): void {
+        this._revivalUsed = revivalUsed;
+        this._awaitingRevival = false;
+    }
+
     protected initialize(): void {
         this.buildingType = BuildingType.BASE;
         this.maxLevel = GameConfig.BUILDING.BASE_UPGRADE.MAX_LEVEL;

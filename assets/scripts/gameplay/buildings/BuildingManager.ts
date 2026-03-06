@@ -354,14 +354,25 @@ export class BuildingManager {
     }
 
     private activatePadsByIndexes(indexes: ReadonlySet<number>, overrideCost?: number): void {
+        let activatedTowerPads = 0;
         for (const pad of this._pads) {
             if (!pad || !pad.node || !pad.node.isValid) continue;
             const idx = this._padNodeToIndex.get(pad.node.uuid);
             if (idx === undefined || !indexes.has(idx)) continue;
+            const wasActive = pad.node.active;
             if (typeof overrideCost === 'number') {
                 pad.overrideCost = overrideCost;
             }
             pad.node.active = true;
+            if (!wasActive && BuildingPadPlacement.isTowerType(pad.buildingTypeId)) {
+                activatedTowerPads += 1;
+            }
+        }
+
+        if (activatedTowerPads > 0) {
+            this.eventManager.emit(GameEvents.TOWER_PADS_EXPANDED, {
+                count: activatedTowerPads,
+            });
         }
     }
 

@@ -1,4 +1,9 @@
-export type TikTokRewardAdSlot = 'weapon_draw' | 'hero_attr_card' | 'tower_attr_card' | 'item_card';
+export type TikTokRewardAdSlot =
+    | 'weapon_draw'
+    | 'hero_attr_card'
+    | 'tower_attr_card'
+    | 'item_card'
+    | 'rebuild';
 
 export interface TikTokRewardAdPlacementConfig {
     slot: TikTokRewardAdSlot;
@@ -10,6 +15,7 @@ export const TIKTOK_REWARDED_AD_PLACEMENTS: Record<TikTokRewardAdSlot, string> =
     hero_attr_card: 'ad7613040313108088843',
     tower_attr_card: 'ad7613186219463804984',
     item_card: 'ad7613084341946107916',
+    rebuild: 'ks_reward_rebuild_v1',
 };
 
 export function getTikTokRewardedAdPlacementId(slot: TikTokRewardAdSlot): string {

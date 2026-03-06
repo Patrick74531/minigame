@@ -1037,7 +1037,11 @@ if [ "$SKIP_COCOS_BUILD" -eq 0 ]; then
   log "Running headless Cocos build (TikTok Native)..."
   local_build_started_at="$(date +%s)"
   set +e
-  GVR_ENABLE_REDDIT_CSP_PATCH=0 "$COCOS_CREATOR" --project "$ROOT_DIR" --build "$BUILD_OPT_BASE"
+  env -u ELECTRON_RUN_AS_NODE \
+    GVR_ENABLE_REDDIT_CSP_PATCH=0 \
+    "$COCOS_CREATOR" \
+    --project "$ROOT_DIR" \
+    --build "$BUILD_OPT_BASE"
   cocos_exit_code=$?
   set -e
 

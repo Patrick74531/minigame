@@ -46,6 +46,7 @@ export class BuffCardUI {
     private _root: Node | null = null;
     private _uiCanvas: Node | null = null;
     private _isShowing: boolean = false;
+    private _pendingShowTimer: ReturnType<typeof setTimeout> | null = null;
 
     public get isShowing(): boolean {
         return this._isShowing;
@@ -61,6 +62,7 @@ export class BuffCardUI {
     public cleanup(): void {
         this.eventManager.offAllByTarget(this);
         this.hideCards();
+        this.clearPendingTimer();
         this._uiCanvas = null;
     }
 
@@ -70,7 +72,55 @@ export class BuffCardUI {
         const cards = this.buffCardService.pendingCards;
         if (cards.length === 0) return;
 
+        this.tryShowPending();
+    }
+
+    private tryShowPending(): void {
+        if (this._isShowing) return;
+        const cards = this.buffCardService.pendingCards;
+        if (cards.length === 0) return;
+        if (this.isDialogueBusy() || this.isOtherModalShowing()) {
+            this.schedulePendingRetry();
+            return;
+        }
+        this.clearPendingTimer();
         this.showCards([...cards]);
+    }
+
+    private schedulePendingRetry(): void {
+        if (this._pendingShowTimer !== null) return;
+        this._pendingShowTimer = setTimeout(() => {
+            this._pendingShowTimer = null;
+            this.tryShowPending();
+        }, 80);
+    }
+
+    private clearPendingTimer(): void {
+        if (this._pendingShowTimer === null) return;
+        clearTimeout(this._pendingShowTimer);
+        this._pendingShowTimer = null;
+    }
+
+    private isDialogueBusy(): boolean {
+        const hud = ServiceRegistry.get<{
+            isDialogueBusy?: () => boolean;
+            isRevivalShowing?: () => boolean;
+        }>('HUDManager');
+        if (hud?.isDialogueBusy?.()) return true;
+        if (hud?.isRevivalShowing?.()) return true;
+        return false;
+    }
+
+    private isOtherModalShowing(): boolean {
+        const w = ServiceRegistry.get<{ isShowing?: boolean }>('WeaponSelectUI');
+        if (w?.isShowing) return true;
+        const i = ServiceRegistry.get<{ isShowing?: boolean }>('ItemCardUI');
+        if (i?.isShowing) return true;
+        const t = ServiceRegistry.get<{ isShowing?: boolean }>('TowerUpgradeCardUI');
+        if (t?.isShowing) return true;
+        const ts = ServiceRegistry.get<{ isShowing?: boolean }>('TowerSelectUI');
+        if (ts?.isShowing) return true;
+        return false;
     }
 
     public showCards(cards: BuffCardDef[]): void {
@@ -212,6 +262,7 @@ export class BuffCardUI {
             this._root = null;
         }
         this._isShowing = false;
+        this.tryShowPending();
     }
 
     // === 卡牌创建 ===

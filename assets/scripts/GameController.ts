@@ -334,6 +334,7 @@ export class GameController extends Component {
             ? Math.max(0, baseComp.currentHp / Math.max(1, baseComp.maxHp))
             : 1;
         const baseLevel = baseComp ? Math.max(1, Math.floor(baseComp.level)) : 1;
+        const baseRevivalUsed = baseComp ? baseComp.revivalUsed : false;
 
         const heroLevel = HeroLevelSystem.instance.level;
         const heroXp = HeroLevelSystem.instance.currentXp;
@@ -373,6 +374,7 @@ export class GameController extends Component {
             buffCardIds: buffIds,
             nextOfferWave,
             items,
+            baseRevivalUsed,
         };
     }
 

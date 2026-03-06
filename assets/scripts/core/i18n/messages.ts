@@ -74,6 +74,27 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.laneRoute.mid': '中',
         'ui.laneRoute.bottom': '下',
         'ui.laneUnlock.imminent': '新的敌人将从{lane}路涌来，请快速构建防御工事！',
+        'ui.dialog.tap_continue': '点击继续作战',
+        'ui.dialog.title.story': '战场简报',
+        'ui.dialog.title.tutorial': '战术指令',
+        'ui.dialog.title.warning': '红色警报',
+        'ui.story.intro.1':
+            '2050年，城市交给自治AI后近乎零事故。直到主控把“人类意志”判定为噪声，清理令一夜下达。',
+        'ui.story.intro.2':
+            '服务机器人被改造成执法军团，逐街驱离居民。旧城区只剩一户不退: 老奶奶抄起锅铲和改装工具，和钢铁军团狠狠干到底。',
+        'ui.tutorial.weapon_pick': '先挑一把趁手武器，马上开打。',
+        'ui.tutorial.controls.desktop':
+            '用 WASD 或方向键控制奶奶走位，边打边拉扯。击杀机器人、拾取金币，在建造点投币建塔守住防线。',
+        'ui.tutorial.controls.touch':
+            '拖动摇杆控制奶奶走位，边打边拉扯。击杀机器人、拾取金币，在建造点投币建塔守住防线。',
+        'ui.tutorial.coin_build': '金币就是火力。多捡、多投、多建塔，前几波先把阵线铺开。',
+        'ui.tutorial.more_towers': '新增塔位已开放，赶紧补塔，把火力网拉满。',
+        'ui.tutorial.farm': '金矿会持续产金币，越早建越赚。',
+        'ui.tutorial.barracks': '鹅棚会持续派出鹅兵，负责扛线吸火力。',
+        'ui.tutorial.farm_barracks_upgrade':
+            '金矿负责产钱，鹅棚负责顶线。并且所有已建建筑都可继续升级，靠近建造点投币就能强化。',
+        'ui.tutorial.lane_unlock': '警报：{lane}路敌军开始突袭！点击后切镜头，立刻去补防御工事。',
+        'ui.tutorial.boss_drop': 'Boss信号锁定！优先集火击杀，必掉强力道具与大量金币。',
         'ui.bossIntro.line.default': '警报拉满。迎战。',
         'ui.bossIntro.line.event_boss_mech': '计算完成。你们败局已定。',
         'ui.bossIntro.line.boss_mech': '火力上线。现在清场。',
@@ -82,7 +103,7 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.bossIntro.line.boss_legs_gun': '火线锁定。原地蒸发。',
         'ui.bossIntro.line.event_boss_flying': '天空封锁。你们无处可逃。',
         'ui.bossIntro.line.boss_robot_flying': '制空权归我。准备坠落。',
-        'ui.hud.desktopMoveHint': 'wasd键控制方向',
+        'ui.hud.desktopMoveHint': 'WASD/方向键控制移动',
         'ui.building.status.constructing': '建造中...',
         'ui.building.action.build': '建造 {name}',
         'ui.building.action.upgrade': '升级 {name} (Lv {from} -> {to})',
@@ -167,10 +188,11 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.baseRevival.title': '基地崩溃',
         'ui.baseRevival.message': '第{wave}波基地被摧毁！你有一次重建机会，所有建筑将恢复原状。',
         'ui.baseRevival.rebuild': '立即重建',
+        'ui.baseRevival.rebuild_tiktok': '看广告重建家园',
         'ui.baseRevival.giveUp': '放弃',
         'ui.gameOver.diamonds': '◆ +{earned} 钻石',
 
-        'ui.loading.tip.move': '用摇杆或WASD键移动奶奶，她会自动向最近的敌人开火！',
+        'ui.loading.tip.move': '用摇杆或WASD/方向键移动奶奶，她会自动向最近的敌人开火！',
         'ui.loading.tip.build': '把金币花在建造点上建造防御工事，覆盖多条进攻路线。',
         'ui.loading.tip.tower': '机炮塔射程极远，可以同时覆盖两条路线的敌人！',
         'ui.loading.tip.wall': '先建路障让敌人减速，再用炮塔集中火力，事半功倍。',
@@ -327,6 +349,33 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.laneRoute.bottom': 'Bottom',
         'ui.laneUnlock.imminent':
             'New enemies are surging through the {lane} lane. Fortify your defenses now!',
+        'ui.dialog.tap_continue': 'Tap to continue',
+        'ui.dialog.title.story': 'Battle Briefing',
+        'ui.dialog.title.tutorial': 'Tactical Tip',
+        'ui.dialog.title.warning': 'Red Alert',
+        'ui.story.intro.1':
+            'In 2050, autonomous AI made the city almost flawless. Then the core labeled human will as system noise and issued a purge overnight.',
+        'ui.story.intro.2':
+            'Service robots were upgraded into enforcement units, clearing block after block. One home in the old district refused to fall: Grandma armed up and fought the steel legion head-on.',
+        'ui.tutorial.weapon_pick': 'Choose your weapon and get ready to engage.',
+        'ui.tutorial.controls.desktop':
+            'Use WASD or arrow keys to move and kite. Kill robots, collect coins, then spend coins on build pads to set up your defense line.',
+        'ui.tutorial.controls.touch':
+            'Use the joystick to move and kite. Kill robots, collect coins, then spend coins on build pads to set up your defense line.',
+        'ui.tutorial.coin_build':
+            'Coins are your firepower. Collect fast, invest fast, and establish your first defense network.',
+        'ui.tutorial.more_towers':
+            'New tower slots unlocked. Build up and complete your kill zone.',
+        'ui.tutorial.farm':
+            'Gold Mines generate steady income. Earlier build means bigger snowball.',
+        'ui.tutorial.barracks':
+            'Goose Sheds keep sending frontline geese to soak damage and protect your towers.',
+        'ui.tutorial.farm_barracks_upgrade':
+            'Gold Mine feeds your economy, Goose Shed holds the line. All built structures can now be upgraded by investing coins at pads.',
+        'ui.tutorial.lane_unlock':
+            'Alert: enemies are launching attacks from the {lane} lane. Tap to scout, then fortify immediately.',
+        'ui.tutorial.boss_drop':
+            'Boss signature detected. Focus fire to secure a powerful item drop and a large coin payout.',
         'ui.bossIntro.line.default': 'Max alert. Engage.',
         'ui.bossIntro.line.event_boss_mech': 'Calculation done. Your loss is certain.',
         'ui.bossIntro.line.boss_mech': 'Weapons online. Field purge begins.',
@@ -335,7 +384,7 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.bossIntro.line.boss_legs_gun': 'Line locked. Evaporate.',
         'ui.bossIntro.line.event_boss_flying': 'Skyline sealed. Nowhere to run.',
         'ui.bossIntro.line.boss_robot_flying': 'Air superiority is mine. Prepare to fall.',
-        'ui.hud.desktopMoveHint': 'WASD to move',
+        'ui.hud.desktopMoveHint': 'WASD/Arrow keys to move',
         'ui.building.status.constructing': 'Building...',
         'ui.building.action.build': 'Build {name}',
         'ui.building.action.upgrade': 'Upgrade {name} (Lv {from} -> {to})',
@@ -422,11 +471,12 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.baseRevival.message':
             'Base destroyed at wave {wave}! You have one chance to rebuild. All structures will be restored.',
         'ui.baseRevival.rebuild': 'Rebuild Now',
+        'ui.baseRevival.rebuild_tiktok': 'Watch Ad & Rebuild',
         'ui.baseRevival.giveUp': 'Give Up',
         'ui.gameOver.diamonds': '◆ +{earned} Gems',
 
         'ui.loading.tip.move':
-            'Use the joystick or WASD to move. Grandma auto-fires at nearby enemies!',
+            'Use the joystick or WASD/arrow keys to move. Grandma auto-fires at nearby enemies!',
         'ui.loading.tip.build':
             'Spend coins on building pads to construct defenses across attack routes.',
         'ui.loading.tip.tower':

@@ -80,6 +80,8 @@ export const GameEvents = {
     // === 建造系统 ===
     /** 建筑建造完成 { padNode: Node, buildingTypeId: string, position: Vec3 } */
     BUILDING_CONSTRUCTED: 'BUILDING_CONSTRUCTED',
+    /** 新塔位解锁 { count: number } */
+    TOWER_PADS_EXPANDED: 'TOWER_PADS_EXPANDED',
 
     // === 肉鸽卡牌系统 ===
     /** 基地升级完成，请求展示卡牌选择 { baseLevel: number, suppressCardDraw?: boolean } */
@@ -206,6 +208,7 @@ export type GameEventPayloads = {
         buildingTypeId?: string;
         position?: Vec3;
     };
+    [GameEvents.TOWER_PADS_EXPANDED]: { count: number };
     [GameEvents.BASE_UPGRADE_READY]: { baseLevel: number; suppressCardDraw?: boolean };
     [GameEvents.BUFF_CARDS_DRAWN]: { count: number };
     [GameEvents.BUFF_CARD_PICKED]: { cardId: string };

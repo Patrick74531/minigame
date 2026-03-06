@@ -33,6 +33,7 @@ export interface GameSaveDataV2 {
     buffCardIds: string[];
     nextOfferWave: number;
     items: Array<{ id: string; count: number }>;
+    baseRevivalUsed: boolean;
 }
 
 /** Legacy V1 shape (read-only, for migration) */
@@ -132,6 +133,9 @@ export class GameSaveManager {
             if (!Array.isArray(v2.items)) {
                 v2.items = [];
             }
+            if (typeof v2.baseRevivalUsed !== 'boolean') {
+                v2.baseRevivalUsed = false;
+            }
             return v2;
         } catch {
             return null;
@@ -180,6 +184,7 @@ export class GameSaveManager {
             buffCardIds: [],
             nextOfferWave: 3,
             items: [],
+            baseRevivalUsed: false,
         };
     }
 }

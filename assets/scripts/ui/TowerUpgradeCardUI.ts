@@ -35,6 +35,8 @@ export class TowerUpgradeCardUI {
     private _uiCanvas: Node | null = null;
     private _isShowing: boolean = false;
     private _activeBuildingId: string | null = null;
+    private _pendingBuildingId: string | null = null;
+    private _pendingShowTimer: ReturnType<typeof setTimeout> | null = null;
 
     public get isShowing(): boolean {
         return this._isShowing;
@@ -52,6 +54,8 @@ export class TowerUpgradeCardUI {
     public cleanup(): void {
         this.eventManager.offAllByTarget(this);
         this.hideCards();
+        this.clearPendingTimer();
+        this._pendingBuildingId = null;
         this._uiCanvas = null;
         this._activeBuildingId = null;
     }
@@ -59,7 +63,61 @@ export class TowerUpgradeCardUI {
     private onTowerUpgradeCardsDrawn(data: { buildingId: string; count: number }): void {
         const cards = this.towerUpgradeCardService.pendingCards;
         if (cards.length === 0) return;
-        this.showCards([...cards], data.buildingId);
+        this._pendingBuildingId = data.buildingId;
+        this.tryShowPending();
+    }
+
+    private tryShowPending(): void {
+        if (this._isShowing) return;
+        const cards = this.towerUpgradeCardService.pendingCards;
+        if (cards.length === 0) {
+            this._pendingBuildingId = null;
+            return;
+        }
+        if (this.isDialogueBusy() || this.isOtherModalShowing()) {
+            this.schedulePendingRetry();
+            return;
+        }
+        const buildingId = this._pendingBuildingId ?? '';
+        this._pendingBuildingId = null;
+        this.clearPendingTimer();
+        this.showCards([...cards], buildingId);
+    }
+
+    private schedulePendingRetry(): void {
+        if (this._pendingShowTimer !== null) return;
+        this._pendingShowTimer = setTimeout(() => {
+            this._pendingShowTimer = null;
+            this.tryShowPending();
+        }, 80);
+    }
+
+    private clearPendingTimer(): void {
+        if (this._pendingShowTimer === null) return;
+        clearTimeout(this._pendingShowTimer);
+        this._pendingShowTimer = null;
+    }
+
+    private isDialogueBusy(): boolean {
+        const hud = ServiceRegistry.get<{
+            isDialogueBusy?: () => boolean;
+            isRevivalShowing?: () => boolean;
+        }>('HUDManager');
+        if (hud?.isDialogueBusy?.()) return true;
+        if (hud?.isRevivalShowing?.()) return true;
+        return false;
+    }
+
+    private isOtherModalShowing(): boolean {
+        const w = ServiceRegistry.get<{ isShowing?: boolean }>('WeaponSelectUI');
+        if (w?.isShowing) return true;
+        const b = ServiceRegistry.get<{ isShowing?: boolean }>('BuffCardUI');
+        if (b?.isShowing) return true;
+        const i = ServiceRegistry.get<{ isShowing?: boolean }>('ItemCardUI');
+        if (i?.isShowing) return true;
+        const ts = ServiceRegistry.get<{ isShowing?: boolean }>('TowerSelectUI');
+        if (ts?.isShowing) return true;
+        return false;
     }
 
     public showCards(cards: TowerUpgradeCardDef[], buildingId: string): void {
@@ -198,6 +256,7 @@ export class TowerUpgradeCardUI {
         }
         this._isShowing = false;
         this._activeBuildingId = null;
+        this.tryShowPending();
     }
 
     private createOverlay(viewportWidth: number, viewportHeight: number): Node {

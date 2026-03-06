@@ -27,6 +27,10 @@ export class TowerSelectUI extends Singleton<TowerSelectUI>() {
 
     private readonly TOWER_TYPES = ['tower', 'frost_tower', 'lightning_tower'];
 
+    public get isShowing(): boolean {
+        return this._isShowing;
+    }
+
     public initialize(uiCanvas: Node): void {
         this._uiCanvas = uiCanvas;
         this.eventManager.on(GameEvents.REQUEST_TOWER_SELECTION, this.onRequestSelection, this);

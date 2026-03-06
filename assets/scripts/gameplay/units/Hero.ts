@@ -57,6 +57,7 @@ export class Hero extends Unit {
     private _weapon: RangedWeapon | null = null;
     private _mover: CharacterMover | null = null;
     private _stackVisualizer: StackVisualizer | null = null;
+    private _coinCount: number = 0;
     /** 空投武器冷却计时器 */
     private _customWeaponTimer: number = 0;
     /** 上一帧 dt（供持续型武器使用） */
@@ -207,7 +208,8 @@ export class Hero extends Unit {
         // Check Coin
         const coin = otherNode.getComponent(Coin);
         if (coin) {
-            this.addCoin(otherNode);
+            const value = Math.max(1, Math.floor(coin.value || 1));
+            this.addCoin(otherNode, value);
             coin.onPickup();
             this.hudManager.updateCoinDisplay(this.coinCount);
         }
@@ -224,7 +226,10 @@ export class Hero extends Unit {
     /**
      * 添加金币
      */
-    public addCoin(coin: Node): void {
+    public addCoin(coin: Node, value: number = 1): void {
+        const safeValue = Math.max(1, Math.floor(value));
+        this._coinCount += safeValue;
+
         // Rotate coin flat (Horizontal) for stacking
         coin.setRotationFromEuler(90, 0, 0);
 
@@ -241,23 +246,24 @@ export class Hero extends Unit {
      * 移除金币
      */
     public removeCoin(count: number = 1): number {
-        if (!this._stackVisualizer) return 0;
+        const safeCount = Math.max(0, Math.floor(count));
+        const removed = Math.min(safeCount, this._coinCount);
+        this._coinCount -= removed;
 
-        let removed = 0;
-        const toRemove = Math.min(count, this._stackVisualizer.count);
-
-        for (let i = 0; i < toRemove; i++) {
-            const coin = this._stackVisualizer.popFromStack();
-            if (coin) {
-                coin.destroy();
-                removed++;
+        if (this._stackVisualizer) {
+            const visualToRemove = Math.min(removed, this._stackVisualizer.count);
+            for (let i = 0; i < visualToRemove; i++) {
+                const coin = this._stackVisualizer.popFromStack();
+                if (coin) {
+                    coin.destroy();
+                }
             }
         }
         return removed;
     }
 
     public get coinCount(): number {
-        return this._stackVisualizer ? this._stackVisualizer.count : 0;
+        return this._coinCount;
     }
 
     /**
@@ -267,6 +273,7 @@ export class Hero extends Unit {
         const safeCount = Math.max(0, Math.floor(targetCount));
 
         if (!this._stackVisualizer) {
+            this._coinCount = 0;
             this.hudManager.updateCoinDisplay(0);
             return;
         }
@@ -286,6 +293,7 @@ export class Hero extends Unit {
 
     private _doRestoreCoins(safeCount: number): void {
         if (!this._stackVisualizer) return;
+        this._coinCount = 0;
 
         // Clear existing carried coins first to avoid duplication on repeated restore calls.
         while (this._stackVisualizer.count > 0) {
@@ -303,7 +311,7 @@ export class Hero extends Unit {
             if (coinComp) {
                 coinComp.onPickup();
             }
-            this.addCoin(coinNode);
+            this.addCoin(coinNode, 1);
         }
 
         this.hudManager.updateCoinDisplay(this.coinCount);
@@ -365,7 +373,9 @@ export class Hero extends Unit {
                 try {
                     const prop = mr.material?.getProperty('mainColor');
                     if (prop instanceof Color) origColor = prop.clone();
-                } catch (_) {}
+                } catch (_err) {
+                    // Ignore materials that do not expose mainColor.
+                }
                 this._rainbowMRs.push(mr);
                 this._rainbowOrigColors.push(origColor);
             }
@@ -382,10 +392,14 @@ export class Hero extends Unit {
             const orig = this._rainbowOrigColors[i] ?? new Color(255, 255, 255, 255);
             try {
                 mr.material.setProperty('mainColor', orig);
-            } catch (_) {}
+            } catch (_err) {
+                // Ignore materials that do not expose mainColor.
+            }
             try {
                 mr.material.setProperty('emissive', new Color(0, 0, 0, 255));
-            } catch (_) {}
+            } catch (_err) {
+                // Ignore materials that do not expose emissive.
+            }
         }
     }
 
@@ -412,7 +426,9 @@ export class Hero extends Unit {
             if (!mr?.isValid || !mr.material) continue;
             try {
                 mr.material.setProperty('mainColor', color);
-            } catch (_) {}
+            } catch (_err) {
+                // Ignore materials that do not expose mainColor.
+            }
             // Emissive boost on standard materials — makes the glow pop
             const esc = showColor ? 0.35 : 0;
             try {
@@ -420,7 +436,9 @@ export class Hero extends Unit {
                     'emissive',
                     new Color(Math.round(r * esc), Math.round(g * esc), Math.round(b * esc), 255)
                 );
-            } catch (_) {}
+            } catch (_err) {
+                // Ignore materials that do not expose emissive.
+            }
         }
     }
 
