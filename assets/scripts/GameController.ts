@@ -62,6 +62,7 @@ export class GameController extends Component {
 
     private _pausedByVisibility: boolean = false;
     private _visibilityHandler: (() => void) | null = null;
+    private _pageHideHandler: (() => void) | null = null;
 
     // === 自动存档 ===
     private _autosaveIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -174,7 +175,14 @@ export class GameController extends Component {
                 }
             }
         };
+        this._pageHideHandler = () => {
+            const hud = this._services.hudManager;
+            if (hud.hasPendingBaseRevivalDecision()) {
+                hud.finalizePendingRevivalAsGiveUp();
+            }
+        };
         document.addEventListener('visibilitychange', this._visibilityHandler);
+        window.addEventListener('pagehide', this._pageHideHandler);
     }
 
     protected update(dt: number): void {
@@ -218,6 +226,10 @@ export class GameController extends Component {
         if (this._visibilityHandler) {
             document.removeEventListener('visibilitychange', this._visibilityHandler);
             this._visibilityHandler = null;
+        }
+        if (this._pageHideHandler) {
+            window.removeEventListener('pagehide', this._pageHideHandler);
+            this._pageHideHandler = null;
         }
         if (SystemReset.consumeSceneHandoff()) {
             console.debug('[SystemReset] Skip shutdown for scene handoff.');

@@ -60,6 +60,7 @@ export class SpawnBootstrap {
             delaySeconds,
             startingWave
         );
+        ServiceRegistry.register('WaveLoop', waveLoop);
     }
 
     private static get gameManager(): GameManager {

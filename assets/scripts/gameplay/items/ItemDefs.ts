@@ -15,7 +15,8 @@ export type ItemId =
     | 'hero_level_up'
     | 'freeze_enemies'
     | 'upgrade_buildings'
-    | 'hero_invincible';
+    | 'hero_invincible'
+    | 'quick_respawn';
 
 /** 效果类型枚举 — 新增效果时在此扩展 */
 export type ItemEffectType =
@@ -24,7 +25,8 @@ export type ItemEffectType =
     | 'hero_level_up'
     | 'freeze_enemies'
     | 'upgrade_buildings'
-    | 'hero_invincible';
+    | 'hero_invincible'
+    | 'quick_respawn';
 
 export interface ItemDef {
     id: ItemId;
@@ -99,6 +101,16 @@ export const ITEM_DEFS: Record<ItemId, ItemDef> = {
         iconSymbol: '🛡',
         effectType: 'hero_invincible',
         effectParams: { duration: 30 },
+    },
+    quick_respawn: {
+        id: 'quick_respawn',
+        nameKey: 'item.quick_respawn.name',
+        descriptionKey: 'item.quick_respawn.description',
+        shortKey: 'item.quick_respawn.short',
+        iconColor: '#34D399',
+        iconSymbol: '⏩',
+        effectType: 'quick_respawn',
+        effectParams: { seconds: 3 },
     },
 };
 

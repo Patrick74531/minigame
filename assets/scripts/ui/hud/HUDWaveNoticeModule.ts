@@ -24,10 +24,10 @@ const LANE_DIALOG_MIN_WIDTH = 520;
 const LANE_DIALOG_MAX_WIDTH = 1120;
 const LANE_DIALOG_MIN_HEIGHT = 88;
 const LANE_DIALOG_MAX_HEIGHT = 156;
-const HERO_RESPAWN_MIN_WIDTH = 520;
-const HERO_RESPAWN_MAX_WIDTH = 1020;
-const HERO_RESPAWN_MIN_HEIGHT = 220;
-const HERO_RESPAWN_MAX_HEIGHT = 360;
+const HERO_RESPAWN_MIN_WIDTH = 280;
+const HERO_RESPAWN_MAX_WIDTH = 520;
+const HERO_RESPAWN_MIN_HEIGHT = 120;
+const HERO_RESPAWN_MAX_HEIGHT = 200;
 
 export type WaveForecastPayload = {
     wave?: number;
@@ -69,8 +69,8 @@ export class HUDWaveNoticeModule implements HUDModule {
     private _heroRespawnCountdownLabel: Label | null = null;
     private _heroRespawnMessageLabel: Label | null = null;
     private _heroRespawnOpacity: UIOpacity | null = null;
-    private _heroRespawnWidth = 920;
-    private _heroRespawnHeight = 260;
+    private _heroRespawnWidth = 420;
+    private _heroRespawnHeight = 160;
     private _heroRespawnToken = 0;
 
     private _respawnMode: RespawnMode = 'none';
@@ -565,12 +565,12 @@ export class HUDWaveNoticeModule implements HUDModule {
         root.addChild(countNode);
         countNode
             .addComponent(UITransform)
-            .setContentSize(this._heroRespawnWidth - 60, this._heroRespawnHeight * 0.58);
-        countNode.setPosition(0, 34, 0);
+            .setContentSize(this._heroRespawnWidth - 32, this._heroRespawnHeight * 0.55);
+        countNode.setPosition(0, Math.round(this._heroRespawnHeight * 0.1), 0);
         this._heroRespawnCountdownLabel = countNode.addComponent(Label);
         this._heroRespawnCountdownLabel.string = '10';
-        this._heroRespawnCountdownLabel.fontSize = 124;
-        this._heroRespawnCountdownLabel.lineHeight = 132;
+        this._heroRespawnCountdownLabel.fontSize = 64;
+        this._heroRespawnCountdownLabel.lineHeight = 70;
         this._heroRespawnCountdownLabel.isBold = true;
         this._heroRespawnCountdownLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._heroRespawnCountdownLabel.verticalAlign = Label.VerticalAlign.CENTER;
@@ -582,12 +582,12 @@ export class HUDWaveNoticeModule implements HUDModule {
         root.addChild(msgNode);
         msgNode
             .addComponent(UITransform)
-            .setContentSize(this._heroRespawnWidth - 80, this._heroRespawnHeight * 0.44);
-        msgNode.setPosition(0, -76, 0);
+            .setContentSize(this._heroRespawnWidth - 32, this._heroRespawnHeight * 0.35);
+        msgNode.setPosition(0, -Math.round(this._heroRespawnHeight * 0.28), 0);
         this._heroRespawnMessageLabel = msgNode.addComponent(Label);
         this._heroRespawnMessageLabel.string = '';
-        this._heroRespawnMessageLabel.fontSize = 34;
-        this._heroRespawnMessageLabel.lineHeight = 42;
+        this._heroRespawnMessageLabel.fontSize = 18;
+        this._heroRespawnMessageLabel.lineHeight = 24;
         this._heroRespawnMessageLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._heroRespawnMessageLabel.verticalAlign = Label.VerticalAlign.CENTER;
         this._heroRespawnMessageLabel.enableWrapText = true;
@@ -606,11 +606,11 @@ export class HUDWaveNoticeModule implements HUDModule {
         const radius = Math.max(14, Math.round(Math.min(width, height) * 0.06));
 
         bg.clear();
-        bg.fillColor = new Color(18, 12, 8, 232);
+        bg.fillColor = new Color(18, 12, 8, 160);
         bg.roundRect(-width / 2, -height / 2, width, height, radius);
         bg.fill();
-        bg.strokeColor = new Color(255, 136, 56, 255);
-        bg.lineWidth = 4;
+        bg.strokeColor = new Color(255, 136, 56, 180);
+        bg.lineWidth = 2;
         bg.roundRect(-width / 2, -height / 2, width, height, radius);
         bg.stroke();
     }
@@ -638,10 +638,10 @@ export class HUDWaveNoticeModule implements HUDModule {
         const laneMaxW = isTikTokPortrait ? 360 : LANE_DIALOG_MAX_WIDTH;
         const laneMinH = isTikTokPortrait ? 58 : LANE_DIALOG_MIN_HEIGHT;
         const laneMaxH = isTikTokPortrait ? 110 : LANE_DIALOG_MAX_HEIGHT;
-        const respawnMinW = isTikTokPortrait ? 260 : HERO_RESPAWN_MIN_WIDTH;
-        const respawnMaxW = isTikTokPortrait ? 420 : HERO_RESPAWN_MAX_WIDTH;
-        const respawnMinH = isTikTokPortrait ? 180 : HERO_RESPAWN_MIN_HEIGHT;
-        const respawnMaxH = isTikTokPortrait ? 300 : HERO_RESPAWN_MAX_HEIGHT;
+        const respawnMinW = isTikTokPortrait ? 180 : HERO_RESPAWN_MIN_WIDTH;
+        const respawnMaxW = isTikTokPortrait ? 300 : HERO_RESPAWN_MAX_WIDTH;
+        const respawnMinH = isTikTokPortrait ? 100 : HERO_RESPAWN_MIN_HEIGHT;
+        const respawnMaxH = isTikTokPortrait ? 170 : HERO_RESPAWN_MAX_HEIGHT;
 
         this._waveForecastWidth = Math.round(
             UIResponsive.clamp(
@@ -732,14 +732,14 @@ export class HUDWaveNoticeModule implements HUDModule {
 
         this._heroRespawnWidth = Math.round(
             UIResponsive.clamp(
-                viewportW * (isTikTokPortrait ? 0.88 : compact ? 0.86 : 0.74),
+                viewportW * (isTikTokPortrait ? 0.6 : compact ? 0.5 : 0.36),
                 respawnMinW,
                 respawnMaxW
             )
         );
         this._heroRespawnHeight = Math.round(
             UIResponsive.clamp(
-                viewportH * (isTikTokPortrait ? 0.34 : compact ? 0.54 : 0.41),
+                viewportH * (isTikTokPortrait ? 0.18 : compact ? 0.28 : 0.22),
                 respawnMinH,
                 respawnMaxH
             )
@@ -753,33 +753,33 @@ export class HUDWaveNoticeModule implements HUDModule {
         countNode
             ?.getComponent(UITransform)
             ?.setContentSize(
-                this._heroRespawnWidth - 64,
-                Math.round(this._heroRespawnHeight * 0.54)
+                this._heroRespawnWidth - 32,
+                Math.round(this._heroRespawnHeight * 0.55)
             );
-        countNode?.setPosition(0, Math.round(this._heroRespawnHeight * 0.16), 0);
+        countNode?.setPosition(0, Math.round(this._heroRespawnHeight * 0.1), 0);
         if (this._heroRespawnCountdownLabel) {
             this._heroRespawnCountdownLabel.fontSize = Math.max(
-                isTikTokPortrait ? 52 : 84,
-                Math.min(isTikTokPortrait ? 96 : 138, Math.round(this._heroRespawnHeight * 0.47))
+                isTikTokPortrait ? 36 : 48,
+                Math.min(isTikTokPortrait ? 60 : 80, Math.round(this._heroRespawnHeight * 0.42))
             );
             this._heroRespawnCountdownLabel.lineHeight =
-                this._heroRespawnCountdownLabel.fontSize + 8;
+                this._heroRespawnCountdownLabel.fontSize + 6;
         }
 
         const msgNode = this._heroRespawnMessageLabel?.node;
         msgNode
             ?.getComponent(UITransform)
             ?.setContentSize(
-                this._heroRespawnWidth - 88,
-                Math.round(this._heroRespawnHeight * 0.42)
+                this._heroRespawnWidth - 32,
+                Math.round(this._heroRespawnHeight * 0.35)
             );
-        msgNode?.setPosition(0, -Math.round(this._heroRespawnHeight * 0.29), 0);
+        msgNode?.setPosition(0, -Math.round(this._heroRespawnHeight * 0.28), 0);
         if (this._heroRespawnMessageLabel) {
             this._heroRespawnMessageLabel.fontSize = Math.max(
-                isTikTokPortrait ? 18 : 24,
-                Math.min(isTikTokPortrait ? 30 : 40, Math.round(this._heroRespawnHeight * 0.14))
+                isTikTokPortrait ? 13 : 16,
+                Math.min(isTikTokPortrait ? 20 : 24, Math.round(this._heroRespawnHeight * 0.12))
             );
-            this._heroRespawnMessageLabel.lineHeight = this._heroRespawnMessageLabel.fontSize + 8;
+            this._heroRespawnMessageLabel.lineHeight = this._heroRespawnMessageLabel.fontSize + 6;
         }
     }
 

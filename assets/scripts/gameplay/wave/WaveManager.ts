@@ -8,6 +8,7 @@ import { GameConfig } from '../../data/GameConfig';
 import { WaveService } from '../../core/managers/WaveService';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { EventManager } from '../../core/managers/EventManager';
+import { GameManager } from '../../core/managers/GameManager';
 import {
     getFallbackArchetypes,
     normalizeBossEventConfig,
@@ -363,6 +364,7 @@ export class WaveManager {
         }
 
         this._currentWave = waveNumber;
+        this.gameManager.setCurrentWave(waveNumber);
         this._waveActive = true;
         this._regularSpawned = 0;
         this._eliteSpawned = 0;
@@ -554,6 +556,25 @@ export class WaveManager {
     }
 
     /**
+     * 基地重建后：清空当前战场敌人并从目标波次重新开始。
+     * 该流程不发死亡事件，避免误发奖励。
+     */
+    public restartWaveAfterBaseRevival(targetWave?: number): void {
+        const wave = Math.max(1, Math.floor(targetWave ?? this._currentWave ?? 1));
+        this.clearActiveEnemiesForRevival();
+        this._pendingLaneUnlock = null;
+        this._waveActive = false;
+        this._waveConfig = null;
+        this._wavePlan = null;
+        this._waveSpawnCursor = 0;
+        this._forcedFirstSpawnLane = null;
+        this._enemySpawnTimer = 0;
+        this._nextSpawnInterval = 0;
+        this.resetRegularLaneAllocation();
+        this.startWave(wave);
+    }
+
+    /**
      * 移除敌人（死亡或到达基地）
      */
     public removeEnemy(enemy: Node): void {
@@ -562,6 +583,33 @@ export class WaveManager {
             this._enemies.splice(idx, 1);
         }
         this._spawnedEnemyMeta.delete(enemy);
+    }
+
+    /**
+     * Called by WaveLoop.restartCurrentWaveForRevival: clears enemies and resets spawn
+     * state without starting the wave — WaveLoop countdown drives the next startWave call.
+     */
+    public resetSpawnStateForRevival(): void {
+        this.clearActiveEnemiesForRevival();
+        this._pendingLaneUnlock = null;
+        this._waveActive = false;
+        this._waveConfig = null;
+        this._wavePlan = null;
+        this._waveSpawnCursor = 0;
+        this._forcedFirstSpawnLane = null;
+        this._enemySpawnTimer = 0;
+        this._nextSpawnInterval = 0;
+        this.resetRegularLaneAllocation();
+    }
+
+    public clearActiveEnemiesForRevival(): void {
+        const currentEnemies = this._enemies.slice();
+        this._enemies = [];
+        this._spawnedEnemyMeta.clear();
+        for (const enemy of currentEnemies) {
+            if (!enemy || !enemy.isValid) continue;
+            enemy.destroy();
+        }
     }
 
     // === 私有方法 ===
@@ -1583,5 +1631,9 @@ export class WaveManager {
 
     private get waveService(): WaveService {
         return ServiceRegistry.get<WaveService>('WaveService') ?? WaveService.instance;
+    }
+
+    private get gameManager(): GameManager {
+        return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
     }
 }

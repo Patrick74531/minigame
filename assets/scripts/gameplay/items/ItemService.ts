@@ -18,11 +18,13 @@ export class ItemService extends Singleton<ItemService>() {
         ItemEffectExecutor.bootstrap();
         this.eventManager.on(GameEvents.BOSS_CHEST_PICKED, this.onChestPicked, this);
         this.eventManager.on(GameEvents.ITEM_CARD_PICKED, this.onItemPicked, this);
+        this.eventManager.on(GameEvents.HERO_RESPAWN_STARTED, this.onHeroRespawnStarted, this);
     }
 
     public cleanup(): void {
         this.eventManager.off(GameEvents.BOSS_CHEST_PICKED, this.onChestPicked, this);
         this.eventManager.off(GameEvents.ITEM_CARD_PICKED, this.onItemPicked, this);
+        this.eventManager.off(GameEvents.HERO_RESPAWN_STARTED, this.onHeroRespawnStarted, this);
         this._inventory.clear();
     }
 
@@ -125,6 +127,12 @@ export class ItemService extends Singleton<ItemService>() {
         this.eventManager.emit(GameEvents.ITEM_CARDS_OFFERED, {
             items: items as string[],
         });
+    }
+
+    private onHeroRespawnStarted(_data: { remainingSeconds: number }): void {
+        if (this.getItemCount('quick_respawn') > 0) {
+            this.useItem('quick_respawn');
+        }
     }
 
     private onItemPicked(data: { itemId: string }): void {

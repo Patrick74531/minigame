@@ -202,17 +202,24 @@ export class CombatSystem extends Component implements CombatProvider {
         let write = 0;
         for (let read = 0; read < arr.length; read++) {
             const item = arr[read];
-            if (
-                item &&
-                item.isAlive &&
-                item.node &&
-                item.node.isValid &&
-                item.node.activeInHierarchy
-            ) {
+            if (CombatSystem.isUsableCombatant(item)) {
                 arr[write++] = item as T;
             }
         }
         arr.length = write;
+    }
+
+    private static isUsableCombatant<T extends { isAlive: boolean; node: { isValid: boolean } | null }>(
+        item: T | null | undefined
+    ): item is T {
+        if (!item) return false;
+
+        const node = item.node;
+        if (!node || !node.isValid || !node.activeInHierarchy) {
+            return false;
+        }
+
+        return item.isAlive;
     }
 
     private findNearestEnemy(soldier: Soldier): Enemy | null {
@@ -222,13 +229,7 @@ export class CombatSystem extends Component implements CombatProvider {
         const myPos = soldier.node.position;
 
         for (const enemy of this._enemies) {
-            if (!enemy) continue;
-            if (
-                !enemy.isAlive ||
-                !enemy.node ||
-                !enemy.node.isValid ||
-                !enemy.node.activeInHierarchy
-            ) {
+            if (!CombatSystem.isUsableCombatant(enemy)) {
                 continue;
             }
 
@@ -257,13 +258,7 @@ export class CombatSystem extends Component implements CombatProvider {
         const pz = position.z ?? position.y ?? 0;
 
         for (const enemy of this._enemies) {
-            if (!enemy) continue;
-            if (
-                !enemy.isAlive ||
-                !enemy.node ||
-                !enemy.node.isValid ||
-                !enemy.node.activeInHierarchy
-            ) {
+            if (!CombatSystem.isUsableCombatant(enemy)) {
                 continue;
             }
 
@@ -292,13 +287,7 @@ export class CombatSystem extends Component implements CombatProvider {
         const pz = position.z ?? position.y ?? 0;
 
         for (const soldier of this._soldiers) {
-            if (!soldier) continue;
-            if (
-                !soldier.isAlive ||
-                !soldier.node ||
-                !soldier.node.isValid ||
-                !soldier.node.activeInHierarchy
-            ) {
+            if (!CombatSystem.isUsableCombatant(soldier)) {
                 continue;
             }
 

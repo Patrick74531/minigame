@@ -28,6 +28,8 @@ export class ShopPanel {
     private _root: Node | null = null;
     private _panel: Node | null = null;
     private _balanceLabel: Label | null = null;
+    private _noticeLabel: Label | null = null;
+    private _noticeTimer: ReturnType<typeof setTimeout> | null = null;
     private _itemNodes: Node[] = [];
     private _onClose: (() => void) | null = null;
     private _diamondListener: ((balance: number) => void) | null = null;
@@ -44,6 +46,10 @@ export class ShopPanel {
             DiamondService.instance.removeListener(this._diamondListener);
             this._diamondListener = null;
         }
+        if (this._noticeTimer !== null) {
+            clearTimeout(this._noticeTimer);
+            this._noticeTimer = null;
+        }
         if (this._root && this._root.isValid) {
             Tween.stopAllByTarget(this._root);
             this._root.destroy();
@@ -51,6 +57,7 @@ export class ShopPanel {
         this._root = null;
         this._panel = null;
         this._balanceLabel = null;
+        this._noticeLabel = null;
         this._itemNodes = [];
     }
 
@@ -148,12 +155,31 @@ export class ShopPanel {
         });
         this.updateBalanceLabel();
 
+        const noticeNode = new Node('ShopNotice');
+        noticeNode.layer = this._uiLayer;
+        panel.addChild(noticeNode);
+        noticeNode.addComponent(UITransform).setContentSize(panelW - 72, 34);
+        noticeNode.setPosition(0, panelH / 2 - 114, 0);
+        this._noticeLabel = noticeNode.addComponent(Label);
+        this._noticeLabel.string = '';
+        this._noticeLabel.fontSize = Math.round(UIResponsive.clamp(shortSide * 0.022, 14, 20));
+        this._noticeLabel.isBold = true;
+        this._noticeLabel.color = new Color(255, 190, 120, 255);
+        this._noticeLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this._noticeLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._noticeLabel.overflow = Label.Overflow.SHRINK;
+        applyGameLabelStyle(this._noticeLabel, {
+            outlineWidth: 2,
+            outlineColor: new Color(0, 0, 0, 180),
+        });
+        noticeNode.active = false;
+
         // Close button (top-right)
         const closeBtn = this.createCloseButton(panel, panelW, panelH);
         panel.addChild(closeBtn);
 
         // Item grid area
-        const gridTop = panelH / 2 - 100;
+        const gridTop = panelH / 2 - 136;
         const gridBottom = -panelH / 2 + 20;
         const gridHeight = gridTop - gridBottom;
         const gridNode = new Node('ItemGrid');
@@ -378,32 +404,18 @@ export class ShopPanel {
         };
 
         if (!ShopInventoryStore.canAddItems()) {
-            label.string = Localization.instance.t('ui.shop.limitReached', {
-                max: String(ShopInventoryStore.MAX_PRE_GAME_ITEMS),
-            });
-            label.color = new Color(255, 100, 100, 255);
-            bg.clear();
-            bg.fillColor = new Color(180, 50, 50, 255);
-            bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, btnR);
-            bg.fill();
-            setTimeout(() => {
-                resetBuyButton();
-            }, 1200);
+            this.showNotice(
+                'ui.shop.limitReached',
+                new Color(255, 120, 120, 255),
+                { max: String(ShopInventoryStore.MAX_PRE_GAME_ITEMS) },
+                1500
+            );
             return;
         }
 
         const ds = DiamondService.instance;
         if (ds.balance < ITEM_PRICE) {
-            // Flash red
-            label.string = Localization.instance.t('ui.shop.insufficient');
-            label.color = new Color(255, 100, 100, 255);
-            bg.clear();
-            bg.fillColor = new Color(180, 50, 50, 255);
-            bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, btnR);
-            bg.fill();
-            setTimeout(() => {
-                resetBuyButton();
-            }, 1200);
+            this.showNotice('ui.shop.insufficient', new Color(255, 120, 120, 255), undefined, 1400);
             return;
         }
 
@@ -415,31 +427,54 @@ export class ShopPanel {
             if (success) {
                 const added = ShopInventoryStore.addItem(itemId);
                 if (!added) {
-                    label.string = Localization.instance.t('ui.shop.limitReached', {
-                        max: String(ShopInventoryStore.MAX_PRE_GAME_ITEMS),
-                    });
-                    label.color = new Color(255, 100, 100, 255);
+                    this.showNotice(
+                        'ui.shop.limitReached',
+                        new Color(255, 120, 120, 255),
+                        { max: String(ShopInventoryStore.MAX_PRE_GAME_ITEMS) },
+                        1600
+                    );
                     setTimeout(() => {
                         resetBuyButton();
-                    }, 1500);
+                    }, 200);
                     return;
                 }
-                label.string = Localization.instance.t('ui.shop.bought');
-                label.color = new Color(160, 255, 160, 255);
+                this.showNotice('ui.shop.bought', new Color(160, 255, 180, 255), undefined, 1200);
                 setTimeout(() => {
                     resetBuyButton();
-                }, 1500);
+                }, 400);
             } else {
-                label.string =
-                    error === 'Insufficient diamonds'
-                        ? Localization.instance.t('ui.shop.insufficient')
-                        : Localization.instance.t('ui.shop.error');
-                label.color = new Color(255, 100, 100, 255);
+                const key =
+                    error === 'Insufficient diamonds' ? 'ui.shop.insufficient' : 'ui.shop.error';
+                this.showNotice(key, new Color(255, 120, 120, 255), undefined, 1500);
                 setTimeout(() => {
                     resetBuyButton();
-                }, 1500);
+                }, 400);
             }
         });
+    }
+
+    private showNotice(
+        key: string,
+        color: Color,
+        params?: Record<string, string>,
+        durationMs: number = 1200
+    ): void {
+        if (!this._noticeLabel || !this._noticeLabel.isValid) return;
+        this._noticeLabel.string = Localization.instance.t(key, params ?? {});
+        this._noticeLabel.color = color;
+        this._noticeLabel.node.active = true;
+        if (this._noticeTimer !== null) {
+            clearTimeout(this._noticeTimer);
+        }
+        this._noticeTimer = setTimeout(
+            () => {
+                if (!this._noticeLabel || !this._noticeLabel.isValid) return;
+                this._noticeLabel.string = '';
+                this._noticeLabel.node.active = false;
+                this._noticeTimer = null;
+            },
+            Math.max(200, durationMs)
+        );
     }
 
     private updateBalanceLabel(): void {

@@ -4,6 +4,7 @@ import { GameConfig } from '../../data/GameConfig';
 import { EventManager } from '../../core/managers/EventManager';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { GameEvents } from '../../data/GameEvents';
+import { WaveManager } from './WaveManager';
 
 const { ccclass } = _decorator;
 const COUNTDOWN_NOT_STARTED = -1;
@@ -116,6 +117,30 @@ export class WaveLoop extends Component {
             }
 
             this.startCountdown(GameConfig.WAVE.NEXT_WAVE_DELAY);
+        });
+    }
+
+    /**
+     * Called after base revival: clears all enemies, restores wave state,
+     * and enters the normal inter-wave countdown for the same wave.
+     */
+    public restartCurrentWaveForRevival(): void {
+        if (!this._wave || !this._game) return;
+        const targetWave = this._wave.currentWave || 1;
+
+        // Clear enemies + reset WaveManager spawn state (without starting the wave)
+        const wm = ServiceRegistry.get<WaveManager>('WaveManager');
+        wm?.resetSpawnStateForRevival();
+
+        // Enter countdown phase — same wave, gives the player prep time
+        this._nextWaveNumber = targetWave;
+        this._pendingNextWave = true;
+        this._awaitLaneUnlockBeforeCountdown = false;
+        this._laneUnlockResolvedForCountdown = false;
+        this.startCountdown(GameConfig.WAVE.NEXT_WAVE_DELAY);
+
+        this.eventManager.emit(GameEvents.WAVE_COUNTDOWN, {
+            seconds: Math.ceil(GameConfig.WAVE.NEXT_WAVE_DELAY),
         });
     }
 

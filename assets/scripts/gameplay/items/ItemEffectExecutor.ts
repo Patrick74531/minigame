@@ -30,6 +30,7 @@ export class ItemEffectExecutor {
         this.register('freeze_enemies', ItemEffectExecutor.freezeEnemies);
         this.register('upgrade_buildings', ItemEffectExecutor.upgradeBuildings);
         this.register('hero_invincible', ItemEffectExecutor.heroInvincible);
+        this.register('quick_respawn', ItemEffectExecutor.quickRespawn);
     }
 
     /** 注册 / 覆盖某个效果类型的处理器 */
@@ -126,6 +127,17 @@ export class ItemEffectExecutor {
         const hero = heroNode.getComponent(Hero);
         if (hero && hero.isAlive) {
             hero.applyInvincible(duration);
+        }
+    }
+
+    private static quickRespawn(params: Record<string, number>): void {
+        const seconds = params.seconds ?? 3;
+        const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+        const heroNode = gm.hero;
+        if (!heroNode || !heroNode.isValid) return;
+        const hero = heroNode.getComponent(Hero);
+        if (hero) {
+            hero.queueQuickRespawn(seconds);
         }
     }
 }

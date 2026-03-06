@@ -119,9 +119,9 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.tower.upgrade.range.minGain': '每级至少 +{value} 射程',
         'ui.levelup.banner': '升级! Lv.{level}',
         'ui.hero.respawn.countdown.value': '{seconds}',
-        'ui.hero.respawn.countdown.message': '奶奶正在纳米修复，{seconds}s 后重返战场！',
+        'ui.hero.respawn.countdown.message': '{seconds}s 后复活',
         'ui.hero.respawn.ready.tag': '出战！',
-        'ui.hero.respawn.ready.message': '倒计时结束，奶奶回归战场，继续战斗！',
+        'ui.hero.respawn.ready.message': '奶奶回来了！',
         'ui.gameOver.title.victory': '防线守住了',
         'ui.gameOver.title.defeat': '防线崩溃',
         'ui.gameOver.message.victory': '这波打得漂亮，准备下一场硬仗。',
@@ -164,6 +164,10 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.shop.insufficient': '钻石不足',
         'ui.shop.error': '购买失败',
         'ui.shop.limitReached': '已达本局预购上限（{max}）',
+        'ui.baseRevival.title': '基地崩溃',
+        'ui.baseRevival.message': '第{wave}波基地被摧毁！你有一次重建机会，所有建筑将恢复原状。',
+        'ui.baseRevival.rebuild': '立即重建',
+        'ui.baseRevival.giveUp': '放弃',
         'ui.gameOver.diamonds': '◆ +{earned} 钻石',
 
         'ui.loading.tip.move': '用摇杆或WASD键移动奶奶，她会自动向最近的敌人开火！',
@@ -225,6 +229,9 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'item.hero_invincible.name': '铁皮围裙',
         'item.hero_invincible.description': '奶奶穿上特制铁皮围裙，30秒内刀枪不入！',
         'item.hero_invincible.short': '奶奶无敌30秒',
+        'item.quick_respawn.name': '紧急复活',
+        'item.quick_respawn.description': '奶奶启动快速修复程序，复活等待时间缩短到3秒！',
+        'item.quick_respawn.short': '复活等待减至3s',
         'ui.item.confirm.title': '使用道具',
         'ui.item.confirm.message': '确定要使用 [{name}] 吗？\n\n{description}',
         'ui.item.confirm.yes': '确认使用',
@@ -365,11 +372,9 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.tower.upgrade.range.minGain': 'At least +{value} range per level',
         'ui.levelup.banner': 'LEVEL UP! Lv.{level}',
         'ui.hero.respawn.countdown.value': '{seconds}',
-        'ui.hero.respawn.countdown.message':
-            'Grandma is in nano-recovery. Rejoining the fight in {seconds}s!',
+        'ui.hero.respawn.countdown.message': 'Respawn in {seconds}s',
         'ui.hero.respawn.ready.tag': 'READY!',
-        'ui.hero.respawn.ready.message':
-            'Countdown complete. Grandma is back in action. Keep pushing!',
+        'ui.hero.respawn.ready.message': 'Grandma is back!',
         'ui.gameOver.title.victory': 'Defense Held',
         'ui.gameOver.title.defeat': 'Defense Collapsed',
         'ui.gameOver.message.victory': 'Clean hold. Get ready for the next hot zone.',
@@ -413,6 +418,11 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.shop.insufficient': 'Not Enough',
         'ui.shop.error': 'Failed',
         'ui.shop.limitReached': 'Pre-buy limit reached ({max})',
+        'ui.baseRevival.title': 'Base Down!',
+        'ui.baseRevival.message':
+            'Base destroyed at wave {wave}! You have one chance to rebuild. All structures will be restored.',
+        'ui.baseRevival.rebuild': 'Rebuild Now',
+        'ui.baseRevival.giveUp': 'Give Up',
         'ui.gameOver.diamonds': '◆ +{earned} Gems',
 
         'ui.loading.tip.move':
@@ -487,6 +497,10 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'item.hero_invincible.description':
             'Grandma dons her reinforced iron apron, becoming invincible for 30 seconds!',
         'item.hero_invincible.short': 'Grandma invincible for 30s',
+        'item.quick_respawn.name': 'Quick Revive',
+        'item.quick_respawn.description':
+            'Grandma activates emergency repair. Respawn wait is reduced to 3 seconds!',
+        'item.quick_respawn.short': 'Respawn wait reduced to 3s',
         'ui.item.confirm.title': 'Use Item',
         'ui.item.confirm.message': 'Use [{name}]?\n\n{description}',
         'ui.item.confirm.yes': 'Confirm',

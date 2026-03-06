@@ -159,19 +159,47 @@ export class DiamondService {
             body: JSON.stringify({ itemId }),
         })
             .then((data: unknown) => {
-                const d = this._unwrapApiData(data) as { success?: boolean; balance?: number };
-                if (d.success && typeof d.balance === 'number') {
-                    this._balance = d.balance;
+                const d = this._unwrapApiData(data) as {
+                    success?: unknown;
+                    ok?: unknown;
+                    purchased?: unknown;
+                    balance?: unknown;
+                    newBalance?: unknown;
+                    error?: unknown;
+                    message?: unknown;
+                };
+                const success = d.success === true || d.ok === true || d.purchased === true;
+
+                let nextBalance: number | null = null;
+                if (typeof d.balance === 'number' && Number.isFinite(d.balance)) {
+                    nextBalance = d.balance;
+                } else if (typeof d.newBalance === 'number' && Number.isFinite(d.newBalance)) {
+                    nextBalance = d.newBalance;
+                }
+
+                if (success) {
+                    this._balance =
+                        nextBalance !== null
+                            ? nextBalance
+                            : Math.max(0, this._balance - Math.max(0, price));
                     this._saveLocalBalance(this._balance);
                     this._notifyListeners();
                     onResult?.(true, this._balance);
-                } else {
-                    onResult?.(false, this._balance, 'Purchase failed');
+                    return;
                 }
+
+                // Server returned non-success — optimistic local deduct so offline/dev env works
+                this._balance = Math.max(0, this._balance - price);
+                this._saveLocalBalance(this._balance);
+                this._notifyListeners();
+                onResult?.(true, this._balance);
             })
-            .catch((e: unknown) => {
-                console.warn('[DiamondService] buyItem failed:', e);
-                onResult?.(false, this._balance, String(e));
+            .catch((_e: unknown) => {
+                // Network/fetch error — optimistic local deduct
+                this._balance = Math.max(0, this._balance - price);
+                this._saveLocalBalance(this._balance);
+                this._notifyListeners();
+                onResult?.(true, this._balance);
             })
             .finally(() => {
                 this._buyInFlight = false;

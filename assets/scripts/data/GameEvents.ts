@@ -74,6 +74,8 @@ export const GameEvents = {
     HERO_XP_GAINED: 'HERO_XP_GAINED',
     /** 英雄升级 { level: number, heroNode: Node } */
     HERO_LEVEL_UP: 'HERO_LEVEL_UP',
+    /** 英雄开始复活倒计时 { remainingSeconds: number } */
+    HERO_RESPAWN_STARTED: 'HERO_RESPAWN_STARTED',
 
     // === 建造系统 ===
     /** 建筑建造完成 { padNode: Node, buildingTypeId: string, position: Vec3 } */
@@ -131,6 +133,12 @@ export const GameEvents = {
     ITEM_INVENTORY_CHANGED: 'ITEM_INVENTORY_CHANGED',
     /** 玩家使用了一个道具 { itemId: string } */
     ITEM_USED: 'ITEM_USED',
+
+    // === 基地复活系统 ===
+    /** 基地被摧毁但可复活 { wave: number } */
+    BASE_REVIVAL_AVAILABLE: 'BASE_REVIVAL_AVAILABLE',
+    /** 玩家选择重建基地 */
+    BASE_REVIVED: 'BASE_REVIVED',
 } as const;
 
 /** 事件名称类型 */
@@ -192,6 +200,7 @@ export type GameEventPayloads = {
     [GameEvents.HERO_SKILL_USED]: { skillId: string };
     [GameEvents.HERO_XP_GAINED]: { xp: number; currentXp: number; maxXp: number; level: number };
     [GameEvents.HERO_LEVEL_UP]: { level: number; heroNode: Node; quiet?: boolean };
+    [GameEvents.HERO_RESPAWN_STARTED]: { remainingSeconds: number };
     [GameEvents.BUILDING_CONSTRUCTED]: {
         padNode: Node;
         buildingTypeId?: string;
@@ -238,4 +247,8 @@ export type GameEventPayloads = {
     [GameEvents.ITEM_CARD_PICKED]: { itemId: string };
     [GameEvents.ITEM_INVENTORY_CHANGED]: { itemId: string; count: number };
     [GameEvents.ITEM_USED]: { itemId: string };
+
+    // === 基地复活系统 ===
+    [GameEvents.BASE_REVIVAL_AVAILABLE]: { wave: number };
+    [GameEvents.BASE_REVIVED]: void;
 };

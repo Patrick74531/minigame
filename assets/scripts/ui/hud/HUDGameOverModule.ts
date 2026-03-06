@@ -49,11 +49,30 @@ export class HUDGameOverModule implements HUDModule {
     private _gameOverButtonWidth = GAME_OVER_RESTART_BTN_MAX_WIDTH;
     private _gameOverButtonHeight = GAME_OVER_RESTART_BTN_MAX_HEIGHT;
 
+    // === Base Revival Dialog ===
+    private _revivalRoot: Node | null = null;
+    private _revivalPanelBg: Graphics | null = null;
+    private _revivalTitleLabel: Label | null = null;
+    private _revivalMessageLabel: Label | null = null;
+    private _revivalRebuildBtnNode: Node | null = null;
+    private _revivalRebuildBtnBg: Graphics | null = null;
+    private _revivalRebuildBtnLabel: Label | null = null;
+    private _revivalGiveUpBtnNode: Node | null = null;
+    private _revivalGiveUpBtnBg: Graphics | null = null;
+    private _revivalGiveUpBtnLabel: Label | null = null;
+    private _revivalOpacity: UIOpacity | null = null;
+    private _onRevivalRebuild: (() => void) | null = null;
+    private _onRevivalGiveUp: (() => void) | null = null;
+
+    // Callback invoked when player actually presses restart (for deferred settlement)
+    private _onBeforeRestart: (() => void) | null = null;
+
     public constructor(private readonly _setInputEnabled: (enabled: boolean) => void) {}
 
     public initialize(uiCanvas: Node): void {
         this._uiCanvas = uiCanvas;
         this.createGameOverDialog(uiCanvas);
+        this.createRevivalDialog(uiCanvas);
     }
 
     public cleanup(): void {
@@ -79,11 +98,33 @@ export class HUDGameOverModule implements HUDModule {
         this._gameOverPanelBg = null;
         this._gameOverOpacity = null;
         this._gameOverRestarting = false;
+
+        if (this._revivalRoot) {
+            Tween.stopAllByTarget(this._revivalRoot);
+        }
+        if (this._revivalOpacity) {
+            Tween.stopAllByTarget(this._revivalOpacity);
+        }
+        this._revivalRoot = null;
+        this._revivalPanelBg = null;
+        this._revivalTitleLabel = null;
+        this._revivalMessageLabel = null;
+        this._revivalRebuildBtnNode = null;
+        this._revivalRebuildBtnBg = null;
+        this._revivalRebuildBtnLabel = null;
+        this._revivalGiveUpBtnNode = null;
+        this._revivalGiveUpBtnBg = null;
+        this._revivalGiveUpBtnLabel = null;
+        this._revivalOpacity = null;
+        this._onRevivalRebuild = null;
+        this._onRevivalGiveUp = null;
+
         this._uiCanvas = null;
     }
 
     public onCanvasResize(): void {
         this.updateGameOverDialogLayout();
+        this.updateRevivalDialogLayout();
     }
 
     public onLanguageChanged(): void {
@@ -115,6 +156,14 @@ export class HUDGameOverModule implements HUDModule {
             earned: String(earned),
         });
         this._gameOverDiamondLabel.node.active = true;
+    }
+
+    /**
+     * Register a callback that fires when the player actually clicks restart.
+     * Used to defer score submission and diamond settlement.
+     */
+    public setOnBeforeRestart(cb: (() => void) | null): void {
+        this._onBeforeRestart = cb;
     }
 
     public showGameOver(victory: boolean, wave: number = 0): void {
@@ -651,6 +700,12 @@ export class HUDGameOverModule implements HUDModule {
         if (this._gameOverRestarting) return;
         this._gameOverRestarting = true;
 
+        // Deferred settlement: submit score + settle diamonds only now
+        if (this._onBeforeRestart) {
+            this._onBeforeRestart();
+            this._onBeforeRestart = null;
+        }
+
         if (this._gameOverButton) {
             this._gameOverButton.interactable = false;
         }
@@ -784,5 +839,345 @@ export class HUDGameOverModule implements HUDModule {
             );
         }
         this.drawGameOverRestartButton(false);
+    }
+
+    // ===================== Base Revival Dialog =====================
+
+    public showBaseRevival(wave: number, onRebuild: () => void, onGiveUp: () => void): void {
+        if (!this._revivalRoot || !this._revivalOpacity) return;
+
+        this._onRevivalRebuild = onRebuild;
+        this._onRevivalGiveUp = onGiveUp;
+        this._setInputEnabled(false);
+
+        if (this._revivalTitleLabel) {
+            this._revivalTitleLabel.string = Localization.instance.t('ui.baseRevival.title');
+        }
+        if (this._revivalMessageLabel) {
+            this._revivalMessageLabel.string = Localization.instance.t('ui.baseRevival.message', {
+                wave: String(wave),
+            });
+        }
+        if (this._revivalRebuildBtnLabel) {
+            this._revivalRebuildBtnLabel.string = Localization.instance.t('ui.baseRevival.rebuild');
+        }
+        if (this._revivalGiveUpBtnLabel) {
+            this._revivalGiveUpBtnLabel.string = Localization.instance.t('ui.baseRevival.giveUp');
+        }
+
+        this.updateRevivalDialogLayout();
+
+        this._revivalRoot.active = true;
+        const rootParent = this._revivalRoot.parent;
+        if (rootParent) {
+            this._revivalRoot.setSiblingIndex(rootParent.children.length - 1);
+        }
+        this._revivalRoot.setScale(0.92, 0.92, 1);
+        this._revivalOpacity.opacity = 0;
+
+        Tween.stopAllByTarget(this._revivalRoot);
+        Tween.stopAllByTarget(this._revivalOpacity);
+
+        tween(this._revivalRoot)
+            .to(0.16, { scale: new Vec3(1.03, 1.03, 1) })
+            .to(0.18, { scale: new Vec3(1, 1, 1) })
+            .start();
+        tween(this._revivalOpacity).to(0.16, { opacity: 255 }).start();
+    }
+
+    public hideBaseRevival(): void {
+        if (!this._revivalRoot) return;
+        Tween.stopAllByTarget(this._revivalRoot);
+        if (this._revivalOpacity) {
+            Tween.stopAllByTarget(this._revivalOpacity);
+        }
+        this._revivalRoot.active = false;
+        this._onRevivalRebuild = null;
+        this._onRevivalGiveUp = null;
+    }
+
+    private createRevivalDialog(parent: Node): void {
+        const root = new Node('BaseRevivalDialog');
+        parent.addChild(root);
+        root.addComponent(UITransform).setContentSize(1280, 720);
+        const rootWidget = root.addComponent(Widget);
+        rootWidget.isAlignTop = true;
+        rootWidget.isAlignBottom = true;
+        rootWidget.isAlignLeft = true;
+        rootWidget.isAlignRight = true;
+
+        this._revivalOpacity = root.addComponent(UIOpacity);
+        this._revivalOpacity.opacity = 0;
+
+        const blocker = new Node('RevivalInputBlocker');
+        root.addChild(blocker);
+        blocker.addComponent(UITransform).setContentSize(1280, 720);
+        const bw = blocker.addComponent(Widget);
+        bw.isAlignTop = true;
+        bw.isAlignBottom = true;
+        bw.isAlignLeft = true;
+        bw.isAlignRight = true;
+        blocker.addComponent(BlockInputEvents);
+
+        const panelW = 480;
+        const panelH = 260;
+        const panel = new Node('RevivalPanel');
+        root.addChild(panel);
+        panel.addComponent(UITransform).setContentSize(panelW, panelH);
+        const pw = panel.addComponent(Widget);
+        pw.isAlignHorizontalCenter = true;
+        pw.isAlignVerticalCenter = true;
+
+        const bg = panel.addComponent(Graphics);
+        this._revivalPanelBg = bg;
+        this.drawRevivalPanelBg(bg, panelW, panelH);
+
+        // Title
+        const titleNode = new Node('RevivalTitle');
+        panel.addChild(titleNode);
+        titleNode.addComponent(UITransform).setContentSize(panelW - 60, 52);
+        titleNode.setPosition(0, 78, 0);
+        this._revivalTitleLabel = titleNode.addComponent(Label);
+        this._revivalTitleLabel.fontSize = 36;
+        this._revivalTitleLabel.lineHeight = 44;
+        this._revivalTitleLabel.isBold = true;
+        this._revivalTitleLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this._revivalTitleLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._revivalTitleLabel.overflow = Label.Overflow.SHRINK;
+        this._revivalTitleLabel.color = new Color(255, 200, 80, 255);
+
+        // Message
+        const msgNode = new Node('RevivalMessage');
+        panel.addChild(msgNode);
+        msgNode.addComponent(UITransform).setContentSize(panelW - 60, 64);
+        msgNode.setPosition(0, 18, 0);
+        this._revivalMessageLabel = msgNode.addComponent(Label);
+        this._revivalMessageLabel.fontSize = 22;
+        this._revivalMessageLabel.lineHeight = 30;
+        this._revivalMessageLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this._revivalMessageLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._revivalMessageLabel.enableWrapText = true;
+        this._revivalMessageLabel.overflow = Label.Overflow.SHRINK;
+        this._revivalMessageLabel.color = new Color(234, 245, 255, 240);
+
+        // Rebuild button (green)
+        const rebuildBtnW = 180;
+        const rebuildBtnH = 56;
+        const rebuildBtn = new Node('RevivalRebuildBtn');
+        panel.addChild(rebuildBtn);
+        rebuildBtn.addComponent(UITransform).setContentSize(rebuildBtnW, rebuildBtnH);
+        rebuildBtn.setPosition(-100, -60, 0);
+        rebuildBtn.addComponent(Button).transition = Button.Transition.SCALE;
+        this._revivalRebuildBtnBg = rebuildBtn.addComponent(Graphics);
+        this._revivalRebuildBtnNode = rebuildBtn;
+        this.drawRevivalButton(this._revivalRebuildBtnBg, rebuildBtnW, rebuildBtnH, true);
+
+        const rebuildLblNode = new Node('RebuildLabel');
+        rebuildBtn.addChild(rebuildLblNode);
+        rebuildLblNode.addComponent(UITransform).setContentSize(rebuildBtnW - 16, rebuildBtnH - 8);
+        this._revivalRebuildBtnLabel = rebuildLblNode.addComponent(Label);
+        this._revivalRebuildBtnLabel.fontSize = 24;
+        this._revivalRebuildBtnLabel.lineHeight = 32;
+        this._revivalRebuildBtnLabel.isBold = true;
+        this._revivalRebuildBtnLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this._revivalRebuildBtnLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._revivalRebuildBtnLabel.overflow = Label.Overflow.SHRINK;
+        this._revivalRebuildBtnLabel.color = new Color(20, 10, 0, 255);
+        this._revivalRebuildBtnLabel.string = '';
+
+        rebuildBtn.on(
+            Button.EventType.CLICK,
+            () => {
+                const cb = this._onRevivalRebuild;
+                this.hideBaseRevival();
+                this._setInputEnabled(true);
+                cb?.();
+            },
+            this
+        );
+
+        // Give Up button (grey/red)
+        const giveUpBtnW = 140;
+        const giveUpBtnH = 48;
+        const giveUpBtn = new Node('RevivalGiveUpBtn');
+        panel.addChild(giveUpBtn);
+        giveUpBtn.addComponent(UITransform).setContentSize(giveUpBtnW, giveUpBtnH);
+        giveUpBtn.setPosition(100, -60, 0);
+        giveUpBtn.addComponent(Button).transition = Button.Transition.SCALE;
+        this._revivalGiveUpBtnBg = giveUpBtn.addComponent(Graphics);
+        this._revivalGiveUpBtnNode = giveUpBtn;
+        this.drawRevivalButton(this._revivalGiveUpBtnBg, giveUpBtnW, giveUpBtnH, false);
+
+        const giveUpLblNode = new Node('GiveUpLabel');
+        giveUpBtn.addChild(giveUpLblNode);
+        giveUpLblNode.addComponent(UITransform).setContentSize(giveUpBtnW - 12, giveUpBtnH - 6);
+        this._revivalGiveUpBtnLabel = giveUpLblNode.addComponent(Label);
+        this._revivalGiveUpBtnLabel.fontSize = 20;
+        this._revivalGiveUpBtnLabel.lineHeight = 28;
+        this._revivalGiveUpBtnLabel.isBold = true;
+        this._revivalGiveUpBtnLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this._revivalGiveUpBtnLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._revivalGiveUpBtnLabel.overflow = Label.Overflow.SHRINK;
+        this._revivalGiveUpBtnLabel.color = new Color(255, 230, 230, 255);
+        this._revivalGiveUpBtnLabel.string = '';
+
+        giveUpBtn.on(
+            Button.EventType.CLICK,
+            () => {
+                const cb = this._onRevivalGiveUp;
+                this.hideBaseRevival();
+                cb?.();
+            },
+            this
+        );
+
+        applyLayerRecursive(root, HUD_UI_LAYER);
+        this._revivalRoot = root;
+        this.updateRevivalDialogLayout();
+        root.active = false;
+    }
+
+    private updateRevivalDialogLayout(): void {
+        if (!this._revivalRoot) return;
+
+        const viewport = UIResponsive.getLayoutViewportSize(480, 320, 'canvas');
+        const viewportW = viewport.width;
+        const viewportH = viewport.height;
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
+        const compact = isTikTokPortrait || viewportW < 900;
+
+        const panelW = Math.round(
+            Math.max(
+                isTikTokPortrait ? 260 : 340,
+                Math.min(480, viewportW * (isTikTokPortrait ? 0.88 : compact ? 0.72 : 0.48))
+            )
+        );
+        const panelH = Math.round(
+            Math.max(
+                isTikTokPortrait ? 220 : 220,
+                Math.min(300, viewportH * (isTikTokPortrait ? 0.32 : compact ? 0.36 : 0.4))
+            )
+        );
+
+        this._revivalRoot.getComponent(UITransform)?.setContentSize(viewportW, viewportH);
+
+        const panel = this._revivalPanelBg?.node;
+        panel?.getComponent(UITransform)?.setContentSize(panelW, panelH);
+        if (this._revivalPanelBg) {
+            this.drawRevivalPanelBg(this._revivalPanelBg, panelW, panelH);
+        }
+
+        // Title
+        const titleNode = this._revivalTitleLabel?.node;
+        titleNode
+            ?.getComponent(UITransform)
+            ?.setContentSize(panelW - 40, Math.round(panelH * 0.22));
+        titleNode?.setPosition(0, Math.round(panelH * 0.3), 0);
+        if (this._revivalTitleLabel) {
+            this._revivalTitleLabel.fontSize = Math.max(
+                isTikTokPortrait ? 20 : 28,
+                Math.min(isTikTokPortrait ? 30 : 36, Math.round(panelH * 0.14))
+            );
+            this._revivalTitleLabel.lineHeight = this._revivalTitleLabel.fontSize + 8;
+        }
+
+        // Message
+        const msgNode = this._revivalMessageLabel?.node;
+        msgNode?.getComponent(UITransform)?.setContentSize(panelW - 40, Math.round(panelH * 0.28));
+        msgNode?.setPosition(0, Math.round(panelH * 0.06), 0);
+        if (this._revivalMessageLabel) {
+            this._revivalMessageLabel.fontSize = Math.max(
+                isTikTokPortrait ? 13 : 16,
+                Math.min(isTikTokPortrait ? 18 : 22, Math.round(panelH * 0.08))
+            );
+            this._revivalMessageLabel.lineHeight = this._revivalMessageLabel.fontSize + 8;
+        }
+
+        // Buttons — narrow screens switch to stacked layout to guarantee no overlap.
+        const stackButtons = isTikTokPortrait || panelW < 320;
+        const btnSpacing = Math.round(Math.max(10, panelW * 0.03));
+        const sideInset = Math.round(Math.max(14, panelW * 0.05));
+        const singleRowBudget = panelW - sideInset * 2 - btnSpacing;
+
+        const rowRebuildBtnW = Math.round(Math.max(108, singleRowBudget * 0.6));
+        const rowGiveUpBtnW = Math.round(Math.max(86, singleRowBudget * 0.4));
+        const stackBtnW = Math.max(120, panelW - sideInset * 2);
+        const btnH = Math.round(Math.max(36, panelH * (stackButtons ? 0.17 : 0.18)));
+        const rowBtnY = -Math.round(panelH * 0.31);
+        const stackPrimaryY = -Math.round(panelH * 0.24);
+        const stackSecondaryY = stackPrimaryY - btnH - Math.max(8, Math.round(panelH * 0.04));
+
+        const rebuildBtnW = stackButtons ? stackBtnW : rowRebuildBtnW;
+        const giveUpBtnW = stackButtons ? stackBtnW : rowGiveUpBtnW;
+        const rebuildX = stackButtons
+            ? 0
+            : -((rebuildBtnW + giveUpBtnW + btnSpacing) / 2) + rebuildBtnW / 2;
+        const giveUpX = stackButtons
+            ? 0
+            : (rebuildBtnW + giveUpBtnW + btnSpacing) / 2 - giveUpBtnW / 2;
+        const rebuildY = stackButtons ? stackPrimaryY : rowBtnY;
+        const giveUpY = stackButtons ? stackSecondaryY : rowBtnY;
+
+        if (this._revivalRebuildBtnNode) {
+            this._revivalRebuildBtnNode
+                .getComponent(UITransform)
+                ?.setContentSize(rebuildBtnW, btnH);
+            this._revivalRebuildBtnNode.setPosition(Math.round(rebuildX), rebuildY, 0);
+            if (this._revivalRebuildBtnBg) {
+                this.drawRevivalButton(this._revivalRebuildBtnBg, rebuildBtnW, btnH, true);
+            }
+            this._revivalRebuildBtnLabel?.node
+                .getComponent(UITransform)
+                ?.setContentSize(rebuildBtnW - 12, btnH - 6);
+            if (this._revivalRebuildBtnLabel) {
+                this._revivalRebuildBtnLabel.fontSize = Math.max(
+                    isTikTokPortrait ? 15 : 18,
+                    Math.min(24, Math.round(btnH * 0.42))
+                );
+                this._revivalRebuildBtnLabel.lineHeight = this._revivalRebuildBtnLabel.fontSize + 8;
+            }
+        }
+
+        if (this._revivalGiveUpBtnNode) {
+            this._revivalGiveUpBtnNode.getComponent(UITransform)?.setContentSize(giveUpBtnW, btnH);
+            this._revivalGiveUpBtnNode.setPosition(Math.round(giveUpX), giveUpY, 0);
+            if (this._revivalGiveUpBtnBg) {
+                this.drawRevivalButton(this._revivalGiveUpBtnBg, giveUpBtnW, btnH, false);
+            }
+            this._revivalGiveUpBtnLabel?.node
+                .getComponent(UITransform)
+                ?.setContentSize(giveUpBtnW - 10, btnH - 4);
+            if (this._revivalGiveUpBtnLabel) {
+                this._revivalGiveUpBtnLabel.fontSize = Math.max(
+                    isTikTokPortrait ? 13 : 15,
+                    Math.min(20, Math.round(btnH * 0.4))
+                );
+                this._revivalGiveUpBtnLabel.lineHeight = this._revivalGiveUpBtnLabel.fontSize + 8;
+            }
+        }
+    }
+
+    private drawRevivalPanelBg(bg: Graphics, w: number, h: number): void {
+        const r = Math.max(12, Math.round(Math.min(w, h) * 0.05));
+        bg.clear();
+        bg.fillColor = new Color(13, 18, 30, 230);
+        bg.roundRect(-w / 2, -h / 2, w, h, r);
+        bg.fill();
+        bg.strokeColor = new Color(255, 180, 60, 255);
+        bg.lineWidth = 3;
+        bg.roundRect(-w / 2, -h / 2, w, h, r);
+        bg.stroke();
+    }
+
+    private drawRevivalButton(bg: Graphics, w: number, h: number, isPrimary: boolean): void {
+        const r = Math.max(8, Math.round(h * 0.25));
+        bg.clear();
+        bg.fillColor = isPrimary ? new Color(72, 200, 96, 255) : new Color(120, 60, 60, 200);
+        bg.roundRect(-w / 2, -h / 2, w, h, r);
+        bg.fill();
+        bg.strokeColor = isPrimary ? new Color(200, 255, 200, 200) : new Color(200, 140, 140, 160);
+        bg.lineWidth = 2;
+        bg.roundRect(-w / 2, -h / 2, w, h, r);
+        bg.stroke();
     }
 }

@@ -1,15 +1,15 @@
-import { _decorator, Vec3, Node, MeshRenderer, primitives, utils, Material, Color } from 'cc';
+import { _decorator, Node } from 'cc';
 import { Building, BuildingType } from './Building';
 import { BuildingPad } from './BuildingPad'; // Added import
-import { GameManager } from '../../core/managers/GameManager';
 import { GameConfig } from '../../data/GameConfig';
 import { HUDManager } from '../../ui/HUDManager';
-import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
+import { WaveService } from '../../core/managers/WaveService';
+import { WaveManager } from '../wave/WaveManager';
 import { Hero } from '../units/Hero';
 
-const { ccclass, property } = _decorator;
+const { ccclass } = _decorator;
 
 /**
  * 基地组件
@@ -18,6 +18,8 @@ const { ccclass, property } = _decorator;
 @ccclass('Base')
 export class Base extends Building {
     private _upgradePad: BuildingPad | null = null;
+    private _revivalUsed: boolean = false;
+    private _awaitingRevival: boolean = false;
 
     protected initialize(): void {
         this.buildingType = BuildingType.BASE;
@@ -30,6 +32,7 @@ export class Base extends Building {
         this.createUpgradePad();
 
         this.eventManager.on(GameEvents.ENEMY_REACHED_BASE, this.onEnemyReachedBase, this);
+        this.eventManager.on(GameEvents.BASE_REVIVED, this.onBaseRevived, this);
 
         // Initial HUD Update
         this.hudManager.updateBaseHp(this.currentHp, this.maxHp);
@@ -136,6 +139,17 @@ export class Base extends Building {
     }
 
     protected onDestroyed(): void {
+        // One-time revival: first destruction shows revival dialog instead of game over
+        if (!this._revivalUsed) {
+            this._revivalUsed = true;
+            this._awaitingRevival = true;
+            console.log('[Base] Destroyed — revival available.');
+            const wave = this.resolveRevivalWave();
+            this.gameManager.pauseGame();
+            this.eventManager.emit(GameEvents.BASE_REVIVAL_AVAILABLE, { wave });
+            return;
+        }
+
         if (this._upgradePad && this._upgradePad.node.isValid) {
             this._upgradePad.node.destroy();
             this._upgradePad = null;
@@ -149,7 +163,60 @@ export class Base extends Building {
         this.gameManager.gameOver(false); // Victory = false
     }
 
+    private onBaseRevived(): void {
+        if (!this._awaitingRevival) return;
+        this._awaitingRevival = false;
+
+        // Restore base to full HP and make node active again
+        this.currentHp = this.maxHp;
+        this.node.active = true;
+        this.hudManager.updateBaseHp(this.currentHp, this.maxHp);
+
+        // Restore all buildings via BuildingManager
+        const bm = ServiceRegistry.get<any>('BuildingManager');
+        if (bm && bm.rebuildDestroyedBuildingsToRecordedLevels) {
+            bm.rebuildDestroyedBuildingsToRecordedLevels();
+        }
+
+        // Force-resume even if pause requests stacked (e.g. item dialog opened before base died)
+        this.forceResumeAfterRevival();
+
+        // Rebuild should always put the hero back at the initial spawn point.
+        const heroNode = this.gameManager.hero;
+        if (heroNode && heroNode.isValid) {
+            const hero = heroNode.getComponent(Hero);
+            hero?.forceReviveAtInitialSpawn();
+        }
+
+        // Use WaveLoop to clear enemies + restart this wave with the full 15s prep countdown
+        const waveLoop = ServiceRegistry.get<any>('WaveLoop');
+        if (waveLoop && typeof waveLoop.restartCurrentWaveForRevival === 'function') {
+            waveLoop.restartCurrentWaveForRevival();
+        }
+    }
+
+    private resolveRevivalWave(): number {
+        const waveFromService = Math.max(0, Math.floor(this.waveService.currentWave));
+        const waveFromGameManager = Math.max(0, Math.floor(this.gameManager.currentWave));
+        return Math.max(1, waveFromService, waveFromGameManager);
+    }
+
+    private forceResumeAfterRevival(): void {
+        // Pause requests can stack; consume all pause requests to avoid "rebuild then still frozen".
+        for (let i = 0; i < 6 && !this.gameManager.isPlaying; i++) {
+            this.gameManager.resumeGame();
+        }
+    }
+
     private get hudManager(): HUDManager {
         return ServiceRegistry.get<HUDManager>('HUDManager') ?? HUDManager.instance;
+    }
+
+    private get waveService(): WaveService {
+        return ServiceRegistry.get<WaveService>('WaveService') ?? WaveService.instance;
+    }
+
+    private get waveManager(): WaveManager {
+        return ServiceRegistry.get<WaveManager>('WaveManager') ?? WaveManager.instance;
     }
 }

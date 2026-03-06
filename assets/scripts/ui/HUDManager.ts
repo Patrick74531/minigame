@@ -20,6 +20,8 @@ import { HUDCameraCinematicService } from './hud/HUDCameraCinematicService';
 import { HUDMinimapModule } from './hud/HUDMinimapModule';
 import { getSocialBridge, type SocialBridge } from '../core/reddit/RedditBridge';
 import { DiamondService } from '../core/diamond/DiamondService';
+import { GameManager } from '../core/managers/GameManager';
+import { Hero } from '../gameplay/units/Hero';
 
 /**
  * HUD 管理器
@@ -57,12 +59,17 @@ export class HUDManager {
     private readonly _minimapModule = new HUDMinimapModule();
     private readonly _cameraCinematicService = new HUDCameraCinematicService();
     private readonly _socialBridge: SocialBridge = getSocialBridge();
+    private _runSettled: boolean = false;
+    private _revivalDecisionPending: boolean = false;
+    private _revivalWave: number = 0;
 
     /**
      * 初始化 HUD
      */
     public initialize(uiCanvas: Node): void {
         this._uiCanvas = uiCanvas;
+        this._runSettled = false;
+        this.clearRevivalDecisionState();
 
         this.destroyLegacyHudNodes(uiCanvas);
 
@@ -140,6 +147,7 @@ export class HUDManager {
             this
         );
         this.eventManager.on(GameEvents.GAME_OVER, this.onGameOver, this);
+        this.eventManager.on(GameEvents.BASE_REVIVAL_AVAILABLE, this.onBaseRevivalAvailable, this);
         this.eventManager.on(GameEvents.COIN_CHANGED, this.onCoinChanged, this);
         this.eventManager.on(GameEvents.LANGUAGE_CHANGED, this.onLanguageChanged, this);
     }
@@ -221,6 +229,16 @@ export class HUDManager {
         this._waveNoticeModule.hideHeroRespawnCountdown();
     }
 
+    public hasPendingBaseRevivalDecision(): boolean {
+        return this._revivalDecisionPending;
+    }
+
+    public finalizePendingRevivalAsGiveUp(): void {
+        if (!this._revivalDecisionPending) return;
+        this._gameOverModule.hideBaseRevival();
+        this.finalizeRevivalAsGiveUp(true);
+    }
+
     // === 事件处理 ===
 
     private onWaveStart(data: { wave?: number }): void {
@@ -256,16 +274,88 @@ export class HUDManager {
     }
 
     private onGameOver(data: { victory: boolean }): void {
-        const wave = WaveService.instance.currentWave;
+        if (this._revivalDecisionPending) {
+            this._gameOverModule.hideBaseRevival();
+            this.clearRevivalDecisionState();
+        }
+
+        const wave = this.resolveWaveForSettlement(undefined, 0);
         this._gameOverModule.showGameOver(Boolean(data?.victory), wave);
+
+        if (this._runSettled) {
+            this._gameOverModule.setOnBeforeRestart(null);
+            return;
+        }
+
+        // Deferred settlement: submit score + settle diamonds when player clicks restart.
+        this._gameOverModule.setOnBeforeRestart(() => {
+            if (this._runSettled) return;
+            this.settleCurrentRun(wave);
+        });
+    }
+
+    private onBaseRevivalAvailable(data: { wave: number }): void {
+        this._revivalDecisionPending = true;
+        this._revivalWave = this.resolveWaveForSettlement(data.wave, 1);
+        this._gameOverModule.showBaseRevival(
+            this._revivalWave,
+            () => {
+                const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+                this.resumeGameFully(gm);
+                const heroNode = gm.hero;
+                const hero = heroNode?.isValid ? heroNode.getComponent(Hero) : null;
+                hero?.forceReviveAtInitialSpawn();
+
+                // Rebuild: emit BASE_REVIVED (Base listens and restores HP + buildings)
+                this.clearRevivalDecisionState();
+                this.eventManager.emit(GameEvents.BASE_REVIVED);
+                this.setJoystickInputEnabled(true);
+            },
+            () => {
+                this.finalizeRevivalAsGiveUp(true);
+            }
+        );
+    }
+
+    private finalizeRevivalAsGiveUp(triggerGameOver: boolean): void {
+        const wave = this.resolveWaveForSettlement(this._revivalWave, 1);
+        this.settleCurrentRun(wave);
+
+        const gm = ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+        this.resumeGameFully(gm);
+        this.clearRevivalDecisionState();
+        if (triggerGameOver) {
+            gm.gameOver(false);
+        }
+    }
+
+    private settleCurrentRun(wave: number): void {
+        if (this._runSettled) return;
+        this._runSettled = true;
         this._socialBridge.submitScore(wave * 100, wave);
-        // Settle diamond reward for this run (wave × 10)
         const runId = DiamondService.generateRunId();
         DiamondService.instance.settleRun(wave, runId, (earned, _balance) => {
             if (earned > 0) {
                 this._gameOverModule.showDiamondReward(earned);
             }
         });
+    }
+
+    private resolveWaveForSettlement(preferredWave?: number, minimum: number = 0): number {
+        const preferred = Math.max(0, Math.floor(preferredWave ?? 0));
+        const fromService = Math.max(0, Math.floor(this.waveService.currentWave));
+        return Math.max(minimum, preferred, fromService);
+    }
+
+    private clearRevivalDecisionState(): void {
+        this._revivalDecisionPending = false;
+        this._revivalWave = 0;
+    }
+
+    private resumeGameFully(gm: GameManager): void {
+        for (let i = 0; i < 6 && !gm.isPlaying; i++) {
+            gm.resumeGame();
+        }
     }
 
     private onBossIntro(data: HUDBossIntroPayload): void {
@@ -320,6 +410,8 @@ export class HUDManager {
 
         this._joystickRef = null;
         this._uiCanvas = null;
+        this.clearRevivalDecisionState();
+        this._runSettled = false;
     }
 
     private onCanvasResize(): void {

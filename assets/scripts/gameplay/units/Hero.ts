@@ -52,6 +52,7 @@ export class Hero extends Unit {
     private _hasFacingDir: boolean = false;
     private _respawning: boolean = false;
     private _respawnRemainingSeconds: number = 0;
+    private _pendingRespawnOverrideSeconds: number | null = null;
 
     private _weapon: RangedWeapon | null = null;
     private _mover: CharacterMover | null = null;
@@ -102,6 +103,7 @@ export class Hero extends Unit {
         WeaponSFXManager.stopAllLoops(this.node);
         this._respawning = false;
         this._respawnRemainingSeconds = 0;
+        this._pendingRespawnOverrideSeconds = null;
         this.hudManager.hideHeroRespawnCountdown();
         if (this.gameManager.hero === this.node) {
             this.gameManager.hero = null;
@@ -880,7 +882,12 @@ export class Hero extends Unit {
         if (this._respawning) return;
 
         this._respawning = true;
-        this._respawnRemainingSeconds = Hero.RESPAWN_DELAY_SECONDS;
+        const pendingOverride = this._pendingRespawnOverrideSeconds;
+        this._pendingRespawnOverrideSeconds = null;
+        this._respawnRemainingSeconds =
+            pendingOverride !== null
+                ? Math.max(0, Math.floor(pendingOverride))
+                : Hero.RESPAWN_DELAY_SECONDS;
         this._inputVector.set(0, 0);
         this._hasFacingDir = false;
         this._target = null;
@@ -891,8 +898,88 @@ export class Hero extends Unit {
 
         this.unschedule(this.tickRespawnCountdown);
         this.unschedule(this.finishRespawn);
-        this.schedule(this.tickRespawnCountdown, 1, Hero.RESPAWN_DELAY_SECONDS - 1, 1);
-        this.scheduleOnce(this.finishRespawn, Hero.RESPAWN_DELAY_SECONDS);
+        this.schedule(this.tickRespawnCountdown, 1, this._respawnRemainingSeconds - 1, 1);
+        this.scheduleOnce(this.finishRespawn, this._respawnRemainingSeconds);
+
+        this._eventMgr.emit(GameEvents.HERO_RESPAWN_STARTED, {
+            remainingSeconds: this._respawnRemainingSeconds,
+        });
+    }
+
+    public queueQuickRespawn(seconds: number): void {
+        const clamped = Math.max(0, Math.floor(seconds));
+        if (this._respawning) {
+            this.accelerateRespawn(clamped);
+            return;
+        }
+
+        this._pendingRespawnOverrideSeconds =
+            this._pendingRespawnOverrideSeconds === null
+                ? clamped
+                : Math.min(this._pendingRespawnOverrideSeconds, clamped);
+    }
+
+    /**
+     * 加速复活：将剩余复活时间缩短到指定秒数。
+     * 由快速复活道具调用。
+     */
+    public accelerateRespawn(newRemainingSeconds: number): void {
+        if (!this._respawning) return;
+        const clamped = Math.max(0, Math.floor(newRemainingSeconds));
+        if (clamped >= this._respawnRemainingSeconds) return;
+
+        this._respawnRemainingSeconds = clamped;
+
+        this.unschedule(this.tickRespawnCountdown);
+        this.unschedule(this.finishRespawn);
+
+        if (clamped <= 0) {
+            this.finishRespawn();
+            return;
+        }
+
+        this.hudManager.updateHeroRespawnCountdown(clamped);
+        this.schedule(this.tickRespawnCountdown, 1, clamped - 1, 1);
+        this.scheduleOnce(this.finishRespawn, clamped);
+    }
+
+    public forceReviveAtInitialSpawn(): void {
+        if (!this.node || !this.node.isValid) return;
+
+        this._respawning = false;
+        this._respawnRemainingSeconds = 0;
+        this.unschedule(this.tickRespawnCountdown);
+        this.unschedule(this.finishRespawn);
+        this._stopCurrentWeapon();
+        WeaponSFXManager.stopAllLoops(this.node);
+
+        const spawnPos = this.resolveInitialSpawnPosition();
+        this.node.setWorldPosition(spawnPos.x, GameConfig.PHYSICS.HERO_Y, spawnPos.z);
+        this.node.active = true;
+
+        this.resetUnit();
+        this.gameManager.hero = this.node;
+        this._inputVector.set(0, 0);
+        this._target = null;
+        this._state = UnitState.IDLE;
+        this._hasFacingDir = false;
+        this.setHeroCollisionEnabled(true);
+        this.hudManager.hideHeroRespawnCountdown();
+    }
+
+    public moveToSafePosition(): void {
+        if (!this.node || !this.node.isValid) return;
+
+        const respawnPos = this.resolveRespawnPosition();
+        this.node.setWorldPosition(respawnPos.x, GameConfig.PHYSICS.HERO_Y, respawnPos.z);
+        this._inputVector.set(0, 0);
+        this._target = null;
+        this._state = UnitState.IDLE;
+        this._hasFacingDir = false;
+    }
+
+    public get isRespawning(): boolean {
+        return this._respawning;
     }
 
     private tickRespawnCountdown(): void {
@@ -942,6 +1029,14 @@ export class Hero extends Unit {
             );
         }
 
+        return new Vec3(
+            this.resolveInitialSpawnPosition().x,
+            GameConfig.PHYSICS.HERO_Y,
+            this.resolveInitialSpawnPosition().z
+        );
+    }
+
+    private resolveInitialSpawnPosition(): Vec3 {
         return new Vec3(
             GameConfig.MAP.BASE_SPAWN.x + GameConfig.MAP.HERO_SPAWN_OFFSET.x,
             GameConfig.PHYSICS.HERO_Y,
