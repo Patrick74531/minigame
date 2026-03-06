@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>老奶大战机器人游戏软件 用户操作手册</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #111;
+      font-family: "PingFang SC","Noto Sans SC","Microsoft YaHei","Heiti SC",sans-serif;
+      font-size: 14px;
+      line-height: 1.7;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    h1,h2,h3 { margin: 0.8em 0 0.35em; }
+    h1 { font-size: 24px; text-align: center; margin-top: 0; }
+    h2 { font-size: 18px; border-left: 4px solid #1f2937; padding-left: 10px; }
+    h3 { font-size: 15px; }
+    p { margin: 0.45em 0; text-align: justify; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; }
+    th, td { border: 1px solid #444; padding: 8px; vertical-align: top; }
+    th { background: #f3f4f6; font-weight: 700; }
+    ul, ol { margin: 0.35em 0 0.5em 1.4em; padding: 0; }
+    .small { font-size: 12px; color: #444; }
+    .page-break { page-break-before: always; }
+    .muted { color: #555; }
+    .mono-block {
+      white-space: pre-wrap;
+      font-family: "SF Mono","Menlo","Consolas",monospace;
+      font-size: 12px;
+      background: #fafafa;
+      border: 1px solid #ddd;
+      padding: 10px 12px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>老奶大战机器人游戏软件 用户操作手册</h1>
+<p class="muted">（用于软著登记辅助材料）</p>
+
+<h2>1. 手册用途</h2>
+<p>本手册用于说明软件的启动方式、操作流程、主要功能页面和常见问题处理方法，可作为软著登记中的“用户操作说明”材料。</p>
+
+<h2>2. 启动与运行</h2>
+<ol>
+  <li>开发调试：使用 Cocos Creator 打开工程后在编辑器内预览运行。</li>
+  <li>发布运行：执行构建脚本生成 Web 产物，通过浏览器或平台 WebView 访问。</li>
+</ol>
+<table>
+  <tr><th style="width:28%">项目</th><th>说明</th></tr>
+  <tr><td>推荐 Node.js</td><td>18 及以上版本</td></tr>
+  <tr><td>推荐引擎版本</td><td>Cocos Creator 3.8.8</td></tr>
+  <tr><td>运行载体</td><td>PC 浏览器、移动浏览器、内嵌 WebView</td></tr>
+</table>
+
+<h2>3. 基础操作</h2>
+<ul>
+  <li>PC 端移动：W / A / S / D（或方向键）</li>
+  <li>移动端移动：虚拟摇杆</li>
+  <li>攻击方式：自动攻击（根据目标范围判定）</li>
+  <li>交互方式：点击按钮完成建造、升级、选卡、选武器、使用道具</li>
+</ul>
+
+<h2>4. 玩法流程</h2>
+<ol>
+  <li>战前建造：选择建造点放置防御建筑，形成基础火力与经济循环。</li>
+  <li>波次防守：敌人按三路与随机组合进攻，玩家需动态调整防线。</li>
+  <li>成长选择：在波间进行武器、增益卡牌、道具选择，形成局内成长。</li>
+  <li>Boss 回合：击败 Boss 后获取宝箱，提升局内逆转与策略空间。</li>
+  <li>回合结算：失败或结束后提交成绩并更新排行榜、结算钻石。</li>
+</ol>
+
+<h2>5. 主要界面说明</h2>
+<h3>5.1 首页</h3>
+<ul>
+  <li>开始游戏：进入新的一局。</li>
+  <li>继续游戏：检测到本地有效存档时可继续。</li>
+  <li>排行榜：查看最高分与波次排行。</li>
+  <li>商店：消耗钻石购买道具。</li>
+</ul>
+
+<h3>5.2 战斗 HUD</h3>
+<ul>
+  <li>金币显示：反映当前可用于建造和升级的资源。</li>
+  <li>波次信息：展示当前波次与下一波倒计时。</li>
+  <li>基地生命：展示基地当前生命状态。</li>
+  <li>武器/道具栏：展示当前可用能力和库存。</li>
+</ul>
+
+<h3>5.3 选择界面</h3>
+<ul>
+  <li>武器选择：每次提供 3 选 1，重复武器可升级。</li>
+  <li>增益卡选择：每次提供 3 选 1，强化角色属性。</li>
+  <li>道具选择：Boss 宝箱触发 3 选 1，进入背包待使用。</li>
+</ul>
+
+<h2>6. 存档与恢复</h2>
+<p>软件具备自动存档能力，支持定时保存、关键节点即时保存以及版本迁移读取。用户重启后可通过“继续游戏”恢复最近一局状态。</p>
+
+<h2>7. 常见问题处理</h2>
+<table>
+  <tr><th style="width:34%">问题</th><th>处理建议</th></tr>
+  <tr><td>排行榜无法刷新</td><td>检查网络连通性、后端接口状态与平台域名配置。</td></tr>
+  <tr><td>成绩疑似重复提交</td><td>系统已通过 runId 做幂等防重，检查客户端 runId 传递逻辑。</td></tr>
+  <tr><td>移动端加载慢</td><td>确认首次资源加载完成，必要时降低并发后台应用占用。</td></tr>
+  <tr><td>恢复存档失败</td><td>检查本地存档是否过期或版本结构不兼容。</td></tr>
+</table>
+
+<h2>8. 版本信息</h2>
+<p>软件版本：V0.1.0。</p>
+<p>文档生成日期：2026年03月06日。</p>
+
+</body>
+</html>

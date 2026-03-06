@@ -1,0 +1,1757 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>老奶大战机器人游戏软件 源程序文档（后1500行）</title>
+  <style>
+    @page { size: A4; margin: 12mm 12mm; }
+    body {
+      margin: 0;
+      color: #111;
+      font-family: "SF Mono","Menlo","Consolas",monospace;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .code-page { page-break-after: always; }
+    .code-page:last-child { page-break-after: auto; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #444;
+      padding-bottom: 4px;
+      margin-bottom: 4px;
+      font-size: 11px;
+    }
+    .title { font-weight: 700; }
+    pre {
+      margin: 0;
+      font-size: 10px;
+      line-height: 1.27;
+      white-space: pre;
+      overflow: hidden;
+      word-break: normal;
+      font-variant-ligatures: none;
+    }
+    .ln {
+      display: inline-block;
+      width: 48px;
+      color: #666;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- 源程序按项目代码合并后截取后 1500 行，保留文件边界标记，供软著登记提交。 -->
+  
+<section class="code-page ">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 1 / 30 页</div>
+  </header>
+  <pre><span class="ln">53072</span>          this._showKeyboardHints = !isTouch;
+<span class="ln">53073</span>          this.refresh();
+<span class="ln">53074</span>      }
+<span class="ln">53075</span>  
+<span class="ln">53076</span>      private createIconNode(
+<span class="ln">53077</span>          type: WeaponType,
+<span class="ln">53078</span>          def: WeaponDef,
+<span class="ln">53079</span>          level: number,
+<span class="ln">53080</span>          isActive: boolean,
+<span class="ln">53081</span>          slotIndex: number
+<span class="ln">53082</span>      ): Node {
+<span class="ln">53083</span>          const node = new Node(`WeaponIcon_${type}`);
+<span class="ln">53084</span>          node.layer = UI_LAYER;
+<span class="ln">53085</span>          const iconSize = this._iconSize;
+<span class="ln">53086</span>          node.addComponent(UITransform).setContentSize(iconSize, iconSize);
+<span class="ln">53087</span>  
+<span class="ln">53088</span>          const themeColor = this.hexToColor(def.iconColor);
+<span class="ln">53089</span>  
+<span class="ln">53090</span>          // Background
+<span class="ln">53091</span>          const g = node.addComponent(Graphics);
+<span class="ln">53092</span>          const radius = Math.max(10, Math.round(iconSize * 0.18));
+<span class="ln">53093</span>  
+<span class="ln">53094</span>          g.fillColor = isActive ? new Color(34, 48, 60, 252) : new Color(20, 30, 42, 232);
+<span class="ln">53095</span>          g.roundRect(-iconSize / 2, -iconSize / 2, iconSize, iconSize, radius);
+<span class="ln">53096</span>          g.fill();
+<span class="ln">53097</span>  
+<span class="ln">53098</span>          g.fillColor = isActive ? new Color(64, 154, 206, 58) : new Color(32, 84, 112, 42);
+<span class="ln">53099</span>          g.roundRect(
+<span class="ln">53100</span>              -iconSize / 2 + 4,
+<span class="ln">53101</span>              -iconSize / 2 + 4,
+<span class="ln">53102</span>              iconSize - 8,
+<span class="ln">53103</span>              iconSize - 8,
+<span class="ln">53104</span>              Math.max(8, radius - 3)
+<span class="ln">53105</span>          );
+<span class="ln">53106</span>          g.fill();
+<span class="ln">53107</span>  
+<span class="ln">53108</span>          g.strokeColor = isActive
+<span class="ln">53109</span>              ? new Color(255, 220, 116, 255)
+<span class="ln">53110</span>              : new Color(themeColor.r, themeColor.g, themeColor.b, 255);
+<span class="ln">53111</span>          g.lineWidth = isActive ? 4 : 2;
+<span class="ln">53112</span>          g.roundRect(-iconSize / 2, -iconSize / 2, iconSize, iconSize, radius);
+<span class="ln">53113</span>          g.stroke();
+<span class="ln">53114</span>  
+<span class="ln">53115</span>          // Icon Sprite
+<span class="ln">53116</span>          const iconNode = new Node(&#39;IconSprite&#39;);
+<span class="ln">53117</span>          iconNode.layer = UI_LAYER;
+<span class="ln">53118</span>          node.addChild(iconNode);
+<span class="ln">53119</span>          const spriteSize = iconSize * 0.75;
+<span class="ln">53120</span>          iconNode.addComponent(UITransform).setContentSize(spriteSize, spriteSize);
+<span class="ln">53121</span>          const sprite = iconNode.addComponent(Sprite);</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 2 / 30 页</div>
+  </header>
+  <pre><span class="ln">53122</span>          sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+<span class="ln">53123</span>  
+<span class="ln">53124</span>          if (def.iconPath) {
+<span class="ln">53125</span>              this.loadWeaponIcon(sprite, def.iconPath);
+<span class="ln">53126</span>          }
+<span class="ln">53127</span>  
+<span class="ln">53128</span>          this.createLevelBadge(node, level, iconSize, isActive);
+<span class="ln">53129</span>  
+<span class="ln">53130</span>          if (this._showKeyboardHints &amp;&amp; slotIndex &gt;= 0 &amp;&amp; slotIndex &lt; KEY_HINTS.length) {
+<span class="ln">53131</span>              this.createKeyHintBadge(node, slotIndex, iconSize);
+<span class="ln">53132</span>          }
+<span class="ln">53133</span>  
+<span class="ln">53134</span>          node.on(Node.EventType.TOUCH_START, () =&gt; {
+<span class="ln">53135</span>              node.setScale(0.95, 0.95, 1);
+<span class="ln">53136</span>          });
+<span class="ln">53137</span>          node.on(Node.EventType.TOUCH_CANCEL, () =&gt; {
+<span class="ln">53138</span>              node.setScale(1, 1, 1);
+<span class="ln">53139</span>          });
+<span class="ln">53140</span>          node.on(Node.EventType.TOUCH_END, () =&gt; {
+<span class="ln">53141</span>              node.setScale(1, 1, 1);
+<span class="ln">53142</span>              HeroWeaponManager.instance.switchWeapon(type);
+<span class="ln">53143</span>          });
+<span class="ln">53144</span>  
+<span class="ln">53145</span>          return node;
+<span class="ln">53146</span>      }
+<span class="ln">53147</span>  
+<span class="ln">53148</span>      private loadWeaponIcon(sprite: Sprite, path: string): void {
+<span class="ln">53149</span>          const normalizedPath = path.trim();
+<span class="ln">53150</span>          const cached = this._iconFrameCache.get(normalizedPath);
+<span class="ln">53151</span>          if (cached) {
+<span class="ln">53152</span>              sprite.spriteFrame = cached;
+<span class="ln">53153</span>              return;
+<span class="ln">53154</span>          }
+<span class="ln">53155</span>  
+<span class="ln">53156</span>          const waitingSet = this.getIconWaitingSet(normalizedPath);
+<span class="ln">53157</span>          waitingSet.add(sprite);
+<span class="ln">53158</span>          if (this._iconLoading.has(normalizedPath)) {
+<span class="ln">53159</span>              return;
+<span class="ln">53160</span>          }
+<span class="ln">53161</span>          this._iconLoading.add(normalizedPath);
+<span class="ln">53162</span>  
+<span class="ln">53163</span>          const candidates = this.getIconLoadCandidates(normalizedPath);
+<span class="ln">53164</span>          this.loadWeaponIconByCandidate(candidates, 0, frame =&gt; {
+<span class="ln">53165</span>              this._iconLoading.delete(normalizedPath);
+<span class="ln">53166</span>              const waiting = this.getIconWaitingSet(normalizedPath);
+<span class="ln">53167</span>              if (!frame) {
+<span class="ln">53168</span>                  console.error(`[WeaponBarUI] Failed to load weapon icon from paths:`, candidates);
+<span class="ln">53169</span>                  waiting.clear();
+<span class="ln">53170</span>                  return;
+<span class="ln">53171</span>              }</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 3 / 30 页</div>
+  </header>
+  <pre><span class="ln">53172</span>  
+<span class="ln">53173</span>              this._iconFrameCache.set(normalizedPath, frame);
+<span class="ln">53174</span>              for (const waitingSprite of waiting) {
+<span class="ln">53175</span>                  if (!waitingSprite?.isValid) continue;
+<span class="ln">53176</span>                  waitingSprite.spriteFrame = frame;
+<span class="ln">53177</span>              }
+<span class="ln">53178</span>              waiting.clear();
+<span class="ln">53179</span>          });
+<span class="ln">53180</span>      }
+<span class="ln">53181</span>  
+<span class="ln">53182</span>      private getIconLoadCandidates(path: string): string[] {
+<span class="ln">53183</span>          const rawCandidates = [
+<span class="ln">53184</span>              path,
+<span class="ln">53185</span>              `${path}/spriteFrame`,
+<span class="ln">53186</span>              `${path}/texture`,
+<span class="ln">53187</span>              path.endsWith(&#39;.webp&#39;) ? path : `${path}.webp`,
+<span class="ln">53188</span>              path.endsWith(&#39;.webp&#39;) ? `${path}/spriteFrame` : `${path}.webp/spriteFrame`,
+<span class="ln">53189</span>              path.endsWith(&#39;.webp&#39;) ? `${path}/texture` : `${path}.webp/texture`,
+<span class="ln">53190</span>          ];
+<span class="ln">53191</span>  
+<span class="ln">53192</span>          const candidates: string[] = [];
+<span class="ln">53193</span>          for (const candidate of rawCandidates) {
+<span class="ln">53194</span>              if (!candidate || candidates.includes(candidate)) continue;
+<span class="ln">53195</span>              candidates.push(candidate);
+<span class="ln">53196</span>          }
+<span class="ln">53197</span>          return candidates;
+<span class="ln">53198</span>      }
+<span class="ln">53199</span>  
+<span class="ln">53200</span>      private loadWeaponIconByCandidate(
+<span class="ln">53201</span>          candidates: string[],
+<span class="ln">53202</span>          index: number,
+<span class="ln">53203</span>          done: (frame: SpriteFrame | null) =&gt; void
+<span class="ln">53204</span>      ): void {
+<span class="ln">53205</span>          if (index &gt;= candidates.length) {
+<span class="ln">53206</span>              done(null);
+<span class="ln">53207</span>              return;
+<span class="ln">53208</span>          }
+<span class="ln">53209</span>  
+<span class="ln">53210</span>          const candidate = candidates[index];
+<span class="ln">53211</span>          resources.load(candidate, SpriteFrame, (sfErr, spriteFrame) =&gt; {
+<span class="ln">53212</span>              if (!sfErr &amp;&amp; spriteFrame) {
+<span class="ln">53213</span>                  done(spriteFrame);
+<span class="ln">53214</span>                  return;
+<span class="ln">53215</span>              }
+<span class="ln">53216</span>  
+<span class="ln">53217</span>              resources.load(candidate, Texture2D, (texErr, texture) =&gt; {
+<span class="ln">53218</span>                  if (!texErr &amp;&amp; texture) {
+<span class="ln">53219</span>                      const frame = new SpriteFrame();
+<span class="ln">53220</span>                      frame.texture = texture;
+<span class="ln">53221</span>                      done(frame);</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 4 / 30 页</div>
+  </header>
+  <pre><span class="ln">53222</span>                      return;
+<span class="ln">53223</span>                  }
+<span class="ln">53224</span>  
+<span class="ln">53225</span>                  resources.load(candidate, ImageAsset, (imgErr, imageAsset) =&gt; {
+<span class="ln">53226</span>                      if (!imgErr &amp;&amp; imageAsset) {
+<span class="ln">53227</span>                          const textureFromImage = new Texture2D();
+<span class="ln">53228</span>                          textureFromImage.image = imageAsset;
+<span class="ln">53229</span>                          const frameFromImage = new SpriteFrame();
+<span class="ln">53230</span>                          frameFromImage.texture = textureFromImage;
+<span class="ln">53231</span>                          done(frameFromImage);
+<span class="ln">53232</span>                          return;
+<span class="ln">53233</span>                      }
+<span class="ln">53234</span>  
+<span class="ln">53235</span>                      this.loadWeaponIconByCandidate(candidates, index + 1, done);
+<span class="ln">53236</span>                  });
+<span class="ln">53237</span>              });
+<span class="ln">53238</span>          });
+<span class="ln">53239</span>      }
+<span class="ln">53240</span>  
+<span class="ln">53241</span>      private getIconWaitingSet(path: string): Set&lt;Sprite&gt; {
+<span class="ln">53242</span>          let waitingSet = this._iconWaiting.get(path);
+<span class="ln">53243</span>          if (!waitingSet) {
+<span class="ln">53244</span>              waitingSet = new Set&lt;Sprite&gt;();
+<span class="ln">53245</span>              this._iconWaiting.set(path, waitingSet);
+<span class="ln">53246</span>          }
+<span class="ln">53247</span>          return waitingSet;
+<span class="ln">53248</span>      }
+<span class="ln">53249</span>  
+<span class="ln">53250</span>      private updateContainerSize(iconCount: number, isTikTokPortrait: boolean): void {
+<span class="ln">53251</span>          if (!this._barNode) return;
+<span class="ln">53252</span>          const columns = isTikTokPortrait ? Math.min(2, Math.max(1, iconCount)) : iconCount;
+<span class="ln">53253</span>          const rows = isTikTokPortrait ? Math.max(1, Math.ceil(iconCount / 2)) : 1;
+<span class="ln">53254</span>          const iconAreaWidth =
+<span class="ln">53255</span>              columns &gt; 0 ? columns * this._iconSize + Math.max(0, columns - 1) * ICON_GAP : 0;
+<span class="ln">53256</span>          const iconAreaHeight =
+<span class="ln">53257</span>              rows &gt; 0 ? rows * this._iconSize + Math.max(0, rows - 1) * ICON_GAP : 0;
+<span class="ln">53258</span>          const minWidth = isTikTokPortrait ? Math.round(this._iconSize * 1.4) : BAR_MIN_WIDTH;
+<span class="ln">53259</span>          const minHeight = isTikTokPortrait
+<span class="ln">53260</span>              ? Math.round(this._iconSize + BAR_PADDING_Y * 2 + 12)
+<span class="ln">53261</span>              : BAR_MIN_HEIGHT;
+<span class="ln">53262</span>          const width = Math.max(minWidth, iconAreaWidth + BAR_PADDING_X * 2);
+<span class="ln">53263</span>          const height = Math.max(minHeight, iconAreaHeight + BAR_PADDING_Y * 2 + 12);
+<span class="ln">53264</span>          this._barNode.getComponent(UITransform)?.setContentSize(width, height);
+<span class="ln">53265</span>      }
+<span class="ln">53266</span>  
+<span class="ln">53267</span>      private createLevelBadge(
+<span class="ln">53268</span>          parent: Node,
+<span class="ln">53269</span>          level: number,
+<span class="ln">53270</span>          iconSize: number,
+<span class="ln">53271</span>          isActive: boolean</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 5 / 30 页</div>
+  </header>
+  <pre><span class="ln">53272</span>      ): void {
+<span class="ln">53273</span>          const badge = new Node(&#39;LvBadge&#39;);
+<span class="ln">53274</span>          badge.layer = UI_LAYER;
+<span class="ln">53275</span>          parent.addChild(badge);
+<span class="ln">53276</span>          badge.addComponent(UITransform).setContentSize(38, 20);
+<span class="ln">53277</span>          badge.setPosition(iconSize * 0.24, -iconSize * 0.32, 0);
+<span class="ln">53278</span>  
+<span class="ln">53279</span>          const bg = badge.addComponent(Graphics);
+<span class="ln">53280</span>          bg.fillColor = isActive ? new Color(255, 214, 109, 255) : new Color(52, 82, 115, 255);
+<span class="ln">53281</span>          bg.roundRect(-19, -10, 38, 20, 8);
+<span class="ln">53282</span>          bg.fill();
+<span class="ln">53283</span>          bg.strokeColor = isActive ? new Color(255, 244, 193, 255) : new Color(126, 194, 244, 240);
+<span class="ln">53284</span>          bg.lineWidth = 1.5;
+<span class="ln">53285</span>          bg.roundRect(-19, -10, 38, 20, 8);
+<span class="ln">53286</span>          bg.stroke();
+<span class="ln">53287</span>  
+<span class="ln">53288</span>          const labelNode = new Node(&#39;LvLabel&#39;);
+<span class="ln">53289</span>          labelNode.layer = UI_LAYER;
+<span class="ln">53290</span>          badge.addChild(labelNode);
+<span class="ln">53291</span>          labelNode.addComponent(UITransform).setContentSize(36, 18);
+<span class="ln">53292</span>          const label = labelNode.addComponent(Label);
+<span class="ln">53293</span>          label.string = Localization.instance.t(&#39;ui.common.level.short&#39;, { level });
+<span class="ln">53294</span>          label.fontSize = 12;
+<span class="ln">53295</span>          label.lineHeight = 14;
+<span class="ln">53296</span>          label.horizontalAlign = Label.HorizontalAlign.CENTER;
+<span class="ln">53297</span>          label.verticalAlign = Label.VerticalAlign.CENTER;
+<span class="ln">53298</span>          label.overflow = Label.Overflow.SHRINK;
+<span class="ln">53299</span>          label.color = isActive ? new Color(42, 24, 10, 255) : new Color(232, 244, 255, 255);
+<span class="ln">53300</span>          label.cacheMode = Label.CacheMode.NONE;
+<span class="ln">53301</span>          label.useSystemFont = true;
+<span class="ln">53302</span>          label.fontFamily = &#39;sans-serif&#39;;
+<span class="ln">53303</span>      }
+<span class="ln">53304</span>  
+<span class="ln">53305</span>      private createKeyHintBadge(parent: Node, slotIndex: number, iconSize: number): void {
+<span class="ln">53306</span>          const keyNode = new Node(&#39;KeyHint&#39;);
+<span class="ln">53307</span>          keyNode.layer = UI_LAYER;
+<span class="ln">53308</span>          parent.addChild(keyNode);
+<span class="ln">53309</span>          keyNode.addComponent(UITransform).setContentSize(20, 20);
+<span class="ln">53310</span>          keyNode.setPosition(-iconSize * 0.32, iconSize * 0.32, 0);
+<span class="ln">53311</span>  
+<span class="ln">53312</span>          const keyBg = keyNode.addComponent(Graphics);
+<span class="ln">53313</span>          keyBg.fillColor = new Color(11, 20, 31, 255);
+<span class="ln">53314</span>          keyBg.roundRect(-10, -10, 20, 20, 5);
+<span class="ln">53315</span>          keyBg.fill();
+<span class="ln">53316</span>          keyBg.strokeColor = new Color(255, 210, 96, 255);
+<span class="ln">53317</span>          keyBg.lineWidth = 1.5;
+<span class="ln">53318</span>          keyBg.roundRect(-10, -10, 20, 20, 5);
+<span class="ln">53319</span>          keyBg.stroke();
+<span class="ln">53320</span>  
+<span class="ln">53321</span>          const keyLabelNode = new Node(&#39;KeyHintLabel&#39;);</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 6 / 30 页</div>
+  </header>
+  <pre><span class="ln">53322</span>          keyLabelNode.layer = UI_LAYER;
+<span class="ln">53323</span>          keyNode.addChild(keyLabelNode);
+<span class="ln">53324</span>          keyLabelNode.addComponent(UITransform).setContentSize(18, 18);
+<span class="ln">53325</span>          const keyLabel = keyLabelNode.addComponent(Label);
+<span class="ln">53326</span>          keyLabel.string = KEY_HINTS[slotIndex];
+<span class="ln">53327</span>          keyLabel.fontSize = 13;
+<span class="ln">53328</span>          keyLabel.lineHeight = 16;
+<span class="ln">53329</span>          keyLabel.color = new Color(255, 233, 156, 255);
+<span class="ln">53330</span>          keyLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+<span class="ln">53331</span>          keyLabel.verticalAlign = Label.VerticalAlign.CENTER;
+<span class="ln">53332</span>          keyLabel.cacheMode = Label.CacheMode.NONE;
+<span class="ln">53333</span>          keyLabel.useSystemFont = true;
+<span class="ln">53334</span>          keyLabel.fontFamily = &#39;sans-serif&#39;;
+<span class="ln">53335</span>      }
+<span class="ln">53336</span>  
+<span class="ln">53337</span>      // === 工具 ===
+<span class="ln">53338</span>  
+<span class="ln">53339</span>      private hexToColor(hex: string): Color {
+<span class="ln">53340</span>          if (!hex || hex.length &lt; 7 || !hex.startsWith(&#39;#&#39;)) {
+<span class="ln">53341</span>              return new Color(168, 204, 255, 255);
+<span class="ln">53342</span>          }
+<span class="ln">53343</span>          const r = parseInt(hex.slice(1, 3), 16);
+<span class="ln">53344</span>          const g = parseInt(hex.slice(3, 5), 16);
+<span class="ln">53345</span>          const b = parseInt(hex.slice(5, 7), 16);
+<span class="ln">53346</span>          return new Color(r, g, b, 255);
+<span class="ln">53347</span>      }
+<span class="ln">53348</span>  
+<span class="ln">53349</span>      private get eventManager(): EventManager {
+<span class="ln">53350</span>          return ServiceRegistry.get&lt;EventManager&gt;(&#39;EventManager&#39;) ?? EventManager.instance;
+<span class="ln">53351</span>      }
+<span class="ln">53352</span>  }
+<span class="ln">53353</span>  
+<span class="ln">53354</span>  // ===== FILE: assets/scripts/ui/WeaponSelectUI.ts =====
+<span class="ln">53355</span>  import {
+<span class="ln">53356</span>      Node,
+<span class="ln">53357</span>      UITransform,
+<span class="ln">53358</span>      Color,
+<span class="ln">53359</span>      Widget,
+<span class="ln">53360</span>      Graphics,
+<span class="ln">53361</span>      Label,
+<span class="ln">53362</span>      Sprite,
+<span class="ln">53363</span>      resources,
+<span class="ln">53364</span>      SpriteFrame,
+<span class="ln">53365</span>      Texture2D,
+<span class="ln">53366</span>      ImageAsset,
+<span class="ln">53367</span>  } from &#39;cc&#39;;
+<span class="ln">53368</span>  import { Singleton } from &#39;../core/base/Singleton&#39;;
+<span class="ln">53369</span>  import { EventManager } from &#39;../core/managers/EventManager&#39;;
+<span class="ln">53370</span>  import { ServiceRegistry } from &#39;../core/managers/ServiceRegistry&#39;;
+<span class="ln">53371</span>  import { GameEvents } from &#39;../data/GameEvents&#39;;</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 7 / 30 页</div>
+  </header>
+  <pre><span class="ln">53372</span>  import { HeroWeaponManager } from &#39;../gameplay/weapons/HeroWeaponManager&#39;;
+<span class="ln">53373</span>  import { WeaponType, WeaponDef } from &#39;../gameplay/weapons/WeaponTypes&#39;;
+<span class="ln">53374</span>  import { Localization } from &#39;../core/i18n/Localization&#39;;
+<span class="ln">53375</span>  import { SelectionCardTheme, type GrantToken } from &#39;./SelectionCardTheme&#39;;
+<span class="ln">53376</span>  import { UIResponsive } from &#39;./UIResponsive&#39;;
+<span class="ln">53377</span>  import { TikTokAdService } from &#39;../core/ads/TikTokAdService&#39;;
+<span class="ln">53378</span>  import { AirdropService } from &#39;../gameplay/airdrop/AirdropService&#39;;
+<span class="ln">53379</span>  
+<span class="ln">53380</span>  const UI_LAYER = 33554432;
+<span class="ln">53381</span>  
+<span class="ln">53382</span>  const CARD_WIDTH = 258;
+<span class="ln">53383</span>  const CARD_HEIGHT = 378;
+<span class="ln">53384</span>  const CARD_GAP = 34;
+<span class="ln">53385</span>  
+<span class="ln">53386</span>  /**
+<span class="ln">53387</span>   * WeaponSelectUI
+<span class="ln">53388</span>   * 空投武器选择界面（3 选 1），暂停期间展示。
+<span class="ln">53389</span>   * 结构与 BuffCardUI 一致，保持 UI 风格统一。
+<span class="ln">53390</span>   */
+<span class="ln">53391</span>  export class WeaponSelectUI extends Singleton&lt;WeaponSelectUI&gt;() {
+<span class="ln">53392</span>      private _uiCanvas: Node | null = null;
+<span class="ln">53393</span>      private _rootNode: Node | null = null;
+<span class="ln">53394</span>      private _isShowing: boolean = false;
+<span class="ln">53395</span>      private _offeredWeaponTypes: WeaponType[] = [];
+<span class="ln">53396</span>  
+<span class="ln">53397</span>      // Icon loading cache
+<span class="ln">53398</span>      private _iconFrameCache: Map&lt;string, SpriteFrame&gt; = new Map();
+<span class="ln">53399</span>      private _iconLoading: Set&lt;string&gt; = new Set();
+<span class="ln">53400</span>      private _iconWaiting: Map&lt;string, Set&lt;Sprite&gt;&gt; = new Map();
+<span class="ln">53401</span>  
+<span class="ln">53402</span>      public initialize(uiCanvas: Node): void {
+<span class="ln">53403</span>          this._uiCanvas = uiCanvas;
+<span class="ln">53404</span>          this.eventManager.on(GameEvents.WEAPONS_OFFERED, this.onWeaponsOffered, this);
+<span class="ln">53405</span>          console.log(&#39;[WeaponSelectUI] 初始化完成&#39;);
+<span class="ln">53406</span>      }
+<span class="ln">53407</span>  
+<span class="ln">53408</span>      public cleanup(): void {
+<span class="ln">53409</span>          this.eventManager.off(GameEvents.WEAPONS_OFFERED, this.onWeaponsOffered, this);
+<span class="ln">53410</span>          this.hideCards();
+<span class="ln">53411</span>          this._iconFrameCache.clear();
+<span class="ln">53412</span>          this._iconLoading.clear();
+<span class="ln">53413</span>          this._iconWaiting.clear();
+<span class="ln">53414</span>      }
+<span class="ln">53415</span>  
+<span class="ln">53416</span>      // === 事件处理 ===
+<span class="ln">53417</span>  
+<span class="ln">53418</span>      private onWeaponsOffered(data: { weapons: string[] }): void {
+<span class="ln">53419</span>          const weaponIds = data.weapons as WeaponType[];
+<span class="ln">53420</span>          const defs: { type: WeaponType; def: WeaponDef }[] = [];
+<span class="ln">53421</span>          const manager = HeroWeaponManager.instance;</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 8 / 30 页</div>
+  </header>
+  <pre><span class="ln">53422</span>  
+<span class="ln">53423</span>          for (const id of weaponIds) {
+<span class="ln">53424</span>              const def = manager.getWeaponDef(id);
+<span class="ln">53425</span>              if (def) defs.push({ type: id, def });
+<span class="ln">53426</span>          }
+<span class="ln">53427</span>          if (defs.length === 0) return;
+<span class="ln">53428</span>  
+<span class="ln">53429</span>          this.showCards(defs);
+<span class="ln">53430</span>      }
+<span class="ln">53431</span>  
+<span class="ln">53432</span>      // === 展示 / 隐藏 ===
+<span class="ln">53433</span>  
+<span class="ln">53434</span>      public showCards(weapons: { type: WeaponType; def: WeaponDef }[]): void {
+<span class="ln">53435</span>          if (!this._uiCanvas || this._isShowing) return;
+<span class="ln">53436</span>          if (
+<span class="ln">53437</span>              SelectionCardTheme.isTikTokRuntime() &amp;&amp;
+<span class="ln">53438</span>              TikTokAdService.isSessionSlotUnlocked(&#39;weapon_draw&#39;)
+<span class="ln">53439</span>          ) {
+<span class="ln">53440</span>              this.grantAllWeaponsAndPlayFeedback(weapons.map(item =&gt; item.type));
+<span class="ln">53441</span>              return;
+<span class="ln">53442</span>          }
+<span class="ln">53443</span>          this._isShowing = true;
+<span class="ln">53444</span>          this._offeredWeaponTypes = weapons.map(w =&gt; w.type);
+<span class="ln">53445</span>          const viewport = this.getViewportSize();
+<span class="ln">53446</span>          const padding = UIResponsive.getControlPadding();
+<span class="ln">53447</span>          const isPortraitTikTok = UIResponsive.isTikTokPhonePortraitProfile();
+<span class="ln">53448</span>  
+<span class="ln">53449</span>          // 创建根节点（全屏遮罩）
+<span class="ln">53450</span>          this._rootNode = new Node(&#39;WeaponSelectRoot&#39;);
+<span class="ln">53451</span>          this._rootNode.layer = UI_LAYER;
+<span class="ln">53452</span>          this._uiCanvas.addChild(this._rootNode);
+<span class="ln">53453</span>  
+<span class="ln">53454</span>          const rootTransform = this._rootNode.addComponent(UITransform);
+<span class="ln">53455</span>          rootTransform.setContentSize(viewport.width, viewport.height);
+<span class="ln">53456</span>  
+<span class="ln">53457</span>          const widget = this._rootNode.addComponent(Widget);
+<span class="ln">53458</span>          widget.isAlignTop = widget.isAlignBottom = widget.isAlignLeft = widget.isAlignRight = true;
+<span class="ln">53459</span>          widget.top = widget.bottom = widget.left = widget.right = 0;
+<span class="ln">53460</span>  
+<span class="ln">53461</span>          // 半透明遮罩
+<span class="ln">53462</span>          const maskNode = new Node(&#39;Mask&#39;);
+<span class="ln">53463</span>          maskNode.layer = UI_LAYER;
+<span class="ln">53464</span>          this._rootNode.addChild(maskNode);
+<span class="ln">53465</span>          const maskTransform = maskNode.addComponent(UITransform);
+<span class="ln">53466</span>          maskTransform.setContentSize(viewport.width, viewport.height);
+<span class="ln">53467</span>          const maskWidget = maskNode.addComponent(Widget);
+<span class="ln">53468</span>          maskWidget.isAlignTop =
+<span class="ln">53469</span>              maskWidget.isAlignBottom =
+<span class="ln">53470</span>              maskWidget.isAlignLeft =
+<span class="ln">53471</span>              maskWidget.isAlignRight =</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 9 / 30 页</div>
+  </header>
+  <pre><span class="ln">53472</span>                  true;
+<span class="ln">53473</span>          maskWidget.top = maskWidget.bottom = maskWidget.left = maskWidget.right = 0;
+<span class="ln">53474</span>          const maskG = maskNode.addComponent(Graphics);
+<span class="ln">53475</span>          SelectionCardTheme.drawOverlayMask(maskG, viewport.width, viewport.height);
+<span class="ln">53476</span>  
+<span class="ln">53477</span>          // 标题
+<span class="ln">53478</span>          this.createTitle(this._rootNode, viewport.width, viewport.height);
+<span class="ln">53479</span>  
+<span class="ln">53480</span>          // 卡牌
+<span class="ln">53481</span>          const totalWidth = weapons.length * CARD_WIDTH + (weapons.length - 1) * CARD_GAP;
+<span class="ln">53482</span>          const usePortraitTriangle = isPortraitTikTok &amp;&amp; weapons.length === 3;
+<span class="ln">53483</span>          const triangleRowGap = 34;
+<span class="ln">53484</span>          const containerWidth = usePortraitTriangle ? CARD_WIDTH * 2 + CARD_GAP : totalWidth;
+<span class="ln">53485</span>          const containerHeight = usePortraitTriangle
+<span class="ln">53486</span>              ? CARD_HEIGHT * 2 + triangleRowGap
+<span class="ln">53487</span>              : CARD_HEIGHT;
+<span class="ln">53488</span>  
+<span class="ln">53489</span>          // Dynamic scaling if total width exceeds screen width
+<span class="ln">53490</span>          const size = this._rootNode.getComponent(UITransform)?.contentSize;
+<span class="ln">53491</span>          // Create a container for scaling
+<span class="ln">53492</span>          const cardContainer = new Node(&#39;CardContainer&#39;);
+<span class="ln">53493</span>          cardContainer.layer = UI_LAYER;
+<span class="ln">53494</span>          this._rootNode.addChild(cardContainer);
+<span class="ln">53495</span>          cardContainer.addComponent(UITransform).setContentSize(containerWidth, containerHeight);
+<span class="ln">53496</span>  
+<span class="ln">53497</span>          let cardScale = 1;
+<span class="ln">53498</span>          if (size) {
+<span class="ln">53499</span>              const availableWidth = Math.max(
+<span class="ln">53500</span>                  240,
+<span class="ln">53501</span>                  size.width - padding.left - padding.right - (usePortraitTriangle ? 16 : 24)
+<span class="ln">53502</span>              );
+<span class="ln">53503</span>              const availableHeight = Math.max(
+<span class="ln">53504</span>                  180,
+<span class="ln">53505</span>                  size.height - padding.top - padding.bottom - (usePortraitTriangle ? 150 : 180)
+<span class="ln">53506</span>              );
+<span class="ln">53507</span>              const widthScale = availableWidth / containerWidth;
+<span class="ln">53508</span>              const heightScale = availableHeight / containerHeight;
+<span class="ln">53509</span>              const maxScale = usePortraitTriangle ? 1.15 : 1;
+<span class="ln">53510</span>              const scale = Math.min(maxScale, widthScale, heightScale);
+<span class="ln">53511</span>              cardScale = scale;
+<span class="ln">53512</span>              cardContainer.setScale(scale, scale, 1);
+<span class="ln">53513</span>          }
+<span class="ln">53514</span>          const cardContainerY = usePortraitTriangle
+<span class="ln">53515</span>              ? -Math.round(viewport.height * 0.08)
+<span class="ln">53516</span>              : Math.round(-padding.bottom * 0.04);
+<span class="ln">53517</span>          cardContainer.setPosition(0, cardContainerY, 0);
+<span class="ln">53518</span>  
+<span class="ln">53519</span>          const startX = -totalWidth / 2 + CARD_WIDTH / 2;
+<span class="ln">53520</span>          const triangleBottomX = (CARD_WIDTH + CARD_GAP) * 0.5;
+<span class="ln">53521</span>          const triangleTopY = CARD_HEIGHT * 0.5 + triangleRowGap * 0.5;</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 10 / 30 页</div>
+  </header>
+  <pre><span class="ln">53522</span>          const triangleBottomY = -(CARD_HEIGHT * 0.5 + triangleRowGap * 0.5);
+<span class="ln">53523</span>  
+<span class="ln">53524</span>          weapons.forEach((w, i) =&gt; {
+<span class="ln">53525</span>              const card = this.createCardNode(w, i);
+<span class="ln">53526</span>              cardContainer.addChild(card);
+<span class="ln">53527</span>              if (usePortraitTriangle) {
+<span class="ln">53528</span>                  if (i === 0) {
+<span class="ln">53529</span>                      card.setPosition(0, triangleTopY, 0);
+<span class="ln">53530</span>                  } else if (i === 1) {
+<span class="ln">53531</span>                      card.setPosition(-triangleBottomX, triangleBottomY, 0);
+<span class="ln">53532</span>                  } else {
+<span class="ln">53533</span>                      card.setPosition(triangleBottomX, triangleBottomY, 0);
+<span class="ln">53534</span>                  }
+<span class="ln">53535</span>              } else {
+<span class="ln">53536</span>                  card.setPosition(startX + i * (CARD_WIDTH + CARD_GAP), -20, 0);
+<span class="ln">53537</span>              }
+<span class="ln">53538</span>              SelectionCardTheme.playCardReveal(card, i);
+<span class="ln">53539</span>          });
+<span class="ln">53540</span>  
+<span class="ln">53541</span>          // 广告按钮（仅 TikTok 环境）
+<span class="ln">53542</span>          const titleHeight = Math.round(
+<span class="ln">53543</span>              Math.max(
+<span class="ln">53544</span>                  isPortraitTikTok ? 58 : 64,
+<span class="ln">53545</span>                  Math.min(
+<span class="ln">53546</span>                      isPortraitTikTok ? 96 : 90,
+<span class="ln">53547</span>                      viewport.height * (isPortraitTikTok ? 0.1 : 0.11)
+<span class="ln">53548</span>                  )
+<span class="ln">53549</span>              )
+<span class="ln">53550</span>          );
+<span class="ln">53551</span>          const titleTop = Math.round(
+<span class="ln">53552</span>              Math.max(
+<span class="ln">53553</span>                  padding.top + 8,
+<span class="ln">53554</span>                  Math.min(
+<span class="ln">53555</span>                      isPortraitTikTok ? 120 : 160,
+<span class="ln">53556</span>                      viewport.height * (isPortraitTikTok ? 0.1 : 0.14) + padding.top * 0.2
+<span class="ln">53557</span>                  )
+<span class="ln">53558</span>              )
+<span class="ln">53559</span>          );
+<span class="ln">53560</span>          const titleBottomY = viewport.height * 0.5 - titleTop - titleHeight;
+<span class="ln">53561</span>          const cardTopY = usePortraitTriangle
+<span class="ln">53562</span>              ? cardContainerY + (triangleTopY + CARD_HEIGHT * 0.5) * cardScale
+<span class="ln">53563</span>              : cardContainerY + (-20 + CARD_HEIGHT * 0.5) * cardScale;
+<span class="ln">53564</span>          const titleToCardGap = titleBottomY - cardTopY;
+<span class="ln">53565</span>          const adBtnY = Math.round(cardTopY + (titleToCardGap &gt; 80 ? titleToCardGap * 0.5 : 40));
+<span class="ln">53566</span>          const adBtnWidth = Math.round(
+<span class="ln">53567</span>              Math.max(
+<span class="ln">53568</span>                  260,
+<span class="ln">53569</span>                  Math.min(
+<span class="ln">53570</span>                      viewport.width - padding.left - padding.right - 24,
+<span class="ln">53571</span>                      (CARD_WIDTH * 2 + CARD_GAP) * cardScale</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 11 / 30 页</div>
+  </header>
+  <pre><span class="ln">53572</span>                  )
+<span class="ln">53573</span>              )
+<span class="ln">53574</span>          );
+<span class="ln">53575</span>          SelectionCardTheme.createAdButton(
+<span class="ln">53576</span>              this._rootNode!,
+<span class="ln">53577</span>              Localization.instance.t(&#39;ui.ad.unlock_run_all_weapons&#39;),
+<span class="ln">53578</span>              { x: 0, y: adBtnY },
+<span class="ln">53579</span>              () =&gt; this.onAdButtonTapped(),
+<span class="ln">53580</span>              {
+<span class="ln">53581</span>                  width: adBtnWidth,
+<span class="ln">53582</span>                  height: 56,
+<span class="ln">53583</span>                  fontSize: 15,
+<span class="ln">53584</span>              }
+<span class="ln">53585</span>          );
+<span class="ln">53586</span>      }
+<span class="ln">53587</span>  
+<span class="ln">53588</span>      private hideCards(): void {
+<span class="ln">53589</span>          if (this._rootNode) {
+<span class="ln">53590</span>              this._rootNode.destroy();
+<span class="ln">53591</span>              this._rootNode = null;
+<span class="ln">53592</span>          }
+<span class="ln">53593</span>          this._isShowing = false;
+<span class="ln">53594</span>          this._offeredWeaponTypes = [];
+<span class="ln">53595</span>          // Clear waiting sets to avoid memory leaks if sprites are destroyed
+<span class="ln">53596</span>          this._iconWaiting.clear();
+<span class="ln">53597</span>          this._iconLoading.clear();
+<span class="ln">53598</span>      }
+<span class="ln">53599</span>  
+<span class="ln">53600</span>      // === UI 构建 ===
+<span class="ln">53601</span>  
+<span class="ln">53602</span>      private createTitle(root: Node, viewportWidth: number, viewportHeight: number): void {
+<span class="ln">53603</span>          const isPortraitTikTok = UIResponsive.isTikTokPhonePortraitProfile();
+<span class="ln">53604</span>          const titleNode = new Node(&#39;Title&#39;);
+<span class="ln">53605</span>          titleNode.layer = UI_LAYER;
+<span class="ln">53606</span>          titleNode
+<span class="ln">53607</span>              .addComponent(UITransform)
+<span class="ln">53608</span>              .setContentSize(
+<span class="ln">53609</span>                  Math.round(
+<span class="ln">53610</span>                      Math.max(
+<span class="ln">53611</span>                          isPortraitTikTok ? 320 : 420,
+<span class="ln">53612</span>                          Math.min(
+<span class="ln">53613</span>                              isPortraitTikTok ? 860 : 880,
+<span class="ln">53614</span>                              viewportWidth * (isPortraitTikTok ? 0.9 : 0.72)
+<span class="ln">53615</span>                          )
+<span class="ln">53616</span>                      )
+<span class="ln">53617</span>                  ),
+<span class="ln">53618</span>                  Math.round(
+<span class="ln">53619</span>                      Math.max(
+<span class="ln">53620</span>                          isPortraitTikTok ? 58 : 64,
+<span class="ln">53621</span>                          Math.min(</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 12 / 30 页</div>
+  </header>
+  <pre><span class="ln">53622</span>                              isPortraitTikTok ? 96 : 90,
+<span class="ln">53623</span>                              viewportHeight * (isPortraitTikTok ? 0.1 : 0.11)
+<span class="ln">53624</span>                          )
+<span class="ln">53625</span>                      )
+<span class="ln">53626</span>                  )
+<span class="ln">53627</span>              );
+<span class="ln">53628</span>          root.addChild(titleNode);
+<span class="ln">53629</span>  
+<span class="ln">53630</span>          // Responsive Title using Widget
+<span class="ln">53631</span>          const widget = titleNode.addComponent(Widget);
+<span class="ln">53632</span>          widget.isAlignTop = true;
+<span class="ln">53633</span>          widget.isAlignHorizontalCenter = true;
+<span class="ln">53634</span>          const padding = UIResponsive.getControlPadding();
+<span class="ln">53635</span>          widget.top = Math.round(
+<span class="ln">53636</span>              Math.max(
+<span class="ln">53637</span>                  padding.top + 8,
+<span class="ln">53638</span>                  Math.min(
+<span class="ln">53639</span>                      isPortraitTikTok ? 120 : 160,
+<span class="ln">53640</span>                      viewportHeight * (isPortraitTikTok ? 0.1 : 0.14) + padding.top * 0.2
+<span class="ln">53641</span>                  )
+<span class="ln">53642</span>              )
+<span class="ln">53643</span>          );
+<span class="ln">53644</span>  
+<span class="ln">53645</span>          const label = titleNode.addComponent(Label);
+<span class="ln">53646</span>          label.string = Localization.instance.t(&#39;ui.weapon.select.title&#39;);
+<span class="ln">53647</span>          label.overflow = Label.Overflow.SHRINK;
+<span class="ln">53648</span>          SelectionCardTheme.applyLabelTheme(label, {
+<span class="ln">53649</span>              fontSize: isPortraitTikTok ? 34 : 48,
+<span class="ln">53650</span>              lineHeight: isPortraitTikTok ? 40 : 54,
+<span class="ln">53651</span>              color: new Color(255, 214, 92, 255),
+<span class="ln">53652</span>              bold: true,
+<span class="ln">53653</span>              hAlign: Label.HorizontalAlign.CENTER,
+<span class="ln">53654</span>              vAlign: Label.VerticalAlign.CENTER,
+<span class="ln">53655</span>              outlineColor: new Color(52, 26, 6, 255),
+<span class="ln">53656</span>              outlineWidth: isPortraitTikTok ? 4 : 5,
+<span class="ln">53657</span>              shadowColor: new Color(0, 0, 0, 210),
+<span class="ln">53658</span>          });
+<span class="ln">53659</span>          const decoNode = new Node(&#39;TitleDeco&#39;);
+<span class="ln">53660</span>          decoNode.layer = UI_LAYER;
+<span class="ln">53661</span>          titleNode.addChild(decoNode);
+<span class="ln">53662</span>          const deco = decoNode.addComponent(Graphics);
+<span class="ln">53663</span>          deco.strokeColor = new Color(255, 219, 120, 210);
+<span class="ln">53664</span>          deco.lineWidth = 2;
+<span class="ln">53665</span>          deco.moveTo(-230, -20);
+<span class="ln">53666</span>          deco.lineTo(-95, -20);
+<span class="ln">53667</span>          deco.stroke();
+<span class="ln">53668</span>          deco.moveTo(95, -20);
+<span class="ln">53669</span>          deco.lineTo(230, -20);
+<span class="ln">53670</span>          deco.stroke();
+<span class="ln">53671</span>      }</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 13 / 30 页</div>
+  </header>
+  <pre><span class="ln">53672</span>  
+<span class="ln">53673</span>      private getViewportSize(): { width: number; height: number } {
+<span class="ln">53674</span>          return UIResponsive.getLayoutViewportSize(480, 320, &#39;canvas&#39;);
+<span class="ln">53675</span>      }
+<span class="ln">53676</span>  
+<span class="ln">53677</span>      private createCardNode(weapon: { type: WeaponType; def: WeaponDef }, _index: number): Node {
+<span class="ln">53678</span>          const { type, def } = weapon;
+<span class="ln">53679</span>          const manager = HeroWeaponManager.instance;
+<span class="ln">53680</span>          const existing = manager.inventory.get(type);
+<span class="ln">53681</span>          const currentLevel = existing ? existing.level : 0;
+<span class="ln">53682</span>          const isUpgrade = currentLevel &gt; 0;
+<span class="ln">53683</span>  
+<span class="ln">53684</span>          const cardNode = new Node(`WeaponCard_${type}`);
+<span class="ln">53685</span>          cardNode.layer = UI_LAYER;
+<span class="ln">53686</span>          cardNode.addComponent(UITransform).setContentSize(CARD_WIDTH, CARD_HEIGHT);
+<span class="ln">53687</span>  
+<span class="ln">53688</span>          // 颜色
+<span class="ln">53689</span>          const themeColor = this.hexToColor(def.iconColor);
+<span class="ln">53690</span>  
+<span class="ln">53691</span>          // 背景
+<span class="ln">53692</span>          const bg = new Node(&#39;BG&#39;);
+<span class="ln">53693</span>          bg.layer = UI_LAYER;
+<span class="ln">53694</span>          bg.addComponent(UITransform).setContentSize(CARD_WIDTH, CARD_HEIGHT);
+<span class="ln">53695</span>          cardNode.addChild(bg);
+<span class="ln">53696</span>  
+<span class="ln">53697</span>          const g = bg.addComponent(Graphics);
+<span class="ln">53698</span>          SelectionCardTheme.drawCardBackground(g, CARD_WIDTH, CARD_HEIGHT, themeColor, 78);
+<span class="ln">53699</span>  
+<span class="ln">53700</span>          // 武器名称
+<span class="ln">53701</span>          const nameNode = new Node(&#39;Name&#39;);
+<span class="ln">53702</span>          nameNode.layer = UI_LAYER;
+<span class="ln">53703</span>          nameNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 30, 56);
+<span class="ln">53704</span>          cardNode.addChild(nameNode);
+<span class="ln">53705</span>          const nameLabel = nameNode.addComponent(Label);
+<span class="ln">53706</span>          nameLabel.string = Localization.instance.t(def.nameKey);
+<span class="ln">53707</span>          SelectionCardTheme.applyLabelTheme(nameLabel, {
+<span class="ln">53708</span>              fontSize: 28,
+<span class="ln">53709</span>              lineHeight: 32,
+<span class="ln">53710</span>              color: Color.WHITE,
+<span class="ln">53711</span>              bold: true,
+<span class="ln">53712</span>              hAlign: Label.HorizontalAlign.CENTER,
+<span class="ln">53713</span>              vAlign: Label.VerticalAlign.CENTER,
+<span class="ln">53714</span>              outlineColor: new Color(18, 20, 34, 255),
+<span class="ln">53715</span>              outlineWidth: 3,
+<span class="ln">53716</span>          });
+<span class="ln">53717</span>          nameLabel.overflow = Label.Overflow.SHRINK;
+<span class="ln">53718</span>          nameLabel.enableWrapText = false;
+<span class="ln">53719</span>          nameNode.setPosition(0, CARD_HEIGHT / 2 - 42, 0);
+<span class="ln">53720</span>  
+<span class="ln">53721</span>          // 等级标签</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 14 / 30 页</div>
+  </header>
+  <pre><span class="ln">53722</span>          const levelText = isUpgrade
+<span class="ln">53723</span>              ? Localization.instance.t(&#39;ui.weapon.level.upgrade&#39;, {
+<span class="ln">53724</span>                    from: currentLevel,
+<span class="ln">53725</span>                    to: currentLevel + 1,
+<span class="ln">53726</span>                })
+<span class="ln">53727</span>              : Localization.instance.t(&#39;ui.weapon.level.new&#39;);
+<span class="ln">53728</span>          SelectionCardTheme.createBadge(
+<span class="ln">53729</span>              cardNode,
+<span class="ln">53730</span>              levelText,
+<span class="ln">53731</span>              SelectionCardTheme.blendColor(themeColor, new Color(255, 224, 146, 255), 0.3),
+<span class="ln">53732</span>              { w: 146, h: 30 },
+<span class="ln">53733</span>              { x: 0, y: CARD_HEIGHT / 2 - 88 },
+<span class="ln">53734</span>              isUpgrade ? new Color(255, 226, 126, 255) : new Color(158, 252, 186, 255)
+<span class="ln">53735</span>          );
+<span class="ln">53736</span>  
+<span class="ln">53737</span>          // 武器描述
+<span class="ln">53738</span>          const descNode = new Node(&#39;Desc&#39;);
+<span class="ln">53739</span>          descNode.layer = UI_LAYER;
+<span class="ln">53740</span>          descNode.addComponent(UITransform).setContentSize(CARD_WIDTH - 26, 82);
+<span class="ln">53741</span>          cardNode.addChild(descNode);
+<span class="ln">53742</span>          const descLabel = descNode.addComponent(Label);
+<span class="ln">53743</span>          descLabel.string = Localization.instance.t(def.descriptionKey);
+<span class="ln">53744</span>          SelectionCardTheme.applyLabelTheme(descLabel, {
+<span class="ln">53745</span>              fontSize: 17,
+<span class="ln">53746</span>              lineHeight: 23,
+<span class="ln">53747</span>              color: new Color(194, 208, 232, 255),
+<span class="ln">53748</span>              hAlign: Label.HorizontalAlign.CENTER,
+<span class="ln">53749</span>              vAlign: Label.VerticalAlign.TOP,
+<span class="ln">53750</span>              outlineColor: new Color(8, 20, 32, 255),
+<span class="ln">53751</span>              outlineWidth: 2,
+<span class="ln">53752</span>              shadowBlur: 1,
+<span class="ln">53753</span>          });
+<span class="ln">53754</span>          descLabel.overflow = Label.Overflow.SHRINK;
+<span class="ln">53755</span>          descLabel.enableWrapText = true;
+<span class="ln">53756</span>          descNode.setPosition(0, 34, 0);
+<span class="ln">53757</span>  
+<span class="ln">53758</span>          // 武器图标 (替代原有的 Stats)
+<span class="ln">53759</span>          const iconContainer = new Node(&#39;WeaponIcon&#39;);
+<span class="ln">53760</span>          iconContainer.layer = UI_LAYER;
+<span class="ln">53761</span>          cardNode.addChild(iconContainer);
+<span class="ln">53762</span>          const containerSize = 100;
+<span class="ln">53763</span>          iconContainer.addComponent(UITransform).setContentSize(containerSize, containerSize);
+<span class="ln">53764</span>          iconContainer.setPosition(0, -60, 0); // Center of the bottom area
+<span class="ln">53765</span>  
+<span class="ln">53766</span>          // Icon Sprite
+<span class="ln">53767</span>          const spriteNode = new Node(&#39;Sprite&#39;);
+<span class="ln">53768</span>          spriteNode.layer = UI_LAYER;
+<span class="ln">53769</span>          iconContainer.addChild(spriteNode);
+<span class="ln">53770</span>          const spriteSize = 80;
+<span class="ln">53771</span>          spriteNode.addComponent(UITransform).setContentSize(spriteSize, spriteSize);</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 15 / 30 页</div>
+  </header>
+  <pre><span class="ln">53772</span>  
+<span class="ln">53773</span>          const sprite = spriteNode.addComponent(Sprite);
+<span class="ln">53774</span>          sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+<span class="ln">53775</span>  
+<span class="ln">53776</span>          if (def.iconPath) {
+<span class="ln">53777</span>              this.loadWeaponIcon(sprite, def.iconPath);
+<span class="ln">53778</span>          }
+<span class="ln">53779</span>  
+<span class="ln">53780</span>          // 点击
+<span class="ln">53781</span>          SelectionCardTheme.bindCardClick(cardNode, () =&gt; {
+<span class="ln">53782</span>              if (!this._isShowing) return;
+<span class="ln">53783</span>              this.eventManager.emit(GameEvents.WEAPON_PICKED, { weaponId: type });
+<span class="ln">53784</span>              this.hideCards();
+<span class="ln">53785</span>          });
+<span class="ln">53786</span>  
+<span class="ln">53787</span>          return cardNode;
+<span class="ln">53788</span>      }
+<span class="ln">53789</span>  
+<span class="ln">53790</span>      private onAdButtonTapped(): void {
+<span class="ln">53791</span>          if (!this._isShowing || this._offeredWeaponTypes.length === 0) return;
+<span class="ln">53792</span>  
+<span class="ln">53793</span>          TikTokAdService.showRewardedAd(&#39;weapon_draw&#39;).then(rewarded =&gt; {
+<span class="ln">53794</span>              if (!rewarded) {
+<span class="ln">53795</span>                  if (TikTokAdService.wasLastAdCancelled()) {
+<span class="ln">53796</span>                      TikTokAdService.showToast(Localization.instance.t(&#39;ui.ad.not_rewarded&#39;));
+<span class="ln">53797</span>                  }
+<span class="ln">53798</span>                  return;
+<span class="ln">53799</span>              }
+<span class="ln">53800</span>              TikTokAdService.unlockSessionSlot(&#39;weapon_draw&#39;);
+<span class="ln">53801</span>              const offered = [...this._offeredWeaponTypes];
+<span class="ln">53802</span>              this.grantAllWeapons(offered);
+<span class="ln">53803</span>              this.hideCards();
+<span class="ln">53804</span>              this.playWeaponGrantAnimation(offered);
+<span class="ln">53805</span>          });
+<span class="ln">53806</span>      }
+<span class="ln">53807</span>  
+<span class="ln">53808</span>      private grantAllWeaponsAndPlayFeedback(weaponTypes: WeaponType[]): void {
+<span class="ln">53809</span>          if (weaponTypes.length &lt;= 0) return;
+<span class="ln">53810</span>          this.grantAllWeapons(weaponTypes);
+<span class="ln">53811</span>          this.playWeaponGrantAnimation(weaponTypes);
+<span class="ln">53812</span>      }
+<span class="ln">53813</span>  
+<span class="ln">53814</span>      private grantAllWeapons(weaponTypes: WeaponType[]): void {
+<span class="ln">53815</span>          const granted = this.airdropService.claimAllPendingWeapons();
+<span class="ln">53816</span>          if (granted &gt; 0) return;
+<span class="ln">53817</span>          const manager = HeroWeaponManager.instance;
+<span class="ln">53818</span>          for (const weaponType of weaponTypes) {
+<span class="ln">53819</span>              manager.addWeapon(weaponType);
+<span class="ln">53820</span>          }
+<span class="ln">53821</span>      }</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 16 / 30 页</div>
+  </header>
+  <pre><span class="ln">53822</span>  
+<span class="ln">53823</span>      private playWeaponGrantAnimation(weaponTypes: WeaponType[]): void {
+<span class="ln">53824</span>          if (!this._uiCanvas || !this._uiCanvas.isValid) return;
+<span class="ln">53825</span>          const manager = HeroWeaponManager.instance;
+<span class="ln">53826</span>          const tokens: GrantToken[] = weaponTypes.map(type =&gt; {
+<span class="ln">53827</span>              const def = manager.getWeaponDef(type);
+<span class="ln">53828</span>              const accent = def ? this.hexToColor(def.iconColor) : new Color(255, 205, 96, 255);
+<span class="ln">53829</span>              return {
+<span class="ln">53830</span>                  text: this.getWeaponTokenText(type),
+<span class="ln">53831</span>                  color: accent,
+<span class="ln">53832</span>              };
+<span class="ln">53833</span>          });
+<span class="ln">53834</span>          const viewport = this.getViewportSize();
+<span class="ln">53835</span>          SelectionCardTheme.playGrantAnimation(this._uiCanvas, {
+<span class="ln">53836</span>              message: Localization.instance.t(&#39;ui.ad.auto_grant.weapons&#39;),
+<span class="ln">53837</span>              tokens,
+<span class="ln">53838</span>              targetNodeName: &#39;WeaponBar&#39;,
+<span class="ln">53839</span>              fallbackTarget: {
+<span class="ln">53840</span>                  x: -Math.round(viewport.width * 0.36),
+<span class="ln">53841</span>                  y: -Math.round(viewport.height * 0.36),
+<span class="ln">53842</span>              },
+<span class="ln">53843</span>          });
+<span class="ln">53844</span>      }
+<span class="ln">53845</span>  
+<span class="ln">53846</span>      private getWeaponTokenText(type: WeaponType): string {
+<span class="ln">53847</span>          if (type === WeaponType.MACHINE_GUN) return &#39;MG&#39;;
+<span class="ln">53848</span>          if (type === WeaponType.FLAMETHROWER) return &#39;FL&#39;;
+<span class="ln">53849</span>          if (type === WeaponType.CANNON) return &#39;CN&#39;;
+<span class="ln">53850</span>          return &#39;GW&#39;;
+<span class="ln">53851</span>      }
+<span class="ln">53852</span>  
+<span class="ln">53853</span>      // === Icon Loading Logic (Copied from WeaponBarUI) ===
+<span class="ln">53854</span>  
+<span class="ln">53855</span>      private loadWeaponIcon(sprite: Sprite, path: string): void {
+<span class="ln">53856</span>          const normalizedPath = path.trim();
+<span class="ln">53857</span>          const cached = this._iconFrameCache.get(normalizedPath);
+<span class="ln">53858</span>          if (cached) {
+<span class="ln">53859</span>              sprite.spriteFrame = cached;
+<span class="ln">53860</span>              return;
+<span class="ln">53861</span>          }
+<span class="ln">53862</span>  
+<span class="ln">53863</span>          const waitingSet = this.getIconWaitingSet(normalizedPath);
+<span class="ln">53864</span>          waitingSet.add(sprite);
+<span class="ln">53865</span>          if (this._iconLoading.has(normalizedPath)) {
+<span class="ln">53866</span>              return;
+<span class="ln">53867</span>          }
+<span class="ln">53868</span>          this._iconLoading.add(normalizedPath);
+<span class="ln">53869</span>  
+<span class="ln">53870</span>          const candidates = this.getIconLoadCandidates(normalizedPath);
+<span class="ln">53871</span>          this.loadWeaponIconByCandidate(candidates, 0, frame =&gt; {</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 17 / 30 页</div>
+  </header>
+  <pre><span class="ln">53872</span>              this._iconLoading.delete(normalizedPath);
+<span class="ln">53873</span>              const waiting = this.getIconWaitingSet(normalizedPath);
+<span class="ln">53874</span>              if (!frame) {
+<span class="ln">53875</span>                  console.error(
+<span class="ln">53876</span>                      `[WeaponSelectUI] Failed to load weapon icon from paths:`,
+<span class="ln">53877</span>                      candidates
+<span class="ln">53878</span>                  );
+<span class="ln">53879</span>                  waiting.clear();
+<span class="ln">53880</span>                  return;
+<span class="ln">53881</span>              }
+<span class="ln">53882</span>  
+<span class="ln">53883</span>              this._iconFrameCache.set(normalizedPath, frame);
+<span class="ln">53884</span>              for (const waitingSprite of waiting) {
+<span class="ln">53885</span>                  if (!waitingSprite?.isValid) continue;
+<span class="ln">53886</span>                  waitingSprite.spriteFrame = frame;
+<span class="ln">53887</span>              }
+<span class="ln">53888</span>              waiting.clear();
+<span class="ln">53889</span>          });
+<span class="ln">53890</span>      }
+<span class="ln">53891</span>  
+<span class="ln">53892</span>      private getIconLoadCandidates(path: string): string[] {
+<span class="ln">53893</span>          const rawCandidates = [
+<span class="ln">53894</span>              path,
+<span class="ln">53895</span>              `${path}/spriteFrame`,
+<span class="ln">53896</span>              `${path}/texture`,
+<span class="ln">53897</span>              path.endsWith(&#39;.webp&#39;) ? path : `${path}.webp`,
+<span class="ln">53898</span>              path.endsWith(&#39;.webp&#39;) ? `${path}/spriteFrame` : `${path}.webp/spriteFrame`,
+<span class="ln">53899</span>              path.endsWith(&#39;.webp&#39;) ? `${path}/texture` : `${path}.webp/texture`,
+<span class="ln">53900</span>          ];
+<span class="ln">53901</span>  
+<span class="ln">53902</span>          const candidates: string[] = [];
+<span class="ln">53903</span>          for (const candidate of rawCandidates) {
+<span class="ln">53904</span>              if (!candidate || candidates.includes(candidate)) continue;
+<span class="ln">53905</span>              candidates.push(candidate);
+<span class="ln">53906</span>          }
+<span class="ln">53907</span>          return candidates;
+<span class="ln">53908</span>      }
+<span class="ln">53909</span>  
+<span class="ln">53910</span>      private loadWeaponIconByCandidate(
+<span class="ln">53911</span>          candidates: string[],
+<span class="ln">53912</span>          index: number,
+<span class="ln">53913</span>          done: (frame: SpriteFrame | null) =&gt; void
+<span class="ln">53914</span>      ): void {
+<span class="ln">53915</span>          if (index &gt;= candidates.length) {
+<span class="ln">53916</span>              done(null);
+<span class="ln">53917</span>              return;
+<span class="ln">53918</span>          }
+<span class="ln">53919</span>  
+<span class="ln">53920</span>          const candidate = candidates[index];
+<span class="ln">53921</span>          resources.load(candidate, SpriteFrame, (sfErr, spriteFrame) =&gt; {</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 18 / 30 页</div>
+  </header>
+  <pre><span class="ln">53922</span>              if (!sfErr &amp;&amp; spriteFrame) {
+<span class="ln">53923</span>                  done(spriteFrame);
+<span class="ln">53924</span>                  return;
+<span class="ln">53925</span>              }
+<span class="ln">53926</span>  
+<span class="ln">53927</span>              resources.load(candidate, Texture2D, (texErr, texture) =&gt; {
+<span class="ln">53928</span>                  if (!texErr &amp;&amp; texture) {
+<span class="ln">53929</span>                      const frame = new SpriteFrame();
+<span class="ln">53930</span>                      frame.texture = texture;
+<span class="ln">53931</span>                      done(frame);
+<span class="ln">53932</span>                      return;
+<span class="ln">53933</span>                  }
+<span class="ln">53934</span>  
+<span class="ln">53935</span>                  resources.load(candidate, ImageAsset, (imgErr, imageAsset) =&gt; {
+<span class="ln">53936</span>                      if (!imgErr &amp;&amp; imageAsset) {
+<span class="ln">53937</span>                          const textureFromImage = new Texture2D();
+<span class="ln">53938</span>                          textureFromImage.image = imageAsset;
+<span class="ln">53939</span>                          const frameFromImage = new SpriteFrame();
+<span class="ln">53940</span>                          frameFromImage.texture = textureFromImage;
+<span class="ln">53941</span>                          done(frameFromImage);
+<span class="ln">53942</span>                          return;
+<span class="ln">53943</span>                      }
+<span class="ln">53944</span>  
+<span class="ln">53945</span>                      this.loadWeaponIconByCandidate(candidates, index + 1, done);
+<span class="ln">53946</span>                  });
+<span class="ln">53947</span>              });
+<span class="ln">53948</span>          });
+<span class="ln">53949</span>      }
+<span class="ln">53950</span>  
+<span class="ln">53951</span>      private getIconWaitingSet(path: string): Set&lt;Sprite&gt; {
+<span class="ln">53952</span>          let waitingSet = this._iconWaiting.get(path);
+<span class="ln">53953</span>          if (!waitingSet) {
+<span class="ln">53954</span>              waitingSet = new Set&lt;Sprite&gt;();
+<span class="ln">53955</span>              this._iconWaiting.set(path, waitingSet);
+<span class="ln">53956</span>          }
+<span class="ln">53957</span>          return waitingSet;
+<span class="ln">53958</span>      }
+<span class="ln">53959</span>  
+<span class="ln">53960</span>      // === 工具 ===
+<span class="ln">53961</span>  
+<span class="ln">53962</span>      private hexToColor(hex: string): Color {
+<span class="ln">53963</span>          const r = parseInt(hex.slice(1, 3), 16);
+<span class="ln">53964</span>          const g = parseInt(hex.slice(3, 5), 16);
+<span class="ln">53965</span>          const b = parseInt(hex.slice(5, 7), 16);
+<span class="ln">53966</span>          return new Color(r, g, b, 255);
+<span class="ln">53967</span>      }
+<span class="ln">53968</span>  
+<span class="ln">53969</span>      private get eventManager(): EventManager {
+<span class="ln">53970</span>          return ServiceRegistry.get&lt;EventManager&gt;(&#39;EventManager&#39;) ?? EventManager.instance;
+<span class="ln">53971</span>      }</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 19 / 30 页</div>
+  </header>
+  <pre><span class="ln">53972</span>  
+<span class="ln">53973</span>      private get airdropService(): AirdropService {
+<span class="ln">53974</span>          return ServiceRegistry.get&lt;AirdropService&gt;(&#39;AirdropService&#39;) ?? AirdropService.instance;
+<span class="ln">53975</span>      }
+<span class="ln">53976</span>  }
+<span class="ln">53977</span>  
+<span class="ln">53978</span>  // ===== FILE: devvit/src/client/preview-entry.ts =====
+<span class="ln">53979</span>  import { requestExpandedMode } from &#39;@devvit/web/client&#39;;
+<span class="ln">53980</span>  
+<span class="ln">53981</span>  document.addEventListener(&#39;DOMContentLoaded&#39;, () =&gt; {
+<span class="ln">53982</span>      const playBtn = document.getElementById(&#39;play-btn&#39;);
+<span class="ln">53983</span>      const bgVideo = document.getElementById(&#39;bg-video&#39;) as HTMLVideoElement | null;
+<span class="ln">53984</span>      let launchInFlight = false;
+<span class="ln">53985</span>  
+<span class="ln">53986</span>      const tryPlayPreview = (): void =&gt; {
+<span class="ln">53987</span>          if (!bgVideo) return;
+<span class="ln">53988</span>          bgVideo.muted = true;
+<span class="ln">53989</span>          bgVideo.defaultMuted = true;
+<span class="ln">53990</span>          bgVideo.playsInline = true;
+<span class="ln">53991</span>          bgVideo.playbackRate = 0.5;
+<span class="ln">53992</span>          const maybePromise = bgVideo.play();
+<span class="ln">53993</span>          if (maybePromise &amp;&amp; typeof maybePromise.catch === &#39;function&#39;) {
+<span class="ln">53994</span>              maybePromise.catch(() =&gt; {
+<span class="ln">53995</span>                  // Ignore autoplay rejections; user interaction path still works.
+<span class="ln">53996</span>              });
+<span class="ln">53997</span>          }
+<span class="ln">53998</span>      };
+<span class="ln">53999</span>  
+<span class="ln">54000</span>      const launchGame = async (event?: Event): Promise&lt;void&gt; =&gt; {
+<span class="ln">54001</span>          if (launchInFlight) return;
+<span class="ln">54002</span>          launchInFlight = true;
+<span class="ln">54003</span>          try {
+<span class="ln">54004</span>              await requestExpandedMode((event ?? new PointerEvent(&#39;click&#39;)) as PointerEvent, &#39;game&#39;);
+<span class="ln">54005</span>          } catch (err) {
+<span class="ln">54006</span>              console.error(&#39;[preview] Failed to enter expanded mode:&#39;, err);
+<span class="ln">54007</span>          } finally {
+<span class="ln">54008</span>              // Only debounce repeated taps while the request is in progress.
+<span class="ln">54009</span>              // Releasing this lock allows Play to work again after user closes the game view.
+<span class="ln">54010</span>              launchInFlight = false;
+<span class="ln">54011</span>          }
+<span class="ln">54012</span>      };
+<span class="ln">54013</span>  
+<span class="ln">54014</span>      if (bgVideo) {
+<span class="ln">54015</span>          bgVideo.setAttribute(&#39;muted&#39;, &#39;&#39;);
+<span class="ln">54016</span>          bgVideo.setAttribute(&#39;playsinline&#39;, &#39;&#39;);
+<span class="ln">54017</span>          bgVideo.setAttribute(&#39;webkit-playsinline&#39;, &#39;&#39;);
+<span class="ln">54018</span>          bgVideo.preload = &#39;auto&#39;;
+<span class="ln">54019</span>          bgVideo.addEventListener(&#39;loadedmetadata&#39;, () =&gt; {
+<span class="ln">54020</span>              bgVideo.playbackRate = 0.5;
+<span class="ln">54021</span>          });</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 20 / 30 页</div>
+  </header>
+  <pre><span class="ln">54022</span>          bgVideo.addEventListener(&#39;loadeddata&#39;, tryPlayPreview, { once: true });
+<span class="ln">54023</span>          bgVideo.addEventListener(&#39;canplay&#39;, tryPlayPreview, { once: true });
+<span class="ln">54024</span>          if (bgVideo.readyState &gt;= HTMLMediaElement.HAVE_CURRENT_DATA) {
+<span class="ln">54025</span>              tryPlayPreview();
+<span class="ln">54026</span>          }
+<span class="ln">54027</span>          document.addEventListener(&#39;visibilitychange&#39;, () =&gt; {
+<span class="ln">54028</span>              if (!document.hidden) tryPlayPreview();
+<span class="ln">54029</span>          });
+<span class="ln">54030</span>      }
+<span class="ln">54031</span>  
+<span class="ln">54032</span>      if (playBtn) {
+<span class="ln">54033</span>          playBtn.addEventListener(&#39;click&#39;, async (event: Event) =&gt; {
+<span class="ln">54034</span>              event.preventDefault();
+<span class="ln">54035</span>              event.stopPropagation();
+<span class="ln">54036</span>              await launchGame(event);
+<span class="ln">54037</span>          });
+<span class="ln">54038</span>      }
+<span class="ln">54039</span>  });
+<span class="ln">54040</span>  
+<span class="ln">54041</span>  // ===== FILE: devvit/src/server/index.ts =====
+<span class="ln">54042</span>  import { Hono } from &#39;hono&#39;;
+<span class="ln">54043</span>  import { serve } from &#39;@hono/node-server&#39;;
+<span class="ln">54044</span>  import { createServer, getServerPort } from &#39;@devvit/web/server&#39;;
+<span class="ln">54045</span>  import { api } from &#39;./routes/api.js&#39;;
+<span class="ln">54046</span>  import { menu } from &#39;./routes/menu.js&#39;;
+<span class="ln">54047</span>  
+<span class="ln">54048</span>  const app = new Hono();
+<span class="ln">54049</span>  
+<span class="ln">54050</span>  app.route(&#39;/api&#39;, api);
+<span class="ln">54051</span>  app.route(&#39;/internal/menu&#39;, menu);
+<span class="ln">54052</span>  
+<span class="ln">54053</span>  serve({
+<span class="ln">54054</span>      fetch: app.fetch,
+<span class="ln">54055</span>      createServer,
+<span class="ln">54056</span>      port: getServerPort(),
+<span class="ln">54057</span>  });
+<span class="ln">54058</span>  
+<span class="ln">54059</span>  // ===== FILE: devvit/src/server/routes/api.ts =====
+<span class="ln">54060</span>  import { Hono } from &#39;hono&#39;;
+<span class="ln">54061</span>  import type { Context } from &#39;hono&#39;;
+<span class="ln">54062</span>  import type { ContentfulStatusCode } from &#39;hono/utils/http-status&#39;;
+<span class="ln">54063</span>  import { context, redis, reddit } from &#39;@devvit/web/server&#39;;
+<span class="ln">54064</span>  
+<span class="ln">54065</span>  const RANK_KEY = &#39;leaderboard:scores&#39;;
+<span class="ln">54066</span>  const META_KEY = &#39;leaderboard:meta&#39;;
+<span class="ln">54067</span>  const FOLLOW_KEY = &#39;leaderboard:followers&#39;;
+<span class="ln">54068</span>  const PLAY_COUNT_KEY = &#39;leaderboard:playcount&#39;;
+<span class="ln">54069</span>  const SCORE_RUN_PREFIX = &#39;leaderboard:run:&#39;;
+<span class="ln">54070</span>  const RATE_LIMIT_PREFIX = &#39;ratelimit:submit:&#39;;
+<span class="ln">54071</span>  const LEADERBOARD_SIZE = 10;</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 21 / 30 页</div>
+  </header>
+  <pre><span class="ln">54072</span>  const DEFAULT_STATS_LEADERBOARD_LIMIT = 200;
+<span class="ln">54073</span>  const DEFAULT_STATS_PLAY_COUNT_LIMIT = 200;
+<span class="ln">54074</span>  const MAX_QUERY_LIMIT = 5000;
+<span class="ln">54075</span>  
+<span class="ln">54076</span>  // ── Diamond system keys ────────────────────────────────────────────────────────
+<span class="ln">54077</span>  const DIAMOND_BALANCE_PREFIX = &#39;diamond:balance:&#39;;
+<span class="ln">54078</span>  const DIAMOND_RUN_PREFIX = &#39;diamond:run:&#39;;
+<span class="ln">54079</span>  const DIAMOND_INITIAL_GRANT = 0;
+<span class="ln">54080</span>  const SUBSCRIBE_DIAMOND_REWARD = 500;
+<span class="ln">54081</span>  const DIAMOND_PER_WAVE = 10;
+<span class="ln">54082</span>  const DIAMOND_ITEM_PRICE = 100;
+<span class="ln">54083</span>  const DIAMOND_DAILY_CAP = 5000;
+<span class="ln">54084</span>  const DIAMOND_DAILY_PREFIX = &#39;diamond:daily:&#39;;
+<span class="ln">54085</span>  
+<span class="ln">54086</span>  // ── Validation constants ─────────────────────────────────────────────────────
+<span class="ln">54087</span>  const MAX_SCORE = 999_999_999;
+<span class="ln">54088</span>  const MAX_WAVE = 9_999;
+<span class="ln">54089</span>  const RATE_LIMIT_WINDOW_SEC = 10;
+<span class="ln">54090</span>  const SCORE_RUN_EXPIRATION_DAYS = 30;
+<span class="ln">54091</span>  
+<span class="ln">54092</span>  interface LeaderboardEntry {
+<span class="ln">54093</span>      rank: number;
+<span class="ln">54094</span>      username: string;
+<span class="ln">54095</span>      score: number;
+<span class="ln">54096</span>      wave: number;
+<span class="ln">54097</span>  }
+<span class="ln">54098</span>  
+<span class="ln">54099</span>  interface PlayCountEntry {
+<span class="ln">54100</span>      username: string;
+<span class="ln">54101</span>      playCount: number;
+<span class="ln">54102</span>  }
+<span class="ln">54103</span>  
+<span class="ln">54104</span>  async function fetchLeaderboard(limit: number = LEADERBOARD_SIZE): Promise&lt;LeaderboardEntry[]&gt; {
+<span class="ln">54105</span>      if (!Number.isFinite(limit) || limit &lt;= 0) return [];
+<span class="ln">54106</span>      const members = await redis.zRange(RANK_KEY, 0, limit - 1, {
+<span class="ln">54107</span>          reverse: true,
+<span class="ln">54108</span>          by: &#39;rank&#39;,
+<span class="ln">54109</span>      });
+<span class="ln">54110</span>      if (!members || members.length === 0) return [];
+<span class="ln">54111</span>  
+<span class="ln">54112</span>      const allMeta = (await redis.hGetAll(META_KEY)) ?? {};
+<span class="ln">54113</span>  
+<span class="ln">54114</span>      return members.map((entry, i) =&gt; {
+<span class="ln">54115</span>          const { member: username, score } = entry as { member: string; score: number };
+<span class="ln">54116</span>          let wave = 0;
+<span class="ln">54117</span>          const metaStr = allMeta[username];
+<span class="ln">54118</span>          if (metaStr) {
+<span class="ln">54119</span>              try {
+<span class="ln">54120</span>                  const parsed = JSON.parse(metaStr) as { wave?: number };
+<span class="ln">54121</span>                  wave = parsed.wave ?? 0;</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 22 / 30 页</div>
+  </header>
+  <pre><span class="ln">54122</span>              } catch {
+<span class="ln">54123</span>                  wave = 0;
+<span class="ln">54124</span>              }
+<span class="ln">54125</span>          }
+<span class="ln">54126</span>          return { rank: i + 1, username, score: Math.round(score), wave };
+<span class="ln">54127</span>      });
+<span class="ln">54128</span>  }
+<span class="ln">54129</span>  
+<span class="ln">54130</span>  async function fetchPlayCounts(
+<span class="ln">54131</span>      options: { reverse?: boolean; limit?: number } = {}
+<span class="ln">54132</span>  ): Promise&lt;PlayCountEntry[]&gt; {
+<span class="ln">54133</span>      const reverse = options.reverse ?? true;
+<span class="ln">54134</span>      const stop = typeof options.limit === &#39;number&#39; &amp;&amp; options.limit &gt; 0 ? options.limit - 1 : -1;
+<span class="ln">54135</span>      const rows = await redis.zRange(PLAY_COUNT_KEY, 0, stop, {
+<span class="ln">54136</span>          by: &#39;rank&#39;,
+<span class="ln">54137</span>          reverse,
+<span class="ln">54138</span>      });
+<span class="ln">54139</span>      return (rows ?? []).map(row =&gt; {
+<span class="ln">54140</span>          const r = row as { member: string; score: number };
+<span class="ln">54141</span>          return {
+<span class="ln">54142</span>              username: r.member,
+<span class="ln">54143</span>              playCount: Math.max(0, Math.round(r.score)),
+<span class="ln">54144</span>          };
+<span class="ln">54145</span>      });
+<span class="ln">54146</span>  }
+<span class="ln">54147</span>  
+<span class="ln">54148</span>  async function recordPlayCount(username: string): Promise&lt;number | null&gt; {
+<span class="ln">54149</span>      try {
+<span class="ln">54150</span>          const next = await redis.zIncrBy(PLAY_COUNT_KEY, username, 1);
+<span class="ln">54151</span>          return Math.max(0, Math.round(next));
+<span class="ln">54152</span>      } catch (error) {
+<span class="ln">54153</span>          console.warn(&#39;[stats] recordPlayCount failed:&#39;, error);
+<span class="ln">54154</span>          return null;
+<span class="ln">54155</span>      }
+<span class="ln">54156</span>  }
+<span class="ln">54157</span>  
+<span class="ln">54158</span>  async function buildStatsSummary() {
+<span class="ln">54159</span>      const [uniquePlayers, playCounts] = await Promise.all([
+<span class="ln">54160</span>          redis.zCard(RANK_KEY),
+<span class="ln">54161</span>          fetchPlayCounts({ reverse: false }),
+<span class="ln">54162</span>      ]);
+<span class="ln">54163</span>  
+<span class="ln">54164</span>      let totalRuns = 0;
+<span class="ln">54165</span>      let repeatPlayers = 0;
+<span class="ln">54166</span>      let singleRunPlayers = 0;
+<span class="ln">54167</span>      for (const row of playCounts) {
+<span class="ln">54168</span>          totalRuns += row.playCount;
+<span class="ln">54169</span>          if (row.playCount &gt; 1) repeatPlayers += 1;
+<span class="ln">54170</span>          else if (row.playCount === 1) singleRunPlayers += 1;
+<span class="ln">54171</span>      }</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 23 / 30 页</div>
+  </header>
+  <pre><span class="ln">54172</span>  
+<span class="ln">54173</span>      const trackedPlayers = playCounts.length;
+<span class="ln">54174</span>      const untrackedPlayers = Math.max(0, uniquePlayers - trackedPlayers);
+<span class="ln">54175</span>  
+<span class="ln">54176</span>      return {
+<span class="ln">54177</span>          uniquePlayers,
+<span class="ln">54178</span>          trackedPlayers,
+<span class="ln">54179</span>          untrackedPlayers,
+<span class="ln">54180</span>          repeatPlayers,
+<span class="ln">54181</span>          singleRunPlayers,
+<span class="ln">54182</span>          totalRuns,
+<span class="ln">54183</span>      };
+<span class="ln">54184</span>  }
+<span class="ln">54185</span>  
+<span class="ln">54186</span>  export const api = new Hono();
+<span class="ln">54187</span>  
+<span class="ln">54188</span>  function jsonNoCache(c: Context, payload: unknown, status: number = 200) {
+<span class="ln">54189</span>      c.header(&#39;Cache-Control&#39;, &#39;no-store, no-cache, must-revalidate&#39;);
+<span class="ln">54190</span>      c.header(&#39;Pragma&#39;, &#39;no-cache&#39;);
+<span class="ln">54191</span>      c.header(&#39;Expires&#39;, &#39;0&#39;);
+<span class="ln">54192</span>      return c.json(payload, status as ContentfulStatusCode);
+<span class="ln">54193</span>  }
+<span class="ln">54194</span>  
+<span class="ln">54195</span>  function jsonError(c: Context, code: number, message: string) {
+<span class="ln">54196</span>      return jsonNoCache(c, { status: &#39;error&#39;, code, message }, code);
+<span class="ln">54197</span>  }
+<span class="ln">54198</span>  
+<span class="ln">54199</span>  function isValidInt(v: unknown): v is number {
+<span class="ln">54200</span>      return typeof v === &#39;number&#39; &amp;&amp; Number.isFinite(v) &amp;&amp; Number.isInteger(v) &amp;&amp; v &gt;= 0;
+<span class="ln">54201</span>  }
+<span class="ln">54202</span>  
+<span class="ln">54203</span>  function parseLimitQuery(raw: string | undefined, fallback: number): number {
+<span class="ln">54204</span>      if (!raw) return fallback;
+<span class="ln">54205</span>      const parsed = Number.parseInt(raw, 10);
+<span class="ln">54206</span>      if (!Number.isFinite(parsed) || parsed &lt;= 0) return fallback;
+<span class="ln">54207</span>      return Math.min(parsed, MAX_QUERY_LIMIT);
+<span class="ln">54208</span>  }
+<span class="ln">54209</span>  
+<span class="ln">54210</span>  async function checkRateLimit(username: string): Promise&lt;boolean&gt; {
+<span class="ln">54211</span>      const key = `${RATE_LIMIT_PREFIX}${username}`;
+<span class="ln">54212</span>      try {
+<span class="ln">54213</span>          const expiration = new Date(Date.now() + RATE_LIMIT_WINDOW_SEC * 1000);
+<span class="ln">54214</span>          const result = await redis.set(key, &#39;1&#39;, { nx: true, expiration });
+<span class="ln">54215</span>          return result === &#39;OK&#39;;
+<span class="ln">54216</span>      } catch {
+<span class="ln">54217</span>          // Redis failure → allow the request (fail-open)
+<span class="ln">54218</span>          return true;
+<span class="ln">54219</span>      }
+<span class="ln">54220</span>  }
+<span class="ln">54221</span>  </pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 24 / 30 页</div>
+  </header>
+  <pre><span class="ln">54222</span>  api.get(&#39;/init&#39;, async c =&gt; {
+<span class="ln">54223</span>      try {
+<span class="ln">54224</span>          const leaderboardLimit = parseLimitQuery(
+<span class="ln">54225</span>              c.req.query(&#39;leaderboardLimit&#39;) ?? c.req.query(&#39;limit&#39;),
+<span class="ln">54226</span>              LEADERBOARD_SIZE
+<span class="ln">54227</span>          );
+<span class="ln">54228</span>          const [username, leaderboard] = await Promise.all([
+<span class="ln">54229</span>              reddit.getCurrentUsername(),
+<span class="ln">54230</span>              fetchLeaderboard(leaderboardLimit),
+<span class="ln">54231</span>          ]);
+<span class="ln">54232</span>  
+<span class="ln">54233</span>          const resolvedUsername = username ?? &#39;Anonymous&#39;;
+<span class="ln">54234</span>          const isSubscribed =
+<span class="ln">54235</span>              resolvedUsername !== &#39;Anonymous&#39;
+<span class="ln">54236</span>                  ? (await redis.hGet(FOLLOW_KEY, resolvedUsername)) === &#39;1&#39;
+<span class="ln">54237</span>                  : false;
+<span class="ln">54238</span>  
+<span class="ln">54239</span>          const diamonds =
+<span class="ln">54240</span>              resolvedUsername !== &#39;Anonymous&#39; ? await ensureDiamondBalance(resolvedUsername) : 0;
+<span class="ln">54241</span>  
+<span class="ln">54242</span>          return jsonNoCache(c, {
+<span class="ln">54243</span>              username: resolvedUsername,
+<span class="ln">54244</span>              isSubscribed,
+<span class="ln">54245</span>              subredditName: context.subredditName ?? &#39;&#39;,
+<span class="ln">54246</span>              leaderboard,
+<span class="ln">54247</span>              leaderboardLimit,
+<span class="ln">54248</span>              diamonds,
+<span class="ln">54249</span>          });
+<span class="ln">54250</span>      } catch (error) {
+<span class="ln">54251</span>          console.error(&#39;[api/init] error:&#39;, error);
+<span class="ln">54252</span>          return jsonError(c, 500, &#39;Internal server error&#39;);
+<span class="ln">54253</span>      }
+<span class="ln">54254</span>  });
+<span class="ln">54255</span>  
+<span class="ln">54256</span>  api.post(&#39;/submit-score&#39;, async c =&gt; {
+<span class="ln">54257</span>      try {
+<span class="ln">54258</span>          const leaderboardLimit = parseLimitQuery(
+<span class="ln">54259</span>              c.req.query(&#39;leaderboardLimit&#39;) ?? c.req.query(&#39;limit&#39;),
+<span class="ln">54260</span>              LEADERBOARD_SIZE
+<span class="ln">54261</span>          );
+<span class="ln">54262</span>          const username = await reddit.getCurrentUsername();
+<span class="ln">54263</span>          if (!username) {
+<span class="ln">54264</span>              return jsonError(c, 401, &#39;Not logged in&#39;);
+<span class="ln">54265</span>          }
+<span class="ln">54266</span>  
+<span class="ln">54267</span>          let body: unknown;
+<span class="ln">54268</span>          try {
+<span class="ln">54269</span>              body = await c.req.json();
+<span class="ln">54270</span>          } catch {
+<span class="ln">54271</span>              return jsonError(c, 400, &#39;Invalid JSON body&#39;);</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 25 / 30 页</div>
+  </header>
+  <pre><span class="ln">54272</span>          }
+<span class="ln">54273</span>  
+<span class="ln">54274</span>          const payload = body as { score?: unknown; wave?: unknown; runId?: unknown };
+<span class="ln">54275</span>          const score = payload.score;
+<span class="ln">54276</span>          const wave = payload.wave;
+<span class="ln">54277</span>          const runId = payload.runId;
+<span class="ln">54278</span>  
+<span class="ln">54279</span>          // ── Input validation ─────────────────────────────────────────────
+<span class="ln">54280</span>          if (!isValidInt(score) || score &gt; MAX_SCORE) {
+<span class="ln">54281</span>              return jsonError(c, 400, `Invalid score: must be integer 0–${MAX_SCORE}`);
+<span class="ln">54282</span>          }
+<span class="ln">54283</span>          if (!isValidInt(wave) || wave &gt; MAX_WAVE) {
+<span class="ln">54284</span>              return jsonError(c, 400, `Invalid wave: must be integer 0–${MAX_WAVE}`);
+<span class="ln">54285</span>          }
+<span class="ln">54286</span>          if (
+<span class="ln">54287</span>              runId !== undefined &amp;&amp;
+<span class="ln">54288</span>              (typeof runId !== &#39;string&#39; || runId.length &lt; 8 || runId.length &gt; 128)
+<span class="ln">54289</span>          ) {
+<span class="ln">54290</span>              return jsonError(c, 400, &#39;Invalid runId&#39;);
+<span class="ln">54291</span>          }
+<span class="ln">54292</span>  
+<span class="ln">54293</span>          if (typeof runId === &#39;string&#39;) {
+<span class="ln">54294</span>              const existingRun = await redis.get(`${SCORE_RUN_PREFIX}${username}:${runId}`);
+<span class="ln">54295</span>              if (existingRun) {
+<span class="ln">54296</span>                  return jsonNoCache(c, JSON.parse(existingRun));
+<span class="ln">54297</span>              }
+<span class="ln">54298</span>          }
+<span class="ln">54299</span>  
+<span class="ln">54300</span>          // ── Rate limiting ────────────────────────────────────────────────
+<span class="ln">54301</span>          const allowed = await checkRateLimit(username);
+<span class="ln">54302</span>          if (!allowed) {
+<span class="ln">54303</span>              c.header(&#39;Retry-After&#39;, String(RATE_LIMIT_WINDOW_SEC));
+<span class="ln">54304</span>              return jsonError(c, 429, &#39;Too many requests. Try again later.&#39;);
+<span class="ln">54305</span>          }
+<span class="ln">54306</span>  
+<span class="ln">54307</span>          const existing = await redis.zScore(RANK_KEY, username);
+<span class="ln">54308</span>          const isNewBest = existing == null || score &gt; existing;
+<span class="ln">54309</span>  
+<span class="ln">54310</span>          if (isNewBest) {
+<span class="ln">54311</span>              await redis.zAdd(RANK_KEY, { score, member: username });
+<span class="ln">54312</span>              await redis.hSet(META_KEY, {
+<span class="ln">54313</span>                  [username]: JSON.stringify({ wave, updatedAt: Date.now() }),
+<span class="ln">54314</span>              });
+<span class="ln">54315</span>          }
+<span class="ln">54316</span>  
+<span class="ln">54317</span>          const playCount = await recordPlayCount(username);
+<span class="ln">54318</span>  
+<span class="ln">54319</span>          const leaderboard = await fetchLeaderboard(leaderboardLimit);
+<span class="ln">54320</span>          const rankIdx = leaderboard.findIndex(e =&gt; e.username === username);
+<span class="ln">54321</span>  </pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 26 / 30 页</div>
+  </header>
+  <pre><span class="ln">54322</span>          const response = {
+<span class="ln">54323</span>              rank: rankIdx &gt;= 0 ? rankIdx + 1 : LEADERBOARD_SIZE + 1,
+<span class="ln">54324</span>              score,
+<span class="ln">54325</span>              isNewBest,
+<span class="ln">54326</span>              playCount,
+<span class="ln">54327</span>              leaderboardLimit,
+<span class="ln">54328</span>              leaderboard,
+<span class="ln">54329</span>          };
+<span class="ln">54330</span>  
+<span class="ln">54331</span>          if (typeof runId === &#39;string&#39;) {
+<span class="ln">54332</span>              await redis.set(`${SCORE_RUN_PREFIX}${username}:${runId}`, JSON.stringify(response), {
+<span class="ln">54333</span>                  expiration: new Date(
+<span class="ln">54334</span>                      Date.now() + SCORE_RUN_EXPIRATION_DAYS * 24 * 60 * 60 * 1000
+<span class="ln">54335</span>                  ),
+<span class="ln">54336</span>              });
+<span class="ln">54337</span>          }
+<span class="ln">54338</span>  
+<span class="ln">54339</span>          return jsonNoCache(c, response);
+<span class="ln">54340</span>      } catch (error) {
+<span class="ln">54341</span>          console.error(&#39;[api/submit-score] error:&#39;, error);
+<span class="ln">54342</span>          return jsonError(c, 500, &#39;Internal server error&#39;);
+<span class="ln">54343</span>      }
+<span class="ln">54344</span>  });
+<span class="ln">54345</span>  
+<span class="ln">54346</span>  api.get(&#39;/leaderboard&#39;, async c =&gt; {
+<span class="ln">54347</span>      try {
+<span class="ln">54348</span>          const limit = parseLimitQuery(c.req.query(&#39;limit&#39;), LEADERBOARD_SIZE);
+<span class="ln">54349</span>          const leaderboard = await fetchLeaderboard(limit);
+<span class="ln">54350</span>          return jsonNoCache(c, { entries: leaderboard, limit });
+<span class="ln">54351</span>      } catch (error) {
+<span class="ln">54352</span>          console.error(&#39;[api/leaderboard] error:&#39;, error);
+<span class="ln">54353</span>          return jsonNoCache(c, { entries: [] });
+<span class="ln">54354</span>      }
+<span class="ln">54355</span>  });
+<span class="ln">54356</span>  
+<span class="ln">54357</span>  api.get(&#39;/stats&#39;, async c =&gt; {
+<span class="ln">54358</span>      try {
+<span class="ln">54359</span>          const leaderboardLimit = parseLimitQuery(
+<span class="ln">54360</span>              c.req.query(&#39;leaderboardLimit&#39;) ?? c.req.query(&#39;limit&#39;),
+<span class="ln">54361</span>              DEFAULT_STATS_LEADERBOARD_LIMIT
+<span class="ln">54362</span>          );
+<span class="ln">54363</span>          const playCountLimit = parseLimitQuery(
+<span class="ln">54364</span>              c.req.query(&#39;playCountLimit&#39;),
+<span class="ln">54365</span>              DEFAULT_STATS_PLAY_COUNT_LIMIT
+<span class="ln">54366</span>          );
+<span class="ln">54367</span>          const [summary, leaderboard, playCounts] = await Promise.all([
+<span class="ln">54368</span>              buildStatsSummary(),
+<span class="ln">54369</span>              fetchLeaderboard(leaderboardLimit),
+<span class="ln">54370</span>              fetchPlayCounts({ reverse: true, limit: playCountLimit }),
+<span class="ln">54371</span>          ]);</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 27 / 30 页</div>
+  </header>
+  <pre><span class="ln">54372</span>  
+<span class="ln">54373</span>          return jsonNoCache(c, {
+<span class="ln">54374</span>              metrics: summary,
+<span class="ln">54375</span>              leaderboard,
+<span class="ln">54376</span>              playCounts,
+<span class="ln">54377</span>              limits: {
+<span class="ln">54378</span>                  leaderboardLimit,
+<span class="ln">54379</span>                  playCountLimit,
+<span class="ln">54380</span>                  maxQueryLimit: MAX_QUERY_LIMIT,
+<span class="ln">54381</span>              },
+<span class="ln">54382</span>              generatedAt: new Date().toISOString(),
+<span class="ln">54383</span>          });
+<span class="ln">54384</span>      } catch (error) {
+<span class="ln">54385</span>          console.error(&#39;[api/stats] error:&#39;, error);
+<span class="ln">54386</span>          return jsonError(c, 500, &#39;Internal server error&#39;);
+<span class="ln">54387</span>      }
+<span class="ln">54388</span>  });
+<span class="ln">54389</span>  
+<span class="ln">54390</span>  // ── Diamond System ──────────────────────────────────────────────────────────────
+<span class="ln">54391</span>  
+<span class="ln">54392</span>  async function ensureDiamondBalance(username: string): Promise&lt;number&gt; {
+<span class="ln">54393</span>      const key = `${DIAMOND_BALANCE_PREFIX}${username}`;
+<span class="ln">54394</span>      const existing = await redis.get(key);
+<span class="ln">54395</span>      if (existing != null) {
+<span class="ln">54396</span>          return parseInt(existing, 10) || 0;
+<span class="ln">54397</span>      }
+<span class="ln">54398</span>      // First-time user: grant initial diamonds
+<span class="ln">54399</span>      await redis.set(key, String(DIAMOND_INITIAL_GRANT));
+<span class="ln">54400</span>      return DIAMOND_INITIAL_GRANT;
+<span class="ln">54401</span>  }
+<span class="ln">54402</span>  
+<span class="ln">54403</span>  function todayKey(): string {
+<span class="ln">54404</span>      const d = new Date();
+<span class="ln">54405</span>      return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, &#39;0&#39;)}${String(
+<span class="ln">54406</span>          d.getUTCDate()
+<span class="ln">54407</span>      ).padStart(2, &#39;0&#39;)}`;
+<span class="ln">54408</span>  }
+<span class="ln">54409</span>  
+<span class="ln">54410</span>  api.get(&#39;/diamond/balance&#39;, async c =&gt; {
+<span class="ln">54411</span>      try {
+<span class="ln">54412</span>          const username = await reddit.getCurrentUsername();
+<span class="ln">54413</span>          if (!username) return jsonError(c, 401, &#39;Not logged in&#39;);
+<span class="ln">54414</span>          const balance = await ensureDiamondBalance(username);
+<span class="ln">54415</span>          return jsonNoCache(c, { balance });
+<span class="ln">54416</span>      } catch (error) {
+<span class="ln">54417</span>          console.error(&#39;[api/diamond/balance] error:&#39;, error);
+<span class="ln">54418</span>          return jsonError(c, 500, &#39;Internal server error&#39;);
+<span class="ln">54419</span>      }
+<span class="ln">54420</span>  });
+<span class="ln">54421</span>  </pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 28 / 30 页</div>
+  </header>
+  <pre><span class="ln">54422</span>  api.post(&#39;/diamond/settle-run&#39;, async c =&gt; {
+<span class="ln">54423</span>      try {
+<span class="ln">54424</span>          const username = await reddit.getCurrentUsername();
+<span class="ln">54425</span>          if (!username) return jsonError(c, 401, &#39;Not logged in&#39;);
+<span class="ln">54426</span>  
+<span class="ln">54427</span>          let body: unknown;
+<span class="ln">54428</span>          try {
+<span class="ln">54429</span>              body = await c.req.json();
+<span class="ln">54430</span>          } catch {
+<span class="ln">54431</span>              return jsonError(c, 400, &#39;Invalid JSON&#39;);
+<span class="ln">54432</span>          }
+<span class="ln">54433</span>  
+<span class="ln">54434</span>          const payload = body as { runId?: string; wave?: unknown };
+<span class="ln">54435</span>          const runId = payload.runId;
+<span class="ln">54436</span>          const wave = payload.wave;
+<span class="ln">54437</span>  
+<span class="ln">54438</span>          if (!runId || typeof runId !== &#39;string&#39; || runId.length &lt; 8 || runId.length &gt; 64) {
+<span class="ln">54439</span>              return jsonError(c, 400, &#39;Invalid runId&#39;);
+<span class="ln">54440</span>          }
+<span class="ln">54441</span>          if (!isValidInt(wave) || (wave as number) &gt; MAX_WAVE) {
+<span class="ln">54442</span>              return jsonError(c, 400, &#39;Invalid wave&#39;);
+<span class="ln">54443</span>          }
+<span class="ln">54444</span>  
+<span class="ln">54445</span>          // Idempotency: check if this runId was already settled
+<span class="ln">54446</span>          const runKey = `${DIAMOND_RUN_PREFIX}${username}:${runId}`;
+<span class="ln">54447</span>          const alreadySettled = await redis.get(runKey);
+<span class="ln">54448</span>          if (alreadySettled) {
+<span class="ln">54449</span>              const prev = JSON.parse(alreadySettled) as { earned: number; balance: number };
+<span class="ln">54450</span>              return jsonNoCache(c, { earned: prev.earned, balance: prev.balance, duplicate: true });
+<span class="ln">54451</span>          }
+<span class="ln">54452</span>  
+<span class="ln">54453</span>          const earned = Math.max(0, (wave as number) * DIAMOND_PER_WAVE);
+<span class="ln">54454</span>  
+<span class="ln">54455</span>          // Daily cap check
+<span class="ln">54456</span>          const dailyKey = `${DIAMOND_DAILY_PREFIX}${username}:${todayKey()}`;
+<span class="ln">54457</span>          const dailyUsedStr = await redis.get(dailyKey);
+<span class="ln">54458</span>          const dailyUsed = dailyUsedStr ? parseInt(dailyUsedStr, 10) || 0 : 0;
+<span class="ln">54459</span>          const actualEarned = Math.min(earned, Math.max(0, DIAMOND_DAILY_CAP - dailyUsed));
+<span class="ln">54460</span>  
+<span class="ln">54461</span>          // Credit diamonds
+<span class="ln">54462</span>          const balanceKey = `${DIAMOND_BALANCE_PREFIX}${username}`;
+<span class="ln">54463</span>          const currentBalance = await ensureDiamondBalance(username);
+<span class="ln">54464</span>          const newBalance = currentBalance + actualEarned;
+<span class="ln">54465</span>          await redis.set(balanceKey, String(newBalance));
+<span class="ln">54466</span>  
+<span class="ln">54467</span>          // Update daily counter (expire after 48h for safety)
+<span class="ln">54468</span>          await redis.set(dailyKey, String(dailyUsed + actualEarned), {
+<span class="ln">54469</span>              expiration: new Date(Date.now() + 48 * 3600 * 1000),
+<span class="ln">54470</span>          });
+<span class="ln">54471</span>  </pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 29 / 30 页</div>
+  </header>
+  <pre><span class="ln">54472</span>          // Mark run as settled (expire after 7 days)
+<span class="ln">54473</span>          await redis.set(runKey, JSON.stringify({ earned: actualEarned, balance: newBalance }), {
+<span class="ln">54474</span>              expiration: new Date(Date.now() + 7 * 24 * 3600 * 1000),
+<span class="ln">54475</span>          });
+<span class="ln">54476</span>  
+<span class="ln">54477</span>          return jsonNoCache(c, { earned: actualEarned, balance: newBalance, duplicate: false });
+<span class="ln">54478</span>      } catch (error) {
+<span class="ln">54479</span>          console.error(&#39;[api/diamond/settle-run] error:&#39;, error);
+<span class="ln">54480</span>          return jsonError(c, 500, &#39;Internal server error&#39;);
+<span class="ln">54481</span>      }
+<span class="ln">54482</span>  });
+<span class="ln">54483</span>  
+<span class="ln">54484</span>  api.post(&#39;/diamond/buy-item&#39;, async c =&gt; {
+<span class="ln">54485</span>      try {
+<span class="ln">54486</span>          const username = await reddit.getCurrentUsername();
+<span class="ln">54487</span>          if (!username) return jsonError(c, 401, &#39;Not logged in&#39;);
+<span class="ln">54488</span>  
+<span class="ln">54489</span>          let body: unknown;
+<span class="ln">54490</span>          try {
+<span class="ln">54491</span>              body = await c.req.json();
+<span class="ln">54492</span>          } catch {
+<span class="ln">54493</span>              return jsonError(c, 400, &#39;Invalid JSON&#39;);
+<span class="ln">54494</span>          }
+<span class="ln">54495</span>  
+<span class="ln">54496</span>          const payload = body as { itemId?: string };
+<span class="ln">54497</span>          const itemId = payload.itemId;
+<span class="ln">54498</span>          if (!itemId || typeof itemId !== &#39;string&#39;) {
+<span class="ln">54499</span>              return jsonError(c, 400, &#39;Invalid itemId&#39;);
+<span class="ln">54500</span>          }
+<span class="ln">54501</span>  
+<span class="ln">54502</span>          const price = DIAMOND_ITEM_PRICE;
+<span class="ln">54503</span>          const balanceKey = `${DIAMOND_BALANCE_PREFIX}${username}`;
+<span class="ln">54504</span>          const currentBalance = await ensureDiamondBalance(username);
+<span class="ln">54505</span>  
+<span class="ln">54506</span>          if (currentBalance &lt; price) {
+<span class="ln">54507</span>              return jsonError(c, 400, &#39;Insufficient diamonds&#39;);
+<span class="ln">54508</span>          }
+<span class="ln">54509</span>  
+<span class="ln">54510</span>          const newBalance = currentBalance - price;
+<span class="ln">54511</span>          await redis.set(balanceKey, String(newBalance));
+<span class="ln">54512</span>  
+<span class="ln">54513</span>          return jsonNoCache(c, { success: true, itemId, price, balance: newBalance });
+<span class="ln">54514</span>      } catch (error) {
+<span class="ln">54515</span>          console.error(&#39;[api/diamond/buy-item] error:&#39;, error);
+<span class="ln">54516</span>          return jsonError(c, 500, &#39;Internal server error&#39;);
+<span class="ln">54517</span>      }
+<span class="ln">54518</span>  });
+<span class="ln">54519</span>  
+<span class="ln">54520</span>  api.post(&#39;/subscribe&#39;, async c =&gt; {
+<span class="ln">54521</span>      try {</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（后1500行）</div>
+    <div class="meta">第 30 / 30 页</div>
+  </header>
+  <pre><span class="ln">54522</span>          const username = await reddit.getCurrentUsername();
+<span class="ln">54523</span>          let alreadySubscribed = false;
+<span class="ln">54524</span>          let diamondsGranted = 0;
+<span class="ln">54525</span>          let newBalance = 0;
+<span class="ln">54526</span>          if (username) {
+<span class="ln">54527</span>              const existing = await redis.hGet(FOLLOW_KEY, username);
+<span class="ln">54528</span>              alreadySubscribed = existing === &#39;1&#39;;
+<span class="ln">54529</span>              if (!alreadySubscribed) {
+<span class="ln">54530</span>                  await redis.hSet(FOLLOW_KEY, { [username]: &#39;1&#39; });
+<span class="ln">54531</span>                  // Grant subscribe reward diamonds
+<span class="ln">54532</span>                  const balanceKey = `${DIAMOND_BALANCE_PREFIX}${username}`;
+<span class="ln">54533</span>                  const currentBalance = await ensureDiamondBalance(username);
+<span class="ln">54534</span>                  newBalance = currentBalance + SUBSCRIBE_DIAMOND_REWARD;
+<span class="ln">54535</span>                  await redis.set(balanceKey, String(newBalance));
+<span class="ln">54536</span>                  diamondsGranted = SUBSCRIBE_DIAMOND_REWARD;
+<span class="ln">54537</span>              } else {
+<span class="ln">54538</span>                  newBalance = await ensureDiamondBalance(username);
+<span class="ln">54539</span>              }
+<span class="ln">54540</span>          }
+<span class="ln">54541</span>          return jsonNoCache(c, { success: true, alreadySubscribed, diamondsGranted, newBalance });
+<span class="ln">54542</span>      } catch (error) {
+<span class="ln">54543</span>          console.error(&#39;[api/subscribe] error:&#39;, error);
+<span class="ln">54544</span>          return jsonError(c, 500, &#39;Internal server error&#39;);
+<span class="ln">54545</span>      }
+<span class="ln">54546</span>  });
+<span class="ln">54547</span>  
+<span class="ln">54548</span>  // ===== FILE: devvit/src/server/routes/menu.ts =====
+<span class="ln">54549</span>  import { Hono } from &#39;hono&#39;;
+<span class="ln">54550</span>  import { context, reddit } from &#39;@devvit/web/server&#39;;
+<span class="ln">54551</span>  
+<span class="ln">54552</span>  export const menu = new Hono();
+<span class="ln">54553</span>  
+<span class="ln">54554</span>  menu.post(&#39;/create-post&#39;, async c =&gt; {
+<span class="ln">54555</span>      try {
+<span class="ln">54556</span>          const post = await reddit.submitCustomPost({
+<span class="ln">54557</span>              title: &#39;🤖 Granny vs Robot — How Far Can You Go?&#39;,
+<span class="ln">54558</span>          });
+<span class="ln">54559</span>  
+<span class="ln">54560</span>          return c.json(
+<span class="ln">54561</span>              {
+<span class="ln">54562</span>                  navigateTo: `https://reddit.com/r/${context.subredditName}/comments/${post.id}`,
+<span class="ln">54563</span>              },
+<span class="ln">54564</span>              200
+<span class="ln">54565</span>          );
+<span class="ln">54566</span>      } catch (error) {
+<span class="ln">54567</span>          console.error(&#39;[menu/create-post] error:&#39;, error);
+<span class="ln">54568</span>          return c.json({ showToast: &#39;Failed to create post&#39; }, 400);
+<span class="ln">54569</span>      }
+<span class="ln">54570</span>  });
+<span class="ln">54571</span>  </pre>
+</section>
+</body>
+</html>

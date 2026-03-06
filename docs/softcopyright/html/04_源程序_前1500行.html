@@ -1,0 +1,1757 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>老奶大战机器人游戏软件 源程序文档（前1500行）</title>
+  <style>
+    @page { size: A4; margin: 12mm 12mm; }
+    body {
+      margin: 0;
+      color: #111;
+      font-family: "SF Mono","Menlo","Consolas",monospace;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .code-page { page-break-after: always; }
+    .code-page:last-child { page-break-after: auto; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #444;
+      padding-bottom: 4px;
+      margin-bottom: 4px;
+      font-size: 11px;
+    }
+    .title { font-weight: 700; }
+    pre {
+      margin: 0;
+      font-size: 10px;
+      line-height: 1.27;
+      white-space: pre;
+      overflow: hidden;
+      word-break: normal;
+      font-variant-ligatures: none;
+    }
+    .ln {
+      display: inline-block;
+      width: 48px;
+      color: #666;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- 源程序按项目代码合并后截取前 1500 行，保留文件边界标记，供软著登记提交。 -->
+  
+<section class="code-page ">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 1 / 30 页</div>
+  </header>
+  <pre><span class="ln">00001</span>  // ===== FILE: assets/scripts/core/ads/TikTokAdService.ts =====
+<span class="ln">00002</span>  import { TikTokRewardAdSlot, TIKTOK_REWARDED_AD_PLACEMENTS } from &#39;../reddit/TikTokAdsConfig&#39;;
+<span class="ln">00003</span>  
+<span class="ln">00004</span>  /**
+<span class="ln">00005</span>   * TikTokAdService
+<span class="ln">00006</span>   * 封装 TikTok 激励广告的加载、展示和奖励回调。
+<span class="ln">00007</span>   * 仅在 TikTok Minis 环境下可用。
+<span class="ln">00008</span>   */
+<span class="ln">00009</span>  export class TikTokAdService {
+<span class="ln">00010</span>      private static _lastCloseRewarded = false;
+<span class="ln">00011</span>      private static _lastCloseHandled = false;
+<span class="ln">00012</span>      private static _sessionUnlockSlots: Set&lt;TikTokRewardAdSlot&gt; = new Set();
+<span class="ln">00013</span>  
+<span class="ln">00014</span>      public static resetSessionUnlocks(): void {
+<span class="ln">00015</span>          this._sessionUnlockSlots.clear();
+<span class="ln">00016</span>      }
+<span class="ln">00017</span>  
+<span class="ln">00018</span>      public static unlockSessionSlot(slot: TikTokRewardAdSlot): void {
+<span class="ln">00019</span>          this._sessionUnlockSlots.add(slot);
+<span class="ln">00020</span>      }
+<span class="ln">00021</span>  
+<span class="ln">00022</span>      public static isSessionSlotUnlocked(slot: TikTokRewardAdSlot): boolean {
+<span class="ln">00023</span>          return this._sessionUnlockSlots.has(slot);
+<span class="ln">00024</span>      }
+<span class="ln">00025</span>  
+<span class="ln">00026</span>      public static wasLastAdCancelled(): boolean {
+<span class="ln">00027</span>          return this._lastCloseHandled &amp;&amp; !this._lastCloseRewarded;
+<span class="ln">00028</span>      }
+<span class="ln">00029</span>  
+<span class="ln">00030</span>      private static markCloseResult(rewarded: boolean): void {
+<span class="ln">00031</span>          this._lastCloseHandled = true;
+<span class="ln">00032</span>          this._lastCloseRewarded = rewarded;
+<span class="ln">00033</span>      }
+<span class="ln">00034</span>  
+<span class="ln">00035</span>      private static markNonCloseFailure(): void {
+<span class="ln">00036</span>          this._lastCloseHandled = false;
+<span class="ln">00037</span>          this._lastCloseRewarded = false;
+<span class="ln">00038</span>      }
+<span class="ln">00039</span>  
+<span class="ln">00040</span>      private static handleAdError(err: any, slot: TikTokRewardAdSlot): void {
+<span class="ln">00041</span>          const errorCode = Number(err?.errorCode);
+<span class="ln">00042</span>          const subErrorCode = Number(err?.subErrorCode);
+<span class="ln">00043</span>  
+<span class="ln">00044</span>          if (errorCode === 20003 &amp;&amp; subErrorCode === 20001) {
+<span class="ln">00045</span>              this.showToast(
+<span class="ln">00046</span>                  &#39;Ad placement inactive. Please enable this placement in TikTok Console.&#39;
+<span class="ln">00047</span>              );
+<span class="ln">00048</span>              console.warn(
+<span class="ln">00049</span>                  `[TikTokAdService] Placement inactive for slot=${slot}. Check Monetization &gt; In-App Ads &gt; Ad placements.`
+<span class="ln">00050</span>              );</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 2 / 30 页</div>
+  </header>
+  <pre><span class="ln">00051</span>              return;
+<span class="ln">00052</span>          }
+<span class="ln">00053</span>  
+<span class="ln">00054</span>          this.showToast(&#39;Ad is temporarily unavailable. Please try again later.&#39;);
+<span class="ln">00055</span>      }
+<span class="ln">00056</span>  
+<span class="ln">00057</span>      private static offIfPossible(
+<span class="ln">00058</span>          adInstance: any,
+<span class="ln">00059</span>          eventName: &#39;offClose&#39; | &#39;offError&#39;,
+<span class="ln">00060</span>          fn: any
+<span class="ln">00061</span>      ): void {
+<span class="ln">00062</span>          if (typeof adInstance?.[eventName] === &#39;function&#39;) {
+<span class="ln">00063</span>              adInstance[eventName](fn);
+<span class="ln">00064</span>          }
+<span class="ln">00065</span>      }
+<span class="ln">00066</span>  
+<span class="ln">00067</span>      private static showWithBestEffort(adInstance: any): Promise&lt;void&gt; {
+<span class="ln">00068</span>          if (typeof adInstance?.show !== &#39;function&#39;) {
+<span class="ln">00069</span>              return Promise.reject(new Error(&#39;Rewarded ad instance has no show()&#39;));
+<span class="ln">00070</span>          }
+<span class="ln">00071</span>  
+<span class="ln">00072</span>          const runShow = () =&gt; {
+<span class="ln">00073</span>              const showResult = adInstance.show();
+<span class="ln">00074</span>              if (showResult &amp;&amp; typeof showResult.then === &#39;function&#39;) {
+<span class="ln">00075</span>                  return showResult;
+<span class="ln">00076</span>              }
+<span class="ln">00077</span>              return Promise.resolve();
+<span class="ln">00078</span>          };
+<span class="ln">00079</span>  
+<span class="ln">00080</span>          if (typeof adInstance?.load !== &#39;function&#39;) {
+<span class="ln">00081</span>              // Some TikTok runtimes only expose show() without load().
+<span class="ln">00082</span>              return runShow();
+<span class="ln">00083</span>          }
+<span class="ln">00084</span>  
+<span class="ln">00085</span>          const loadResult = adInstance.load();
+<span class="ln">00086</span>          if (loadResult &amp;&amp; typeof loadResult.then === &#39;function&#39;) {
+<span class="ln">00087</span>              return loadResult.then(() =&gt; runShow());
+<span class="ln">00088</span>          }
+<span class="ln">00089</span>  
+<span class="ln">00090</span>          return runShow();
+<span class="ln">00091</span>      }
+<span class="ln">00092</span>  
+<span class="ln">00093</span>      /** 检测当前是否运行在 TikTok 环境 */
+<span class="ln">00094</span>      public static isTikTokRuntime(): boolean {
+<span class="ln">00095</span>          const g = globalThis as any;
+<span class="ln">00096</span>          return g?.__GVR_PLATFORM__ === &#39;tiktok&#39; || typeof g?.tt !== &#39;undefined&#39;;
+<span class="ln">00097</span>      }
+<span class="ln">00098</span>  
+<span class="ln">00099</span>      /** 检测 TikTok 广告 SDK 是否可用 */
+<span class="ln">00100</span>      public static isAdAvailable(): boolean {</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 3 / 30 页</div>
+  </header>
+  <pre><span class="ln">00101</span>          if (!this.isTikTokRuntime()) return false;
+<span class="ln">00102</span>          const g = globalThis as any;
+<span class="ln">00103</span>          return typeof g?.tt?.createRewardedVideoAd === &#39;function&#39;;
+<span class="ln">00104</span>      }
+<span class="ln">00105</span>  
+<span class="ln">00106</span>      /** 在 TikTok 端显示轻提示 */
+<span class="ln">00107</span>      public static showToast(message: string): void {
+<span class="ln">00108</span>          const g = globalThis as any;
+<span class="ln">00109</span>          try {
+<span class="ln">00110</span>              if (typeof g?.tt?.showToast === &#39;function&#39;) {
+<span class="ln">00111</span>                  g.tt.showToast({
+<span class="ln">00112</span>                      title: message,
+<span class="ln">00113</span>                      icon: &#39;none&#39;,
+<span class="ln">00114</span>                      duration: 1500,
+<span class="ln">00115</span>                  });
+<span class="ln">00116</span>                  return;
+<span class="ln">00117</span>              }
+<span class="ln">00118</span>          } catch (err) {
+<span class="ln">00119</span>              console.warn(&#39;[TikTokAdService] showToast failed:&#39;, err);
+<span class="ln">00120</span>          }
+<span class="ln">00121</span>          console.warn(`[TikTokAdService] ${message}`);
+<span class="ln">00122</span>      }
+<span class="ln">00123</span>  
+<span class="ln">00124</span>      /**
+<span class="ln">00125</span>       * 展示激励广告并等待结果
+<span class="ln">00126</span>       * @param slot 广告位标识
+<span class="ln">00127</span>       * @returns true 表示用户看完广告获得奖励，false 表示中途关闭或出错
+<span class="ln">00128</span>       */
+<span class="ln">00129</span>      public static showRewardedAd(slot: TikTokRewardAdSlot): Promise&lt;boolean&gt; {
+<span class="ln">00130</span>          return new Promise&lt;boolean&gt;(resolve =&gt; {
+<span class="ln">00131</span>              this.markNonCloseFailure();
+<span class="ln">00132</span>              if (!this.isAdAvailable()) {
+<span class="ln">00133</span>                  console.warn(&#39;[TikTokAdService] Ad SDK not available&#39;);
+<span class="ln">00134</span>                  this.showToast(&#39;Ad is temporarily unavailable. Please try again later.&#39;);
+<span class="ln">00135</span>                  resolve(false);
+<span class="ln">00136</span>                  return;
+<span class="ln">00137</span>              }
+<span class="ln">00138</span>  
+<span class="ln">00139</span>              const placementId = TIKTOK_REWARDED_AD_PLACEMENTS[slot];
+<span class="ln">00140</span>              if (!placementId) {
+<span class="ln">00141</span>                  console.warn(`[TikTokAdService] No placement ID for slot: ${slot}`);
+<span class="ln">00142</span>                  this.showToast(&#39;Ad placement is not configured yet.&#39;);
+<span class="ln">00143</span>                  resolve(false);
+<span class="ln">00144</span>                  return;
+<span class="ln">00145</span>              }
+<span class="ln">00146</span>  
+<span class="ln">00147</span>              const tt = (globalThis as any).tt;
+<span class="ln">00148</span>  
+<span class="ln">00149</span>              try {
+<span class="ln">00150</span>                  // TikTok rewardedVideoAd 实例只能展示一次；每次展示都新建实例</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 4 / 30 页</div>
+  </header>
+  <pre><span class="ln">00151</span>                  const adInstance = tt.createRewardedVideoAd({ adUnitId: placementId });
+<span class="ln">00152</span>  
+<span class="ln">00153</span>                  let settled = false;
+<span class="ln">00154</span>                  const settleOnce = (rewarded: boolean) =&gt; {
+<span class="ln">00155</span>                      if (settled) return;
+<span class="ln">00156</span>                      settled = true;
+<span class="ln">00157</span>                      resolve(rewarded);
+<span class="ln">00158</span>                  };
+<span class="ln">00159</span>  
+<span class="ln">00160</span>                  // 绑定关闭回调（一次性）
+<span class="ln">00161</span>                  const onClose = (res: { isEnded: boolean }) =&gt; {
+<span class="ln">00162</span>                      this.offIfPossible(adInstance, &#39;offClose&#39;, onClose);
+<span class="ln">00163</span>                      this.offIfPossible(adInstance, &#39;offError&#39;, onError);
+<span class="ln">00164</span>                      const rewarded = res?.isEnded === true;
+<span class="ln">00165</span>                      this.markCloseResult(rewarded);
+<span class="ln">00166</span>                      console.log(`[TikTokAdService] Ad closed, rewarded=${rewarded}, slot=${slot}`);
+<span class="ln">00167</span>                      settleOnce(rewarded);
+<span class="ln">00168</span>                  };
+<span class="ln">00169</span>  
+<span class="ln">00170</span>                  const onError = (err: any) =&gt; {
+<span class="ln">00171</span>                      this.offIfPossible(adInstance, &#39;offClose&#39;, onClose);
+<span class="ln">00172</span>                      this.offIfPossible(adInstance, &#39;offError&#39;, onError);
+<span class="ln">00173</span>                      this.markNonCloseFailure();
+<span class="ln">00174</span>                      console.error(`[TikTokAdService] Ad error for slot=${slot}:`, err);
+<span class="ln">00175</span>                      this.handleAdError(err, slot);
+<span class="ln">00176</span>                      settleOnce(false);
+<span class="ln">00177</span>                  };
+<span class="ln">00178</span>  
+<span class="ln">00179</span>                  if (typeof adInstance?.onClose === &#39;function&#39;) {
+<span class="ln">00180</span>                      adInstance.onClose(onClose);
+<span class="ln">00181</span>                  }
+<span class="ln">00182</span>                  if (typeof adInstance?.onError === &#39;function&#39;) {
+<span class="ln">00183</span>                      adInstance.onError(onError);
+<span class="ln">00184</span>                  }
+<span class="ln">00185</span>  
+<span class="ln">00186</span>                  // 加载并展示
+<span class="ln">00187</span>                  this.showWithBestEffort(adInstance).catch((err: any) =&gt; {
+<span class="ln">00188</span>                      this.offIfPossible(adInstance, &#39;offClose&#39;, onClose);
+<span class="ln">00189</span>                      this.offIfPossible(adInstance, &#39;offError&#39;, onError);
+<span class="ln">00190</span>                      this.markNonCloseFailure();
+<span class="ln">00191</span>                      console.error(
+<span class="ln">00192</span>                          `[TikTokAdService] Failed to load/show ad for slot=${slot}:`,
+<span class="ln">00193</span>                          err
+<span class="ln">00194</span>                      );
+<span class="ln">00195</span>                      this.handleAdError(err, slot);
+<span class="ln">00196</span>                      settleOnce(false);
+<span class="ln">00197</span>                  });
+<span class="ln">00198</span>              } catch (err) {
+<span class="ln">00199</span>                  this.markNonCloseFailure();
+<span class="ln">00200</span>                  console.error(`[TikTokAdService] Exception for slot=${slot}:`, err);</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 5 / 30 页</div>
+  </header>
+  <pre><span class="ln">00201</span>                  this.handleAdError(err, slot);
+<span class="ln">00202</span>                  resolve(false);
+<span class="ln">00203</span>              }
+<span class="ln">00204</span>          });
+<span class="ln">00205</span>      }
+<span class="ln">00206</span>  }
+<span class="ln">00207</span>  
+<span class="ln">00208</span>  // ===== FILE: assets/scripts/core/base/BaseComponent.ts =====
+<span class="ln">00209</span>  import { Component } from &#39;cc&#39;;
+<span class="ln">00210</span>  
+<span class="ln">00211</span>  /**
+<span class="ln">00212</span>   * 组件基类
+<span class="ln">00213</span>   * 提供通用的生命周期方法和辅助功能
+<span class="ln">00214</span>   * 所有游戏组件应继承此类
+<span class="ln">00215</span>   */
+<span class="ln">00216</span>  export abstract class BaseComponent extends Component {
+<span class="ln">00217</span>      /** 组件是否已初始化 */
+<span class="ln">00218</span>      protected _initialized: boolean = false;
+<span class="ln">00219</span>  
+<span class="ln">00220</span>      /** 组件是否处于激活状态 */
+<span class="ln">00221</span>      protected _isActive: boolean = true;
+<span class="ln">00222</span>  
+<span class="ln">00223</span>      /**
+<span class="ln">00224</span>       * 初始化方法，子类重写此方法进行初始化
+<span class="ln">00225</span>       * 在 onLoad 中自动调用
+<span class="ln">00226</span>       */
+<span class="ln">00227</span>      protected abstract initialize(): void;
+<span class="ln">00228</span>  
+<span class="ln">00229</span>      /**
+<span class="ln">00230</span>       * 清理方法，子类重写此方法进行资源释放
+<span class="ln">00231</span>       * 在 onDestroy 中自动调用
+<span class="ln">00232</span>       */
+<span class="ln">00233</span>      protected cleanup(): void {
+<span class="ln">00234</span>          // 子类重写
+<span class="ln">00235</span>      }
+<span class="ln">00236</span>  
+<span class="ln">00237</span>      protected onLoad(): void {
+<span class="ln">00238</span>          if (!this._initialized) {
+<span class="ln">00239</span>              this.initialize();
+<span class="ln">00240</span>              this._initialized = true;
+<span class="ln">00241</span>          }
+<span class="ln">00242</span>      }
+<span class="ln">00243</span>  
+<span class="ln">00244</span>      protected onDestroy(): void {
+<span class="ln">00245</span>          this.cleanup();
+<span class="ln">00246</span>          this._initialized = false;
+<span class="ln">00247</span>      }
+<span class="ln">00248</span>  
+<span class="ln">00249</span>      protected onEnable(): void {
+<span class="ln">00250</span>          this._isActive = true;</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 6 / 30 页</div>
+  </header>
+  <pre><span class="ln">00251</span>      }
+<span class="ln">00252</span>  
+<span class="ln">00253</span>      protected onDisable(): void {
+<span class="ln">00254</span>          this._isActive = false;
+<span class="ln">00255</span>      }
+<span class="ln">00256</span>  
+<span class="ln">00257</span>      /**
+<span class="ln">00258</span>       * 安全的延时调用
+<span class="ln">00259</span>       * @param callback 回调函数
+<span class="ln">00260</span>       * @param delay 延时秒数
+<span class="ln">00261</span>       * @returns unschedule 用的 key
+<span class="ln">00262</span>       */
+<span class="ln">00263</span>      protected delayCall(callback: () =&gt; void, delay: number): void {
+<span class="ln">00264</span>          this.scheduleOnce(callback, delay);
+<span class="ln">00265</span>      }
+<span class="ln">00266</span>  
+<span class="ln">00267</span>      /**
+<span class="ln">00268</span>       * 取消当前节点的所有调度
+<span class="ln">00269</span>       */
+<span class="ln">00270</span>      protected cancelAllDelays(): void {
+<span class="ln">00271</span>          this.unscheduleAllCallbacks();
+<span class="ln">00272</span>      }
+<span class="ln">00273</span>  }
+<span class="ln">00274</span>  
+<span class="ln">00275</span>  // ===== FILE: assets/scripts/core/base/index.ts =====
+<span class="ln">00276</span>  /**
+<span class="ln">00277</span>   * 基础导出
+<span class="ln">00278</span>   */
+<span class="ln">00279</span>  export { Singleton } from &#39;./Singleton&#39;;
+<span class="ln">00280</span>  export { BaseComponent } from &#39;./BaseComponent&#39;;
+<span class="ln">00281</span>  
+<span class="ln">00282</span>  // ===== FILE: assets/scripts/core/base/Singleton.ts =====
+<span class="ln">00283</span>  /**
+<span class="ln">00284</span>   * 单例基类
+<span class="ln">00285</span>   * 所有管理器类应继承此类以实现单例模式
+<span class="ln">00286</span>   *
+<span class="ln">00287</span>   * @example
+<span class="ln">00288</span>   * class AudioManager extends Singleton&lt;AudioManager&gt;() {
+<span class="ln">00289</span>   *     public playSound() { ... }
+<span class="ln">00290</span>   * }
+<span class="ln">00291</span>   * // 使用: AudioManager.instance.playSound()
+<span class="ln">00292</span>   */
+<span class="ln">00293</span>  export function Singleton&lt;T&gt;() {
+<span class="ln">00294</span>      class SingletonClass {
+<span class="ln">00295</span>          static _instance: T | null = null;
+<span class="ln">00296</span>  
+<span class="ln">00297</span>          public static get instance(): T {
+<span class="ln">00298</span>              if (!this._instance) {
+<span class="ln">00299</span>                  this._instance = new (this as unknown as new () =&gt; T)();
+<span class="ln">00300</span>              }</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 7 / 30 页</div>
+  </header>
+  <pre><span class="ln">00301</span>              return this._instance;
+<span class="ln">00302</span>          }
+<span class="ln">00303</span>  
+<span class="ln">00304</span>          /**
+<span class="ln">00305</span>           * 销毁单例实例
+<span class="ln">00306</span>           * 用于场景切换或热更新时重置状态
+<span class="ln">00307</span>           */
+<span class="ln">00308</span>          public static destroyInstance(): void {
+<span class="ln">00309</span>              this._instance = null;
+<span class="ln">00310</span>          }
+<span class="ln">00311</span>  
+<span class="ln">00312</span>          /**
+<span class="ln">00313</span>           * 检查单例是否已创建
+<span class="ln">00314</span>           */
+<span class="ln">00315</span>          public static hasInstance(): boolean {
+<span class="ln">00316</span>              return this._instance !== null;
+<span class="ln">00317</span>          }
+<span class="ln">00318</span>      }
+<span class="ln">00319</span>  
+<span class="ln">00320</span>      return SingletonClass;
+<span class="ln">00321</span>  }
+<span class="ln">00322</span>  
+<span class="ln">00323</span>  // ===== FILE: assets/scripts/core/bootstrap/ControllerServices.ts =====
+<span class="ln">00324</span>  import { ServiceRegistry } from &#39;../managers/ServiceRegistry&#39;;
+<span class="ln">00325</span>  import { EventManager } from &#39;../managers/EventManager&#39;;
+<span class="ln">00326</span>  import { GameManager } from &#39;../managers/GameManager&#39;;
+<span class="ln">00327</span>  import { EffectManager } from &#39;../managers/EffectManager&#39;;
+<span class="ln">00328</span>  import { WaveService } from &#39;../managers/WaveService&#39;;
+<span class="ln">00329</span>  import { PoolManager } from &#39;../managers/PoolManager&#39;;
+<span class="ln">00330</span>  import { HUDManager } from &#39;../../ui/HUDManager&#39;;
+<span class="ln">00331</span>  import { BuildingManager } from &#39;../../gameplay/buildings/BuildingManager&#39;;
+<span class="ln">00332</span>  import { WaveManager } from &#39;../../gameplay/wave/WaveManager&#39;;
+<span class="ln">00333</span>  import { CoinDropManager } from &#39;../../gameplay/economy/CoinDropManager&#39;;
+<span class="ln">00334</span>  import { BuffCardService } from &#39;../../gameplay/roguelike/BuffCardService&#39;;
+<span class="ln">00335</span>  import { BuffCardUI } from &#39;../../ui/BuffCardUI&#39;;
+<span class="ln">00336</span>  import { TowerUpgradeCardService } from &#39;../../gameplay/roguelike/TowerUpgradeCardService&#39;;
+<span class="ln">00337</span>  import { TowerUpgradeCardUI } from &#39;../../ui/TowerUpgradeCardUI&#39;;
+<span class="ln">00338</span>  import { HeroWeaponManager } from &#39;../../gameplay/weapons/HeroWeaponManager&#39;;
+<span class="ln">00339</span>  import { AirdropService } from &#39;../../gameplay/airdrop/AirdropService&#39;;
+<span class="ln">00340</span>  import { WeaponSelectUI } from &#39;../../ui/WeaponSelectUI&#39;;
+<span class="ln">00341</span>  import { WeaponBarUI } from &#39;../../ui/WeaponBarUI&#39;;
+<span class="ln">00342</span>  import { ItemService } from &#39;../../gameplay/items/ItemService&#39;;
+<span class="ln">00343</span>  import { ChestDropManager } from &#39;../../gameplay/items/ChestDropManager&#39;;
+<span class="ln">00344</span>  import { ItemCardUI } from &#39;../../ui/ItemCardUI&#39;;
+<span class="ln">00345</span>  import { ItemBarUI } from &#39;../../ui/ItemBarUI&#39;;
+<span class="ln">00346</span>  
+<span class="ln">00347</span>  /**
+<span class="ln">00348</span>   * ControllerServices
+<span class="ln">00349</span>   * GameController 专用服务入口集合
+<span class="ln">00350</span>   */</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 8 / 30 页</div>
+  </header>
+  <pre><span class="ln">00351</span>  export class ControllerServices {
+<span class="ln">00352</span>      public get eventManager(): EventManager {
+<span class="ln">00353</span>          return ServiceRegistry.get&lt;EventManager&gt;(&#39;EventManager&#39;) ?? EventManager.instance;
+<span class="ln">00354</span>      }
+<span class="ln">00355</span>  
+<span class="ln">00356</span>      public get gameManager(): GameManager {
+<span class="ln">00357</span>          return ServiceRegistry.get&lt;GameManager&gt;(&#39;GameManager&#39;) ?? GameManager.instance;
+<span class="ln">00358</span>      }
+<span class="ln">00359</span>  
+<span class="ln">00360</span>      public get hudManager(): HUDManager {
+<span class="ln">00361</span>          return ServiceRegistry.get&lt;HUDManager&gt;(&#39;HUDManager&#39;) ?? HUDManager.instance;
+<span class="ln">00362</span>      }
+<span class="ln">00363</span>  
+<span class="ln">00364</span>      public get buildingManager(): BuildingManager {
+<span class="ln">00365</span>          return ServiceRegistry.get&lt;BuildingManager&gt;(&#39;BuildingManager&#39;) ?? BuildingManager.instance;
+<span class="ln">00366</span>      }
+<span class="ln">00367</span>  
+<span class="ln">00368</span>      public get effectManager(): EffectManager {
+<span class="ln">00369</span>          return ServiceRegistry.get&lt;EffectManager&gt;(&#39;EffectManager&#39;) ?? EffectManager.instance;
+<span class="ln">00370</span>      }
+<span class="ln">00371</span>  
+<span class="ln">00372</span>      public get waveManager(): WaveManager {
+<span class="ln">00373</span>          return ServiceRegistry.get&lt;WaveManager&gt;(&#39;WaveManager&#39;) ?? WaveManager.instance;
+<span class="ln">00374</span>      }
+<span class="ln">00375</span>  
+<span class="ln">00376</span>      public get waveService(): WaveService {
+<span class="ln">00377</span>          return ServiceRegistry.get&lt;WaveService&gt;(&#39;WaveService&#39;) ?? WaveService.instance;
+<span class="ln">00378</span>      }
+<span class="ln">00379</span>  
+<span class="ln">00380</span>      public get poolManager(): PoolManager {
+<span class="ln">00381</span>          return ServiceRegistry.get&lt;PoolManager&gt;(&#39;PoolManager&#39;) ?? PoolManager.instance;
+<span class="ln">00382</span>      }
+<span class="ln">00383</span>  
+<span class="ln">00384</span>      public get coinDropManager(): CoinDropManager {
+<span class="ln">00385</span>          return ServiceRegistry.get&lt;CoinDropManager&gt;(&#39;CoinDropManager&#39;) ?? CoinDropManager.instance;
+<span class="ln">00386</span>      }
+<span class="ln">00387</span>  
+<span class="ln">00388</span>      public get buffCardService(): BuffCardService {
+<span class="ln">00389</span>          return ServiceRegistry.get&lt;BuffCardService&gt;(&#39;BuffCardService&#39;) ?? BuffCardService.instance;
+<span class="ln">00390</span>      }
+<span class="ln">00391</span>  
+<span class="ln">00392</span>      public get buffCardUI(): BuffCardUI {
+<span class="ln">00393</span>          return ServiceRegistry.get&lt;BuffCardUI&gt;(&#39;BuffCardUI&#39;) ?? BuffCardUI.instance;
+<span class="ln">00394</span>      }
+<span class="ln">00395</span>  
+<span class="ln">00396</span>      public get towerUpgradeCardService(): TowerUpgradeCardService {
+<span class="ln">00397</span>          return (
+<span class="ln">00398</span>              ServiceRegistry.get&lt;TowerUpgradeCardService&gt;(&#39;TowerUpgradeCardService&#39;) ??
+<span class="ln">00399</span>              TowerUpgradeCardService.instance
+<span class="ln">00400</span>          );</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 9 / 30 页</div>
+  </header>
+  <pre><span class="ln">00401</span>      }
+<span class="ln">00402</span>  
+<span class="ln">00403</span>      public get towerUpgradeCardUI(): TowerUpgradeCardUI {
+<span class="ln">00404</span>          return (
+<span class="ln">00405</span>              ServiceRegistry.get&lt;TowerUpgradeCardUI&gt;(&#39;TowerUpgradeCardUI&#39;) ??
+<span class="ln">00406</span>              TowerUpgradeCardUI.instance
+<span class="ln">00407</span>          );
+<span class="ln">00408</span>      }
+<span class="ln">00409</span>  
+<span class="ln">00410</span>      public get heroWeaponManager(): HeroWeaponManager {
+<span class="ln">00411</span>          return (
+<span class="ln">00412</span>              ServiceRegistry.get&lt;HeroWeaponManager&gt;(&#39;HeroWeaponManager&#39;) ??
+<span class="ln">00413</span>              HeroWeaponManager.instance
+<span class="ln">00414</span>          );
+<span class="ln">00415</span>      }
+<span class="ln">00416</span>  
+<span class="ln">00417</span>      public get airdropService(): AirdropService {
+<span class="ln">00418</span>          return ServiceRegistry.get&lt;AirdropService&gt;(&#39;AirdropService&#39;) ?? AirdropService.instance;
+<span class="ln">00419</span>      }
+<span class="ln">00420</span>  
+<span class="ln">00421</span>      public get weaponSelectUI(): WeaponSelectUI {
+<span class="ln">00422</span>          return ServiceRegistry.get&lt;WeaponSelectUI&gt;(&#39;WeaponSelectUI&#39;) ?? WeaponSelectUI.instance;
+<span class="ln">00423</span>      }
+<span class="ln">00424</span>  
+<span class="ln">00425</span>      public get weaponBarUI(): WeaponBarUI {
+<span class="ln">00426</span>          return ServiceRegistry.get&lt;WeaponBarUI&gt;(&#39;WeaponBarUI&#39;) ?? WeaponBarUI.instance;
+<span class="ln">00427</span>      }
+<span class="ln">00428</span>  
+<span class="ln">00429</span>      public get itemService(): ItemService {
+<span class="ln">00430</span>          return ServiceRegistry.get&lt;ItemService&gt;(&#39;ItemService&#39;) ?? ItemService.instance;
+<span class="ln">00431</span>      }
+<span class="ln">00432</span>  
+<span class="ln">00433</span>      public get chestDropManager(): ChestDropManager {
+<span class="ln">00434</span>          return (
+<span class="ln">00435</span>              ServiceRegistry.get&lt;ChestDropManager&gt;(&#39;ChestDropManager&#39;) ?? ChestDropManager.instance
+<span class="ln">00436</span>          );
+<span class="ln">00437</span>      }
+<span class="ln">00438</span>  
+<span class="ln">00439</span>      public get itemCardUI(): ItemCardUI {
+<span class="ln">00440</span>          return ServiceRegistry.get&lt;ItemCardUI&gt;(&#39;ItemCardUI&#39;) ?? ItemCardUI.instance;
+<span class="ln">00441</span>      }
+<span class="ln">00442</span>  
+<span class="ln">00443</span>      public get itemBarUI(): ItemBarUI {
+<span class="ln">00444</span>          return ServiceRegistry.get&lt;ItemBarUI&gt;(&#39;ItemBarUI&#39;) ?? ItemBarUI.instance;
+<span class="ln">00445</span>      }
+<span class="ln">00446</span>  }
+<span class="ln">00447</span>  
+<span class="ln">00448</span>  // ===== FILE: assets/scripts/core/bootstrap/GameplayBootstrap.ts =====
+<span class="ln">00449</span>  import { Node } from &#39;cc&#39;;
+<span class="ln">00450</span>  import { MapGenerator } from &#39;../../gameplay/map/MapGenerator&#39;;</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 10 / 30 页</div>
+  </header>
+  <pre><span class="ln">00451</span>  import { CombatSystem } from &#39;../../gameplay/combat/CombatSystem&#39;;
+<span class="ln">00452</span>  import { WaveLoop } from &#39;../../gameplay/wave/WaveLoop&#39;;
+<span class="ln">00453</span>  
+<span class="ln">00454</span>  export type GameplayNodes = {
+<span class="ln">00455</span>      mapGenerator: MapGenerator;
+<span class="ln">00456</span>      combatSystem: CombatSystem;
+<span class="ln">00457</span>      waveLoop: WaveLoop;
+<span class="ln">00458</span>      waveNode: Node;
+<span class="ln">00459</span>  };
+<span class="ln">00460</span>  
+<span class="ln">00461</span>  /**
+<span class="ln">00462</span>   * GameplayBootstrap
+<span class="ln">00463</span>   * 负责创建与挂载核心玩法系统节点
+<span class="ln">00464</span>   */
+<span class="ln">00465</span>  export class GameplayBootstrap {
+<span class="ln">00466</span>      public static build(container: Node, generateMap: boolean = false): GameplayNodes {
+<span class="ln">00467</span>          const mapNode = new Node(&#39;MapGenerator&#39;);
+<span class="ln">00468</span>          container.addChild(mapNode);
+<span class="ln">00469</span>          const mapGenerator = mapNode.addComponent(MapGenerator);
+<span class="ln">00470</span>          if (generateMap) {
+<span class="ln">00471</span>              mapGenerator.generateProceduralMap();
+<span class="ln">00472</span>          }
+<span class="ln">00473</span>  
+<span class="ln">00474</span>          const combatNode = new Node(&#39;CombatSystem&#39;);
+<span class="ln">00475</span>          container.addChild(combatNode);
+<span class="ln">00476</span>          const combatSystem = combatNode.addComponent(CombatSystem);
+<span class="ln">00477</span>  
+<span class="ln">00478</span>          const waveNode = new Node(&#39;WaveLoop&#39;);
+<span class="ln">00479</span>          container.addChild(waveNode);
+<span class="ln">00480</span>          const waveLoop = waveNode.addComponent(WaveLoop);
+<span class="ln">00481</span>  
+<span class="ln">00482</span>          return { mapGenerator, combatSystem, waveLoop, waveNode };
+<span class="ln">00483</span>      }
+<span class="ln">00484</span>  }
+<span class="ln">00485</span>  
+<span class="ln">00486</span>  // ===== FILE: assets/scripts/core/bootstrap/GameResourceLoader.ts =====
+<span class="ln">00487</span>  import { resources, Prefab, AnimationClip } from &#39;cc&#39;;
+<span class="ln">00488</span>  import { resolveHeroModelConfig } from &#39;../../gameplay/units/HeroModelConfig&#39;;
+<span class="ln">00489</span>  
+<span class="ln">00490</span>  export type LoadProgressCallback = (loaded: number, total: number) =&gt; void;
+<span class="ln">00491</span>  
+<span class="ln">00492</span>  /**
+<span class="ln">00493</span>   * GameResourceLoader
+<span class="ln">00494</span>   * Phase 1: 首屏关键资源 — 用 preloadDir 整目录预加载，绕过 GLB 嵌套路径格式问题。
+<span class="ln">00495</span>   * Phase 2: 后台静默预加载。
+<span class="ln">00496</span>   *
+<span class="ln">00497</span>   * preloadDir 会把目录内所有子资源（含 GLB 生成的 Mesh/Prefab/Material）都加载进缓存，
+<span class="ln">00498</span>   * 无需知道 GLB 在 Cocos 中实际展开成哪个嵌套路径。
+<span class="ln">00499</span>   */
+<span class="ln">00500</span>  export class GameResourceLoader {</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 11 / 30 页</div>
+  </header>
+  <pre><span class="ln">00501</span>      // Phase 1 directories — fully preloaded before game starts
+<span class="ln">00502</span>      private static readonly PHASE1_DIRS = [
+<span class="ln">00503</span>          &#39;ui&#39;, // homepage background + any other UI textures — preload first for fast splash→game transition
+<span class="ln">00504</span>          &#39;building&#39;, // rifle_tower, fencebar, house, spa, barn_3d, gold, radar_3d
+<span class="ln">00505</span>          &#39;enemies/vehicle&#39;, // Tank, Rover, Truck, Turret, RoundRover (wave-1 enemies)
+<span class="ln">00506</span>          &#39;models/nature&#39;, // trees, bushes, rocks
+<span class="ln">00507</span>          &#39;floor&#39;, // all floor textures
+<span class="ln">00508</span>          &#39;character&#39;, // hero GLB + animation clips
+<span class="ln">00509</span>          &#39;icon&#39;, // coin/diamond/weapon/building type icons — needed for HUD &amp; building pads
+<span class="ln">00510</span>          &#39;textures&#39;, // bullet sprites, fog, tower_bullet — needed for combat VFX
+<span class="ln">00511</span>          &#39;weapons&#39;, // weapon models — needed for hero weapon display
+<span class="ln">00512</span>      ];
+<span class="ln">00513</span>  
+<span class="ln">00514</span>      // Phase 2 directories — silently preloaded after game begins
+<span class="ln">00515</span>      private static readonly PHASE2_DIRS = [
+<span class="ln">00516</span>          &#39;enemies/boss&#39;,
+<span class="ln">00517</span>          &#39;enemies/flying&#39;,
+<span class="ln">00518</span>          &#39;enemies/bullet&#39;,
+<span class="ln">00519</span>          &#39;footman&#39;,
+<span class="ln">00520</span>          &#39;effects&#39;,
+<span class="ln">00521</span>          &#39;shaders&#39;,
+<span class="ln">00522</span>      ];
+<span class="ln">00523</span>  
+<span class="ln">00524</span>      /** Phase 1: 等 preloadDir 全部完成，每目录算一个进度单位 */
+<span class="ln">00525</span>      public static loadPhase1(onProgress: LoadProgressCallback): Promise&lt;void&gt; {
+<span class="ln">00526</span>          const dirs = [...this.PHASE1_DIRS];
+<span class="ln">00527</span>          const heroClips = this._heroClipPaths();
+<span class="ln">00528</span>  
+<span class="ln">00529</span>          // hero clips are individual files — treat them as one extra &quot;task&quot;
+<span class="ln">00530</span>          const total = dirs.length + (heroClips.length &gt; 0 ? 1 : 0);
+<span class="ln">00531</span>          if (total === 0) {
+<span class="ln">00532</span>              onProgress(1, 1);
+<span class="ln">00533</span>              return Promise.resolve();
+<span class="ln">00534</span>          }
+<span class="ln">00535</span>  
+<span class="ln">00536</span>          return new Promise(resolve =&gt; {
+<span class="ln">00537</span>              let done = 0;
+<span class="ln">00538</span>              onProgress(0, total);
+<span class="ln">00539</span>  
+<span class="ln">00540</span>              const tick = () =&gt; {
+<span class="ln">00541</span>                  done++;
+<span class="ln">00542</span>                  onProgress(done, total);
+<span class="ln">00543</span>                  if (done &gt;= total) resolve();
+<span class="ln">00544</span>              };
+<span class="ln">00545</span>  
+<span class="ln">00546</span>              for (const dir of dirs) {
+<span class="ln">00547</span>                  resources.preloadDir(dir, (_err: Error | null) =&gt; tick());
+<span class="ln">00548</span>              }
+<span class="ln">00549</span>  
+<span class="ln">00550</span>              if (heroClips.length &gt; 0) {</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 12 / 30 页</div>
+  </header>
+  <pre><span class="ln">00551</span>                  let clipsDone = 0;
+<span class="ln">00552</span>                  for (const path of heroClips) {
+<span class="ln">00553</span>                      resources.load(path, AnimationClip, () =&gt; {
+<span class="ln">00554</span>                          clipsDone++;
+<span class="ln">00555</span>                          if (clipsDone &gt;= heroClips.length) tick();
+<span class="ln">00556</span>                      });
+<span class="ln">00557</span>                  }
+<span class="ln">00558</span>              }
+<span class="ln">00559</span>          });
+<span class="ln">00560</span>      }
+<span class="ln">00561</span>  
+<span class="ln">00562</span>      /** Phase 2: 后台静默预加载，不阻塞游戏 */
+<span class="ln">00563</span>      public static loadPhase2(): void {
+<span class="ln">00564</span>          for (const dir of this.PHASE2_DIRS) {
+<span class="ln">00565</span>              resources.preloadDir(dir);
+<span class="ln">00566</span>          }
+<span class="ln">00567</span>          // Also warm up hero prefab in case it wasn&#39;t in character/ dir
+<span class="ln">00568</span>          const cfg = resolveHeroModelConfig();
+<span class="ln">00569</span>          if (cfg.prefabPath) resources.preload(cfg.prefabPath, Prefab);
+<span class="ln">00570</span>      }
+<span class="ln">00571</span>  
+<span class="ln">00572</span>      // ── internals ─────────────────────────────────────────────────────────────
+<span class="ln">00573</span>  
+<span class="ln">00574</span>      private static _heroClipPaths(): string[] {
+<span class="ln">00575</span>          const cfg = resolveHeroModelConfig();
+<span class="ln">00576</span>          const paths: string[] = [];
+<span class="ln">00577</span>          if (cfg.runClipPath) paths.push(cfg.runClipPath);
+<span class="ln">00578</span>          if (cfg.idleClipPath &amp;&amp; cfg.idleClipPath !== cfg.runClipPath) {
+<span class="ln">00579</span>              paths.push(cfg.idleClipPath);
+<span class="ln">00580</span>          }
+<span class="ln">00581</span>          return paths;
+<span class="ln">00582</span>      }
+<span class="ln">00583</span>  }
+<span class="ln">00584</span>  
+<span class="ln">00585</span>  // ===== FILE: assets/scripts/core/bootstrap/GameStartFlow.ts =====
+<span class="ln">00586</span>  import { Node, assetManager } from &#39;cc&#39;;
+<span class="ln">00587</span>  import { GameManager } from &#39;../managers/GameManager&#39;;
+<span class="ln">00588</span>  import { GameConfig } from &#39;../../data/GameConfig&#39;;
+<span class="ln">00589</span>  import { SpawnBootstrap } from &#39;./SpawnBootstrap&#39;;
+<span class="ln">00590</span>  import { WaveLoop } from &#39;../../gameplay/wave/WaveLoop&#39;;
+<span class="ln">00591</span>  import { MapGenerator } from &#39;../../gameplay/map/MapGenerator&#39;;
+<span class="ln">00592</span>  import { ServiceRegistry } from &#39;../managers/ServiceRegistry&#39;;
+<span class="ln">00593</span>  import { HomePage } from &#39;../../ui/home/HomePage&#39;;
+<span class="ln">00594</span>  import { HUDManager } from &#39;../../ui/HUDManager&#39;;
+<span class="ln">00595</span>  import { LoadingScreen } from &#39;../../ui/LoadingScreen&#39;;
+<span class="ln">00596</span>  import { GameResourceLoader } from &#39;./GameResourceLoader&#39;;
+<span class="ln">00597</span>  import { GameSaveManager } from &#39;../managers/GameSaveManager&#39;;
+<span class="ln">00598</span>  import type { GameSaveDataV2 } from &#39;../managers/GameSaveManager&#39;;
+<span class="ln">00599</span>  import { HeroLevelSystem } from &#39;../../gameplay/units/HeroLevelSystem&#39;;
+<span class="ln">00600</span>  import { HeroWeaponManager } from &#39;../../gameplay/weapons/HeroWeaponManager&#39;;</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 13 / 30 页</div>
+  </header>
+  <pre><span class="ln">00601</span>  import { AirdropService } from &#39;../../gameplay/airdrop/AirdropService&#39;;
+<span class="ln">00602</span>  import { BuffCardService } from &#39;../../gameplay/roguelike/BuffCardService&#39;;
+<span class="ln">00603</span>  import { BuildingManager } from &#39;../../gameplay/buildings/BuildingManager&#39;;
+<span class="ln">00604</span>  import { WaveManager } from &#39;../../gameplay/wave/WaveManager&#39;;
+<span class="ln">00605</span>  import { Base } from &#39;../../gameplay/buildings/Base&#39;;
+<span class="ln">00606</span>  import { ItemService } from &#39;../../gameplay/items/ItemService&#39;;
+<span class="ln">00607</span>  import { ShopInventoryStore } from &#39;../diamond/ShopInventoryStore&#39;;
+<span class="ln">00608</span>  import type { ItemId } from &#39;../../gameplay/items/ItemDefs&#39;;
+<span class="ln">00609</span>  import { Hero } from &#39;../../gameplay/units/Hero&#39;;
+<span class="ln">00610</span>  import { EventManager } from &#39;../managers/EventManager&#39;;
+<span class="ln">00611</span>  import { GameEvents } from &#39;../../data/GameEvents&#39;;
+<span class="ln">00612</span>  
+<span class="ln">00613</span>  export type StartContext = {
+<span class="ln">00614</span>      mapGenerator: MapGenerator | null;
+<span class="ln">00615</span>      waveLoop: WaveLoop | null;
+<span class="ln">00616</span>      containers: {
+<span class="ln">00617</span>          enemy: Node;
+<span class="ln">00618</span>          soldier: Node;
+<span class="ln">00619</span>          building: Node;
+<span class="ln">00620</span>          ui: Node;
+<span class="ln">00621</span>      };
+<span class="ln">00622</span>      onSpawned?: (base: Node, hero: Node) =&gt; void;
+<span class="ln">00623</span>      onAudioPreferenceSelected?: (enabled: boolean) =&gt; void;
+<span class="ln">00624</span>      showHomePage?: boolean;
+<span class="ln">00625</span>      saveData?: GameSaveDataV2 | null;
+<span class="ln">00626</span>  };
+<span class="ln">00627</span>  
+<span class="ln">00628</span>  /**
+<span class="ln">00629</span>   * GameStartFlow
+<span class="ln">00630</span>   * 负责游戏启动与初始实体生成流程
+<span class="ln">00631</span>   */
+<span class="ln">00632</span>  export class GameStartFlow {
+<span class="ln">00633</span>      private static _tiktokResourcesReadyPromise: Promise&lt;void&gt; | null = null;
+<span class="ln">00634</span>  
+<span class="ln">00635</span>      public static run(ctx: StartContext): void {
+<span class="ln">00636</span>          const game = this.gameManager;
+<span class="ln">00637</span>  
+<span class="ln">00638</span>          // If homepage is requested (default true) and not already playing
+<span class="ln">00639</span>          if (ctx.showHomePage !== false) {
+<span class="ln">00640</span>              this.showHomePage(ctx);
+<span class="ln">00641</span>              return;
+<span class="ln">00642</span>          }
+<span class="ln">00643</span>  
+<span class="ln">00644</span>          // Direct start (e.g. restart or debug)
+<span class="ln">00645</span>          this.startGame(ctx);
+<span class="ln">00646</span>          game.startGame();
+<span class="ln">00647</span>      }
+<span class="ln">00648</span>  
+<span class="ln">00649</span>      private static showHomePage(ctx: StartContext) {
+<span class="ln">00650</span>          HUDManager.instance.setVisible(false);</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 14 / 30 页</div>
+  </header>
+  <pre><span class="ln">00651</span>  
+<span class="ln">00652</span>          const homeNode = new Node(&#39;HomePage&#39;);
+<span class="ln">00653</span>          ctx.containers.ui.addChild(homeNode);
+<span class="ln">00654</span>          const homePage = homeNode.addComponent(HomePage);
+<span class="ln">00655</span>  
+<span class="ln">00656</span>          homePage.setOnStartRequested(() =&gt; {
+<span class="ln">00657</span>              homeNode.destroy();
+<span class="ln">00658</span>              const freshCtx = { ...ctx, saveData: null };
+<span class="ln">00659</span>              this._showLoadingScreen(freshCtx);
+<span class="ln">00660</span>          });
+<span class="ln">00661</span>  
+<span class="ln">00662</span>          homePage.setOnContinueRequested(() =&gt; {
+<span class="ln">00663</span>              const saveData = GameSaveManager.instance.load();
+<span class="ln">00664</span>              homeNode.destroy();
+<span class="ln">00665</span>              const continueCtx = { ...ctx, saveData };
+<span class="ln">00666</span>              this._showLoadingScreen(continueCtx);
+<span class="ln">00667</span>          });
+<span class="ln">00668</span>      }
+<span class="ln">00669</span>  
+<span class="ln">00670</span>      private static _showLoadingScreen(ctx: StartContext) {
+<span class="ln">00671</span>          this.ensureTikTokResourcesBundleReady()
+<span class="ln">00672</span>              .catch(err =&gt; {
+<span class="ln">00673</span>                  console.warn(
+<span class="ln">00674</span>                      &#39;[GameStartFlow] TikTok resources bundle gate failed, continue with default loader.&#39;,
+<span class="ln">00675</span>                      err
+<span class="ln">00676</span>                  );
+<span class="ln">00677</span>              })
+<span class="ln">00678</span>              .finally(() =&gt; {
+<span class="ln">00679</span>                  this._showLoadingScreenAfterBundleReady(ctx);
+<span class="ln">00680</span>              });
+<span class="ln">00681</span>      }
+<span class="ln">00682</span>  
+<span class="ln">00683</span>      private static _showLoadingScreenAfterBundleReady(ctx: StartContext) {
+<span class="ln">00684</span>          // onComplete fires AFTER GPU warmup (loading screen still visible during warmup)
+<span class="ln">00685</span>          const screen = LoadingScreen.show(ctx.containers.ui, () =&gt; {
+<span class="ln">00686</span>              GameResourceLoader.loadPhase2();
+<span class="ln">00687</span>          });
+<span class="ln">00688</span>          const audioChoicePromise: Promise&lt;boolean&gt; = screen
+<span class="ln">00689</span>              .waitForAudioChoice()
+<span class="ln">00690</span>              .then(enabled =&gt; {
+<span class="ln">00691</span>                  ctx.onAudioPreferenceSelected?.(enabled);
+<span class="ln">00692</span>                  return enabled;
+<span class="ln">00693</span>              })
+<span class="ln">00694</span>              .catch(err =&gt; {
+<span class="ln">00695</span>                  console.warn(
+<span class="ln">00696</span>                      &#39;[GameStartFlow] Failed to resolve audio preference. Fallback to disabled.&#39;,
+<span class="ln">00697</span>                      err
+<span class="ln">00698</span>                  );
+<span class="ln">00699</span>                  ctx.onAudioPreferenceSelected?.(false);
+<span class="ln">00700</span>                  return false;</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 15 / 30 页</div>
+  </header>
+  <pre><span class="ln">00701</span>              });
+<span class="ln">00702</span>  
+<span class="ln">00703</span>          const phase1ReadyPromise: Promise&lt;boolean&gt; = GameResourceLoader.loadPhase1(
+<span class="ln">00704</span>              (loaded, total) =&gt; {
+<span class="ln">00705</span>                  if (screen.isValid) screen.setProgress(loaded, total);
+<span class="ln">00706</span>              }
+<span class="ln">00707</span>          )
+<span class="ln">00708</span>              .then(() =&gt; true)
+<span class="ln">00709</span>              .catch(err =&gt; {
+<span class="ln">00710</span>                  console.warn(
+<span class="ln">00711</span>                      &#39;[GameStartFlow] Phase1 resource load failed, continue to gameplay.&#39;,
+<span class="ln">00712</span>                      err
+<span class="ln">00713</span>                  );
+<span class="ln">00714</span>                  return false;
+<span class="ln">00715</span>              });
+<span class="ln">00716</span>  
+<span class="ln">00717</span>          Promise.all([phase1ReadyPromise, audioChoicePromise]).then(([phase1Ready]) =&gt; {
+<span class="ln">00718</span>              // Phase 1 in CPU memory. Start game NOW while loading screen covers the scene.
+<span class="ln">00719</span>              // The 3D scene renders behind the loading screen, uploading GPU textures.
+<span class="ln">00720</span>              this.startGame(ctx);
+<span class="ln">00721</span>              this.gameManager.startGame();
+<span class="ln">00722</span>              // Restore coins/score AFTER gameManager.startGame() which resets them to INITIAL_COINS.
+<span class="ln">00723</span>              if (ctx.saveData) {
+<span class="ln">00724</span>                  this.gameManager.setCoins(ctx.saveData.coins);
+<span class="ln">00725</span>                  this.gameManager.setScore(ctx.saveData.score);
+<span class="ln">00726</span>              }
+<span class="ln">00727</span>              if (!screen.isValid) return;
+<span class="ln">00728</span>              if (phase1Ready) {
+<span class="ln">00729</span>                  // GPU warmup: wait 1.0 s (~60 frames) for textures to upload before revealing scene.
+<span class="ln">00730</span>                  screen.scheduleOnce(() =&gt; {
+<span class="ln">00731</span>                      if (screen.isValid) screen.signalReadyToClose();
+<span class="ln">00732</span>                  }, 1.0);
+<span class="ln">00733</span>                  return;
+<span class="ln">00734</span>              }
+<span class="ln">00735</span>              // If phase 1 failed, avoid extra warmup delay and reveal immediately.
+<span class="ln">00736</span>              screen.signalReadyToClose();
+<span class="ln">00737</span>          });
+<span class="ln">00738</span>      }
+<span class="ln">00739</span>  
+<span class="ln">00740</span>      private static ensureTikTokResourcesBundleReady(): Promise&lt;void&gt; {
+<span class="ln">00741</span>          if (!this.isTikTokRuntime()) return Promise.resolve();
+<span class="ln">00742</span>          if (assetManager.getBundle(&#39;resources&#39;)) return Promise.resolve();
+<span class="ln">00743</span>          if (this._tiktokResourcesReadyPromise) return this._tiktokResourcesReadyPromise;
+<span class="ln">00744</span>  
+<span class="ln">00745</span>          const loadBundle = () =&gt;
+<span class="ln">00746</span>              new Promise&lt;void&gt;((resolve, reject) =&gt; {
+<span class="ln">00747</span>                  assetManager.loadBundle(&#39;resources&#39;, err =&gt; {
+<span class="ln">00748</span>                      if (err) {
+<span class="ln">00749</span>                          reject(err);
+<span class="ln">00750</span>                          return;</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 16 / 30 页</div>
+  </header>
+  <pre><span class="ln">00751</span>                      }
+<span class="ln">00752</span>                      resolve();
+<span class="ln">00753</span>                  });
+<span class="ln">00754</span>              });
+<span class="ln">00755</span>  
+<span class="ln">00756</span>          this._tiktokResourcesReadyPromise = loadBundle().catch(firstErr =&gt; {
+<span class="ln">00757</span>              const ttLike = (
+<span class="ln">00758</span>                  globalThis as unknown as {
+<span class="ln">00759</span>                      tt?: {
+<span class="ln">00760</span>                          loadSubpackage?: (options: {
+<span class="ln">00761</span>                              name: string;
+<span class="ln">00762</span>                              success?: () =&gt; void;
+<span class="ln">00763</span>                              fail?: (err: unknown) =&gt; void;
+<span class="ln">00764</span>                          }) =&gt; void;
+<span class="ln">00765</span>                      };
+<span class="ln">00766</span>                  }
+<span class="ln">00767</span>              ).tt;
+<span class="ln">00768</span>  
+<span class="ln">00769</span>              if (!ttLike?.loadSubpackage) {
+<span class="ln">00770</span>                  throw firstErr;
+<span class="ln">00771</span>              }
+<span class="ln">00772</span>  
+<span class="ln">00773</span>              return new Promise&lt;void&gt;((resolve, reject) =&gt; {
+<span class="ln">00774</span>                  ttLike.loadSubpackage?.({
+<span class="ln">00775</span>                      name: &#39;resources&#39;,
+<span class="ln">00776</span>                      success: () =&gt; {
+<span class="ln">00777</span>                          loadBundle().then(resolve).catch(reject);
+<span class="ln">00778</span>                      },
+<span class="ln">00779</span>                      fail: reject,
+<span class="ln">00780</span>                  });
+<span class="ln">00781</span>              });
+<span class="ln">00782</span>          });
+<span class="ln">00783</span>  
+<span class="ln">00784</span>          return this._tiktokResourcesReadyPromise;
+<span class="ln">00785</span>      }
+<span class="ln">00786</span>  
+<span class="ln">00787</span>      private static isTikTokRuntime(): boolean {
+<span class="ln">00788</span>          const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
+<span class="ln">00789</span>          return g.__GVR_PLATFORM__ === &#39;tiktok&#39; || typeof g.tt !== &#39;undefined&#39;;
+<span class="ln">00790</span>      }
+<span class="ln">00791</span>  
+<span class="ln">00792</span>      // Refactored actual start logic (Map generation, Spawning)
+<span class="ln">00793</span>      private static startGame(ctx: StartContext) {
+<span class="ln">00794</span>          // Show HUD when game starts
+<span class="ln">00795</span>          HUDManager.instance.setVisible(true);
+<span class="ln">00796</span>  
+<span class="ln">00797</span>          if (ctx.mapGenerator) {
+<span class="ln">00798</span>              ctx.mapGenerator.generateProceduralMap();
+<span class="ln">00799</span>          }
+<span class="ln">00800</span>  </pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 17 / 30 页</div>
+  </header>
+  <pre><span class="ln">00801</span>          const spawned = SpawnBootstrap.spawn(ctx.containers);
+<span class="ln">00802</span>          ctx.onSpawned?.(spawned.base, spawned.hero);
+<span class="ln">00803</span>  
+<span class="ln">00804</span>          // Load shop purchases from home screen into ItemService for this run
+<span class="ln">00805</span>          const shopItems = ShopInventoryStore.drainItems();
+<span class="ln">00806</span>          for (const entry of shopItems) {
+<span class="ln">00807</span>              ItemService.instance.addItem(entry.id as ItemId, entry.count);
+<span class="ln">00808</span>          }
+<span class="ln">00809</span>  
+<span class="ln">00810</span>          const startingWave = ctx.saveData?.waveNumber ?? 1;
+<span class="ln">00811</span>          SpawnBootstrap.startWaves(ctx.waveLoop, GameConfig.WAVE.FIRST_WAVE_DELAY, startingWave);
+<span class="ln">00812</span>  
+<span class="ln">00813</span>          if (ctx.saveData) {
+<span class="ln">00814</span>              this.applyPostStartRestore(ctx.saveData, spawned.base, spawned.hero);
+<span class="ln">00815</span>          }
+<span class="ln">00816</span>      }
+<span class="ln">00817</span>  
+<span class="ln">00818</span>      private static applyPostStartRestore(save: GameSaveDataV2, base: Node, hero: Node): void {
+<span class="ln">00819</span>          // NOTE: coins/score are intentionally NOT set here — gameManager.startGame() resets them
+<span class="ln">00820</span>          // to INITIAL_COINS after this method runs. They are applied in _showLoadingScreen instead.
+<span class="ln">00821</span>  
+<span class="ln">00822</span>          // Suppress the unconditional GAME_START weapon offer — player already has weapons.
+<span class="ln">00823</span>          AirdropService.instance.suppressInitialOffer();
+<span class="ln">00824</span>  
+<span class="ln">00825</span>          HeroLevelSystem.instance.restoreState(save.heroLevel, save.heroXp);
+<span class="ln">00826</span>  
+<span class="ln">00827</span>          if (save.weapons &amp;&amp; save.weapons.length &gt; 0) {
+<span class="ln">00828</span>              HeroWeaponManager.instance.restoreInventory(save.weapons, save.activeWeaponType);
+<span class="ln">00829</span>          }
+<span class="ln">00830</span>  
+<span class="ln">00831</span>          if (save.buildings &amp;&amp; save.buildings.length &gt; 0) {
+<span class="ln">00832</span>              BuildingManager.instance.restoreFromSave(save.buildings);
+<span class="ln">00833</span>          }
+<span class="ln">00834</span>  
+<span class="ln">00835</span>          // Fast-forward WaveManager boss schedule &amp; lane unlocks to match restored wave.
+<span class="ln">00836</span>          if (save.waveNumber &gt; 1) {
+<span class="ln">00837</span>              WaveManager.instance.restoreToWave(save.waveNumber);
+<span class="ln">00838</span>          }
+<span class="ln">00839</span>  
+<span class="ln">00840</span>          const baseComp = base.getComponent(Base);
+<span class="ln">00841</span>          if (baseComp) {
+<span class="ln">00842</span>              const targetBaseLevel = Math.max(1, Math.floor(save.baseLevel ?? 1));
+<span class="ln">00843</span>              if (targetBaseLevel &gt; baseComp.level) {
+<span class="ln">00844</span>                  baseComp.restoreToLevel(targetBaseLevel);
+<span class="ln">00845</span>              }
+<span class="ln">00846</span>              baseComp.syncUpgradePadForCurrentLevel();
+<span class="ln">00847</span>              // Replay base-upgrade side effects (hero/barracks scaling) without opening buff-card UI.
+<span class="ln">00848</span>              this.eventManager.emit(GameEvents.BASE_UPGRADE_READY, {
+<span class="ln">00849</span>                  baseLevel: targetBaseLevel,
+<span class="ln">00850</span>                  suppressCardDraw: true,</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 18 / 30 页</div>
+  </header>
+  <pre><span class="ln">00851</span>              });
+<span class="ln">00852</span>          }
+<span class="ln">00853</span>          if (baseComp &amp;&amp; typeof save.baseHpRatio === &#39;number&#39;) {
+<span class="ln">00854</span>              baseComp.currentHp = Math.max(1, Math.floor(save.baseHpRatio * baseComp.maxHp));
+<span class="ln">00855</span>              baseComp.refreshHudHp();
+<span class="ln">00856</span>          }
+<span class="ln">00857</span>  
+<span class="ln">00858</span>          if (save.buffCardIds &amp;&amp; save.buffCardIds.length &gt; 0) {
+<span class="ln">00859</span>              BuffCardService.instance.restorePickedHistory(save.buffCardIds);
+<span class="ln">00860</span>          }
+<span class="ln">00861</span>  
+<span class="ln">00862</span>          if (typeof save.nextOfferWave === &#39;number&#39; &amp;&amp; save.nextOfferWave &gt; 1) {
+<span class="ln">00863</span>              AirdropService.instance.setNextOfferWave(save.nextOfferWave);
+<span class="ln">00864</span>          }
+<span class="ln">00865</span>  
+<span class="ln">00866</span>          if (save.items &amp;&amp; save.items.length &gt; 0) {
+<span class="ln">00867</span>              ItemService.instance.restoreFromSave(save.items);
+<span class="ln">00868</span>          }
+<span class="ln">00869</span>  
+<span class="ln">00870</span>          const heroComp = hero.getComponent(Hero);
+<span class="ln">00871</span>          if (heroComp) {
+<span class="ln">00872</span>              heroComp.restoreCoinCount(save.heroCoinCount);
+<span class="ln">00873</span>          }
+<span class="ln">00874</span>  
+<span class="ln">00875</span>          console.log(
+<span class="ln">00876</span>              `[GameStartFlow] Restored save: wave=${save.waveNumber}, baseLv=${Math.max(1, Math.floor(save.baseLevel ?? 1))}, gmCoins=${save.coins}, heroCoins=${save.heroCoinCount}, heroLv=${save.heroLevel}, buildings=${save.buildings?.length ?? 0}`
+<span class="ln">00877</span>          );
+<span class="ln">00878</span>      }
+<span class="ln">00879</span>  
+<span class="ln">00880</span>      private static get gameManager(): GameManager {
+<span class="ln">00881</span>          return ServiceRegistry.get&lt;GameManager&gt;(&#39;GameManager&#39;) ?? GameManager.instance;
+<span class="ln">00882</span>      }
+<span class="ln">00883</span>  
+<span class="ln">00884</span>      private static get eventManager(): EventManager {
+<span class="ln">00885</span>          return ServiceRegistry.get&lt;EventManager&gt;(&#39;EventManager&#39;) ?? EventManager.instance;
+<span class="ln">00886</span>      }
+<span class="ln">00887</span>  }
+<span class="ln">00888</span>  
+<span class="ln">00889</span>  // ===== FILE: assets/scripts/core/bootstrap/ResourcePreloader.ts =====
+<span class="ln">00890</span>  import { resources, Texture2D, Prefab, AnimationClip } from &#39;cc&#39;;
+<span class="ln">00891</span>  import { resolveHeroModelConfig } from &#39;../../gameplay/units/HeroModelConfig&#39;;
+<span class="ln">00892</span>  import { GameConfig } from &#39;../../data/GameConfig&#39;;
+<span class="ln">00893</span>  
+<span class="ln">00894</span>  /**
+<span class="ln">00895</span>   * ResourcePreloader
+<span class="ln">00896</span>   * 在游戏启动时预加载运行时懒加载资源，避免首波帧率抖动。
+<span class="ln">00897</span>   *
+<span class="ln">00898</span>   * 调用 preloadAll() 即可触发所有资源的后台加载。
+<span class="ln">00899</span>   * 加载结果缓存在各自的工厂/管理器中（通过 resources 引用计数），
+<span class="ln">00900</span>   * 后续运行时 load 会命中缓存，不再产生 IO 开销。</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 19 / 30 页</div>
+  </header>
+  <pre><span class="ln">00901</span>   */
+<span class="ln">00902</span>  export class ResourcePreloader {
+<span class="ln">00903</span>      private static _started = false;
+<span class="ln">00904</span>  
+<span class="ln">00905</span>      /** 一次性触发所有关键资源的预加载 */
+<span class="ln">00906</span>      public static preloadAll(): void {
+<span class="ln">00907</span>          if (this._started) return;
+<span class="ln">00908</span>          this._started = true;
+<span class="ln">00909</span>  
+<span class="ln">00910</span>          this.preloadEnemyPaperDollTextures();
+<span class="ln">00911</span>          this.preloadSoldierGooseTextures();
+<span class="ln">00912</span>          this.preloadWeaponVFXTextures();
+<span class="ln">00913</span>          this.preloadBuildingModelPrefabs();
+<span class="ln">00914</span>          this.preloadHeroAssets();
+<span class="ln">00915</span>          this.preloadHeroWeaponVisuals();
+<span class="ln">00916</span>      }
+<span class="ln">00917</span>  
+<span class="ln">00918</span>      // === Enemy Paper-Doll 贴图 ===
+<span class="ln">00919</span>  
+<span class="ln">00920</span>      private static readonly ENEMY_TEXTURE_PATHS = [
+<span class="ln">00921</span>          &#39;enemies/Robot/Body&#39;,
+<span class="ln">00922</span>          &#39;enemies/Robot/Head&#39;,
+<span class="ln">00923</span>          &#39;enemies/Robot/LeftArm&#39;,
+<span class="ln">00924</span>          &#39;enemies/Robot/RightArm&#39;,
+<span class="ln">00925</span>          &#39;enemies/Robot/LeftLeg&#39;,
+<span class="ln">00926</span>          &#39;enemies/Robot/RightLeg&#39;,
+<span class="ln">00927</span>          &#39;enemies/robovacuum_blue&#39;,
+<span class="ln">00928</span>          &#39;enemies/robovacuum_blue.webp&#39;,
+<span class="ln">00929</span>      ];
+<span class="ln">00930</span>  
+<span class="ln">00931</span>      private static preloadEnemyPaperDollTextures(): void {
+<span class="ln">00932</span>          for (const path of this.ENEMY_TEXTURE_PATHS) {
+<span class="ln">00933</span>              // 尝试两种路径格式（与 EnemyPaperDollAnimator.loadFrameFromTexture 一致）
+<span class="ln">00934</span>              resources.preload(path, Texture2D);
+<span class="ln">00935</span>              resources.preload(`${path}/texture`, Texture2D);
+<span class="ln">00936</span>          }
+<span class="ln">00937</span>      }
+<span class="ln">00938</span>  
+<span class="ln">00939</span>      private static readonly SOLDIER_GOOSE_TEXTURE_PATHS = [
+<span class="ln">00940</span>          &#39;footman/goose/Run&#39;,
+<span class="ln">00941</span>          &#39;footman/goose/Flap&#39;,
+<span class="ln">00942</span>      ];
+<span class="ln">00943</span>  
+<span class="ln">00944</span>      private static preloadSoldierGooseTextures(): void {
+<span class="ln">00945</span>          for (const path of this.SOLDIER_GOOSE_TEXTURE_PATHS) {
+<span class="ln">00946</span>              resources.preload(path, Texture2D);
+<span class="ln">00947</span>              resources.preload(`${path}/texture`, Texture2D);
+<span class="ln">00948</span>          }
+<span class="ln">00949</span>      }
+<span class="ln">00950</span>  </pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 20 / 30 页</div>
+  </header>
+  <pre><span class="ln">00951</span>      // === WeaponVFX 贴图 ===
+<span class="ln">00952</span>  
+<span class="ln">00953</span>      private static preloadWeaponVFXTextures(): void {
+<span class="ln">00954</span>          resources.preload(&#39;textures/bullet/texture&#39;, Texture2D);
+<span class="ln">00955</span>          resources.preload(&#39;textures/bullet&#39;, Texture2D);
+<span class="ln">00956</span>          resources.preload(&#39;floor/grass/texture&#39;, Texture2D);
+<span class="ln">00957</span>          resources.preload(&#39;floor/grass&#39;, Texture2D);
+<span class="ln">00958</span>          resources.preload(&#39;floor/grass.webp&#39;, Texture2D);
+<span class="ln">00959</span>          resources.preload(&#39;floor/Dirt_02/texture&#39;, Texture2D);
+<span class="ln">00960</span>          resources.preload(&#39;floor/Dirt_02&#39;, Texture2D);
+<span class="ln">00961</span>          resources.preload(&#39;floor/Dirt_02.webp&#39;, Texture2D);
+<span class="ln">00962</span>          resources.preload(&#39;textures/droplet/texture&#39;, Texture2D);
+<span class="ln">00963</span>          resources.preload(&#39;textures/droplet&#39;, Texture2D);
+<span class="ln">00964</span>          resources.preload(&#39;textures/droplet.webp&#39;, Texture2D);
+<span class="ln">00965</span>          resources.preload(&#39;building/sunflower/texture&#39;, Texture2D);
+<span class="ln">00966</span>          resources.preload(&#39;building/sunflower&#39;, Texture2D);
+<span class="ln">00967</span>          resources.preload(&#39;building/sunflower.webp&#39;, Texture2D);
+<span class="ln">00968</span>          resources.preload(&#39;building/radar_3d&#39;, Prefab);
+<span class="ln">00969</span>          resources.preload(&#39;effects/star_coin&#39;, Prefab);
+<span class="ln">00970</span>          resources.preload(&#39;effects/star_coin/star_coin&#39;, Prefab);
+<span class="ln">00971</span>      }
+<span class="ln">00972</span>  
+<span class="ln">00973</span>      private static readonly BUILDING_MODEL_PREFAB_PATHS = [
+<span class="ln">00974</span>          &#39;building/barn_3d&#39;,
+<span class="ln">00975</span>          &#39;building/barn_3d/barn_3d&#39;,
+<span class="ln">00976</span>      ];
+<span class="ln">00977</span>  
+<span class="ln">00978</span>      private static preloadBuildingModelPrefabs(): void {
+<span class="ln">00979</span>          for (const path of this.BUILDING_MODEL_PREFAB_PATHS) {
+<span class="ln">00980</span>              resources.preload(path, Prefab);
+<span class="ln">00981</span>          }
+<span class="ln">00982</span>      }
+<span class="ln">00983</span>  
+<span class="ln">00984</span>      // === Hero 模型 + 动画 ===
+<span class="ln">00985</span>  
+<span class="ln">00986</span>      private static preloadHeroAssets(): void {
+<span class="ln">00987</span>          const config = resolveHeroModelConfig();
+<span class="ln">00988</span>          if (!config) return;
+<span class="ln">00989</span>  
+<span class="ln">00990</span>          // Prefab
+<span class="ln">00991</span>          const prefabPaths = [config.prefabPath, ...config.prefabFallbacks].filter(Boolean);
+<span class="ln">00992</span>          for (const p of prefabPaths) {
+<span class="ln">00993</span>              resources.preload(p, Prefab);
+<span class="ln">00994</span>          }
+<span class="ln">00995</span>  
+<span class="ln">00996</span>          // Run clip
+<span class="ln">00997</span>          const runPaths = [config.runClipPath, ...config.runClipFallbacks].filter(Boolean);
+<span class="ln">00998</span>          for (const p of runPaths) {
+<span class="ln">00999</span>              resources.preload(p as string, AnimationClip);
+<span class="ln">01000</span>          }</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 21 / 30 页</div>
+  </header>
+  <pre><span class="ln">01001</span>  
+<span class="ln">01002</span>          // Idle clip
+<span class="ln">01003</span>          const idlePaths = [config.idleClipPath, ...config.idleClipFallbacks].filter(Boolean);
+<span class="ln">01004</span>          for (const p of idlePaths) {
+<span class="ln">01005</span>              resources.preload(p as string, AnimationClip);
+<span class="ln">01006</span>          }
+<span class="ln">01007</span>      }
+<span class="ln">01008</span>  
+<span class="ln">01009</span>      private static preloadHeroWeaponVisuals(): void {
+<span class="ln">01010</span>          const visuals = (GameConfig.HERO as unknown as { WEAPON_VISUALS?: unknown }).WEAPON_VISUALS;
+<span class="ln">01011</span>          if (!visuals || typeof visuals !== &#39;object&#39;) return;
+<span class="ln">01012</span>  
+<span class="ln">01013</span>          const entries = visuals as Record&lt;
+<span class="ln">01014</span>              string,
+<span class="ln">01015</span>              { prefab?: { path?: string; fallbacks?: string[]; uuid?: string } }
+<span class="ln">01016</span>          &gt;;
+<span class="ln">01017</span>          for (const key of Object.keys(entries)) {
+<span class="ln">01018</span>              const prefabCfg = entries[key]?.prefab;
+<span class="ln">01019</span>              const paths = [prefabCfg?.path, ...(prefabCfg?.fallbacks ?? [])].filter(Boolean);
+<span class="ln">01020</span>              for (const p of paths) {
+<span class="ln">01021</span>                  resources.preload(p as string, Prefab);
+<span class="ln">01022</span>              }
+<span class="ln">01023</span>          }
+<span class="ln">01024</span>      }
+<span class="ln">01025</span>  }
+<span class="ln">01026</span>  
+<span class="ln">01027</span>  // ===== FILE: assets/scripts/core/bootstrap/RuntimeSystemsBootstrap.ts =====
+<span class="ln">01028</span>  import { Node } from &#39;cc&#39;;
+<span class="ln">01029</span>  import { PlayerInputAdapter } from &#39;../input/PlayerInputAdapter&#39;;
+<span class="ln">01030</span>  import { BuildingSystemTick } from &#39;../../gameplay/buildings/BuildingSystemTick&#39;;
+<span class="ln">01031</span>  
+<span class="ln">01032</span>  export type RuntimeSystems = {
+<span class="ln">01033</span>      inputAdapter: PlayerInputAdapter;
+<span class="ln">01034</span>  };
+<span class="ln">01035</span>  
+<span class="ln">01036</span>  /**
+<span class="ln">01037</span>   * RuntimeSystemsBootstrap
+<span class="ln">01038</span>   * 负责创建运行时系统（输入、建造系统调度等）
+<span class="ln">01039</span>   */
+<span class="ln">01040</span>  export class RuntimeSystemsBootstrap {
+<span class="ln">01041</span>      public static build(container: Node): RuntimeSystems {
+<span class="ln">01042</span>          const inputNode = new Node(&#39;PlayerInput&#39;);
+<span class="ln">01043</span>          container.addChild(inputNode);
+<span class="ln">01044</span>          const inputAdapter = inputNode.addComponent(PlayerInputAdapter);
+<span class="ln">01045</span>  
+<span class="ln">01046</span>          const buildingNode = new Node(&#39;BuildingSystem&#39;);
+<span class="ln">01047</span>          container.addChild(buildingNode);
+<span class="ln">01048</span>          buildingNode.addComponent(BuildingSystemTick);
+<span class="ln">01049</span>  
+<span class="ln">01050</span>          return { inputAdapter };</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 22 / 30 页</div>
+  </header>
+  <pre><span class="ln">01051</span>      }
+<span class="ln">01052</span>  }
+<span class="ln">01053</span>  
+<span class="ln">01054</span>  // ===== FILE: assets/scripts/core/bootstrap/SceneGraphBuilder.ts =====
+<span class="ln">01055</span>  import { Node } from &#39;cc&#39;;
+<span class="ln">01056</span>  import { CoinDropManager } from &#39;../../gameplay/economy/CoinDropManager&#39;;
+<span class="ln">01057</span>  import { EffectManager } from &#39;../managers/EffectManager&#39;;
+<span class="ln">01058</span>  import { ServiceRegistry } from &#39;../managers/ServiceRegistry&#39;;
+<span class="ln">01059</span>  
+<span class="ln">01060</span>  export type SceneGraphNodes = {
+<span class="ln">01061</span>      container: Node;
+<span class="ln">01062</span>      enemyContainer: Node;
+<span class="ln">01063</span>      soldierContainer: Node;
+<span class="ln">01064</span>      buildingContainer: Node;
+<span class="ln">01065</span>      coinContainer: Node;
+<span class="ln">01066</span>      effectContainer: Node;
+<span class="ln">01067</span>  };
+<span class="ln">01068</span>  
+<span class="ln">01069</span>  /**
+<span class="ln">01070</span>   * SceneGraphBuilder
+<span class="ln">01071</span>   * 负责创建与组织场景内核心容器节点
+<span class="ln">01072</span>   */
+<span class="ln">01073</span>  export class SceneGraphBuilder {
+<span class="ln">01074</span>      public static build(root: Node): SceneGraphNodes {
+<span class="ln">01075</span>          const old = root.getChildByName(&#39;GameContainer&#39;);
+<span class="ln">01076</span>          if (old) {
+<span class="ln">01077</span>              old.destroy();
+<span class="ln">01078</span>          }
+<span class="ln">01079</span>  
+<span class="ln">01080</span>          const container = new Node(&#39;GameContainer&#39;);
+<span class="ln">01081</span>          root.addChild(container);
+<span class="ln">01082</span>  
+<span class="ln">01083</span>          const enemyContainer = new Node(&#39;Enemies&#39;);
+<span class="ln">01084</span>          const soldierContainer = new Node(&#39;Soldiers&#39;);
+<span class="ln">01085</span>          const buildingContainer = new Node(&#39;Buildings&#39;);
+<span class="ln">01086</span>          const coinContainer = new Node(&#39;Coins&#39;);
+<span class="ln">01087</span>  
+<span class="ln">01088</span>          container.addChild(enemyContainer);
+<span class="ln">01089</span>          container.addChild(soldierContainer);
+<span class="ln">01090</span>          container.addChild(buildingContainer);
+<span class="ln">01091</span>          container.addChild(coinContainer);
+<span class="ln">01092</span>  
+<span class="ln">01093</span>          SceneGraphBuilder.coinDropManager.initialize(coinContainer);
+<span class="ln">01094</span>  
+<span class="ln">01095</span>          const effectContainer = new Node(&#39;Effects&#39;);
+<span class="ln">01096</span>          container.addChild(effectContainer);
+<span class="ln">01097</span>          SceneGraphBuilder.effectManager.initialize(effectContainer);
+<span class="ln">01098</span>  
+<span class="ln">01099</span>          return {
+<span class="ln">01100</span>              container,</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 23 / 30 页</div>
+  </header>
+  <pre><span class="ln">01101</span>              enemyContainer,
+<span class="ln">01102</span>              soldierContainer,
+<span class="ln">01103</span>              buildingContainer,
+<span class="ln">01104</span>              coinContainer,
+<span class="ln">01105</span>              effectContainer,
+<span class="ln">01106</span>          };
+<span class="ln">01107</span>      }
+<span class="ln">01108</span>  
+<span class="ln">01109</span>      private static get coinDropManager(): CoinDropManager {
+<span class="ln">01110</span>          return ServiceRegistry.get&lt;CoinDropManager&gt;(&#39;CoinDropManager&#39;) ?? CoinDropManager.instance;
+<span class="ln">01111</span>      }
+<span class="ln">01112</span>  
+<span class="ln">01113</span>      private static get effectManager(): EffectManager {
+<span class="ln">01114</span>          return ServiceRegistry.get&lt;EffectManager&gt;(&#39;EffectManager&#39;) ?? EffectManager.instance;
+<span class="ln">01115</span>      }
+<span class="ln">01116</span>  }
+<span class="ln">01117</span>  
+<span class="ln">01118</span>  // ===== FILE: assets/scripts/core/bootstrap/ServiceRegistrar.ts =====
+<span class="ln">01119</span>  import { Node } from &#39;cc&#39;;
+<span class="ln">01120</span>  import { ServiceRegistry } from &#39;../managers/ServiceRegistry&#39;;
+<span class="ln">01121</span>  import { EventManager } from &#39;../managers/EventManager&#39;;
+<span class="ln">01122</span>  import { GameManager } from &#39;../managers/GameManager&#39;;
+<span class="ln">01123</span>  import { HUDManager } from &#39;../../ui/HUDManager&#39;;
+<span class="ln">01124</span>  import { BuildingManager } from &#39;../../gameplay/buildings/BuildingManager&#39;;
+<span class="ln">01125</span>  import { BuildingRegistry } from &#39;../../gameplay/buildings/BuildingRegistry&#39;;
+<span class="ln">01126</span>  import { EffectManager } from &#39;../managers/EffectManager&#39;;
+<span class="ln">01127</span>  import { WaveManager } from &#39;../../gameplay/wave/WaveManager&#39;;
+<span class="ln">01128</span>  import { WaveService } from &#39;../managers/WaveService&#39;;
+<span class="ln">01129</span>  import { PoolManager } from &#39;../managers/PoolManager&#39;;
+<span class="ln">01130</span>  import { CoinDropManager } from &#39;../../gameplay/economy/CoinDropManager&#39;;
+<span class="ln">01131</span>  import { UnitFactory } from &#39;../../gameplay/units/UnitFactory&#39;;
+<span class="ln">01132</span>  import { BuffCardService } from &#39;../../gameplay/roguelike/BuffCardService&#39;;
+<span class="ln">01133</span>  import { BuffCardUI } from &#39;../../ui/BuffCardUI&#39;;
+<span class="ln">01134</span>  import { TowerUpgradeCardService } from &#39;../../gameplay/roguelike/TowerUpgradeCardService&#39;;
+<span class="ln">01135</span>  import { TowerUpgradeCardUI } from &#39;../../ui/TowerUpgradeCardUI&#39;;
+<span class="ln">01136</span>  import { HeroWeaponManager } from &#39;../../gameplay/weapons/HeroWeaponManager&#39;;
+<span class="ln">01137</span>  import { AirdropService } from &#39;../../gameplay/airdrop/AirdropService&#39;;
+<span class="ln">01138</span>  import { WeaponSelectUI } from &#39;../../ui/WeaponSelectUI&#39;;
+<span class="ln">01139</span>  import { WeaponBarUI } from &#39;../../ui/WeaponBarUI&#39;;
+<span class="ln">01140</span>  
+<span class="ln">01141</span>  /**
+<span class="ln">01142</span>   * ServiceRegistrar
+<span class="ln">01143</span>   * 统一注册全局服务入口
+<span class="ln">01144</span>   */
+<span class="ln">01145</span>  export class ServiceRegistrar {
+<span class="ln">01146</span>      public static registerCore(): void {
+<span class="ln">01147</span>          ServiceRegistry.register(&#39;EventManager&#39;, EventManager.instance);
+<span class="ln">01148</span>          ServiceRegistry.register(&#39;GameManager&#39;, GameManager.instance);
+<span class="ln">01149</span>          ServiceRegistry.register(&#39;HUDManager&#39;, HUDManager.instance);
+<span class="ln">01150</span>          ServiceRegistry.register(&#39;BuildingManager&#39;, BuildingManager.instance);</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 24 / 30 页</div>
+  </header>
+  <pre><span class="ln">01151</span>          ServiceRegistry.register(&#39;BuildingRegistry&#39;, BuildingRegistry.instance);
+<span class="ln">01152</span>          ServiceRegistry.register(&#39;EffectManager&#39;, EffectManager.instance);
+<span class="ln">01153</span>          ServiceRegistry.register(&#39;CoinDropManager&#39;, CoinDropManager.instance);
+<span class="ln">01154</span>          ServiceRegistry.register(&#39;WaveManager&#39;, WaveManager.instance);
+<span class="ln">01155</span>          ServiceRegistry.register(&#39;WaveRuntime&#39;, WaveManager.instance);
+<span class="ln">01156</span>          ServiceRegistry.register(&#39;WaveService&#39;, WaveService.instance);
+<span class="ln">01157</span>          ServiceRegistry.register(&#39;PoolManager&#39;, PoolManager.instance);
+<span class="ln">01158</span>          // 注册士兵工厂池（预热 5 个实例，避免首波实例化卡顿）
+<span class="ln">01159</span>          PoolManager.instance.registerFactoryPool(
+<span class="ln">01160</span>              &#39;soldier_basic&#39;,
+<span class="ln">01161</span>              () =&gt; UnitFactory.createSoldier(null),
+<span class="ln">01162</span>              0
+<span class="ln">01163</span>          );
+<span class="ln">01164</span>          // Fallback spawner when soldier pool is not registered
+<span class="ln">01165</span>          ServiceRegistry.register(&#39;SoldierSpawner&#39;, (parent: Node, x: number, z: number) =&gt;
+<span class="ln">01166</span>              UnitFactory.createSoldier(parent, x, z)
+<span class="ln">01167</span>          );
+<span class="ln">01168</span>          ServiceRegistry.register(&#39;BuffCardService&#39;, BuffCardService.instance);
+<span class="ln">01169</span>          ServiceRegistry.register(&#39;BuffCardUI&#39;, BuffCardUI.instance);
+<span class="ln">01170</span>          ServiceRegistry.register(&#39;TowerUpgradeCardService&#39;, TowerUpgradeCardService.instance);
+<span class="ln">01171</span>          ServiceRegistry.register(&#39;TowerUpgradeCardUI&#39;, TowerUpgradeCardUI.instance);
+<span class="ln">01172</span>          ServiceRegistry.register(&#39;HeroWeaponManager&#39;, HeroWeaponManager.instance);
+<span class="ln">01173</span>          ServiceRegistry.register(&#39;AirdropService&#39;, AirdropService.instance);
+<span class="ln">01174</span>          ServiceRegistry.register(&#39;WeaponSelectUI&#39;, WeaponSelectUI.instance);
+<span class="ln">01175</span>          ServiceRegistry.register(&#39;WeaponBarUI&#39;, WeaponBarUI.instance);
+<span class="ln">01176</span>      }
+<span class="ln">01177</span>  }
+<span class="ln">01178</span>  
+<span class="ln">01179</span>  // ===== FILE: assets/scripts/core/bootstrap/SpawnBootstrap.ts =====
+<span class="ln">01180</span>  import { Node } from &#39;cc&#39;;
+<span class="ln">01181</span>  import { GameConfig } from &#39;../../data/GameConfig&#39;;
+<span class="ln">01182</span>  import { BuildingFactory } from &#39;../../gameplay/buildings/BuildingFactory&#39;;
+<span class="ln">01183</span>  import { UnitFactory } from &#39;../../gameplay/units/UnitFactory&#39;;
+<span class="ln">01184</span>  import { CameraRig } from &#39;../camera/CameraRig&#39;;
+<span class="ln">01185</span>  import { BuildingManager } from &#39;../../gameplay/buildings/BuildingManager&#39;;
+<span class="ln">01186</span>  import { BuildingPadSpawner } from &#39;../../gameplay/buildings/BuildingPadSpawner&#39;;
+<span class="ln">01187</span>  import { WaveManager } from &#39;../../gameplay/wave/WaveManager&#39;;
+<span class="ln">01188</span>  import { GameManager } from &#39;../managers/GameManager&#39;;
+<span class="ln">01189</span>  import { WaveLoop } from &#39;../../gameplay/wave/WaveLoop&#39;;
+<span class="ln">01190</span>  import { ServiceRegistry } from &#39;../managers/ServiceRegistry&#39;;
+<span class="ln">01191</span>  import { UIResponsive } from &#39;../../ui/UIResponsive&#39;;
+<span class="ln">01192</span>  
+<span class="ln">01193</span>  export type SpawnResult = {
+<span class="ln">01194</span>      base: Node;
+<span class="ln">01195</span>      hero: Node;
+<span class="ln">01196</span>  };
+<span class="ln">01197</span>  
+<span class="ln">01198</span>  /**
+<span class="ln">01199</span>   * SpawnBootstrap
+<span class="ln">01200</span>   * 负责初始实体创建与波次/相机/建造点的装配</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 25 / 30 页</div>
+  </header>
+  <pre><span class="ln">01201</span>   */
+<span class="ln">01202</span>  export class SpawnBootstrap {
+<span class="ln">01203</span>      public static spawn(containers: { enemy: Node; soldier: Node; building: Node }): SpawnResult {
+<span class="ln">01204</span>          const spawnX = GameConfig.MAP.BASE_SPAWN.x;
+<span class="ln">01205</span>          const spawnZ = GameConfig.MAP.BASE_SPAWN.z;
+<span class="ln">01206</span>  
+<span class="ln">01207</span>          const base = BuildingFactory.createBase(
+<span class="ln">01208</span>              containers.building,
+<span class="ln">01209</span>              spawnX,
+<span class="ln">01210</span>              spawnZ,
+<span class="ln">01211</span>              GameConfig.BUILDING.BASE_START_HP
+<span class="ln">01212</span>          );
+<span class="ln">01213</span>  
+<span class="ln">01214</span>          const hero = UnitFactory.createHero(
+<span class="ln">01215</span>              containers.soldier,
+<span class="ln">01216</span>              spawnX + GameConfig.MAP.HERO_SPAWN_OFFSET.x,
+<span class="ln">01217</span>              spawnZ + GameConfig.MAP.HERO_SPAWN_OFFSET.z
+<span class="ln">01218</span>          );
+<span class="ln">01219</span>  
+<span class="ln">01220</span>          SpawnBootstrap.waveManager.initialize(containers.enemy, base);
+<span class="ln">01221</span>          const cameraPreset = UIResponsive.getGameplayCameraPreset();
+<span class="ln">01222</span>          CameraRig.setupFollow(base.scene, hero, cameraPreset.offset, cameraPreset.fov);
+<span class="ln">01223</span>  
+<span class="ln">01224</span>          SpawnBootstrap.buildingManager.setHeroNode(hero);
+<span class="ln">01225</span>          BuildingPadSpawner.spawnPads(containers.building, SpawnBootstrap.buildingManager);
+<span class="ln">01226</span>  
+<span class="ln">01227</span>          return { base, hero };
+<span class="ln">01228</span>      }
+<span class="ln">01229</span>  
+<span class="ln">01230</span>      public static startWaves(
+<span class="ln">01231</span>          waveLoop: WaveLoop | null,
+<span class="ln">01232</span>          delaySeconds: number = GameConfig.WAVE.FIRST_WAVE_DELAY,
+<span class="ln">01233</span>          startingWave: number = 1
+<span class="ln">01234</span>      ): void {
+<span class="ln">01235</span>          if (!waveLoop) return;
+<span class="ln">01236</span>          waveLoop.initialize(
+<span class="ln">01237</span>              SpawnBootstrap.waveManager,
+<span class="ln">01238</span>              SpawnBootstrap.gameManager,
+<span class="ln">01239</span>              delaySeconds,
+<span class="ln">01240</span>              startingWave
+<span class="ln">01241</span>          );
+<span class="ln">01242</span>          ServiceRegistry.register(&#39;WaveLoop&#39;, waveLoop);
+<span class="ln">01243</span>      }
+<span class="ln">01244</span>  
+<span class="ln">01245</span>      private static get gameManager(): GameManager {
+<span class="ln">01246</span>          return ServiceRegistry.get&lt;GameManager&gt;(&#39;GameManager&#39;) ?? GameManager.instance;
+<span class="ln">01247</span>      }
+<span class="ln">01248</span>  
+<span class="ln">01249</span>      private static get waveManager(): WaveManager {
+<span class="ln">01250</span>          return ServiceRegistry.get&lt;WaveManager&gt;(&#39;WaveManager&#39;) ?? WaveManager.instance;</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 26 / 30 页</div>
+  </header>
+  <pre><span class="ln">01251</span>      }
+<span class="ln">01252</span>  
+<span class="ln">01253</span>      private static get buildingManager(): BuildingManager {
+<span class="ln">01254</span>          return ServiceRegistry.get&lt;BuildingManager&gt;(&#39;BuildingManager&#39;) ?? BuildingManager.instance;
+<span class="ln">01255</span>      }
+<span class="ln">01256</span>  }
+<span class="ln">01257</span>  
+<span class="ln">01258</span>  // ===== FILE: assets/scripts/core/bootstrap/SystemReset.ts =====
+<span class="ln">01259</span>  import { GameManager } from &#39;../managers/GameManager&#39;;
+<span class="ln">01260</span>  import { EventManager } from &#39;../managers/EventManager&#39;;
+<span class="ln">01261</span>  import { EffectManager } from &#39;../managers/EffectManager&#39;;
+<span class="ln">01262</span>  import { WaveService } from &#39;../managers/WaveService&#39;;
+<span class="ln">01263</span>  import { PoolManager } from &#39;../managers/PoolManager&#39;;
+<span class="ln">01264</span>  import { HUDManager } from &#39;../../ui/HUDManager&#39;;
+<span class="ln">01265</span>  import { BuffCardUI } from &#39;../../ui/BuffCardUI&#39;;
+<span class="ln">01266</span>  import { TowerUpgradeCardUI } from &#39;../../ui/TowerUpgradeCardUI&#39;;
+<span class="ln">01267</span>  import { TowerSelectUI } from &#39;../../ui/TowerSelectUI&#39;;
+<span class="ln">01268</span>  import { WeaponSelectUI } from &#39;../../ui/WeaponSelectUI&#39;;
+<span class="ln">01269</span>  import { WeaponBarUI } from &#39;../../ui/WeaponBarUI&#39;;
+<span class="ln">01270</span>  import { BuildingManager } from &#39;../../gameplay/buildings/BuildingManager&#39;;
+<span class="ln">01271</span>  import { BuildingRegistry } from &#39;../../gameplay/buildings/BuildingRegistry&#39;;
+<span class="ln">01272</span>  import { WaveManager } from &#39;../../gameplay/wave/WaveManager&#39;;
+<span class="ln">01273</span>  import { CoinDropManager } from &#39;../../gameplay/economy/CoinDropManager&#39;;
+<span class="ln">01274</span>  import { BuffCardService } from &#39;../../gameplay/roguelike/BuffCardService&#39;;
+<span class="ln">01275</span>  import { TowerUpgradeCardService } from &#39;../../gameplay/roguelike/TowerUpgradeCardService&#39;;
+<span class="ln">01276</span>  import { HeroWeaponManager } from &#39;../../gameplay/weapons/HeroWeaponManager&#39;;
+<span class="ln">01277</span>  import { AirdropService } from &#39;../../gameplay/airdrop/AirdropService&#39;;
+<span class="ln">01278</span>  import { HeroLevelSystem } from &#39;../../gameplay/units/HeroLevelSystem&#39;;
+<span class="ln">01279</span>  import { ItemService } from &#39;../../gameplay/items/ItemService&#39;;
+<span class="ln">01280</span>  import { ChestDropManager } from &#39;../../gameplay/items/ChestDropManager&#39;;
+<span class="ln">01281</span>  import { ItemCardUI } from &#39;../../ui/ItemCardUI&#39;;
+<span class="ln">01282</span>  import { ItemBarUI } from &#39;../../ui/ItemBarUI&#39;;
+<span class="ln">01283</span>  
+<span class="ln">01284</span>  /**
+<span class="ln">01285</span>   * SystemReset
+<span class="ln">01286</span>   * 负责在游戏重启/销毁时的“硬重置”逻辑。
+<span class="ln">01287</span>   * 确保所有单例实例被销毁，以便场景重载后能创建全新的状态。
+<span class="ln">01288</span>   */
+<span class="ln">01289</span>  export class SystemReset {
+<span class="ln">01290</span>      private static _sceneHandoffInProgress = false;
+<span class="ln">01291</span>  
+<span class="ln">01292</span>      public static markSceneHandoff(): void {
+<span class="ln">01293</span>          this._sceneHandoffInProgress = true;
+<span class="ln">01294</span>      }
+<span class="ln">01295</span>  
+<span class="ln">01296</span>      public static clearSceneHandoff(): void {
+<span class="ln">01297</span>          this._sceneHandoffInProgress = false;
+<span class="ln">01298</span>      }
+<span class="ln">01299</span>  
+<span class="ln">01300</span>      public static consumeSceneHandoff(): boolean {</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 27 / 30 页</div>
+  </header>
+  <pre><span class="ln">01301</span>          const active = this._sceneHandoffInProgress;
+<span class="ln">01302</span>          this._sceneHandoffInProgress = false;
+<span class="ln">01303</span>          return active;
+<span class="ln">01304</span>      }
+<span class="ln">01305</span>  
+<span class="ln">01306</span>      /**
+<span class="ln">01307</span>       * 销毁所有单例实例
+<span class="ln">01308</span>       *
+<span class="ln">01309</span>       * NOTE: 调用此方法后，所有 Manager.instance 将变为 null。
+<span class="ln">01310</span>       * 必须保证之后立即进行场景重载或重新初始化，否则会报错。
+<span class="ln">01311</span>       */
+<span class="ln">01312</span>      public static shutdown(): void {
+<span class="ln">01313</span>          console.debug(&#39;[SystemReset] Shutting down all singletons...&#39;);
+<span class="ln">01314</span>  
+<span class="ln">01315</span>          // 核心管理
+<span class="ln">01316</span>          GameManager.destroyInstance();
+<span class="ln">01317</span>          EventManager.destroyInstance();
+<span class="ln">01318</span>          EffectManager.destroyInstance();
+<span class="ln">01319</span>          PoolManager.destroyInstance();
+<span class="ln">01320</span>  
+<span class="ln">01321</span>          // 游戏玩法
+<span class="ln">01322</span>          WaveService.destroyInstance();
+<span class="ln">01323</span>          WaveManager.destroyInstance();
+<span class="ln">01324</span>          BuildingManager.destroyInstance();
+<span class="ln">01325</span>          BuildingRegistry.destroyInstance();
+<span class="ln">01326</span>          CoinDropManager.destroyInstance();
+<span class="ln">01327</span>          HeroLevelSystem.destroyInstance();
+<span class="ln">01328</span>          BuffCardService.destroyInstance();
+<span class="ln">01329</span>          TowerUpgradeCardService.destroyInstance();
+<span class="ln">01330</span>          HeroWeaponManager.destroyInstance();
+<span class="ln">01331</span>          AirdropService.destroyInstance();
+<span class="ln">01332</span>  
+<span class="ln">01333</span>          // 道具系统
+<span class="ln">01334</span>          ItemService.destroyInstance();
+<span class="ln">01335</span>          ChestDropManager.destroyInstance();
+<span class="ln">01336</span>  
+<span class="ln">01337</span>          // UI
+<span class="ln">01338</span>          HUDManager.destroyInstance();
+<span class="ln">01339</span>          BuffCardUI.destroyInstance();
+<span class="ln">01340</span>          TowerUpgradeCardUI.destroyInstance();
+<span class="ln">01341</span>          TowerSelectUI.destroyInstance();
+<span class="ln">01342</span>          WeaponSelectUI.destroyInstance();
+<span class="ln">01343</span>          WeaponBarUI.destroyInstance();
+<span class="ln">01344</span>          ItemCardUI.destroyInstance();
+<span class="ln">01345</span>          ItemBarUI.destroyInstance();
+<span class="ln">01346</span>  
+<span class="ln">01347</span>          console.debug(&#39;[SystemReset] All singletons destroyed.&#39;);
+<span class="ln">01348</span>      }
+<span class="ln">01349</span>  }
+<span class="ln">01350</span>  </pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 28 / 30 页</div>
+  </header>
+  <pre><span class="ln">01351</span>  // ===== FILE: assets/scripts/core/bootstrap/UIBootstrap.ts =====
+<span class="ln">01352</span>  import { Node, sys } from &#39;cc&#39;;
+<span class="ln">01353</span>  import { UIFactory } from &#39;../../ui/UIFactory&#39;;
+<span class="ln">01354</span>  import { Joystick } from &#39;../../ui/Joystick&#39;;
+<span class="ln">01355</span>  import { HUDManager } from &#39;../../ui/HUDManager&#39;;
+<span class="ln">01356</span>  import { BuffCardUI } from &#39;../../ui/BuffCardUI&#39;;
+<span class="ln">01357</span>  import { TowerUpgradeCardUI } from &#39;../../ui/TowerUpgradeCardUI&#39;;
+<span class="ln">01358</span>  import { WeaponSelectUI } from &#39;../../ui/WeaponSelectUI&#39;;
+<span class="ln">01359</span>  import { WeaponBarUI } from &#39;../../ui/WeaponBarUI&#39;;
+<span class="ln">01360</span>  import { TowerSelectUI } from &#39;../../ui/TowerSelectUI&#39;;
+<span class="ln">01361</span>  import { UIResponsive } from &#39;../../ui/UIResponsive&#39;;
+<span class="ln">01362</span>  import { ServiceRegistry } from &#39;../managers/ServiceRegistry&#39;;
+<span class="ln">01363</span>  
+<span class="ln">01364</span>  export type UIRefs = {
+<span class="ln">01365</span>      canvas: Node;
+<span class="ln">01366</span>      joystick: Joystick;
+<span class="ln">01367</span>  };
+<span class="ln">01368</span>  
+<span class="ln">01369</span>  /**
+<span class="ln">01370</span>   * UIBootstrap
+<span class="ln">01371</span>   * 负责创建 UI Canvas、摇杆与 HUD 初始化
+<span class="ln">01372</span>   */
+<span class="ln">01373</span>  export class UIBootstrap {
+<span class="ln">01374</span>      public static build(root: Node): UIRefs {
+<span class="ln">01375</span>          const canvas = UIFactory.createUICanvas();
+<span class="ln">01376</span>          root.addChild(canvas);
+<span class="ln">01377</span>  
+<span class="ln">01378</span>          const joystick = UIFactory.createJoystick(canvas);
+<span class="ln">01379</span>          if (sys.isBrowser &amp;&amp; !UIResponsive.shouldUseTouchControls()) {
+<span class="ln">01380</span>              UIFactory.createDesktopMoveHint(canvas);
+<span class="ln">01381</span>          }
+<span class="ln">01382</span>  
+<span class="ln">01383</span>          UIBootstrap.hudManager.initialize(canvas);
+<span class="ln">01384</span>          UIBootstrap.buffCardUI.initialize(canvas);
+<span class="ln">01385</span>          UIBootstrap.towerUpgradeCardUI.initialize(canvas);
+<span class="ln">01386</span>          UIBootstrap.weaponSelectUI.initialize(canvas);
+<span class="ln">01387</span>          UIBootstrap.weaponBarUI.initialize(canvas);
+<span class="ln">01388</span>          UIBootstrap.towerSelectUI.initialize(canvas);
+<span class="ln">01389</span>  
+<span class="ln">01390</span>          return { canvas, joystick };
+<span class="ln">01391</span>      }
+<span class="ln">01392</span>  
+<span class="ln">01393</span>      private static get hudManager(): HUDManager {
+<span class="ln">01394</span>          return ServiceRegistry.get&lt;HUDManager&gt;(&#39;HUDManager&#39;) ?? HUDManager.instance;
+<span class="ln">01395</span>      }
+<span class="ln">01396</span>  
+<span class="ln">01397</span>      private static get buffCardUI(): BuffCardUI {
+<span class="ln">01398</span>          return ServiceRegistry.get&lt;BuffCardUI&gt;(&#39;BuffCardUI&#39;) ?? BuffCardUI.instance;
+<span class="ln">01399</span>      }
+<span class="ln">01400</span>  </pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 29 / 30 页</div>
+  </header>
+  <pre><span class="ln">01401</span>      private static get weaponSelectUI(): WeaponSelectUI {
+<span class="ln">01402</span>          return ServiceRegistry.get&lt;WeaponSelectUI&gt;(&#39;WeaponSelectUI&#39;) ?? WeaponSelectUI.instance;
+<span class="ln">01403</span>      }
+<span class="ln">01404</span>  
+<span class="ln">01405</span>      private static get towerUpgradeCardUI(): TowerUpgradeCardUI {
+<span class="ln">01406</span>          return (
+<span class="ln">01407</span>              ServiceRegistry.get&lt;TowerUpgradeCardUI&gt;(&#39;TowerUpgradeCardUI&#39;) ??
+<span class="ln">01408</span>              TowerUpgradeCardUI.instance
+<span class="ln">01409</span>          );
+<span class="ln">01410</span>      }
+<span class="ln">01411</span>  
+<span class="ln">01412</span>      private static get towerSelectUI(): TowerSelectUI {
+<span class="ln">01413</span>          return ServiceRegistry.get&lt;TowerSelectUI&gt;(&#39;TowerSelectUI&#39;) ?? TowerSelectUI.instance;
+<span class="ln">01414</span>      }
+<span class="ln">01415</span>  
+<span class="ln">01416</span>      private static get weaponBarUI(): WeaponBarUI {
+<span class="ln">01417</span>          return ServiceRegistry.get&lt;WeaponBarUI&gt;(&#39;WeaponBarUI&#39;) ?? WeaponBarUI.instance;
+<span class="ln">01418</span>      }
+<span class="ln">01419</span>  }
+<span class="ln">01420</span>  
+<span class="ln">01421</span>  // ===== FILE: assets/scripts/core/camera/CameraFollow.ts =====
+<span class="ln">01422</span>  import { _decorator, Component, Node, Vec3 } from &#39;cc&#39;;
+<span class="ln">01423</span>  import { ScreenShake } from &#39;../../gameplay/weapons/vfx/ScreenShake&#39;;
+<span class="ln">01424</span>  
+<span class="ln">01425</span>  const { ccclass, property } = _decorator;
+<span class="ln">01426</span>  
+<span class="ln">01427</span>  /**
+<span class="ln">01428</span>   * Camera Follow Script
+<span class="ln">01429</span>   * Smoothly follows a target node (e.g., Hero)
+<span class="ln">01430</span>   */
+<span class="ln">01431</span>  @ccclass(&#39;CameraFollow&#39;)
+<span class="ln">01432</span>  export class CameraFollow extends Component {
+<span class="ln">01433</span>      @property(Node)
+<span class="ln">01434</span>      public target: Node | null = null;
+<span class="ln">01435</span>  
+<span class="ln">01436</span>      @property
+<span class="ln">01437</span>      public smoothSpeed: number = 0.125;
+<span class="ln">01438</span>  
+<span class="ln">01439</span>      @property
+<span class="ln">01440</span>      public offset: Vec3 = new Vec3(0, 10, 10); // Default isometric-ish offset
+<span class="ln">01441</span>  
+<span class="ln">01442</span>      private _tempVec = new Vec3();
+<span class="ln">01443</span>  
+<span class="ln">01444</span>      protected start(): void {
+<span class="ln">01445</span>          // If target is set and offset is zero, calculate initial offset relative to it
+<span class="ln">01446</span>          if (this.target &amp;&amp; this.offset.lengthSqr() === 0) {
+<span class="ln">01447</span>              Vec3.subtract(this.offset, this.node.position, this.target.position);
+<span class="ln">01448</span>          }
+<span class="ln">01449</span>  
+<span class="ln">01450</span>          // Snap immediately on start to ensure correct rotation relative to the offset position</pre>
+</section>
+
+<section class="code-page next-page">
+  <header>
+    <div class="title">老奶大战机器人游戏软件 源程序文档（前1500行）</div>
+    <div class="meta">第 30 / 30 页</div>
+  </header>
+  <pre><span class="ln">01451</span>          this.snap();
+<span class="ln">01452</span>      }
+<span class="ln">01453</span>  
+<span class="ln">01454</span>      protected lateUpdate(dt: number): void {
+<span class="ln">01455</span>          // 驱动屏幕震动（通过修改 offset 实现，零额外开销）
+<span class="ln">01456</span>          ScreenShake.update(dt);
+<span class="ln">01457</span>  
+<span class="ln">01458</span>          if (!this.target || !this.target.isValid) return;
+<span class="ln">01459</span>  
+<span class="ln">01460</span>          // Desired Position
+<span class="ln">01461</span>          const desiredPos = this._tempVec;
+<span class="ln">01462</span>          Vec3.add(desiredPos, this.target.position, this.offset);
+<span class="ln">01463</span>  
+<span class="ln">01464</span>          const currentPos = this.node.position;
+<span class="ln">01465</span>          const t = this.smoothSpeed;
+<span class="ln">01466</span>  
+<span class="ln">01467</span>          // Manual Lerp for clarity
+<span class="ln">01468</span>          const finalX = currentPos.x + (desiredPos.x - currentPos.x) * t;
+<span class="ln">01469</span>          const finalY = currentPos.y + (desiredPos.y - currentPos.y) * t;
+<span class="ln">01470</span>          const finalZ = currentPos.z + (desiredPos.z - currentPos.z) * t;
+<span class="ln">01471</span>  
+<span class="ln">01472</span>          this.node.setPosition(finalX, finalY, finalZ);
+<span class="ln">01473</span>      }
+<span class="ln">01474</span>  
+<span class="ln">01475</span>      /**
+<span class="ln">01476</span>       * Snap camera to target immediately and set rotation
+<span class="ln">01477</span>       */
+<span class="ln">01478</span>      public snap(): void {
+<span class="ln">01479</span>          if (this.target) {
+<span class="ln">01480</span>              // Set Position
+<span class="ln">01481</span>              const desired = new Vec3();
+<span class="ln">01482</span>              Vec3.add(desired, this.target.position, this.offset);
+<span class="ln">01483</span>              this.node.setPosition(desired);
+<span class="ln">01484</span>  
+<span class="ln">01485</span>              // Set Rotation (Look at target)
+<span class="ln">01486</span>              this.node.lookAt(this.target.position);
+<span class="ln">01487</span>          }
+<span class="ln">01488</span>      }
+<span class="ln">01489</span>  }
+<span class="ln">01490</span>  
+<span class="ln">01491</span>  // ===== FILE: assets/scripts/core/camera/CameraRig.ts =====
+<span class="ln">01492</span>  import { Camera, Node, Vec3 } from &#39;cc&#39;;
+<span class="ln">01493</span>  import { CameraFollow } from &#39;./CameraFollow&#39;;
+<span class="ln">01494</span>  
+<span class="ln">01495</span>  /**
+<span class="ln">01496</span>   * CameraRig
+<span class="ln">01497</span>   * 集中处理相机跟随初始化
+<span class="ln">01498</span>   */
+<span class="ln">01499</span>  export class CameraRig {
+<span class="ln">01500</span>      public static setupFollow(</pre>
+</section>
+</body>
+</html>

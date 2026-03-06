@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>老奶大战机器人游戏软件 软件说明书</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #111;
+      font-family: "PingFang SC","Noto Sans SC","Microsoft YaHei","Heiti SC",sans-serif;
+      font-size: 14px;
+      line-height: 1.7;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    h1,h2,h3 { margin: 0.8em 0 0.35em; }
+    h1 { font-size: 24px; text-align: center; margin-top: 0; }
+    h2 { font-size: 18px; border-left: 4px solid #1f2937; padding-left: 10px; }
+    h3 { font-size: 15px; }
+    p { margin: 0.45em 0; text-align: justify; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; }
+    th, td { border: 1px solid #444; padding: 8px; vertical-align: top; }
+    th { background: #f3f4f6; font-weight: 700; }
+    ul, ol { margin: 0.35em 0 0.5em 1.4em; padding: 0; }
+    .small { font-size: 12px; color: #444; }
+    .page-break { page-break-before: always; }
+    .muted { color: #555; }
+    .mono-block {
+      white-space: pre-wrap;
+      font-family: "SF Mono","Menlo","Consolas",monospace;
+      font-size: 12px;
+      background: #fafafa;
+      border: 1px solid #ddd;
+      padding: 10px 12px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>老奶大战机器人游戏软件 软件说明书</h1>
+<p class="muted">（用于计算机软件著作权登记）</p>
+
+<h2>1. 软件概述</h2>
+<p>老奶大战机器人游戏软件（Granny vs Robot）是一款融合“动作生存 + 塔防建造 + 肉鸽成长”的休闲策略游戏软件。玩家在三路战场中操控主角，通过建设防御工事、选择武器和增益、管理道具与资源来抵御机器人军团的持续进攻。</p>
+<p>本软件强调“低门槛操作 + 中高策略深度”的设计目标，支持移动端与桌面端 Web 场景，可适配社区小游戏和短视频小游戏发布形态。</p>
+
+<h2>2. 开发目标</h2>
+<ol>
+  <li>建立可长期迭代的塔防玩法基础框架，兼顾爽快感与可重复游玩性。</li>
+  <li>通过事件驱动与配置驱动的技术路线，提升版本维护效率和扩展能力。</li>
+  <li>实现跨平台发布能力，统一排行榜与结算交互接口，降低平台迁移成本。</li>
+</ol>
+
+<h2>3. 系统架构</h2>
+<table>
+  <tr><th style="width:26%">层级</th><th>技术</th><th>职责</th></tr>
+  <tr><td>客户端层</td><td>Cocos Creator 3.8.8 + TypeScript</td><td>场景渲染、交互输入、战斗逻辑、UI 展示与本地存档</td></tr>
+  <tr><td>服务接口层</td><td>Node.js + Hono</td><td>初始化信息、排行榜、分数提交、统计与钻石接口</td></tr>
+  <tr><td>数据存储层</td><td>Redis</td><td>排行榜有序集合、玩家元数据、限流键、结算幂等键</td></tr>
+  <tr><td>平台桥接层</td><td>SocialBridge 统一抽象</td><td>屏蔽 Reddit/TikTok 平台差异，复用客户端业务逻辑</td></tr>
+</table>
+
+<h2>4. 功能模块</h2>
+<h3>4.1 角色与战斗模块</h3>
+<p>实现角色移动、自动索敌攻击、经验成长、复活与战斗状态机管理。通过统一事件广播（如波次开始、击杀、升级）连接 UI 与玩法模块。</p>
+
+<h3>4.2 建筑与经济模块</h3>
+<p>提供 8 类建筑（基地、兵营、机炮塔、冰霜塔、闪电塔、路障、金矿、温泉），支持建造、升级、破坏与恢复。经济系统包含金币获取、花费与自动收集。</p>
+
+<h3>4.3 波次与 AI 模块</h3>
+<p>支持无限波次，含三路解锁、精英单位、Boss 事件。通过组合记忆窗口、近期出现惩罚和标签占比惩罚算法，平衡随机性与新鲜感。</p>
+
+<h3>4.4 武器与增益模块</h3>
+<p>提供 4 类武器，采用空投三选一机制；重复获取触发武器升级。增益卡牌共 17 张，支持蓝/紫/金稀有度梯度与多属性叠加。</p>
+
+<h3>4.5 Boss 道具模块</h3>
+<p>Boss 击杀后掉落宝箱，触发三选一道具。当前实现 7 类道具，包括清场、冻结、建筑恢复、快速复活、建筑升级等关键战术效果。</p>
+
+<h3>4.6 排行榜与结算模块</h3>
+<p>服务端支持分数提交与排行榜读取，采用幂等 runId 防止重复记分，配合限流策略防止刷榜。支持回合钻石结算与道具购买流程。</p>
+
+<h2>5. 核心业务流程</h2>
+<ol>
+  <li>启动阶段：初始化资源、输入系统、平台桥接、UI 与核心服务。</li>
+  <li>战斗阶段：玩家建造防线，波次系统生成敌人并触发战斗。</li>
+  <li>成长阶段：波间提供武器/卡牌选择，Boss 后提供道具选择。</li>
+  <li>结算阶段：游戏结束后提交分数，刷新排行榜，执行钻石结算。</li>
+</ol>
+
+<h2>6. 技术特点</h2>
+<ul>
+  <li>事件驱动：统一事件中心减少模块耦合，提高可维护性。</li>
+  <li>配置驱动：平衡参数集中管理，便于快速调优和 A/B 方案切换。</li>
+  <li>性能优化：对象池、资源预加载、运行时降频检查降低卡顿概率。</li>
+  <li>跨平台抽象：同一客户端逻辑适配不同平台 API 与域名策略。</li>
+</ul>
+
+<h2>7. 运行环境</h2>
+<table>
+  <tr><th style="width:26%">项目</th><th>说明</th></tr>
+  <tr><td>开发操作系统</td><td>macOS / Windows</td></tr>
+  <tr><td>运行环境</td><td>Web 浏览器、移动端 WebView</td></tr>
+  <tr><td>开发引擎</td><td>Cocos Creator 3.8.8</td></tr>
+  <tr><td>主要语言</td><td>TypeScript</td></tr>
+  <tr><td>Node 环境</td><td>Node.js 18+</td></tr>
+</table>
+
+<h2>8. 程序规模</h2>
+<p>核心客户端脚本：184 个 TypeScript 文件，约 53,793 行。</p>
+<p>全项目相关代码：约 54,383 行。</p>
+
+<h2>9. 版本与权属说明</h2>
+<p>软件版本号：V0.1.0。文档生成日期：2026年03月06日。</p>
+<p>本说明书用于软著登记材料准备，著作权归属信息以正式申请表填报主体为准。</p>
+
+</body>
+</html>

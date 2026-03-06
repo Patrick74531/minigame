@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>软著提交清单与步骤</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #111;
+      font-family: "PingFang SC","Noto Sans SC","Microsoft YaHei","Heiti SC",sans-serif;
+      font-size: 14px;
+      line-height: 1.7;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    h1,h2,h3 { margin: 0.8em 0 0.35em; }
+    h1 { font-size: 24px; text-align: center; margin-top: 0; }
+    h2 { font-size: 18px; border-left: 4px solid #1f2937; padding-left: 10px; }
+    h3 { font-size: 15px; }
+    p { margin: 0.45em 0; text-align: justify; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; }
+    th, td { border: 1px solid #444; padding: 8px; vertical-align: top; }
+    th { background: #f3f4f6; font-weight: 700; }
+    ul, ol { margin: 0.35em 0 0.5em 1.4em; padding: 0; }
+    .small { font-size: 12px; color: #444; }
+    .page-break { page-break-before: always; }
+    .muted { color: #555; }
+    .mono-block {
+      white-space: pre-wrap;
+      font-family: "SF Mono","Menlo","Consolas",monospace;
+      font-size: 12px;
+      background: #fafafa;
+      border: 1px solid #ddd;
+      padding: 10px 12px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>软著提交清单与步骤</h1>
+<p class="muted">该清单用于把“已自动生成材料”与“需人工补充材料”分开处理，降低退回率。</p>
+
+<h2>A. 已生成文件（可直接用）</h2>
+<ol>
+  <li><code>01_软著申请信息汇总.pdf</code></li>
+  <li><code>02_软件说明书.pdf</code></li>
+  <li><code>03_用户操作手册.pdf</code></li>
+  <li><code>04_源程序_前1500行.pdf</code> 与 <code>04_源程序_前1500行.txt</code></li>
+  <li><code>05_源程序_后1500行.pdf</code> 与 <code>05_源程序_后1500行.txt</code></li>
+</ol>
+
+<h2>B. 需你补充的材料</h2>
+<ul>
+  <li>申请人身份证明（个人身份证 / 企业营业执照）</li>
+  <li>权属证明（仅合作开发/委托开发场景）</li>
+  <li>官方系统导出的《计算机软件著作权登记申请表》</li>
+</ul>
+
+<h2>C. 提交流程建议</h2>
+<ol>
+  <li>在版权保护中心系统填写并导出申请表。</li>
+  <li>上传源程序（前后各 1500 行）和说明文档。</li>
+  <li>上传主体证明及必要权属附件。</li>
+  <li>提交后关注补正通知并在期限内处理。</li>
+</ol>
+
+<h2>D. 一致性检查要点</h2>
+<table>
+  <tr><th style="width:30%">检查项</th><th>要求</th></tr>
+  <tr><td>软件名称</td><td>申请表、说明书、源程序封面保持一致</td></tr>
+  <tr><td>版本号</td><td>统一使用 V0.1.0</td></tr>
+  <tr><td>完成日期</td><td>申请表与说明书一致</td></tr>
+  <tr><td>运行平台</td><td>仅写当前已实现、可验证的平台环境</td></tr>
+  <tr><td>主体信息</td><td>名称、证件号、联系人、地址完整准确</td></tr>
+</table>
+
+</body>
+</html>
