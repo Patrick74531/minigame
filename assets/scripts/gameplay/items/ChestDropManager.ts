@@ -1,4 +1,4 @@
-import { Node, Vec3, resources, Prefab, instantiate } from 'cc';
+import { Node, Vec3, resources, Prefab, instantiate, assetManager } from 'cc';
 import { MeshRenderer, primitives, utils, Material, Color, Tween, tween } from 'cc';
 import { Singleton } from '../../core/base/Singleton';
 import { EventManager } from '../../core/managers/EventManager';
@@ -8,6 +8,8 @@ import { GameEvents } from '../../data/GameEvents';
 const CHEST_COLLECT_RADIUS = 0.7;
 const CHEST_FLOAT_SPEED = 2.0;
 const CHEST_FLOAT_AMPLITUDE = 0.3;
+const CHEST_PREFAB_UUID = '37c00d00-681b-42c0-a340-ce7c0cd15abd@ec25a';
+const CHEST_PREFAB_PATHS = ['property/Chest/Chest', 'property/Chest'];
 
 /**
  * ChestDropManager
@@ -83,10 +85,6 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
 
     private onBossChestDrop(data: { position: Vec3 }): void {
         if (!this._coinContainer) return;
-        if (this.isTikTokRuntime()) {
-            this.spawnChest(data.position, true);
-            return;
-        }
         if (this._chestPrefab) {
             this.spawnChest(data.position);
             return;
@@ -103,6 +101,7 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
         let node: Node;
         if (!forceFallback && this._chestPrefab) {
             node = instantiate(this._chestPrefab);
+            node.name = 'BossChest';
             node.setScale(1.8, 1.8, 1.8);
         } else {
             node = this.createFallbackChest();
@@ -148,10 +147,20 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
 
     private loadChestPrefab(): void {
         if (this._isLoading || this._chestPrefab) return;
-        if (this.isTikTokRuntime()) return;
         this._isLoading = true;
-        const candidates = ['property/Chest', 'property/Chest/Chest'];
-        this.tryLoadPrefab(candidates, 0);
+        assetManager.loadAny({ uuid: CHEST_PREFAB_UUID }, (uuidErr, asset) => {
+            if (!uuidErr && asset instanceof Prefab) {
+                this._chestPrefab = asset;
+                this._isLoading = false;
+                this.flushPendingChests(false);
+                return;
+            }
+
+            if (uuidErr) {
+                console.warn('[ChestDropManager] Failed to load chest prefab by uuid:', uuidErr);
+            }
+            this.tryLoadPrefab(CHEST_PREFAB_PATHS, 0);
+        });
     }
 
     private tryLoadPrefab(candidates: string[], index: number): void {
@@ -181,11 +190,6 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
         for (const pos of pending) {
             this.spawnChest(pos, forceFallback);
         }
-    }
-
-    private isTikTokRuntime(): boolean {
-        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
-        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
     }
 
     private get eventManager(): EventManager {

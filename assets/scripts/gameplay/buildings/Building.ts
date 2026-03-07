@@ -141,7 +141,8 @@ export class Building extends BaseComponent implements IAttackable {
     // === 访问器 ===
 
     public get isAlive(): boolean {
-        return this.currentHp > 0;
+        const self = this as Building | null;
+        return !!self && self.currentHp > 0;
     }
 
     public get activeUnits(): number {

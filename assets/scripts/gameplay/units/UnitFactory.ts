@@ -220,6 +220,7 @@ export class UnitFactory {
         // 血条样式由 spawnType 决定（而非 modelPath），确保复用 boss 模型的普通怪不使用 boss 大血条
         const isBossHealthBar = resolvedSpawnType === 'boss';
         const isBossModelMinion = !isBossHealthBar && modelPath.includes('boss/');
+        const enemyDamagedHealthBarDuration = isTikTokRuntime ? 1.8 : 3.0;
         const hb = node.addComponent(HealthBar);
         if (isBossHealthBar) {
             hb.width = 120;
@@ -240,7 +241,7 @@ export class UnitFactory {
             hb.autoDetectHeadAnchor = false;
             hb.inheritOwnerScaleInWorldSpace = false;
             hb.showOnlyWhenDamaged = true;
-            hb.damagedShowDuration = 3.0;
+            hb.damagedShowDuration = enemyDamagedHealthBarDuration;
         } else {
             hb.width = 60;
             hb.height = 6;
@@ -249,7 +250,7 @@ export class UnitFactory {
             hb.autoDetectHeadAnchor = false;
             hb.inheritOwnerScaleInWorldSpace = false;
             hb.showOnlyWhenDamaged = true;
-            hb.damagedShowDuration = 3.0;
+            hb.damagedShowDuration = enemyDamagedHealthBarDuration;
         }
 
         return node;

@@ -96,7 +96,9 @@ export class Unit extends BaseComponent implements IPoolable, IAttackable {
     }
 
     public get isAlive(): boolean {
-        return this._stats.currentHp > 0 && this._state !== UnitState.DEAD;
+        const self = this as Unit | null;
+        const stats = self?._stats;
+        return !!self && !!stats && stats.currentHp > 0 && self._state !== UnitState.DEAD;
     }
 
     public get target(): IAttackable | null {

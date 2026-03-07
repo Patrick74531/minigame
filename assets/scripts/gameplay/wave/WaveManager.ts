@@ -91,6 +91,8 @@ export class WaveManager {
     private static readonly SPAWN_POSITION_TRIES: number = 10;
     private static readonly BOSS_HP_FLOOR_ADJACENT_AVERAGE_WEIGHT = 0.5;
     private static readonly BOSS_HP_FLOOR_TARGET_SHARE = 0.6;
+    private static readonly TOTAL_ENEMY_CAP = 40;
+    private static readonly REGULAR_ATTACK_COMPENSATION_SHARE = 0.5;
     private static readonly LOCKED_LANE_PAD_TYPES: ReadonlySet<string> = new Set([
         'tower',
         'frost_tower',
@@ -380,13 +382,7 @@ export class WaveManager {
         // Difficulty scaling from centralized config
         const infinite = GameConfig.WAVE.INFINITE;
         const waveIndex = waveNumber - 1;
-        const countStepBonus =
-            Math.floor(waveIndex / infinite.COUNT_GROWTH_STEP_WAVES) *
-            infinite.COUNT_GROWTH_STEP_BONUS;
-        const regularCountBase = Math.max(
-            1,
-            Math.round(infinite.BASE_COUNT + waveIndex * infinite.COUNT_PER_WAVE + countStepBonus)
-        );
+        const regularCountBase = this.resolveRawRegularCountForWave(waveNumber);
         const eliteCountBase = this.getEliteCountForWave(waveNumber);
         const bossCount = shouldTriggerBossWave(
             waveNumber,
@@ -397,8 +393,10 @@ export class WaveManager {
             : 0;
         const isBossWave = bossCount > 0;
         const bossOnly = isBossWave && this._bossEventConfig?.BOSS_ONLY_WAVE !== false;
-        const adjustedRegularCount = bossOnly ? 0 : regularCountBase;
         const adjustedEliteCount = bossOnly ? 0 : eliteCountBase;
+        const adjustedRegularCount = bossOnly
+            ? 0
+            : this.resolveRegularCountForWave(waveNumber, adjustedEliteCount, bossCount);
         const openWave3 = infinite.SPAWN_PORTALS?.OPEN_WAVE_3 ?? 8;
         const lane3ExtraWaves = Math.max(0, waveNumber - openWave3);
         const accelThreshold = infinite.HP_ACCEL_WAVE_THRESHOLD ?? 5;
@@ -455,11 +453,15 @@ export class WaveManager {
         }
 
         const waveConfig = this._waveConfig;
+        const regularCountLabel =
+            regularCountBase > adjustedRegularCount
+                ? `${adjustedRegularCount}/${regularCountBase}`
+                : `${adjustedRegularCount}`;
 
         console.debug('═══════════════════════════════════════');
         console.debug(
             `🌊 第 ${waveNumber} 波! 敌人: ${waveConfig.enemyCount} ` +
-                `(普通:${waveConfig.regularCount} 精英:${waveConfig.eliteCount} Boss:${waveConfig.bossCount})`
+                `(普通:${regularCountLabel} 精英:${waveConfig.eliteCount} Boss:${waveConfig.bossCount})`
         );
         console.debug(
             `[WaveManager] 组合=${wavePlan.comboKey} 模板=${wavePlan.compositionTemplateId} ` +
@@ -635,7 +637,15 @@ export class WaveManager {
             entry.spawnType === 'regular'
                 ? this.resolveRegularHpAccelForWave(waveConfig.waveNumber)
                 : 0;
-        const waveHpMultiplier = waveConfig.hpMultiplier + regularHpAccel;
+        const regularStatCompensation =
+            entry.spawnType === 'regular'
+                ? this.resolveRegularStatCompensation(
+                      waveConfig.waveNumber,
+                      waveConfig.regularCount
+                  )
+                : { hp: 1, attack: 1 };
+        const waveHpMultiplier =
+            (waveConfig.hpMultiplier + regularHpAccel) * regularStatCompensation.hp;
         const defaultHpMultiplier = waveHpMultiplier * spawnCombat.hpMultiplier * powerHpMultiplier;
         const finalHpMultiplier =
             entry.spawnType === 'boss'
@@ -653,6 +663,7 @@ export class WaveManager {
                     waveConfig.speedMultiplier * spawnCombat.speedMultiplier * powerSpeedMultiplier,
                 attackMultiplier:
                     waveConfig.attackMultiplier *
+                    regularStatCompensation.attack *
                     spawnCombat.attackMultiplier *
                     powerAttackMultiplier,
                 isElite: spawnCombat.isElite,
@@ -1008,6 +1019,30 @@ export class WaveManager {
         const accelThreshold = infinite.HP_ACCEL_WAVE_THRESHOLD ?? 15;
         if (waveNumber <= accelThreshold) return 0;
         return Math.pow(waveNumber - accelThreshold, 2) * (infinite.HP_ACCEL_PER_WAVE ?? 0);
+    }
+
+    private resolveRegularStatCompensation(
+        waveNumber: number,
+        regularCount: number
+    ): { hp: number; attack: number } {
+        if (regularCount <= 0) {
+            return { hp: 1, attack: 1 };
+        }
+
+        const rawRegularCount = this.resolveRawRegularCountForWave(waveNumber);
+        if (rawRegularCount <= regularCount) {
+            return { hp: 1, attack: 1 };
+        }
+
+        const pressureScale = rawRegularCount / Math.max(1, regularCount);
+        return {
+            // Full HP compensation preserves the old total regular-enemy health pool after the cap.
+            hp: pressureScale,
+            // Attack only gets partial compensation to avoid damage spikes feeling unfair.
+            attack:
+                1 +
+                (pressureScale - 1) * WaveManager.REGULAR_ATTACK_COMPENSATION_SHARE,
+        };
     }
 
     private resolveSpawnVisualScale(
@@ -1368,19 +1403,39 @@ export class WaveManager {
         const wave = Math.max(1, Math.floor(waveNumber));
         const infinite = GameConfig.WAVE.INFINITE;
         const waveIndex = wave - 1;
-        const countStepBonus =
-            Math.floor(waveIndex / infinite.COUNT_GROWTH_STEP_WAVES) *
-            infinite.COUNT_GROWTH_STEP_BONUS;
-        const regularCount = Math.max(
-            1,
-            Math.round(infinite.BASE_COUNT + waveIndex * infinite.COUNT_PER_WAVE + countStepBonus)
-        );
+        const regularCount = this.resolveRawRegularCountForWave(wave);
         const eliteCount = this.getEliteCountForWave(wave);
         const hpMult = infinite.BASE_HP_MULT + waveIndex * infinite.HP_MULT_PER_WAVE;
         const avgPowerHpMultiplier = this.resolveAverageRegularPowerHpMultiplier();
         const regularUnitHp = GameConfig.ENEMY.BASE_HP * hpMult * avgPowerHpMultiplier;
         const eliteUnitHp = regularUnitHp * Math.max(1, GameConfig.ENEMY.ELITE.HP_MULTIPLIER);
         return regularCount * regularUnitHp + eliteCount * eliteUnitHp;
+    }
+
+    private resolveRawRegularCountForWave(waveNumber: number): number {
+        const wave = Math.max(1, Math.floor(waveNumber));
+        const infinite = GameConfig.WAVE.INFINITE;
+        const waveIndex = wave - 1;
+        const countStepBonus =
+            Math.floor(waveIndex / infinite.COUNT_GROWTH_STEP_WAVES) *
+            infinite.COUNT_GROWTH_STEP_BONUS;
+        return Math.max(
+            1,
+            Math.round(infinite.BASE_COUNT + waveIndex * infinite.COUNT_PER_WAVE + countStepBonus)
+        );
+    }
+
+    private resolveRegularCountForWave(
+        waveNumber: number,
+        eliteCount: number = 0,
+        bossCount: number = 0
+    ): number {
+        const rawCount = this.resolveRawRegularCountForWave(waveNumber);
+        const regularBudget = Math.max(
+            0,
+            WaveManager.TOTAL_ENEMY_CAP - Math.max(0, eliteCount) - Math.max(0, bossCount)
+        );
+        return Math.min(rawCount, regularBudget);
     }
 
     private resolveAverageRegularPowerHpMultiplier(): number {
