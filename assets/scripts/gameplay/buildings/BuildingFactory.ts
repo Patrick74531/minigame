@@ -103,20 +103,34 @@ export class BuildingFactory {
             primitives.box({ width: 1, height: 1, length: 1 })
         );
 
-        const colorKey = `${color.r}_${color.g}_${color.b}`;
+        const effectName = this.isTikTokRuntime() ? 'builtin-unlit' : 'builtin-standard';
+        const colorKey = `${effectName}_${color.r}_${color.g}_${color.b}`;
         let material = this._materials.get(colorKey);
 
         if (!material) {
             material = new Material();
-            material.initialize({ effectName: 'builtin-standard' });
+            material.initialize({ effectName });
             material.setProperty('mainColor', color);
             this._materials.set(colorKey, material);
         }
 
-        renderer.material = material;
+        try {
+            renderer.material = material;
+        } catch (err) {
+            console.warn('[BuildingFactory] Color material assignment failed, fallback to unlit', err);
+            const fallback = new Material();
+            fallback.initialize({ effectName: 'builtin-unlit' });
+            fallback.setProperty('mainColor', color);
+            renderer.material = fallback;
+        }
         renderer.shadowCastingMode = 1;
         renderer.receiveShadow = 1;
         return node;
+    }
+
+    private static isTikTokRuntime(): boolean {
+        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
+        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
     }
 
     /**

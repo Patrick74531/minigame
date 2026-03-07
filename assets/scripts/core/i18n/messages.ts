@@ -168,6 +168,44 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.home.subscribed': '领取钻石',
         'ui.home.subscribe.success': '关注成功！',
         'ui.home.subscribe.already': '你已关注 ✓',
+        'ui.home.tiktok.review.title': 'TikTok 审核任务',
+        'ui.home.tiktok.review.body': '首屏完成桌面捷径和主页回访入口，避免审核因流程缺失被拒。',
+        'ui.home.tiktok.review.body.compact': '保存快捷入口，方便下次直接继续游戏。',
+        'ui.home.tiktok.review.summary.partial': '已启用一个快捷入口。',
+        'ui.home.tiktok.review.summary.prompted': '回访任务已发起，按引导从 TikTok 主页再进一次。',
+        'ui.home.tiktok.review.summary.done': '两个快捷返回入口都已就绪。',
+        'ui.home.tiktok.action.processing': '处理中...',
+        'ui.home.tiktok.action.unavailable': '当前不可用',
+        'ui.home.tiktok.status.loading': '正在检查 TikTok 任务状态...',
+        'ui.home.tiktok.status.unsupported': '当前 TikTok 运行环境未提供该接口',
+        'ui.home.tiktok.shortcut.cta': '桌面捷径',
+        'ui.home.tiktok.shortcut.done': '捷径完成',
+        'ui.home.tiktok.shortcut.status.pending': '点击后会弹出 TikTok 系统捷径提示',
+        'ui.home.tiktok.shortcut.status.done': '已检测到桌面捷径来源，可通过审核项',
+        'ui.home.tiktok.shortcut.toast.completed': '桌面捷径已完成。',
+        'ui.home.tiktok.shortcut.toast.already': '桌面捷径已存在。',
+        'ui.home.tiktok.shortcut.toast.prompt_requested': 'TikTok 已发起桌面捷径提示，请在系统弹窗里确认。',
+        'ui.home.tiktok.shortcut.toast.unsupported': '当前 TikTok 环境没有暴露桌面捷径接口。',
+        'ui.home.tiktok.shortcut.toast.failed': '桌面捷径请求失败，请稍后再试。',
+        'ui.home.tiktok.profile.cta': '主页回访',
+        'ui.home.tiktok.profile.done': '回访完成',
+        'ui.home.tiktok.profile.guide': '查看引导',
+        'ui.home.tiktok.profile.status.pending': '点击后会触发 TikTok 的主页回访任务',
+        'ui.home.tiktok.profile.status.prompted': '任务已发起，请从 TikTok 主页再次进入游戏完成回访',
+        'ui.home.tiktok.profile.status.done': '已检测到主页回访来源，可通过审核项',
+        'ui.home.tiktok.profile.toast.completed': '已检测到主页回访。',
+        'ui.home.tiktok.profile.toast.already': '主页回访任务已经记录。',
+        'ui.home.tiktok.profile.toast.prompt_requested': 'TikTok 已发起主页回访任务，请从主页再次进入一次。',
+        'ui.home.tiktok.profile.toast.unsupported': '当前 TikTok 环境没有暴露主页回访接口。',
+        'ui.home.tiktok.profile.toast.failed': '主页回访任务发起失败，请稍后再试。',
+        'ui.home.tiktok.profile.guide.title': '从主页入口再次进入',
+        'ui.home.tiktok.profile.guide.body':
+            '1. 先点击下方的主页回访入口，让 TikTok 记录本次回访任务。\n2. 退出当前小游戏页面，回到 TikTok 个人主页。\n3. 从个人主页里的小游戏入口再次进入本游戏。\n4. 再次进入后，这个入口会自动变成“回访完成”。',
+        'ui.home.tiktok.profile.guide.step1': '回到 TikTok 个人主页',
+        'ui.home.tiktok.profile.guide.step2': '点击侧边栏小游戏入口',
+        'ui.home.tiktok.profile.guide.step3': '再次进入当前游戏',
+        'ui.home.tiktok.profile.guide.tip': '完成一次后，这里会自动变成“回访完成”。',
+        'ui.home.tiktok.profile.guide.confirm': '知道了',
         'ui.subscribe.dialog.body': '关注我们即可领取 500◆ 钻石！',
         'ui.subscribe.dialog.confirm': '立即领取',
         'ui.subscribe.dialog.cancel': '取消',
@@ -450,6 +488,62 @@ export const DEFAULT_MESSAGES: Record<LanguageCode, LocalizationDictionary> = {
         'ui.home.subscribed': 'Claim Diamonds',
         'ui.home.subscribe.success': 'Followed successfully!',
         'ui.home.subscribe.already': 'Already following ✓',
+        'ui.home.tiktok.review.title': 'TikTok Review Tasks',
+        'ui.home.tiktok.review.body':
+            'Keep shortcut and profile revisit entry points on the first screen so review can complete the required flow.',
+        'ui.home.tiktok.review.body.compact':
+            'Save quick return points so players can jump back in later.',
+        'ui.home.tiktok.review.summary.partial':
+            'One quick entry is enabled.',
+        'ui.home.tiktok.review.summary.prompted':
+            'Revisit was started. Follow the guide and reopen once from your TikTok profile.',
+        'ui.home.tiktok.review.summary.done':
+            'Both quick-return entries are ready.',
+        'ui.home.tiktok.action.processing': 'Processing...',
+        'ui.home.tiktok.action.unavailable': 'Unavailable',
+        'ui.home.tiktok.status.loading': 'Checking TikTok mission status...',
+        'ui.home.tiktok.status.unsupported': 'This TikTok runtime did not expose the required API',
+        'ui.home.tiktok.shortcut.cta': 'Add Shortcut',
+        'ui.home.tiktok.shortcut.done': 'Shortcut Complete',
+        'ui.home.tiktok.shortcut.status.pending':
+            'Tap to open TikTok\'s native add-shortcut prompt',
+        'ui.home.tiktok.shortcut.status.done':
+            'Shortcut launch source detected and ready for review',
+        'ui.home.tiktok.shortcut.toast.completed': 'Shortcut task completed.',
+        'ui.home.tiktok.shortcut.toast.already': 'Shortcut already exists.',
+        'ui.home.tiktok.shortcut.toast.prompt_requested':
+            'TikTok opened the native shortcut prompt. Confirm it in the system sheet.',
+        'ui.home.tiktok.shortcut.toast.unsupported':
+            'This TikTok runtime did not expose the shortcut API.',
+        'ui.home.tiktok.shortcut.toast.failed':
+            'Failed to trigger the shortcut flow. Please try again.',
+        'ui.home.tiktok.profile.cta': 'Profile Revisit',
+        'ui.home.tiktok.profile.done': 'Revisit Complete',
+        'ui.home.tiktok.profile.guide': 'View Guide',
+        'ui.home.tiktok.profile.status.pending':
+            'Tap to start TikTok\'s profile revisit task',
+        'ui.home.tiktok.profile.status.prompted':
+            'Task started. Reopen the game once from your TikTok profile.',
+        'ui.home.tiktok.profile.status.done':
+            'Profile revisit source detected and ready for review',
+        'ui.home.tiktok.profile.toast.completed': 'Profile revisit detected.',
+        'ui.home.tiktok.profile.toast.already':
+            'Profile revisit task was already recorded.',
+        'ui.home.tiktok.profile.toast.prompt_requested':
+            'TikTok started the revisit task. Reopen once from your profile.',
+        'ui.home.tiktok.profile.toast.unsupported':
+            'This TikTok runtime did not expose the profile revisit API.',
+        'ui.home.tiktok.profile.toast.failed':
+            'Failed to start the profile revisit task. Please try again.',
+        'ui.home.tiktok.profile.guide.title': 'Return Through Your Profile',
+        'ui.home.tiktok.profile.guide.body':
+            '1. Tap the profile revisit entry first so TikTok records the revisit task.\n2. Leave the current mini game page and return to your TikTok profile.\n3. Open this game again from the mini game entry on your profile.\n4. When you come back, this entry will switch to “Revisit Complete.”',
+        'ui.home.tiktok.profile.guide.step1': 'Go back to your TikTok profile',
+        'ui.home.tiktok.profile.guide.step2': 'Tap the mini game entry in the sidebar',
+        'ui.home.tiktok.profile.guide.step3': 'Open this game again',
+        'ui.home.tiktok.profile.guide.tip':
+            'After one successful return, this button will switch to “Revisit Complete.”',
+        'ui.home.tiktok.profile.guide.confirm': 'Got It',
         'ui.subscribe.dialog.body': 'Follow us to claim 500◆ diamonds!',
         'ui.subscribe.dialog.confirm': 'Claim Now',
         'ui.subscribe.dialog.cancel': 'Cancel',

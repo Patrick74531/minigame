@@ -270,6 +270,7 @@ NODE
   var started = false;
   var retryCount = 0;
   var maxRetry = 5;
+  var nativeLoadingVisible = false;
 
   function launchEntryOnce() {
     var lastErr = null;
@@ -318,6 +319,41 @@ NODE
       }
       if (API_BASE) {
         console.log('[BOOT][API_BASE] ' + API_BASE);
+      }
+    } catch (_e) {}
+  }
+
+  function showNativeLoading(title) {
+    try {
+      if (typeof tt === 'undefined' || !tt || typeof tt.showLoading !== 'function') {
+        return;
+      }
+      tt.showLoading({
+        title: title || 'Loading...',
+        mask: true
+      });
+      nativeLoadingVisible = true;
+    } catch (_e) {}
+  }
+
+  function hideNativeLoading() {
+    try {
+      if (typeof tt !== 'undefined' && tt && typeof tt.hideLoading === 'function') {
+        tt.hideLoading();
+      }
+    } catch (_e) {}
+    nativeLoadingVisible = false;
+  }
+
+  function exposeNativeLoadingControls() {
+    try {
+      if (typeof globalThis !== 'undefined') {
+        globalThis.__GVR_SHOW_TIKTOK_NATIVE_LOADING__ = showNativeLoading;
+        globalThis.__GVR_HIDE_TIKTOK_NATIVE_LOADING__ = hideNativeLoading;
+      }
+      if (typeof window !== 'undefined') {
+        window.__GVR_SHOW_TIKTOK_NATIVE_LOADING__ = showNativeLoading;
+        window.__GVR_HIDE_TIKTOK_NATIVE_LOADING__ = hideNativeLoading;
       }
     } catch (_e) {}
   }
@@ -662,7 +698,9 @@ NODE
   }
 
   exposePlatform();
+  exposeNativeLoadingControls();
   installCrashBreadcrumbs();
+  showNativeLoading('Loading...');
 
   prepareTikTokIdentity(function() {
     if (typeof tt !== 'undefined' && tt && typeof tt.loadSubpackage === 'function') {
@@ -670,6 +708,7 @@ NODE
         name: SUBPACKAGE_NAME,
         success: launch,
         fail: function (err) {
+          hideNativeLoading();
           console.error('[tiktok-native-build] loadSubpackage failed:', err);
         }
       });

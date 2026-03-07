@@ -115,6 +115,7 @@ export class GameStartFlow {
         const screen = LoadingScreen.show(ctx.containers.ui, () => {
             GameResourceLoader.loadPhase2();
         });
+        this.hideTikTokNativeLoading();
         const audioChoicePromise: Promise<boolean> = screen
             .waitForAudioChoice()
             .then(enabled => {
@@ -217,6 +218,30 @@ export class GameStartFlow {
     private static isTikTokRuntime(): boolean {
         const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
         return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
+    }
+
+    private static hideTikTokNativeLoading(): void {
+        try {
+            const g = globalThis as Record<string, unknown> & {
+                __GVR_HIDE_TIKTOK_NATIVE_LOADING__?: () => void;
+            };
+            if (typeof g.__GVR_HIDE_TIKTOK_NATIVE_LOADING__ === 'function') {
+                g.__GVR_HIDE_TIKTOK_NATIVE_LOADING__();
+            }
+        } catch {
+            // Ignore missing runtime hook.
+        }
+
+        try {
+            const w = window as unknown as {
+                __GVR_HIDE_TIKTOK_NATIVE_LOADING__?: () => void;
+            };
+            if (typeof w.__GVR_HIDE_TIKTOK_NATIVE_LOADING__ === 'function') {
+                w.__GVR_HIDE_TIKTOK_NATIVE_LOADING__();
+            }
+        } catch {
+            // Ignore runtimes without window.
+        }
     }
 
     private static consumePendingResumeAfterReloadReason(): string | null {

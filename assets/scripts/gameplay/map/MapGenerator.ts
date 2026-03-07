@@ -91,6 +91,7 @@ export class MapGenerator extends Component {
 
     // Splatmap resolution (pixels)
     private static readonly SPLAT_SIZE = 256;
+    private static readonly TIKTOK_SPLAT_SIZE = 384;
     private static readonly LANE_HALF_WIDTH_NORM = 0.032;
     private static readonly LANE_HALF_WIDTH_WIDE_NORM = 0.052;
     private static readonly LANE_EDGE_SOFTNESS_NORM = 0.014;
@@ -228,6 +229,7 @@ export class MapGenerator extends Component {
     private createSplatmapGround(cols: number, rows: number): void {
         const worldW = cols * this.tileSize;
         const worldH = rows * this.tileSize;
+        const splatSize = this.getSplatTextureSize();
 
         // Create a single plane mesh covering the entire map
         const groundNode = new Node('SplatmapGround');
@@ -251,7 +253,7 @@ export class MapGenerator extends Component {
         renderer.shadowCastingMode = 0;
 
         // Generate splatmap texture
-        const splatTex = this.generateSplatmapTexture(cols, rows);
+        const splatTex = this.generateSplatmapTexture(splatSize);
 
         // Create material with fallback color first
         const mat = new Material();
@@ -264,10 +266,14 @@ export class MapGenerator extends Component {
         this._terrainMaterial = mat;
 
         // Load effect + textures asynchronously, then swap material
-        void this.initSplatmapMaterial(renderer, splatTex);
+        void this.initSplatmapMaterial(renderer, splatTex, splatSize);
     }
 
-    private async initSplatmapMaterial(renderer: MeshRenderer, splatTex: Texture2D): Promise<void> {
+    private async initSplatmapMaterial(
+        renderer: MeshRenderer,
+        splatTex: Texture2D,
+        splatSize: number
+    ): Promise<void> {
         // Load grass and dirt textures
         const [grassTex, dirtTex] = await Promise.all([
             this.loadGroundTextureWithFallbacks([...MapGenerator.GRASS_TEX_PATHS]),
@@ -299,10 +305,14 @@ export class MapGenerator extends Component {
             return;
         }
 
+        const useLiteTerrainShader = this.shouldUseLiteTerrainShader();
+
         try {
             mat.initialize({
                 effectAsset: effectAsset,
-                defines: {},
+                defines: {
+                    TERRAIN_LITE: useLiteTerrainShader,
+                },
             });
         } catch (e) {
             console.error('[MapGenerator] Failed to initialize material with splat effect:', e);
@@ -320,10 +330,7 @@ export class MapGenerator extends Component {
         mat.setProperty('grassTint', new Vec4(0.92, 0.97, 0.87, 1.0));
         mat.setProperty('dirtTint', new Vec4(0.98, 0.93, 0.86, 1.0));
         mat.setProperty('gradeParams', new Vec4(0.92, 1.04, 0.98, 0.04));
-        mat.setProperty(
-            'splatTexel',
-            new Vec4(1 / MapGenerator.SPLAT_SIZE, 1 / MapGenerator.SPLAT_SIZE, 0, 0)
-        );
+        mat.setProperty('splatTexel', new Vec4(1 / splatSize, 1 / splatSize, 0, 0));
         mat.setProperty('lightDir', new Vec4(-0.22, 1.0, 0.38, 0));
         mat.setProperty('lightingParams', new Vec4(0.62, 0.5, 2.2, 0.16));
 
@@ -343,8 +350,8 @@ export class MapGenerator extends Component {
     //  SPLATMAP GENERATION — distance field + noise
     // ═══════════════════════════════════════════════════════════
 
-    private generateSplatmapTexture(cols: number, rows: number): Texture2D {
-        const S = MapGenerator.SPLAT_SIZE;
+    private generateSplatmapTexture(size: number): Texture2D {
+        const S = size;
         const data = new Uint8Array(S * S * 4); // RGBA
 
         // Base position in normalized [0,1] space
@@ -499,15 +506,18 @@ export class MapGenerator extends Component {
             format: pixFmt,
         });
         tex.image = img;
-        // Set filters: LINEAR = 2
+        // TikTok uses a sharper mask sampler to avoid blurry road boundaries on device.
         const filterLinear =
             (Texture2D as unknown as { Filter?: { LINEAR?: number } }).Filter?.LINEAR ?? 2;
+        const filterNearest =
+            (Texture2D as unknown as { Filter?: { NEAREST?: number } }).Filter?.NEAREST ?? 1;
         const texAny = tex as Texture2D & {
             setFilters?: (min: number, mag: number) => void;
             setWrapMode?: (u: number, v: number) => void;
         };
         if (texAny.setFilters) {
-            texAny.setFilters(filterLinear, filterLinear);
+            const filter = this.shouldUseSharpSplatSampling() ? filterNearest : filterLinear;
+            texAny.setFilters(filter, filter);
         }
         // CLAMP_TO_EDGE = 0
         const clamp =
@@ -674,7 +684,7 @@ export class MapGenerator extends Component {
 
         const renderer = node.addComponent(MeshRenderer);
         renderer.mesh = this.getSharedTileMesh();
-        renderer.material = this.getColorMaterial(color);
+        this.applyColorMaterial(renderer, color);
         // Boundary mountains are outside the playable area. Letting them cast shadows
         // causes remote-webview-only stray silhouettes when shadow frustum differs.
         renderer.shadowCastingMode = 0;
@@ -736,7 +746,7 @@ export class MapGenerator extends Component {
 
         const renderer = node.addComponent(MeshRenderer);
         renderer.mesh = this.getSharedTileMesh();
-        renderer.material = this.getColorMaterial(color);
+        this.applyColorMaterial(renderer, color);
 
         if (isObstacle) {
             const collider = node.addComponent(BoxCollider);
@@ -750,15 +760,51 @@ export class MapGenerator extends Component {
     }
 
     private getColorMaterial(color: Color): Material {
-        const key = `${color.r}_${color.g}_${color.b}_${color.a}`;
+        const effectName = this.isTikTokRuntime() ? 'builtin-unlit' : 'builtin-standard';
+        const key = `${effectName}_${color.r}_${color.g}_${color.b}_${color.a}`;
         let material = this._colorMaterials.get(key);
         if (!material) {
             material = new Material();
-            material.initialize({ effectName: 'builtin-standard' });
+            material.initialize({ effectName });
             material.setProperty('mainColor', color);
             this._colorMaterials.set(key, material);
         }
         return material;
+    }
+
+    private applyColorMaterial(renderer: MeshRenderer, color: Color): void {
+        try {
+            renderer.material = this.getColorMaterial(color);
+        } catch (err) {
+            console.warn('[MapGenerator] Color material assignment failed, fallback to unlit', err);
+            renderer.material = this.createFallbackUnlitMaterial(color);
+        }
+    }
+
+    private createFallbackUnlitMaterial(color: Color): Material {
+        const material = new Material();
+        material.initialize({ effectName: 'builtin-unlit' });
+        material.setProperty('mainColor', color);
+        return material;
+    }
+
+    private getSplatTextureSize(): number {
+        return this.isTikTokRuntime()
+            ? MapGenerator.TIKTOK_SPLAT_SIZE
+            : MapGenerator.SPLAT_SIZE;
+    }
+
+    private shouldUseLiteTerrainShader(): boolean {
+        return this.isTikTokRuntime();
+    }
+
+    private shouldUseSharpSplatSampling(): boolean {
+        return this.isTikTokRuntime();
+    }
+
+    private isTikTokRuntime(): boolean {
+        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
+        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
     }
 
     private async loadGroundTextureWithFallbacks(paths: string[]): Promise<Texture2D | null> {
@@ -982,14 +1028,27 @@ export class MapGenerator extends Component {
         const minEdgeInset = 4.2;
         const edgeBandDepth = 5.0;
         const density = Math.max(0.8, Math.min(1.3, (cols * rows) / (28 * 28)));
+        const isTikTokRuntime = this.isTikTokRuntime();
         const targetCounts: Record<NatureCategory, number> = {
-            tree: Math.max(34, Math.round(64 * density)),
-            rock: Math.max(28, Math.round(58 * density)),
-            bush: Math.max(30, Math.round(62 * density)),
+            tree: Math.max(
+                isTikTokRuntime ? 20 : 34,
+                Math.round(64 * density * (isTikTokRuntime ? 0.44 : 1))
+            ),
+            rock: Math.max(
+                isTikTokRuntime ? 18 : 28,
+                Math.round(58 * density * (isTikTokRuntime ? 0.4 : 1))
+            ),
+            bush: Math.max(
+                isTikTokRuntime ? 18 : 30,
+                Math.round(62 * density * (isTikTokRuntime ? 0.34 : 1))
+            ),
             grass: 0,
         };
         const grassScatterTarget = 0;
-        const grassPatchTarget = Math.max(150, Math.round(320 * density));
+        const grassPatchTarget = Math.max(
+            isTikTokRuntime ? 72 : 150,
+            Math.round(320 * density * (isTikTokRuntime ? 0.26 : 1))
+        );
         const buildingZones = this.getNatureBuildingExclusionZones();
         const lanePolylines = this.getLanePolylinesNormalized();
         const placed: NaturePlacement[] = [];
@@ -1170,9 +1229,10 @@ export class MapGenerator extends Component {
 
         let created = 0;
         const world = Math.max(1, worldMin);
-        const spacingWorld = 4.8;
+        const spacingWorld = this.isTikTokRuntime() ? 6.2 : 4.8;
         const startInsetWorld = 1.6;
         const endInsetWorld = 1.2;
+        const sideSkipChance = this.isTikTokRuntime() ? 0.58 : 0.35;
 
         for (let laneIndex = 0; laneIndex < lanePolylines.length; laneIndex++) {
             const lane = lanePolylines[laneIndex];
@@ -1215,7 +1275,7 @@ export class MapGenerator extends Component {
                     const baseOffset = laneHalfWorld + roadsideEdgeOffset;
 
                     for (const side of [-1, 1]) {
-                        if (rng() < 0.35) continue;
+                        if (rng() < sideSkipChance) continue;
                         let planted = false;
                         for (let attempt = 0; attempt < 2 && !planted; attempt++) {
                             const offsetJitter =

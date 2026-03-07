@@ -324,8 +324,7 @@ export class EnemyFlyingAnimator extends Component {
         mr.mesh = utils.createMesh(primitives.box({ width: 0.5, height: 0.5, length: 0.5 }));
         const mat = new Material();
         mat.initialize({
-            effectName: 'builtin-standard',
-            technique: 0,
+            effectName: 'builtin-unlit',
         });
         mat.setProperty('mainColor', new Color(0, 0, 255, 255)); // Blue for load failure
         mr.material = mat;

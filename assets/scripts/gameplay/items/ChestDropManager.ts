@@ -83,6 +83,10 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
 
     private onBossChestDrop(data: { position: Vec3 }): void {
         if (!this._coinContainer) return;
+        if (this.isTikTokRuntime()) {
+            this.spawnChest(data.position, true);
+            return;
+        }
         if (this._chestPrefab) {
             this.spawnChest(data.position);
             return;
@@ -144,6 +148,7 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
 
     private loadChestPrefab(): void {
         if (this._isLoading || this._chestPrefab) return;
+        if (this.isTikTokRuntime()) return;
         this._isLoading = true;
         const candidates = ['property/Chest', 'property/Chest/Chest'];
         this.tryLoadPrefab(candidates, 0);
@@ -176,6 +181,11 @@ export class ChestDropManager extends Singleton<ChestDropManager>() {
         for (const pos of pending) {
             this.spawnChest(pos, forceFallback);
         }
+    }
+
+    private isTikTokRuntime(): boolean {
+        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
+        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
     }
 
     private get eventManager(): EventManager {

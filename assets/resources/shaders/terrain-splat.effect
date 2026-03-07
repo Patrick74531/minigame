@@ -44,6 +44,7 @@ CCProgram terrain-vs %{
 
 CCProgram terrain-fs %{
   precision highp float;
+  #pragma define-meta TERRAIN_LITE
 
   in vec2 v_uv;
 
@@ -131,6 +132,24 @@ CCProgram terrain-fs %{
     vec2 grassUV = v_uv * grassTiling.xy + grassTiling.zw;
     vec2 dirtUV  = v_uv * dirtTiling.xy  + dirtTiling.zw;
 
+#if TERRAIN_LITE
+    vec4 grassColor = texture(grassTex, grassUV);
+    vec4 dirtColor  = texture(dirtTex, dirtUV);
+    grassColor.rgb *= grassTint.rgb;
+    dirtColor.rgb *= dirtTint.rgb;
+
+    // Keep the mobile path crisp and cheap: 2 texture reads + splat mask.
+    grassColor.rgb *= 0.92 + grassColor.g * 0.18;
+    dirtColor.rgb *= 0.92 + dirtColor.r * 0.14;
+
+    vec4 finalColor = mix(grassColor, dirtColor, mask);
+    float laneTint = smoothstep(0.12, 0.88, mask);
+    finalColor.rgb *= mix(1.02, 0.98, laneTint);
+    finalColor.rgb = (finalColor.rgb - 0.5) * gradeParams.y + 0.5;
+    finalColor.rgb *= gradeParams.z;
+    finalColor.a = 1.0;
+    return finalColor;
+#else
     vec4 grassColor = sampleTextureAntiTile(grassTex, grassUV, vec2(0.71, 1.37), vec2(-2.14, 4.83));
     vec4 dirtColor  = sampleTextureAntiTile(dirtTex, dirtUV, vec2(1.93, -0.66), vec2(3.27, 2.14));
     grassColor.rgb *= grassTint.rgb;
@@ -180,5 +199,6 @@ CCProgram terrain-fs %{
     finalColor.a = 1.0;
 
     return finalColor;
+#endif
   }
 }%

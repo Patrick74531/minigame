@@ -112,7 +112,11 @@ export class LoadingScreen extends Component {
         this._shuffleTips();
         this._showTip(0);
         this._ensureAudioChoicePromise();
-        this._buildAudioPrompt();
+        if (this._shouldSkipBlockingAudioChoice()) {
+            this._resolveAudioChoice(false);
+        } else {
+            this._buildAudioPrompt();
+        }
         this.scheduleOnce(() => {
             this._minDurationElapsed = true;
             this._tryComplete();
@@ -572,6 +576,11 @@ export class LoadingScreen extends Component {
             this._audioChoiceResolver = resolve;
         });
         return this._audioChoicePromise;
+    }
+
+    private _shouldSkipBlockingAudioChoice(): boolean {
+        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
+        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
     }
 
     private _resolveAudioChoice(enabled: boolean): void {
