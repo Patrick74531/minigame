@@ -89,6 +89,8 @@ export class MapGenerator extends Component {
     private static readonly GRASS_DARK_COLOR = new Vec4(116 / 255, 164 / 255, 99 / 255, 1);
     private static readonly GRASS_ACCENT_COLOR = new Vec4(129 / 255, 176 / 255, 106 / 255, 1);
     private static readonly GRASS_VARIATION = new Vec4(3.2, 7.5, 0.14, 0.07);
+    private static readonly GRASS_VARIATION_CONSTRAINED = new Vec4(2.2, 4.6, 0.09, 0.035);
+    private static readonly GRASS_TILING_CONSTRAINED_SCALE = 0.8;
 
     // Splatmap resolution (pixels)
     private static readonly SPLAT_SIZE = 256;
@@ -313,15 +315,22 @@ export class MapGenerator extends Component {
         }
 
         // Tiling: dirt stays tiled, grass variation is now procedural.
+        const useConstrainedMode = shouldUseConstrainedGameplayMode();
         const tilesAcross = Math.max(this.mapWidth, this.mapHeight) / 4;
+        const grassTilesAcross = useConstrainedMode
+            ? tilesAcross * MapGenerator.GRASS_TILING_CONSTRAINED_SCALE
+            : tilesAcross;
+        const grassVariation = useConstrainedMode
+            ? MapGenerator.GRASS_VARIATION_CONSTRAINED
+            : MapGenerator.GRASS_VARIATION;
         mat.setProperty('dirtTex', dirtTex);
         mat.setProperty('splatMap', splatTex);
         mat.setProperty('grassMainColor', MapGenerator.GRASS_MAIN_COLOR);
         mat.setProperty('grassBrightColor', MapGenerator.GRASS_BRIGHT_COLOR);
         mat.setProperty('grassDarkColor', MapGenerator.GRASS_DARK_COLOR);
         mat.setProperty('grassAccentColor', MapGenerator.GRASS_ACCENT_COLOR);
-        mat.setProperty('grassVariation', MapGenerator.GRASS_VARIATION);
-        mat.setProperty('grassTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
+        mat.setProperty('grassVariation', grassVariation);
+        mat.setProperty('grassTiling', new Vec4(grassTilesAcross, grassTilesAcross, 0, 0));
         mat.setProperty('dirtTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
         mat.setProperty('splatTexel', new Vec4(1 / splatSize, 1 / splatSize, 0, 0));
         mat.setProperty('lightDir', new Vec4(-0.35, 1.0, 0.25, 0));
@@ -790,7 +799,8 @@ export class MapGenerator extends Component {
     }
 
     private shouldUseSharpSplatSampling(): boolean {
-        return shouldUseConstrainedGameplayMode();
+        // Nearest sampling makes the splat mask grid show through the procedural grass on phones.
+        return false;
     }
 
     private async loadGroundTextureWithFallbacks(paths: string[]): Promise<Texture2D | null> {
