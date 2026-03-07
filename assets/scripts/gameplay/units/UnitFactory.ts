@@ -126,6 +126,7 @@ export class UnitFactory {
         targetPos: Vec3,
         options: EnemySpawnOptions = {}
     ): Node {
+        const isTikTokRuntime = this.isTikTokRuntime();
         const isElite = options.isElite ?? false;
         const node = this.createCubeNode(
             isElite ? 'Enemy_Elite' : 'Enemy',
@@ -166,13 +167,14 @@ export class UnitFactory {
         col.size = new Vec3(1, 1, 1);
         col.isTrigger = false; // Solid for collision
         col.setGroup(UnitFactory.GROUP_ENEMY);
-        // Collide with DEFAULT (buildings/hero/soldier), ENEMY, BULLET and WALL.
+        // TikTok swarm fights get expensive fast if enemies physically collide with each other.
+        // Keep gameplay collisions, but drop enemy-enemy contact resolution on that runtime.
         col.setMask(
             UnitFactory.GROUP_DEFAULT |
-                UnitFactory.GROUP_ENEMY |
                 UnitFactory.GROUP_BULLET |
                 UnitFactory.GROUP_WALL |
-                UnitFactory.GROUP_PROJECTILE_BLOCKER
+                UnitFactory.GROUP_PROJECTILE_BLOCKER |
+                (isTikTokRuntime ? 0 : UnitFactory.GROUP_ENEMY)
         );
 
         const hpMultiplier = options.hpMultiplier ?? 1;
@@ -180,7 +182,12 @@ export class UnitFactory {
         const speedMultiplier = options.speedMultiplier ?? 1;
 
         const resolvedSpawnType = options.spawnType ?? (isElite ? 'elite' : 'regular');
-        this.attachGroundShadow(node, this.resolveEnemyGroundShadowConfig(options, resolvedSpawnType));
+        if (this.shouldAttachEnemyGroundShadow(resolvedSpawnType)) {
+            this.attachGroundShadow(
+                node,
+                this.resolveEnemyGroundShadowConfig(options, resolvedSpawnType)
+            );
+        }
 
         enemy.initStats({
             maxHp: GameConfig.ENEMY.BASE_HP * hpMultiplier,
@@ -198,7 +205,7 @@ export class UnitFactory {
         });
         enemy.setCrowdSeparationProfile({
             radius: this.resolveEnemyCrowdSeparationRadius(options),
-            weight: 1.08,
+            weight: isTikTokRuntime ? 0.82 : 1.08,
         });
 
         // Set Target
@@ -375,6 +382,13 @@ export class UnitFactory {
             innerFade,
             outerFade,
         };
+    }
+
+    private static shouldAttachEnemyGroundShadow(
+        spawnType: 'regular' | 'elite' | 'boss'
+    ): boolean {
+        if (!this.isTikTokRuntime()) return true;
+        return spawnType !== 'regular';
     }
 
     /**

@@ -44,6 +44,10 @@ export class Enemy extends Unit {
     private static readonly NEAR_LOGIC_STEP = 1 / 24;
     private static readonly FAR_LOGIC_STEP = 1 / 12;
     private static readonly FAR_LOGIC_DIST_SQ = 18 * 18;
+    private static readonly TIKTOK_NEAR_LOGIC_STEP = 1 / 18;
+    private static readonly TIKTOK_FAR_LOGIC_STEP = 1 / 8;
+    private static readonly TIKTOK_FAR_LOGIC_DIST_SQ = 14 * 14;
+    private static readonly TIKTOK_CROWD_SEPARATION_ENEMY_LIMIT = 18;
     private static readonly MIN_ATTACK_RANGE = 0.3;
     private static readonly RANGED_PROJECTILE_SPEED =
         GameConfig.ENEMY.FLYING_RANGED.PROJECTILE_SPEED;
@@ -682,20 +686,28 @@ export class Enemy extends Unit {
     }
 
     private resolveLogicStep(): number {
+        const isTikTokRuntime = this.isTikTokRuntime();
+        const nearStep = isTikTokRuntime
+            ? Enemy.TIKTOK_NEAR_LOGIC_STEP
+            : Enemy.NEAR_LOGIC_STEP;
+        const farStep = isTikTokRuntime ? Enemy.TIKTOK_FAR_LOGIC_STEP : Enemy.FAR_LOGIC_STEP;
+        const farDistSq = isTikTokRuntime
+            ? Enemy.TIKTOK_FAR_LOGIC_DIST_SQ
+            : Enemy.FAR_LOGIC_DIST_SQ;
         if (this._state === UnitState.ATTACKING || (this._target && this._target.isAlive)) {
-            return Enemy.NEAR_LOGIC_STEP;
+            return nearStep;
         }
 
         const heroNode = this.gameManager.hero;
         if (!heroNode || !heroNode.isValid) {
-            return Enemy.NEAR_LOGIC_STEP;
+            return nearStep;
         }
 
         const myPos = this.node.position;
         const dx = heroNode.position.x - myPos.x;
         const dz = heroNode.position.z - myPos.z;
         const distSq = dx * dx + dz * dz;
-        return distSq > Enemy.FAR_LOGIC_DIST_SQ ? Enemy.FAR_LOGIC_STEP : Enemy.NEAR_LOGIC_STEP;
+        return distSq > farDistSq ? farStep : nearStep;
     }
 
     private syncAttackVisualState(): void {
@@ -744,6 +756,12 @@ export class Enemy extends Unit {
 
         const radiusSq = radius * radius;
         const enemies = EnemyQuery.getEnemies();
+        if (
+            this.isTikTokRuntime() &&
+            enemies.length > Enemy.TIKTOK_CROWD_SEPARATION_ENEMY_LIMIT
+        ) {
+            return;
+        }
         for (const enemy of enemies) {
             if (!enemy || !enemy.isValid || enemy === this.node) continue;
 
@@ -764,6 +782,11 @@ export class Enemy extends Unit {
             out.x *= inv;
             out.z *= inv;
         }
+    }
+
+    private isTikTokRuntime(): boolean {
+        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
+        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
     }
 
     protected get eventManager(): EventManager {

@@ -149,10 +149,11 @@ export class EnemyFlyingAnimator extends Component {
     }
 
     private applyShadowSettingsRecursive(root: Node): void {
+        const enableRealtimeShadows = !this.isTikTokRuntime();
         const renderers = root.getComponentsInChildren(MeshRenderer);
         for (const renderer of renderers) {
-            renderer.shadowCastingMode = 1;
-            renderer.receiveShadow = 1;
+            renderer.shadowCastingMode = enableRealtimeShadows ? 1 : 0;
+            renderer.receiveShadow = enableRealtimeShadows ? 1 : 0;
         }
     }
 
@@ -332,5 +333,10 @@ export class EnemyFlyingAnimator extends Component {
         owner.addChild(fallback);
         fallback.setPosition(0, 0.5, 0);
         console.warn('[EnemyFlyingAnimator] Created Fallback Cube due to load failure.');
+    }
+
+    private isTikTokRuntime(): boolean {
+        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
+        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
     }
 }
