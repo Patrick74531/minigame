@@ -601,7 +601,7 @@ const BASE = {
         },
     },
     hero: {
-        baseHp: 60,
+        baseHp: 120,
         baseAttack: 12,
         attackInterval: 0.9,
         attackRange: 2.5,
@@ -615,7 +615,7 @@ const BASE = {
         xpPerKill: 5,
         xpPerEliteKill: 20,
         growth: {
-            maxHpMultiply: 1.015,
+            maxHpMultiply: 1.025,
             attackMultiply: 1.04,
             critRateAdd: 0.006,
             critDamageAdd: 0.03,
