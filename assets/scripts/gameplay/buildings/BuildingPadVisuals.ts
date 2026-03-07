@@ -182,22 +182,22 @@ export class BuildingPadVisuals {
         }
 
         if (iconNode?.isValid) {
-            iconNode.setPosition(shouldShowLevelBadge ? -22 : 0, 0, 0);
+            iconNode.setPosition(shouldShowLevelBadge ? -36 : 0, 0, 0);
             iconNode.setScale(
-                shouldShowLevelBadge ? 0.78 : 0.88,
-                shouldShowLevelBadge ? 0.78 : 0.88,
+                shouldShowLevelBadge ? 0.68 : 0.88,
+                shouldShowLevelBadge ? 0.68 : 0.88,
                 1
             );
         }
         if (levelBadgeNode?.isValid) {
             levelBadgeNode.active = shouldShowLevelBadge;
             if (shouldShowLevelBadge) {
-                levelBadgeNode.setPosition(24, 0, 0);
+                levelBadgeNode.setPosition(38, 0, 0);
                 const levelText = `${Math.max(1, Math.floor(currentLevel))}`;
                 if (levelBadgeLabel) {
                     levelBadgeLabel.string = levelText;
-                    levelBadgeLabel.fontSize = levelText.length >= 2 ? 16 : 18;
-                    levelBadgeLabel.lineHeight = levelBadgeLabel.fontSize + 2;
+                    levelBadgeLabel.fontSize = levelText.length >= 2 ? 24 : 30;
+                    levelBadgeLabel.lineHeight = levelBadgeLabel.fontSize + 3;
                 }
                 this.drawLevelBadge(levelBadgeNode.getComponent(Graphics));
             }
@@ -212,7 +212,7 @@ export class BuildingPadVisuals {
         const rowNode = new Node('FunctionRow');
         contentNode.addChild(rowNode);
         rowNode.setPosition(0, 42, 0);
-        rowNode.addComponent(UITransform).setContentSize(72, 30);
+        rowNode.addComponent(UITransform).setContentSize(114, 50);
 
         const iconNode = new Node('FunctionIcon');
         rowNode.addChild(iconNode);
@@ -221,17 +221,17 @@ export class BuildingPadVisuals {
 
         const levelBadgeNode = new Node('LevelBadge');
         rowNode.addChild(levelBadgeNode);
-        levelBadgeNode.addComponent(UITransform).setContentSize(46, 26);
+        levelBadgeNode.addComponent(UITransform).setContentSize(76, 50);
         const levelBadgeBg = levelBadgeNode.addComponent(Graphics);
         this.drawLevelBadge(levelBadgeBg);
 
         const levelLabelNode = new Node('LevelLabel');
         levelBadgeNode.addChild(levelLabelNode);
-        levelLabelNode.addComponent(UITransform).setContentSize(46, 26);
+        levelLabelNode.addComponent(UITransform).setContentSize(76, 50);
         const levelBadgeLabel = levelLabelNode.addComponent(Label);
         levelBadgeLabel.string = '1';
-        levelBadgeLabel.fontSize = 18;
-        levelBadgeLabel.lineHeight = 20;
+        levelBadgeLabel.fontSize = 30;
+        levelBadgeLabel.lineHeight = 33;
         levelBadgeLabel.isBold = true;
         levelBadgeLabel.color = new Color(255, 244, 204, 255);
         levelBadgeLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
@@ -273,14 +273,14 @@ export class BuildingPadVisuals {
         if (!graphics) return;
         graphics.clear();
         graphics.fillColor = new Color(255, 255, 255, 244);
-        graphics.circle(0, 0, 13);
+        graphics.circle(0, 0, 21);
         graphics.fill();
         graphics.strokeColor = new Color(220, 184, 92, 236);
         graphics.lineWidth = 2;
-        graphics.circle(0, 0, 12);
+        graphics.circle(0, 0, 20);
         graphics.stroke();
         graphics.fillColor = new Color(255, 218, 120, 40);
-        graphics.circle(-3.5, 4, 4);
+        graphics.circle(-5.5, 6.5, 6.5);
         graphics.fill();
     }
 
