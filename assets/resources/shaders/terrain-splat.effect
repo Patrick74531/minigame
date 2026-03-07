@@ -13,9 +13,13 @@ CCEffect %{
       rasterizerState:
         cullMode: none
       properties:
-        grassTex:     { value: white }
         dirtTex:      { value: white }
         splatMap:     { value: black }
+        grassMainColor:   { value: [0.5294118, 0.7215686, 0.4588235, 1.0] }
+        grassBrightColor: { value: [0.6117647, 0.7882353, 0.5098039, 1.0] }
+        grassDarkColor:   { value: [0.4156863, 0.5921569, 0.3568628, 1.0] }
+        grassAccentColor: { value: [0.4901961, 0.6784314, 0.3960784, 1.0] }
+        grassVariation:   { value: [6.0, 18.0, 0.32, 0.18] }
         grassTiling:  { value: [8.0, 8.0, 0.0, 0.0] }
         dirtTiling:   { value: [8.0, 8.0, 0.0, 0.0] }
         splatTexel:   { value: [0.00390625, 0.00390625, 0.0, 0.0] }
@@ -44,11 +48,15 @@ CCProgram terrain-fs %{
 
   in vec2 v_uv;
 
-  uniform sampler2D grassTex;
   uniform sampler2D dirtTex;
   uniform sampler2D splatMap;
 
   uniform TerrainParams {
+    vec4 grassMainColor;
+    vec4 grassBrightColor;
+    vec4 grassDarkColor;
+    vec4 grassAccentColor;
+    vec4 grassVariation;
     vec4 grassTiling;
     vec4 dirtTiling;
     vec4 splatTexel;
@@ -56,15 +64,56 @@ CCProgram terrain-fs %{
     vec4 lightingParams;
   };
 
+  float hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+
+  float valueNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+
+    float a = hash12(i);
+    float b = hash12(i + vec2(1.0, 0.0));
+    float c = hash12(i + vec2(0.0, 1.0));
+    float d = hash12(i + vec2(1.0, 1.0));
+
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+  }
+
+  vec3 buildGrassColor(vec2 uv) {
+    float macro = valueNoise(uv * grassVariation.x + vec2(4.2, 9.1));
+    float secondary = valueNoise(uv * (grassVariation.x * 0.58) + vec2(11.3, 5.7));
+    float detail = valueNoise(uv * grassVariation.y + vec2(13.7, 2.8));
+    float accent = valueNoise(uv * (grassVariation.y * 0.45) + vec2(2.4, 14.8));
+    float macroBlend = smoothstep(0.18, 0.82, macro * 0.72 + secondary * 0.28);
+
+    vec3 grassColor = mix(
+      grassDarkColor.rgb,
+      grassMainColor.rgb,
+      macroBlend
+    );
+    grassColor = mix(grassColor, grassBrightColor.rgb, detail * detail * grassVariation.z);
+    grassColor = mix(
+      grassColor,
+      grassAccentColor.rgb,
+      smoothstep(0.34, 0.84, accent) * grassVariation.w
+    );
+
+    return clamp(grassColor, 0.0, 1.0);
+  }
+
   vec4 frag () {
     // Sample splatmap (single channel mask: 0=grass, 1=dirt)
     float mask = texture(splatMap, v_uv).r;
 
-    // Tile grass and dirt textures independently
+    // Grass uses a procedural palette, dirt still uses the texture.
     vec2 grassUV = v_uv * grassTiling.xy + grassTiling.zw;
     vec2 dirtUV  = v_uv * dirtTiling.xy  + dirtTiling.zw;
 
-    vec4 grassColor = texture(grassTex, grassUV);
+    vec4 grassColor = vec4(buildGrassColor(grassUV), 1.0);
     vec4 dirtColor  = texture(dirtTex, dirtUV);
 
     // Blend: mask=0 → grass, mask=1 → dirt

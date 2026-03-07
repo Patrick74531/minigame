@@ -77,18 +77,18 @@ export class MapGenerator extends Component {
     private static readonly NATURE_BLOCKER_HEIGHT = 3.6;
     private static readonly NATURE_BLOCKER_CENTER_Y = 1.55;
 
-    // Texture paths (with Cocos sub-asset fallbacks)
-    private static readonly GRASS_TEX_PATHS: ReadonlyArray<string> = [
-        'floor/grass/texture',
-        'floor/grass',
-        'floor/grass.webp',
-    ];
+    // Ground texture paths (with Cocos sub-asset fallbacks)
     private static readonly DIRT_TEX_PATHS: ReadonlyArray<string> = [
         'floor/Dirt_02/texture',
         'floor/Dirt_02',
         'floor/Dirt_02.webp',
     ];
     private static readonly SPLAT_EFFECT_PATH = 'shaders/terrain-splat';
+    private static readonly GRASS_MAIN_COLOR = new Vec4(135 / 255, 184 / 255, 117 / 255, 1);
+    private static readonly GRASS_BRIGHT_COLOR = new Vec4(156 / 255, 201 / 255, 130 / 255, 1);
+    private static readonly GRASS_DARK_COLOR = new Vec4(116 / 255, 164 / 255, 99 / 255, 1);
+    private static readonly GRASS_ACCENT_COLOR = new Vec4(129 / 255, 176 / 255, 106 / 255, 1);
+    private static readonly GRASS_VARIATION = new Vec4(3.2, 7.5, 0.14, 0.07);
 
     // Splatmap resolution (pixels)
     private static readonly SPLAT_SIZE = 256;
@@ -262,7 +262,7 @@ export class MapGenerator extends Component {
             effectName: 'builtin-unlit',
             defines: { USE_TEXTURE: false },
         });
-        mat.setProperty('mainColor', new Color(98, 133, 75, 255)); // fallback grass
+        mat.setProperty('mainColor', new Color(135, 184, 117, 255)); // fallback grass
         renderer.material = mat;
         this._terrainMaterial = mat;
 
@@ -275,33 +275,29 @@ export class MapGenerator extends Component {
         splatTex: Texture2D,
         splatSize: number
     ): Promise<void> {
-        // Load grass and dirt textures
-        const [grassTex, dirtTex] = await Promise.all([
-            this.loadGroundTextureWithFallbacks([...MapGenerator.GRASS_TEX_PATHS]),
-            this.loadGroundTextureWithFallbacks([...MapGenerator.DIRT_TEX_PATHS]),
+        // Grass now uses a procedural palette, only dirt remains texture-driven.
+        const dirtTex = await this.loadGroundTextureWithFallbacks([
+            ...MapGenerator.DIRT_TEX_PATHS,
         ]);
 
-        if (!grassTex || !dirtTex) {
-            console.warn(
-                '[MapGenerator] Failed to load grass or dirt texture, keeping fallback color'
-            );
+        if (!dirtTex) {
+            console.warn('[MapGenerator] Failed to load dirt texture, keeping fallback color');
             return;
         }
 
-        // Set wrap modes to repeat
-        this.setTextureRepeat(grassTex);
+        // Set wrap mode to repeat for dirt texture tiling.
         this.setTextureRepeat(dirtTex);
 
         // Create splatmap material
         const mat = new Material();
 
         // Load the effect asset first to ensure it's available
-        const effectAsset = await this.loadEffectAsset('shaders/terrain-splat');
+        const effectAsset = await this.loadEffectAsset(MapGenerator.SPLAT_EFFECT_PATH);
         if (!effectAsset) {
             console.error('[MapGenerator] Failed to load terrain-splat effect asset');
             // Fallback to unlit
-            mat.initialize({ effectName: 'builtin-unlit', defines: { USE_TEXTURE: true } });
-            mat.setProperty('mainColor', new Color(98, 133, 75, 255));
+            mat.initialize({ effectName: 'builtin-unlit', defines: { USE_TEXTURE: false } });
+            mat.setProperty('mainColor', new Color(135, 184, 117, 255));
             renderer.material = mat;
             return;
         }
@@ -316,11 +312,15 @@ export class MapGenerator extends Component {
             return;
         }
 
-        // Tiling: reduce tiling for more natural look (less repeated pattern)
+        // Tiling: dirt stays tiled, grass variation is now procedural.
         const tilesAcross = Math.max(this.mapWidth, this.mapHeight) / 4;
-        mat.setProperty('grassTex', grassTex);
         mat.setProperty('dirtTex', dirtTex);
         mat.setProperty('splatMap', splatTex);
+        mat.setProperty('grassMainColor', MapGenerator.GRASS_MAIN_COLOR);
+        mat.setProperty('grassBrightColor', MapGenerator.GRASS_BRIGHT_COLOR);
+        mat.setProperty('grassDarkColor', MapGenerator.GRASS_DARK_COLOR);
+        mat.setProperty('grassAccentColor', MapGenerator.GRASS_ACCENT_COLOR);
+        mat.setProperty('grassVariation', MapGenerator.GRASS_VARIATION);
         mat.setProperty('grassTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
         mat.setProperty('dirtTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
         mat.setProperty('splatTexel', new Vec4(1 / splatSize, 1 / splatSize, 0, 0));
