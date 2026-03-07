@@ -1,4 +1,14 @@
-import { Node, MeshRenderer, Prefab, resources, instantiate, Renderer, assetManager } from 'cc';
+import {
+    Node,
+    MeshRenderer,
+    Prefab,
+    resources,
+    instantiate,
+    Renderer,
+    assetManager,
+    Vec3,
+} from 'cc';
+import { Building } from './Building';
 import { SunflowerPreview } from '../visuals/SunflowerPreview';
 
 /**
@@ -283,9 +293,10 @@ export class BuildingModelVisuals {
         node: Node,
         baseline: { x: number; y: number; z: number }
     ): number {
-        const sx = Math.abs(node.scale.x) > 1e-6 ? Math.abs(node.scale.x) : 1;
-        const sy = Math.abs(node.scale.y) > 1e-6 ? Math.abs(node.scale.y) : 1;
-        const sz = Math.abs(node.scale.z) > 1e-6 ? Math.abs(node.scale.z) : 1;
+        const stableScale = this.getStableNodeScale(node);
+        const sx = Math.abs(stableScale.x) > 1e-6 ? Math.abs(stableScale.x) : 1;
+        const sy = Math.abs(stableScale.y) > 1e-6 ? Math.abs(stableScale.y) : 1;
+        const sz = Math.abs(stableScale.z) > 1e-6 ? Math.abs(stableScale.z) : 1;
         const curAvg = (sx + sy + sz) / 3;
 
         const bx = Math.abs(baseline.x) > 1e-6 ? Math.abs(baseline.x) : 1;
@@ -295,6 +306,14 @@ export class BuildingModelVisuals {
 
         if (baseAvg <= 1e-6) return 1;
         return curAvg / baseAvg;
+    }
+
+    private static getStableNodeScale(node: Node): Vec3 {
+        const building = node.getComponent(Building);
+        if (building) {
+            return building.getVisualRestScale(new Vec3());
+        }
+        return new Vec3(node.scale.x, node.scale.y, node.scale.z);
     }
 
     private static attachLightningTowerRadarModelAsync(node: Node): void {
@@ -343,7 +362,7 @@ export class BuildingModelVisuals {
 
         const model = instantiate(prefab);
         model.name = this.LIGHTNING_TOWER_MODEL_NODE_NAME;
-        const parentScale = node.scale;
+        const parentScale = this.getStableNodeScale(node);
         const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
@@ -434,7 +453,7 @@ export class BuildingModelVisuals {
         const model = instantiate(prefab);
         model.name = this.BASE_MODEL_NODE_NAME;
 
-        const parentScale = node.scale;
+        const parentScale = this.getStableNodeScale(node);
         const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
@@ -606,7 +625,7 @@ export class BuildingModelVisuals {
         const model = instantiate(prefab);
         model.name = this.RIFLE_TOWER_MODEL_NODE_NAME;
 
-        const parentScale = node.scale;
+        const parentScale = this.getStableNodeScale(node);
         const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
@@ -679,7 +698,7 @@ export class BuildingModelVisuals {
         const model = instantiate(prefab);
         model.name = this.SPA_MODEL_NODE_NAME;
 
-        const parentScale = node.scale;
+        const parentScale = this.getStableNodeScale(node);
         const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
@@ -751,7 +770,7 @@ export class BuildingModelVisuals {
 
         const container = new Node(this.FENCEBAR_MODEL_NODE_NAME);
 
-        const parentScale = node.scale;
+        const parentScale = this.getStableNodeScale(node);
         const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;
@@ -878,7 +897,7 @@ export class BuildingModelVisuals {
         const existing = node.getChildByName(this.FARM_MODEL_NODE_NAME);
         if (existing && existing.isValid) return;
 
-        const parentScale = node.scale;
+        const parentScale = this.getStableNodeScale(node);
         const parentScaleX = Math.abs(parentScale.x) > 1e-6 ? Math.abs(parentScale.x) : 1;
         const parentScaleY = Math.abs(parentScale.y) > 1e-6 ? Math.abs(parentScale.y) : 1;
         const parentScaleZ = Math.abs(parentScale.z) > 1e-6 ? Math.abs(parentScale.z) : 1;

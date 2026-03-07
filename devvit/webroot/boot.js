@@ -124,29 +124,37 @@
   var _progressTimer = 0;
   var _fallbackHideTimer = 0;
   var _typedArrayRecoverFlag = '__gvr_typed_array_recover_v1';
+  var _resumeAfterReloadFlag = '__gvr_resume_after_reload_v1';
   var _typedArrayRecoverUsed = false;
   try {
     _typedArrayRecoverUsed = sessionStorage.getItem(_typedArrayRecoverFlag) === '1';
   } catch (_e) {}
 
-  // ── Re-entry fix ──────────────────────────────────────────────────────────────
-  // DevVit keeps the WebView alive between sessions. If the user was away for
-  // >3 s after the game fully loaded, force a fresh reload on return so the game
-  // starts in a clean state instead of a stale/paused one.
-  var _hiddenAt = 0;
-  document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'hidden') {
-      _hiddenAt = Date.now();
-    } else if (_hiddenAt > 0 && _splashHidden && (Date.now() - _hiddenAt) > 3000) {
-      location.reload();
-    } else {
-      _hiddenAt = 0;
-    }
-  });
+  function markResumeAfterReload(reason) {
+    try {
+      sessionStorage.setItem(_resumeAfterReloadFlag, JSON.stringify({
+        reason: reason || 'reload',
+        ts: Date.now()
+      }));
+    } catch (_e) {}
+  }
+
+  function reloadForResume(reason) {
+    markResumeAfterReload(reason);
+    location.reload();
+  }
+
+  function replaceForResume(reason, url) {
+    markResumeAfterReload(reason);
+    location.replace(url);
+  }
+
+  // Runtime background/foreground transitions are handled in game code.
+  // Do not hard-reload the page merely because the Reddit WebView was hidden.
   // iOS back-forward cache (bfcache) — the page is served from memory without
   // re-running scripts. Always force a real reload in that case.
   window.addEventListener('pageshow', function (e) {
-    if (e && e.persisted) location.reload();
+    if (e && e.persisted) reloadForResume('bfcache');
   });
   // DevVit "Play Now" sends WEBVIEW_REMOUNTED each time the button is pressed.
   // If the splash was already dismissed (game was running), reload for a clean start.
@@ -156,7 +164,7 @@
     if (!d || typeof d !== 'object') return;
     if (d.type === 'devvit-message' && d.data && d.data.message) d = d.data.message;
     if (d.type === 'WEBVIEW_REMOUNTED' && _splashHidden) {
-      location.reload();
+      reloadForResume('webview-remounted');
     }
   });
 
@@ -191,9 +199,9 @@
         var url = new URL(location.href);
         url.searchParams.set('__gvr_retry', 'typed-array');
         url.searchParams.set('__gvr_ts', String(Date.now()));
-        location.replace(url.toString());
+        replaceForResume('typed-array', url.toString());
       } catch (_e2) {
-        location.reload();
+        reloadForResume('typed-array');
       }
     }, 80);
     return true;

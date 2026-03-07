@@ -252,7 +252,7 @@ export class Building extends BaseComponent implements IAttackable {
         return Math.min(Building.BUILDING_SCALE_MAX, initial + n * stepPerLevel);
     }
 
-    protected getVisualRestScale(out?: Vec3): Vec3 {
+    public getVisualRestScale(out?: Vec3): Vec3 {
         const target = out ?? new Vec3();
         if (!this._baseNodeScale) {
             target.set(this.node.scale.x, this.node.scale.y, this.node.scale.z);
