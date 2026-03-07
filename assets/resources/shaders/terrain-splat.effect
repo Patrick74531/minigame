@@ -16,14 +16,11 @@ CCEffect %{
         grassTex:     { value: white }
         dirtTex:      { value: white }
         splatMap:     { value: black }
-        grassTiling:  { value: [8.6, 8.6, 0.0, 0.0] }
-        dirtTiling:   { value: [9.3, 9.3, 0.0, 0.0] }
-        grassTint:    { value: [0.92, 0.97, 0.87, 1.0] }
-        dirtTint:     { value: [0.98, 0.93, 0.86, 1.0] }
-        gradeParams:  { value: [0.92, 1.04, 0.98, 0.04] }
+        grassTiling:  { value: [8.0, 8.0, 0.0, 0.0] }
+        dirtTiling:   { value: [8.0, 8.0, 0.0, 0.0] }
         splatTexel:   { value: [0.00390625, 0.00390625, 0.0, 0.0] }
-        lightDir:     { value: [-0.22, 1.0, 0.38, 0.0] }
-        lightingParams: { value: [0.62, 0.50, 2.20, 0.16] }
+        lightDir:     { value: [-0.35, 1.0, 0.25, 0.0] }
+        lightingParams: { value: [0.62, 0.52, 2.4, 0.16] }
 }%
 
 CCProgram terrain-vs %{
@@ -44,7 +41,6 @@ CCProgram terrain-vs %{
 
 CCProgram terrain-fs %{
   precision highp float;
-  #pragma define-meta TERRAIN_LITE
 
   in vec2 v_uv;
 
@@ -55,74 +51,10 @@ CCProgram terrain-fs %{
   uniform TerrainParams {
     vec4 grassTiling;
     vec4 dirtTiling;
-    vec4 grassTint;
-    vec4 dirtTint;
-    vec4 gradeParams;
     vec4 splatTexel;
     vec4 lightDir;
     vec4 lightingParams;
   };
-
-  float hash12(vec2 p) {
-    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-    p3 += dot(p3, p3.yzx + 33.33);
-    return fract((p3.x + p3.y) * p3.z);
-  }
-
-  float valueNoise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-
-    float a = hash12(i);
-    float b = hash12(i + vec2(1.0, 0.0));
-    float c = hash12(i + vec2(0.0, 1.0));
-    float d = hash12(i + vec2(1.0, 1.0));
-
-    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-  }
-
-  float fbm(vec2 p) {
-    float v = 0.0;
-    float a = 0.5;
-    for (int i = 0; i < 4; i++) {
-      v += valueNoise(p) * a;
-      p = p * 2.03 + vec2(17.1, 9.2);
-      a *= 0.5;
-    }
-    return v / 0.9375;
-  }
-
-  mat2 rotation2d(float a) {
-    float c = cos(a);
-    float s = sin(a);
-    return mat2(c, -s, s, c);
-  }
-
-  vec4 sampleTextureAntiTile(sampler2D tex, vec2 uv, vec2 seedA, vec2 seedB) {
-    float macroA = fbm(uv * 0.18 + seedA);
-    float macroB = fbm(uv * 0.21 + seedB);
-    float macroC = fbm(uv * 0.16 + seedA.yx + seedB * 0.37);
-
-    vec2 warpA = vec2(macroA, macroB) - 0.5;
-    vec2 warpB = vec2(macroB, macroC) - 0.5;
-    vec2 warpC = vec2(macroC, macroA) - 0.5;
-
-    vec2 uvA = rotation2d(0.12 + macroA * 0.42) * (uv + warpA * 0.24);
-    vec2 uvB = rotation2d(-0.68 + macroB * 0.36) * (uv * 1.07 + seedA * 3.8 + warpB * 0.19);
-    vec2 uvC = rotation2d(1.16 - macroC * 0.31) * (uv * 0.93 + seedB * 4.6 + warpC * 0.22);
-
-    vec4 sampleA = texture(tex, uvA);
-    vec4 sampleB = texture(tex, uvB);
-    vec4 sampleC = texture(tex, uvC);
-
-    float weightA = 0.34 + macroA * 0.28;
-    float weightB = 0.30 + macroB * 0.26;
-    float weightC = 0.28 + macroC * 0.24;
-    float weightSum = max(0.0001, weightA + weightB + weightC);
-
-    return (sampleA * weightA + sampleB * weightB + sampleC * weightC) / weightSum;
-  }
 
   vec4 frag () {
     // Sample splatmap (single channel mask: 0=grass, 1=dirt)
@@ -132,46 +64,8 @@ CCProgram terrain-fs %{
     vec2 grassUV = v_uv * grassTiling.xy + grassTiling.zw;
     vec2 dirtUV  = v_uv * dirtTiling.xy  + dirtTiling.zw;
 
-#if TERRAIN_LITE
     vec4 grassColor = texture(grassTex, grassUV);
     vec4 dirtColor  = texture(dirtTex, dirtUV);
-    grassColor.rgb *= grassTint.rgb;
-    dirtColor.rgb *= dirtTint.rgb;
-
-    // Keep the mobile path crisp and cheap: 2 texture reads + splat mask.
-    grassColor.rgb *= 0.92 + grassColor.g * 0.18;
-    dirtColor.rgb *= 0.92 + dirtColor.r * 0.14;
-
-    vec4 finalColor = mix(grassColor, dirtColor, mask);
-    float laneTint = smoothstep(0.12, 0.88, mask);
-    finalColor.rgb *= mix(1.02, 0.98, laneTint);
-    finalColor.rgb = (finalColor.rgb - 0.5) * gradeParams.y + 0.5;
-    finalColor.rgb *= gradeParams.z;
-    finalColor.a = 1.0;
-    return finalColor;
-#else
-    vec4 grassColor = sampleTextureAntiTile(grassTex, grassUV, vec2(0.71, 1.37), vec2(-2.14, 4.83));
-    vec4 dirtColor  = sampleTextureAntiTile(dirtTex, dirtUV, vec2(1.93, -0.66), vec2(3.27, 2.14));
-    grassColor.rgb *= grassTint.rgb;
-    dirtColor.rgb *= dirtTint.rgb;
-
-    float grassMacro = fbm(grassUV * 0.85 + vec2(0.8, 3.1));
-    float grassMicro = fbm(grassUV * 2.7 + vec2(5.4, -7.2));
-    float grassDetail = fbm(grassUV * 6.2 + vec2(8.7, -4.8));
-    float grassSpeckle = smoothstep(0.7, 0.9, fbm(grassUV * 9.1 + vec2(-3.7, 6.2)));
-    grassColor.rgb *= 0.95 + grassMacro * 0.10;
-    grassColor.rgb *= 0.95 + grassMicro * 0.10;
-    grassColor.rgb *= 0.97 + grassDetail * 0.06;
-    grassColor.rgb = mix(grassColor.rgb, grassColor.rgb * vec3(0.90, 0.94, 0.88), grassSpeckle * 0.10);
-    grassColor.rgb += vec3(0.010, 0.018, 0.006) * grassSpeckle * 0.12;
-
-    float dirtMacro = fbm(dirtUV * 0.9 + vec2(-4.0, 2.5));
-    float dirtMicro = fbm(dirtUV * 3.3 + vec2(12.1, 6.8));
-    float dirtPebble = smoothstep(0.62, 0.82, fbm(dirtUV * 4.8 + vec2(18.7, -3.4)));
-    dirtColor.rgb *= 0.96 + dirtMacro * 0.08;
-    dirtColor.rgb *= 0.95 + dirtMicro * 0.10;
-    dirtColor.rgb = mix(dirtColor.rgb, dirtColor.rgb * vec3(0.82, 0.83, 0.86), dirtPebble * 0.16);
-    dirtColor.rgb += vec3(0.014, 0.010, 0.006) * smoothstep(0.72, 0.94, dirtMicro) * 0.18;
 
     // Blend: mask=0 → grass, mask=1 → dirt
     vec4 finalColor = mix(grassColor, dirtColor, mask);
@@ -190,15 +84,9 @@ CCProgram terrain-fs %{
 
     float edgeOcc = clamp(length(grad) * lightingParams.w, 0.0, 0.25);
     finalColor.rgb *= litFactor * (1.0 - edgeOcc);
-    float luma = dot(finalColor.rgb, vec3(0.299, 0.587, 0.114));
-    finalColor.rgb = mix(vec3(luma), finalColor.rgb, gradeParams.x);
-    finalColor.rgb = (finalColor.rgb - 0.5) * gradeParams.y + 0.5;
-    finalColor.rgb *= gradeParams.z;
-    finalColor.rgb *= mix(1.0, 0.96, smoothstep(0.18, 0.82, mask) * gradeParams.w);
 
     finalColor.a = 1.0;
 
     return finalColor;
-#endif
   }
 }%

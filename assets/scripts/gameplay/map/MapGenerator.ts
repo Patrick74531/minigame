@@ -261,7 +261,7 @@ export class MapGenerator extends Component {
             effectName: 'builtin-unlit',
             defines: { USE_TEXTURE: false },
         });
-        mat.setProperty('mainColor', new Color(112, 128, 88, 255)); // fallback grass
+        mat.setProperty('mainColor', new Color(98, 133, 75, 255)); // fallback grass
         renderer.material = mat;
         this._terrainMaterial = mat;
 
@@ -300,19 +300,15 @@ export class MapGenerator extends Component {
             console.error('[MapGenerator] Failed to load terrain-splat effect asset');
             // Fallback to unlit
             mat.initialize({ effectName: 'builtin-unlit', defines: { USE_TEXTURE: true } });
-            mat.setProperty('mainColor', new Color(112, 128, 88, 255));
+            mat.setProperty('mainColor', new Color(98, 133, 75, 255));
             renderer.material = mat;
             return;
         }
 
-        const useLiteTerrainShader = this.shouldUseLiteTerrainShader();
-
         try {
             mat.initialize({
                 effectAsset: effectAsset,
-                defines: {
-                    TERRAIN_LITE: useLiteTerrainShader,
-                },
+                defines: {},
             });
         } catch (e) {
             console.error('[MapGenerator] Failed to initialize material with splat effect:', e);
@@ -320,19 +316,15 @@ export class MapGenerator extends Component {
         }
 
         // Tiling: reduce tiling for more natural look (less repeated pattern)
-        const grassTilesAcross = Math.max(this.mapWidth, this.mapHeight) / 3.25;
-        const dirtTilesAcross = Math.max(this.mapWidth, this.mapHeight) / 3.0;
+        const tilesAcross = Math.max(this.mapWidth, this.mapHeight) / 4;
         mat.setProperty('grassTex', grassTex);
         mat.setProperty('dirtTex', dirtTex);
         mat.setProperty('splatMap', splatTex);
-        mat.setProperty('grassTiling', new Vec4(grassTilesAcross, grassTilesAcross, 0, 0));
-        mat.setProperty('dirtTiling', new Vec4(dirtTilesAcross, dirtTilesAcross, 0, 0));
-        mat.setProperty('grassTint', new Vec4(0.92, 0.97, 0.87, 1.0));
-        mat.setProperty('dirtTint', new Vec4(0.98, 0.93, 0.86, 1.0));
-        mat.setProperty('gradeParams', new Vec4(0.92, 1.04, 0.98, 0.04));
+        mat.setProperty('grassTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
+        mat.setProperty('dirtTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
         mat.setProperty('splatTexel', new Vec4(1 / splatSize, 1 / splatSize, 0, 0));
-        mat.setProperty('lightDir', new Vec4(-0.22, 1.0, 0.38, 0));
-        mat.setProperty('lightingParams', new Vec4(0.62, 0.5, 2.2, 0.16));
+        mat.setProperty('lightDir', new Vec4(-0.35, 1.0, 0.25, 0));
+        mat.setProperty('lightingParams', new Vec4(0.62, 0.52, 2.4, 0.16));
 
         renderer.material = mat;
         this._terrainMaterial = mat;
@@ -792,10 +784,6 @@ export class MapGenerator extends Component {
         return this.isTikTokRuntime()
             ? MapGenerator.TIKTOK_SPLAT_SIZE
             : MapGenerator.SPLAT_SIZE;
-    }
-
-    private shouldUseLiteTerrainShader(): boolean {
-        return this.isTikTokRuntime();
     }
 
     private shouldUseSharpSplatSampling(): boolean {
