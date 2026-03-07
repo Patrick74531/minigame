@@ -11,6 +11,7 @@ import {
     GroundContactShadow,
     type GroundContactShadowConfig,
 } from '../visuals/GroundContactShadow';
+import { shouldUseConstrainedGameplayMode } from '../../core/utils/RuntimeSupport';
 
 /**
  * 建筑工厂
@@ -103,7 +104,9 @@ export class BuildingFactory {
             primitives.box({ width: 1, height: 1, length: 1 })
         );
 
-        const effectName = this.isTikTokRuntime() ? 'builtin-unlit' : 'builtin-standard';
+        const effectName = shouldUseConstrainedGameplayMode()
+            ? 'builtin-unlit'
+            : 'builtin-standard';
         const colorKey = `${effectName}_${color.r}_${color.g}_${color.b}`;
         let material = this._materials.get(colorKey);
 
@@ -126,11 +129,6 @@ export class BuildingFactory {
         renderer.shadowCastingMode = 1;
         renderer.receiveShadow = 1;
         return node;
-    }
-
-    private static isTikTokRuntime(): boolean {
-        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
-        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
     }
 
     /**

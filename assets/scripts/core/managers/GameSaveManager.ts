@@ -1,7 +1,9 @@
 const SAVE_KEY = 'gvr.save';
+const ACTIVE_RUN_KEY = 'gvr.active_run';
 const SAVE_VERSION = 2;
 const MAX_SAVE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MIN_SAVE_INTERVAL_MS = 5_000;
+const ACTIVE_RUN_MAX_AGE_MS = 5 * 60 * 1000;
 
 export interface WeaponSaveState {
     type: string;
@@ -82,6 +84,26 @@ export class GameSaveManager {
 
     public hasSave(): boolean {
         return this.load() !== null;
+    }
+
+    public hasFreshActiveRunMarker(): boolean {
+        if (!this.hasSave()) return false;
+        try {
+            const raw = localStorage.getItem(ACTIVE_RUN_KEY);
+            if (!raw) return false;
+            const parsed = JSON.parse(raw) as { updatedAt?: unknown } | null;
+            if (!parsed || typeof parsed !== 'object') return false;
+            const updatedAt =
+                typeof parsed.updatedAt === 'number'
+                    ? parsed.updatedAt
+                    : typeof parsed.updatedAt === 'string'
+                      ? Number(parsed.updatedAt)
+                      : NaN;
+            if (!Number.isFinite(updatedAt)) return false;
+            return Date.now() - updatedAt <= ACTIVE_RUN_MAX_AGE_MS;
+        } catch {
+            return false;
+        }
     }
 
     /**
@@ -185,6 +207,7 @@ export class GameSaveManager {
         }
         try {
             localStorage.removeItem(SAVE_KEY);
+            localStorage.removeItem(ACTIVE_RUN_KEY);
         } catch {
             // ignore storage errors
         }
@@ -196,6 +219,13 @@ export class GameSaveManager {
         try {
             const serialized = JSON.stringify(data);
             localStorage.setItem(SAVE_KEY, serialized);
+            localStorage.setItem(
+                ACTIVE_RUN_KEY,
+                JSON.stringify({
+                    updatedAt: data.savedAt ?? Date.now(),
+                    waveNumber: data.waveNumber,
+                })
+            );
             this._lastSaveTime = Date.now();
         } catch (e) {
             console.warn('[GameSaveManager] Failed to save:', e);

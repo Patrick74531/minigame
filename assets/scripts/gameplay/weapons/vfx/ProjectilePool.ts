@@ -6,12 +6,13 @@ import { Node, MeshRenderer, primitives, utils, Material, Color } from 'cc';
  * 与 PoolManager 不同，不依赖 Prefab，使用工厂函数按需创建节点。
  * 专为武器子弹/VFX 碎片等高频创建销毁的场景设计。
  *
- * 核心原则：战斗中绝不 new Node() 或 destroy()。
+ * 核心原则：战斗中优先复用节点，只在池超过上限时销毁。
  */
 export class ProjectilePool {
     private static _pools: Map<string, Node[]> = new Map();
     private static _factories: Map<string, () => Node> = new Map();
     private static _recycleCbs: Map<string, (node: Node) => void> = new Map();
+    private static _maxSizes: Map<string, number> = new Map();
 
     /**
      * 注册一个池（附带工厂函数）
@@ -23,7 +24,8 @@ export class ProjectilePool {
         key: string,
         factory: () => Node,
         warmUp: number = 0,
-        recycleCb?: (node: Node) => void
+        recycleCb?: (node: Node) => void,
+        maxSize: number = Number.POSITIVE_INFINITY
     ): void {
         if (!this._pools.has(key)) {
             this._pools.set(key, []);
@@ -32,6 +34,10 @@ export class ProjectilePool {
         if (recycleCb) {
             this._recycleCbs.set(key, recycleCb);
         }
+        const resolvedMaxSize = Number.isFinite(maxSize)
+            ? Math.max(warmUp, Math.floor(maxSize))
+            : Number.POSITIVE_INFINITY;
+        this._maxSizes.set(key, resolvedMaxSize);
         // 预热
         const pool = this._pools.get(key)!;
         for (let i = 0; i < warmUp; i++) {
@@ -75,6 +81,11 @@ export class ProjectilePool {
             pool = [];
             this._pools.set(key, pool);
         }
+        const maxSize = this._maxSizes.get(key) ?? Number.POSITIVE_INFINITY;
+        if (pool.length >= maxSize) {
+            node.destroy();
+            return;
+        }
         pool.push(node);
     }
 
@@ -102,5 +113,6 @@ export class ProjectilePool {
         this._pools.clear();
         this._factories.clear();
         this._recycleCbs.clear();
+        this._maxSizes.clear();
     }
 }

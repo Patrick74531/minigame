@@ -24,6 +24,7 @@ import type { ItemId } from '../../gameplay/items/ItemDefs';
 import { Hero } from '../../gameplay/units/Hero';
 import { EventManager } from '../managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
+import { shouldUseConstrainedGameplayMode } from '../utils/RuntimeSupport';
 
 const RESUME_AFTER_RELOAD_KEY = '__gvr_resume_after_reload_v1';
 const RESUME_AFTER_RELOAD_MAX_AGE_MS = 2 * 60 * 1000;
@@ -53,14 +54,19 @@ export class GameStartFlow {
     public static run(ctx: StartContext): void {
         const game = this.gameManager;
         const resumeReason = this.consumePendingResumeAfterReloadReason();
+        const activeRunResumeReason =
+            shouldUseConstrainedGameplayMode() && GameSaveManager.instance.hasFreshActiveRunMarker()
+            ? 'active-run'
+            : null;
+        const autoResumeReason = resumeReason ?? activeRunResumeReason;
 
         // If homepage is requested (default true) and not already playing
         if (ctx.showHomePage !== false) {
-            if (resumeReason) {
+            if (autoResumeReason) {
                 const saveData = ctx.saveData ?? GameSaveManager.instance.load();
                 if (saveData) {
                     console.log(
-                        `[GameStartFlow] Auto-continue after forced reload (${resumeReason}).`
+                        `[GameStartFlow] Auto-continue after runtime restart (${autoResumeReason}).`
                     );
                     const continueCtx = { ...ctx, saveData };
                     this._showLoadingScreen(continueCtx);

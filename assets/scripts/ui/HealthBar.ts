@@ -592,19 +592,19 @@ export class HealthBar extends Component {
             badge.iconNode.setPosition(0, 1, 0);
             this.drawBadgeIcon(badge.iconGraphics, stat, badgeSize * 0.54);
 
-            const countSize = Math.round(Math.max(13, badgeSize * 0.55));
-            const countX = Math.round(badgeSize * 0.32);
-            const countY = -Math.round(badgeSize * 0.32);
+            const countSize = Math.round(Math.max(15, badgeSize * 0.64));
+            const countX = Math.round(badgeSize * 0.36);
+            const countY = -Math.round(badgeSize * 0.36);
             badge.countRootNode.setPosition(countX, countY, 0);
             badge.countBgNode.setPosition(0, 0, 0);
             badge.countLabelNode.setPosition(0, 0, 0);
             badge.countLabelNode.setSiblingIndex(1);
             badge.countLabel.overflow = Label.Overflow.NONE;
-            badge.countLabel.fontSize = Math.round(Math.max(11, countSize * 0.72));
+            badge.countLabel.fontSize = Math.round(Math.max(13, countSize * 0.82));
             badge.countLabel.lineHeight = badge.countLabel.fontSize + 2;
             badge.countLabel.node.getComponent(LabelOutline)!.width = Math.max(
                 1,
-                Math.round(countSize * 0.1)
+                Math.round(countSize * 0.12)
             );
             const labelTransform = badge.countLabelNode.getComponent(UITransform);
             if (labelTransform) {

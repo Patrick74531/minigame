@@ -33,6 +33,7 @@ import { HeroWeaponManager } from './gameplay/weapons/HeroWeaponManager';
 import { Hero } from './gameplay/units/Hero';
 import { GameState } from './core/managers/GameManager';
 import { ItemService } from './gameplay/items/ItemService';
+import { shouldUseConstrainedGameplayMode } from './core/utils/RuntimeSupport';
 
 const { ccclass, property } = _decorator;
 
@@ -85,11 +86,8 @@ export class GameController extends Component {
     protected onLoad(): void {
         applyCanvasOnDisableSafetyPatch();
 
-        // TikTok native: defer heavy preloads until actual gameplay starts.
-        const isTikTokRuntime =
-            (globalThis as unknown as { __GVR_PLATFORM__?: unknown }).__GVR_PLATFORM__ ===
-                'tiktok' || typeof (globalThis as unknown as { tt?: unknown }).tt !== 'undefined';
-        if (isTikTokRuntime) {
+        // Constrained mobile runtimes benefit from deferring heavy loads until gameplay starts.
+        if (shouldUseConstrainedGameplayMode()) {
             this._deferStartupLoadsForTikTok = true;
             this._deferRuntimeMediaBootstrapForTikTok = true;
         } else {

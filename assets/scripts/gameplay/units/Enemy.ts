@@ -25,6 +25,7 @@ import { EnemyQuery } from '../../core/managers/EnemyQuery';
 import { HitFeedback } from '../visuals/HitFeedback';
 import { WeaponVFX } from '../weapons/WeaponVFX';
 import { ScreenShake } from '../weapons/vfx/ScreenShake';
+import { shouldUseConstrainedGameplayMode } from '../../core/utils/RuntimeSupport';
 
 const { ccclass } = _decorator;
 type RouteLane = 'top' | 'mid' | 'bottom';
@@ -686,12 +687,12 @@ export class Enemy extends Unit {
     }
 
     private resolveLogicStep(): number {
-        const isTikTokRuntime = this.isTikTokRuntime();
-        const nearStep = isTikTokRuntime
+        const useConstrainedMode = shouldUseConstrainedGameplayMode();
+        const nearStep = useConstrainedMode
             ? Enemy.TIKTOK_NEAR_LOGIC_STEP
             : Enemy.NEAR_LOGIC_STEP;
-        const farStep = isTikTokRuntime ? Enemy.TIKTOK_FAR_LOGIC_STEP : Enemy.FAR_LOGIC_STEP;
-        const farDistSq = isTikTokRuntime
+        const farStep = useConstrainedMode ? Enemy.TIKTOK_FAR_LOGIC_STEP : Enemy.FAR_LOGIC_STEP;
+        const farDistSq = useConstrainedMode
             ? Enemy.TIKTOK_FAR_LOGIC_DIST_SQ
             : Enemy.FAR_LOGIC_DIST_SQ;
         if (this._state === UnitState.ATTACKING || (this._target && this._target.isAlive)) {
@@ -757,7 +758,7 @@ export class Enemy extends Unit {
         const radiusSq = radius * radius;
         const enemies = EnemyQuery.getEnemies();
         if (
-            this.isTikTokRuntime() &&
+            shouldUseConstrainedGameplayMode() &&
             enemies.length > Enemy.TIKTOK_CROWD_SEPARATION_ENEMY_LIMIT
         ) {
             return;
@@ -782,11 +783,6 @@ export class Enemy extends Unit {
             out.x *= inv;
             out.z *= inv;
         }
-    }
-
-    private isTikTokRuntime(): boolean {
-        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
-        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
     }
 
     protected get eventManager(): EventManager {

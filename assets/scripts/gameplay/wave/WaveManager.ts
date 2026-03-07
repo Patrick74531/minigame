@@ -1272,10 +1272,7 @@ export class WaveManager {
         const poolSize = Math.max(1, regularPool.length);
 
         const totalPool = Math.max(0, regularCount + eliteCount);
-        const pickCount = Math.max(
-            1,
-            Math.min(this._randomizerConfig.PICK_TYPES_PER_WAVE, poolSize)
-        );
+        const pickCount = this.resolveRegularTypeCountForWave(waveNumber, poolSize);
         const selectedArchetypeIds = this.selectArchetypesForWave(waveNumber, pickCount);
         const comboKey = toComboKey(selectedArchetypeIds);
 
@@ -1345,6 +1342,20 @@ export class WaveManager {
             rhythmTemplateId: rhythmTemplate.id,
             comboKey,
         };
+    }
+
+    private resolveRegularTypeCountForWave(waveNumber: number, poolSize: number): number {
+        let desiredTypeCount = 1;
+        if (waveNumber > 20) {
+            desiredTypeCount = 3;
+        } else if (waveNumber >= 10) {
+            desiredTypeCount = 2;
+        }
+
+        return Math.max(
+            1,
+            Math.min(desiredTypeCount, this._randomizerConfig.PICK_TYPES_PER_WAVE, poolSize)
+        );
     }
 
     private assignDistinctEliteArchetypes(entries: PlannedSpawnEntry[], waveNumber: number): void {

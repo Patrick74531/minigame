@@ -35,6 +35,7 @@ import { WeaponType } from '../weapons/WeaponTypes';
 import { attachEnemyVisual, isEnemyAirUnitModelPath } from './EnemyVisualFactory';
 import type { EnemyAttackType, EnemyVisualVariant } from './EnemyVisualTypes';
 import { findChildByName, findRightHandBone, pathBaseName } from './UnitFactoryHeroSearch';
+import { shouldUseConstrainedGameplayMode } from '../../core/utils/RuntimeSupport';
 
 export type { EnemyAttackType, EnemyVisualVariant } from './EnemyVisualTypes';
 
@@ -126,7 +127,7 @@ export class UnitFactory {
         targetPos: Vec3,
         options: EnemySpawnOptions = {}
     ): Node {
-        const isTikTokRuntime = this.isTikTokRuntime();
+        const useConstrainedMode = shouldUseConstrainedGameplayMode();
         const isElite = options.isElite ?? false;
         const node = this.createCubeNode(
             isElite ? 'Enemy_Elite' : 'Enemy',
@@ -167,14 +168,14 @@ export class UnitFactory {
         col.size = new Vec3(1, 1, 1);
         col.isTrigger = false; // Solid for collision
         col.setGroup(UnitFactory.GROUP_ENEMY);
-        // TikTok swarm fights get expensive fast if enemies physically collide with each other.
-        // Keep gameplay collisions, but drop enemy-enemy contact resolution on that runtime.
+        // Constrained mobile runtimes get expensive fast if enemies physically collide.
+        // Keep gameplay collisions, but drop enemy-enemy contact resolution there.
         col.setMask(
             UnitFactory.GROUP_DEFAULT |
                 UnitFactory.GROUP_BULLET |
                 UnitFactory.GROUP_WALL |
                 UnitFactory.GROUP_PROJECTILE_BLOCKER |
-                (isTikTokRuntime ? 0 : UnitFactory.GROUP_ENEMY)
+                (useConstrainedMode ? 0 : UnitFactory.GROUP_ENEMY)
         );
 
         const hpMultiplier = options.hpMultiplier ?? 1;
@@ -205,7 +206,7 @@ export class UnitFactory {
         });
         enemy.setCrowdSeparationProfile({
             radius: this.resolveEnemyCrowdSeparationRadius(options),
-            weight: isTikTokRuntime ? 0.82 : 1.08,
+            weight: useConstrainedMode ? 0.82 : 1.08,
         });
 
         // Set Target
@@ -220,7 +221,7 @@ export class UnitFactory {
         // 血条样式由 spawnType 决定（而非 modelPath），确保复用 boss 模型的普通怪不使用 boss 大血条
         const isBossHealthBar = resolvedSpawnType === 'boss';
         const isBossModelMinion = !isBossHealthBar && modelPath.includes('boss/');
-        const enemyDamagedHealthBarDuration = isTikTokRuntime ? 1.8 : 3.0;
+        const enemyDamagedHealthBarDuration = useConstrainedMode ? 1.8 : 3.0;
         const hb = node.addComponent(HealthBar);
         if (isBossHealthBar) {
             hb.width = 120;
@@ -388,7 +389,7 @@ export class UnitFactory {
     private static shouldAttachEnemyGroundShadow(
         spawnType: 'regular' | 'elite' | 'boss'
     ): boolean {
-        if (!this.isTikTokRuntime()) return true;
+        if (!shouldUseConstrainedGameplayMode()) return true;
         return spawnType !== 'regular';
     }
 
@@ -502,7 +503,9 @@ export class UnitFactory {
         );
 
         // 获取或创建材质
-        const effectName = this.isTikTokRuntime() ? 'builtin-unlit' : 'builtin-standard';
+        const effectName = shouldUseConstrainedGameplayMode()
+            ? 'builtin-unlit'
+            : 'builtin-standard';
         const colorKey = `${effectName}_${color.r}_${color.g}_${color.b}`;
         let material = this._materials.get(colorKey);
 
@@ -525,11 +528,6 @@ export class UnitFactory {
         renderer.shadowCastingMode = 1;
         renderer.receiveShadow = 1;
         return node;
-    }
-
-    private static isTikTokRuntime(): boolean {
-        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
-        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
     }
 
     /**

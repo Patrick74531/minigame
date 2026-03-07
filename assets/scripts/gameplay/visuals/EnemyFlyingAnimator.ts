@@ -19,6 +19,7 @@ import {
 import { GameConfig } from '../../data/GameConfig';
 import { Enemy } from '../units/Enemy';
 import { UnitState } from '../units/Unit';
+import { shouldUseConstrainedGameplayMode } from '../../core/utils/RuntimeSupport';
 
 const { ccclass, property } = _decorator;
 
@@ -149,7 +150,7 @@ export class EnemyFlyingAnimator extends Component {
     }
 
     private applyShadowSettingsRecursive(root: Node): void {
-        const enableRealtimeShadows = !this.isTikTokRuntime();
+        const enableRealtimeShadows = !shouldUseConstrainedGameplayMode();
         const renderers = root.getComponentsInChildren(MeshRenderer);
         for (const renderer of renderers) {
             renderer.shadowCastingMode = enableRealtimeShadows ? 1 : 0;
@@ -335,8 +336,4 @@ export class EnemyFlyingAnimator extends Component {
         console.warn('[EnemyFlyingAnimator] Created Fallback Cube due to load failure.');
     }
 
-    private isTikTokRuntime(): boolean {
-        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
-        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
-    }
 }

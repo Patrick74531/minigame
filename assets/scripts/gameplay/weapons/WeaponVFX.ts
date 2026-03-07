@@ -63,28 +63,67 @@ export class WeaponVFX {
         this._initialized = true;
 
         // 预热 VFX 节点池
-        ProjectilePool.register('vfx_flash', () => this._createVfxNode('Flash'), 30);
-        ProjectilePool.register('vfx_ring', () => this._createVfxNode('Ring'), 4);
-        ProjectilePool.register('vfx_debris', () => this._createVfxNode('Debris'), 15);
-        ProjectilePool.register('vfx_ground', () => this._createVfxNode('Ground'), 3);
-        ProjectilePool.register('vfx_beam_core', () => this._createVfxNode('BeamCore'), 2);
-        ProjectilePool.register('vfx_beam_glow', () => this._createVfxNode('BeamGlow'), 2);
-        ProjectilePool.register('vfx_beam_pulse', () => this._createVfxNode('BeamPulse'), 2);
+        ProjectilePool.register('vfx_flash', () => this._createVfxNode('Flash'), 30, undefined, 48);
+        ProjectilePool.register('vfx_ring', () => this._createVfxNode('Ring'), 4, undefined, 8);
+        ProjectilePool.register(
+            'vfx_debris',
+            () => this._createVfxNode('Debris'),
+            15,
+            undefined,
+            24
+        );
+        ProjectilePool.register(
+            'vfx_ground',
+            () => this._createVfxNode('Ground'),
+            3,
+            undefined,
+            6
+        );
+        ProjectilePool.register(
+            'vfx_beam_core',
+            () => this._createVfxNode('BeamCore'),
+            2,
+            undefined,
+            4
+        );
+        ProjectilePool.register(
+            'vfx_beam_glow',
+            () => this._createVfxNode('BeamGlow'),
+            2,
+            undefined,
+            4
+        );
+        ProjectilePool.register(
+            'vfx_beam_pulse',
+            () => this._createVfxNode('BeamPulse'),
+            2,
+            undefined,
+            4
+        );
         // Laser Tower Bolt (Stripped skill8)
         ProjectilePool.register(
             'laser_bolt',
             () => this._createLaserBoltNode(),
             0,
-            node => this._cleanupLaserBoltNode(node) // Custom Recycle Handler
+            node => this._cleanupLaserBoltNode(node), // Custom Recycle Handler
+            6
         );
         // 机枪子弹池 + 弹壳池
-        ProjectilePool.register(this.HERO_MG_BULLET_POOL_KEY, () => this._createMGBulletNode(), 40);
+        ProjectilePool.register(
+            this.HERO_MG_BULLET_POOL_KEY,
+            () => this._createMGBulletNode(),
+            40,
+            undefined,
+            64
+        );
         ProjectilePool.register(
             this.TOWER_MG_BULLET_POOL_KEY,
             () => this._createTowerMGBulletNode(),
-            60
+            60,
+            undefined,
+            96
         );
-        ProjectilePool.register('mg_casing', () => this._createCasingNode(), 10);
+        ProjectilePool.register('mg_casing', () => this._createCasingNode(), 10, undefined, 18);
         this._ensureBulletTexture();
         this._ensureTowerBulletTexture();
         this._ensureDeathRayPrefab();

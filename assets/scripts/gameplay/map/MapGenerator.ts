@@ -20,6 +20,7 @@ import {
 } from 'cc';
 import { GameConfig } from '../../data/GameConfig';
 import { ProjectileBlocker } from '../combat/ProjectileBlocker';
+import { shouldUseConstrainedGameplayMode } from '../../core/utils/RuntimeSupport';
 
 const { ccclass, property } = _decorator;
 
@@ -752,7 +753,9 @@ export class MapGenerator extends Component {
     }
 
     private getColorMaterial(color: Color): Material {
-        const effectName = this.isTikTokRuntime() ? 'builtin-unlit' : 'builtin-standard';
+        const effectName = shouldUseConstrainedGameplayMode()
+            ? 'builtin-unlit'
+            : 'builtin-standard';
         const key = `${effectName}_${color.r}_${color.g}_${color.b}_${color.a}`;
         let material = this._colorMaterials.get(key);
         if (!material) {
@@ -781,18 +784,13 @@ export class MapGenerator extends Component {
     }
 
     private getSplatTextureSize(): number {
-        return this.isTikTokRuntime()
+        return shouldUseConstrainedGameplayMode()
             ? MapGenerator.TIKTOK_SPLAT_SIZE
             : MapGenerator.SPLAT_SIZE;
     }
 
     private shouldUseSharpSplatSampling(): boolean {
-        return this.isTikTokRuntime();
-    }
-
-    private isTikTokRuntime(): boolean {
-        const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
-        return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
+        return shouldUseConstrainedGameplayMode();
     }
 
     private async loadGroundTextureWithFallbacks(paths: string[]): Promise<Texture2D | null> {
@@ -1016,26 +1014,26 @@ export class MapGenerator extends Component {
         const minEdgeInset = 4.2;
         const edgeBandDepth = 5.0;
         const density = Math.max(0.8, Math.min(1.3, (cols * rows) / (28 * 28)));
-        const isTikTokRuntime = this.isTikTokRuntime();
+        const useConstrainedMode = shouldUseConstrainedGameplayMode();
         const targetCounts: Record<NatureCategory, number> = {
             tree: Math.max(
-                isTikTokRuntime ? 20 : 34,
-                Math.round(64 * density * (isTikTokRuntime ? 0.44 : 1))
+                useConstrainedMode ? 20 : 34,
+                Math.round(64 * density * (useConstrainedMode ? 0.44 : 1))
             ),
             rock: Math.max(
-                isTikTokRuntime ? 18 : 28,
-                Math.round(58 * density * (isTikTokRuntime ? 0.4 : 1))
+                useConstrainedMode ? 18 : 28,
+                Math.round(58 * density * (useConstrainedMode ? 0.4 : 1))
             ),
             bush: Math.max(
-                isTikTokRuntime ? 18 : 30,
-                Math.round(62 * density * (isTikTokRuntime ? 0.34 : 1))
+                useConstrainedMode ? 18 : 30,
+                Math.round(62 * density * (useConstrainedMode ? 0.34 : 1))
             ),
             grass: 0,
         };
         const grassScatterTarget = 0;
         const grassPatchTarget = Math.max(
-            isTikTokRuntime ? 72 : 150,
-            Math.round(320 * density * (isTikTokRuntime ? 0.26 : 1))
+            useConstrainedMode ? 72 : 150,
+            Math.round(320 * density * (useConstrainedMode ? 0.26 : 1))
         );
         const buildingZones = this.getNatureBuildingExclusionZones();
         const lanePolylines = this.getLanePolylinesNormalized();
@@ -1217,10 +1215,10 @@ export class MapGenerator extends Component {
 
         let created = 0;
         const world = Math.max(1, worldMin);
-        const spacingWorld = this.isTikTokRuntime() ? 6.2 : 4.8;
+        const spacingWorld = shouldUseConstrainedGameplayMode() ? 6.2 : 4.8;
         const startInsetWorld = 1.6;
         const endInsetWorld = 1.2;
-        const sideSkipChance = this.isTikTokRuntime() ? 0.58 : 0.35;
+        const sideSkipChance = shouldUseConstrainedGameplayMode() ? 0.58 : 0.35;
 
         for (let laneIndex = 0; laneIndex < lanePolylines.length; laneIndex++) {
             const lane = lanePolylines[laneIndex];
