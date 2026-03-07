@@ -18,6 +18,9 @@ CCEffect %{
         splatMap:     { value: black }
         grassTiling:  { value: [8.0, 8.0, 0.0, 0.0] }
         dirtTiling:   { value: [8.0, 8.0, 0.0, 0.0] }
+        grassTint:    { value: [0.76, 0.84, 0.68, 1.0] }
+        dirtTint:     { value: [1.0, 0.92, 0.82, 1.0] }
+        gradeParams:  { value: [0.82, 1.08, 0.90, 0.08] }
         splatTexel:   { value: [0.00390625, 0.00390625, 0.0, 0.0] }
         lightDir:     { value: [-0.35, 1.0, 0.25, 0.0] }
         lightingParams: { value: [0.62, 0.52, 2.4, 0.16] }
@@ -51,6 +54,9 @@ CCProgram terrain-fs %{
   uniform TerrainParams {
     vec4 grassTiling;
     vec4 dirtTiling;
+    vec4 grassTint;
+    vec4 dirtTint;
+    vec4 gradeParams;
     vec4 splatTexel;
     vec4 lightDir;
     vec4 lightingParams;
@@ -66,6 +72,8 @@ CCProgram terrain-fs %{
 
     vec4 grassColor = texture(grassTex, grassUV);
     vec4 dirtColor  = texture(dirtTex, dirtUV);
+    grassColor.rgb *= grassTint.rgb;
+    dirtColor.rgb *= dirtTint.rgb;
 
     // Blend: mask=0 → grass, mask=1 → dirt
     vec4 finalColor = mix(grassColor, dirtColor, mask);
@@ -84,6 +92,11 @@ CCProgram terrain-fs %{
 
     float edgeOcc = clamp(length(grad) * lightingParams.w, 0.0, 0.25);
     finalColor.rgb *= litFactor * (1.0 - edgeOcc);
+    float luma = dot(finalColor.rgb, vec3(0.299, 0.587, 0.114));
+    finalColor.rgb = mix(vec3(luma), finalColor.rgb, gradeParams.x);
+    finalColor.rgb = (finalColor.rgb - 0.5) * gradeParams.y + 0.5;
+    finalColor.rgb *= gradeParams.z;
+    finalColor.rgb *= mix(1.0, 0.96, smoothstep(0.18, 0.82, mask) * gradeParams.w);
 
     finalColor.a = 1.0;
 

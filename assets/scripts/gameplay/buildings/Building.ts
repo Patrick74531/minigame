@@ -187,11 +187,14 @@ export class Building extends BaseComponent implements IAttackable {
 
     private setupHealthBar(): void {
         this._healthBar = this.node.addComponent(HealthBar);
-        this._healthBar.width = 60;
-        this._healthBar.height = 6;
-        this._healthBar.baseWorldScale = 0.012;
+        this._healthBar.width = this.buildingType === BuildingType.BASE ? 60 : 52;
+        this._healthBar.height = this.buildingType === BuildingType.BASE ? 6 : 5;
+        this._healthBar.baseWorldScale = this.buildingType === BuildingType.BASE ? 0.012 : 0.011;
         this._healthBar.inheritOwnerScaleInWorldSpace = false;
         this._healthBar.autoDetectHeadAnchor = false;
+        this._healthBar.showOnlyWhenDamaged = this.buildingType !== BuildingType.BASE;
+        this._healthBar.damagedShowDuration = 4.5;
+        this._healthBar.showTowerFocusedBuffBadges = false;
 
         // Disable health bar immediately if building is full HP (default behavior)
         // or just let updateHealth handle it.

@@ -1,0 +1,62 @@
+// Soft Ground Shadow
+// Texture-free radial shadow used to anchor units/buildings to the ground.
+
+CCEffect %{
+  techniques:
+  - name: transparent
+    passes:
+    - vert: soft-shadow-vs:vert
+      frag: soft-shadow-fs:frag
+      depthStencilState:
+        depthTest: true
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendSrcAlpha: src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      properties:
+        shadowColor: { value: [0.07, 0.06, 0.05, 0.24], editor: { type: color } }
+        shadowParams: { value: [0.10, 0.96, 1.35, 0.0] }
+}%
+
+CCProgram soft-shadow-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #include <builtin/uniforms/cc-local>
+
+  in vec3 a_position;
+  in vec2 a_texCoord;
+
+  out vec2 v_uv;
+
+  vec4 vert () {
+    v_uv = a_texCoord;
+    return cc_matProj * cc_matView * cc_matWorld * vec4(a_position, 1.0);
+  }
+}%
+
+CCProgram soft-shadow-fs %{
+  precision highp float;
+
+  in vec2 v_uv;
+
+  uniform ShadowParams {
+    vec4 shadowColor;
+    vec4 shadowParams;
+  };
+
+  vec4 frag () {
+    vec2 centered = v_uv * 2.0 - 1.0;
+    float dist = length(centered);
+
+    float fade = 1.0 - smoothstep(shadowParams.x, shadowParams.y, dist);
+    fade = pow(max(fade, 0.0), shadowParams.z);
+
+    return vec4(shadowColor.rgb, shadowColor.a * fade);
+  }
+}%

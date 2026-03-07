@@ -1,4 +1,16 @@
-import { Color, Graphics, Label, LabelOutline, LabelShadow, Node, UITransform, Widget } from 'cc';
+import {
+    Color,
+    Graphics,
+    Label,
+    LabelOutline,
+    LabelShadow,
+    Node,
+    Tween,
+    tween,
+    UIOpacity,
+    UITransform,
+    Widget,
+} from 'cc';
 import { DiamondService } from '../../core/diamond/DiamondService';
 import { GameConfig } from '../../data/GameConfig';
 import { WaveService } from '../../core/managers/WaveService';
@@ -28,6 +40,8 @@ export class HUDStatusModule implements HUDModule {
     private _waveLabel: Label | null = null;
     private _waveWidget: Widget | null = null;
     private _desktopMoveHintWidget: Widget | null = null;
+    private _desktopMoveHintOpacity: UIOpacity | null = null;
+    private _desktopMoveHintDismissed: boolean = false;
     private _buildingInfoLabel: Label | null = null;
     private _baseHpLabel: Label | null = null;
 
@@ -43,6 +57,8 @@ export class HUDStatusModule implements HUDModule {
     private _currentCountdownSeconds: number = 0;
 
     public initialize(uiCanvas: Node): void {
+        this._desktopMoveHintDismissed = false;
+
         const currencyPanel = UIFactory.createCurrencyPanel(uiCanvas);
         this._coinsLabel = currencyPanel.coinsLabel;
         this._diamondsLabel = currencyPanel.diamondsLabel;
@@ -111,10 +127,28 @@ export class HUDStatusModule implements HUDModule {
 
         this._desktopMoveHintWidget =
             uiCanvas.getChildByName('DesktopMoveHint')?.getComponent(Widget) ?? null;
+        this._desktopMoveHintOpacity =
+            this._desktopMoveHintWidget?.node.getComponent(UIOpacity) ??
+            this._desktopMoveHintWidget?.node.addComponent(UIOpacity) ??
+            null;
+        if (this._desktopMoveHintWidget?.node?.isValid) {
+            this._desktopMoveHintWidget.node.active = true;
+        }
+        if (this._desktopMoveHintOpacity) {
+            this._desktopMoveHintOpacity.opacity = 210;
+        }
+
+        this.refreshWaveLabelStyle();
         this.applyHudEdgeLayout();
     }
 
     public cleanup(): void {
+        if (this._desktopMoveHintWidget?.node) {
+            Tween.stopAllByTarget(this._desktopMoveHintWidget.node);
+        }
+        if (this._desktopMoveHintOpacity) {
+            Tween.stopAllByTarget(this._desktopMoveHintOpacity);
+        }
         if (this._diamondListener) {
             DiamondService.instance.removeListener(this._diamondListener);
             this._diamondListener = null;
@@ -125,6 +159,8 @@ export class HUDStatusModule implements HUDModule {
         this._waveLabel = null;
         this._waveWidget = null;
         this._desktopMoveHintWidget = null;
+        this._desktopMoveHintOpacity = null;
+        this._desktopMoveHintDismissed = false;
         this._buildingInfoLabel = null;
         this._baseHpLabel = null;
         this._xpRootWidget = null;
@@ -151,6 +187,10 @@ export class HUDStatusModule implements HUDModule {
             }
         });
 
+        if (this._desktopMoveHintDismissed && this._desktopMoveHintWidget?.node?.isValid) {
+            this._desktopMoveHintWidget.node.active = false;
+        }
+
         if (this._currencyPanelNode?.isValid) {
             this._currencyPanelNode.active = visible;
         }
@@ -170,6 +210,7 @@ export class HUDStatusModule implements HUDModule {
                     wave: WaveService.instance.currentWave,
                 });
             }
+            this.refreshWaveLabelStyle();
         }
 
         if (this._baseHpLabel) {
@@ -224,6 +265,7 @@ export class HUDStatusModule implements HUDModule {
         if (!this._waveLabel) return;
         this._isWaitingForNextWave = false;
         this._waveLabel.string = Localization.instance.t('ui.hud.wave', { wave });
+        this.refreshWaveLabelStyle();
     }
 
     public updateWaveCountdown(seconds: number): void {
@@ -231,6 +273,33 @@ export class HUDStatusModule implements HUDModule {
         this._isWaitingForNextWave = true;
         this._currentCountdownSeconds = seconds;
         this._waveLabel.string = Localization.instance.t('ui.hud.wave.countdown', { seconds });
+        this.refreshWaveLabelStyle();
+    }
+
+    public dismissDesktopMoveHint(): void {
+        if (this._desktopMoveHintDismissed || !this._desktopMoveHintWidget?.node?.isValid) {
+            return;
+        }
+
+        this._desktopMoveHintDismissed = true;
+        const node = this._desktopMoveHintWidget.node;
+        const opacity =
+            this._desktopMoveHintOpacity ??
+            node.getComponent(UIOpacity) ??
+            node.addComponent(UIOpacity);
+        this._desktopMoveHintOpacity = opacity;
+
+        Tween.stopAllByTarget(node);
+        Tween.stopAllByTarget(opacity);
+
+        tween(opacity)
+            .to(0.22, { opacity: 0 })
+            .call(() => {
+                if (node.isValid) {
+                    node.active = false;
+                }
+            })
+            .start();
     }
 
     public showBuildingInfo(title: string, requiredCoins: number, collectedCoins: number): void {
@@ -271,15 +340,18 @@ export class HUDStatusModule implements HUDModule {
 
         this._buildingInfoLabel = node.addComponent(Label);
         this._buildingInfoLabel.string = '';
-        this._buildingInfoLabel.fontSize = 40;
-        this._buildingInfoLabel.lineHeight = 46;
-        this._buildingInfoLabel.color = new Color(255, 244, 212, 255);
+        this._buildingInfoLabel.fontSize = 30;
+        this._buildingInfoLabel.lineHeight = 36;
+        this._buildingInfoLabel.color = new Color(242, 234, 210, 240);
         this._buildingInfoLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._buildingInfoLabel.enableWrapText = true;
         this._buildingInfoLabel.overflow = Label.Overflow.SHRINK;
         this.applyLabelStyle(this._buildingInfoLabel, {
-            outlineColor: new Color(24, 16, 8, 255),
-            outlineWidth: 4,
+            outlineColor: new Color(20, 14, 8, 220),
+            outlineWidth: 3,
+            shadowColor: new Color(0, 0, 0, 150),
+            shadowOffsetY: -1,
+            shadowBlur: 1,
         });
 
         node.active = false;
@@ -434,6 +506,35 @@ export class HUDStatusModule implements HUDModule {
         applyGameLabelStyle(label, options);
     }
 
+    private refreshWaveLabelStyle(): void {
+        if (!this._waveLabel) return;
+
+        const outline = this._waveLabel.node.getComponent(LabelOutline);
+        const shadow = this._waveLabel.node.getComponent(LabelShadow);
+        const isCountdown = this._isWaitingForNextWave;
+        const isTikTokPortrait = UIResponsive.isTikTokPhonePortraitProfile();
+
+        this._waveLabel.color = isCountdown
+            ? new Color(224, 234, 246, 255)
+            : new Color(255, 215, 80, 255);
+
+        if (outline) {
+            outline.color = isCountdown
+                ? new Color(10, 18, 28, 235)
+                : new Color(40, 20, 0, 255);
+            outline.width = isTikTokPortrait ? 2 : isCountdown ? 3 : 4;
+        }
+
+        if (shadow) {
+            shadow.enabled = !isTikTokPortrait;
+            shadow.color = isCountdown
+                ? new Color(0, 0, 0, 150)
+                : new Color(0, 0, 0, 205);
+            shadow.offset.set(1, -1);
+            shadow.blur = isCountdown ? 1 : 2;
+        }
+    }
+
     private redrawCurrencyPanelBackground(panelW: number, panelH: number): void {
         const bg = this._currencyPanelNode?.getComponent(Graphics);
         if (!bg) return;
@@ -515,7 +616,9 @@ export class HUDStatusModule implements HUDModule {
                     }
                     coinValueNode.getComponent(UITransform)?.setContentSize(valueW, panelH);
                     coinValueNode.setPosition(valueX, 0, 0);
-                    this._coinsLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+                    if (this._coinsLabel) {
+                        this._coinsLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+                    }
                 }
 
                 const mapTopPad = tiktokTopReserve;
@@ -631,20 +734,28 @@ export class HUDStatusModule implements HUDModule {
                     )
                 );
             if (this._waveLabel) {
-                this._waveLabel.fontSize = isTikTokPortrait ? 18 : compact ? 34 : 40;
+                this._waveLabel.fontSize = isTikTokPortrait
+                    ? 18
+                    : this._isWaitingForNextWave
+                      ? compact
+                            ? 26
+                            : 30
+                      : compact
+                        ? 32
+                        : 36;
                 this._waveLabel.lineHeight = this._waveLabel.fontSize + 6;
                 this._waveLabel.enableWrapText = !isTikTokPortrait;
 
                 const outline = this._waveLabel.node.getComponent(LabelOutline);
                 if (outline) {
-                    outline.width = isTikTokPortrait ? 2 : 5;
+                    outline.width = isTikTokPortrait ? 2 : this._isWaitingForNextWave ? 3 : 4;
                 }
                 const shadow = this._waveLabel.node.getComponent(LabelShadow);
                 if (shadow) {
                     shadow.enabled = !isTikTokPortrait;
                     if (!isTikTokPortrait) {
-                        shadow.offset.set(2, -2);
-                        shadow.blur = 2;
+                        shadow.offset.set(1, -1);
+                        shadow.blur = this._isWaitingForNextWave ? 1 : 2;
                     }
                 }
             }
@@ -726,13 +837,27 @@ export class HUDStatusModule implements HUDModule {
             const hintLabel = this._desktopMoveHintWidget.node.getComponent(Label);
             if (hintLabel) {
                 hintLabel.overflow = Label.Overflow.SHRINK;
+                hintLabel.fontSize = isTikTokPortrait ? 16 : compact ? 18 : 20;
+                hintLabel.lineHeight = hintLabel.fontSize + 4;
+                hintLabel.color = new Color(208, 222, 238, 220);
+                const outline = hintLabel.node.getComponent(LabelOutline);
+                if (outline) {
+                    outline.width = 1;
+                    outline.color = new Color(10, 18, 28, 220);
+                }
+                const shadow = hintLabel.node.getComponent(LabelShadow);
+                if (shadow) {
+                    shadow.offset.set(1, -1);
+                    shadow.blur = 1;
+                    shadow.color = new Color(0, 0, 0, 120);
+                }
             }
             this._desktopMoveHintWidget.isAlignBottom = true;
             this._desktopMoveHintWidget.isAlignHorizontalCenter = true;
             this._desktopMoveHintWidget.isAlignTop = false;
             this._desktopMoveHintWidget.isAlignLeft = false;
             this._desktopMoveHintWidget.isAlignRight = false;
-            this._desktopMoveHintWidget.bottom = Math.max(2, bottomInset - 34);
+            this._desktopMoveHintWidget.bottom = Math.max(2, bottomInset - 26);
             this._desktopMoveHintWidget.horizontalCenter = 0;
             this._desktopMoveHintWidget.updateAlignment();
         }
@@ -762,17 +887,19 @@ export class HUDStatusModule implements HUDModule {
                 ?.setContentSize(
                     Math.round(
                         isTikTokPortrait
-                            ? UIResponsive.clamp(size.width * 0.8, 260, 420)
-                            : UIResponsive.clamp(size.width * 0.82, 420, 1020)
+                            ? UIResponsive.clamp(size.width * 0.76, 240, 380)
+                            : UIResponsive.clamp(size.width * 0.68, 360, 780)
                     ),
                     Math.round(
                         isTikTokPortrait
-                            ? UIResponsive.clamp(size.height * 0.11, 52, 84)
-                            : UIResponsive.clamp(size.height * 0.16, 70, 130)
+                            ? UIResponsive.clamp(size.height * 0.085, 40, 62)
+                            : UIResponsive.clamp(size.height * 0.1, 52, 86)
                     )
                 );
-            this._buildingInfoLabel.fontSize = isTikTokPortrait ? 24 : compact ? 32 : 40;
+            this._buildingInfoLabel.fontSize = isTikTokPortrait ? 20 : compact ? 24 : 28;
             this._buildingInfoLabel.lineHeight = this._buildingInfoLabel.fontSize + 6;
         }
+
+        this.refreshWaveLabelStyle();
     }
 }

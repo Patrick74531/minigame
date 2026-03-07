@@ -466,7 +466,7 @@ export class UIFactory {
 
         const transform = node.addComponent(UITransform);
         transform.setAnchorPoint(0.5, 0);
-        transform.setContentSize(300, 34);
+        transform.setContentSize(260, 30);
 
         const widget = node.addComponent(Widget);
         widget.isAlignHorizontalCenter = true;
@@ -475,18 +475,18 @@ export class UIFactory {
 
         const label = node.addComponent(Label);
         label.string = Localization.instance.t('ui.hud.desktopMoveHint');
-        label.fontSize = 22;
-        label.lineHeight = 26;
-        label.color = new Color(224, 236, 252, 255);
+        label.fontSize = 18;
+        label.lineHeight = 22;
+        label.color = new Color(208, 222, 238, 220);
         label.horizontalAlign = Label.HorizontalAlign.CENTER;
         label.verticalAlign = Label.VerticalAlign.CENTER;
 
         const outline = node.addComponent(LabelOutline);
-        outline.color = new Color(10, 20, 32, 255);
-        outline.width = 2;
+        outline.color = new Color(10, 18, 28, 220);
+        outline.width = 1;
         const shadow = node.addComponent(LabelShadow);
-        shadow.color = new Color(0, 0, 0, 156);
-        shadow.offset.set(2, -1);
+        shadow.color = new Color(0, 0, 0, 120);
+        shadow.offset.set(1, -1);
         shadow.blur = 1;
 
         return label;

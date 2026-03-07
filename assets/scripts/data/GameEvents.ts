@@ -70,6 +70,8 @@ export const GameEvents = {
     HERO_ATTACK: 'HERO_ATTACK',
     /** 英雄技能使用 { skillId: string } */
     HERO_SKILL_USED: 'HERO_SKILL_USED',
+    /** 玩家首次开始移动 { input: 'keyboard'|'touch' } */
+    PLAYER_STARTED_MOVING: 'PLAYER_STARTED_MOVING',
     /** 英雄获得经验 { xp: number, currentXp: number, maxXp: number, level: number } */
     HERO_XP_GAINED: 'HERO_XP_GAINED',
     /** 英雄升级 { level: number, heroNode: Node } */
@@ -200,6 +202,7 @@ export type GameEventPayloads = {
     [GameEvents.GAME_OVER]: { victory: boolean };
     [GameEvents.HERO_ATTACK]: { target: Node };
     [GameEvents.HERO_SKILL_USED]: { skillId: string };
+    [GameEvents.PLAYER_STARTED_MOVING]: { input: 'keyboard' | 'touch' };
     [GameEvents.HERO_XP_GAINED]: { xp: number; currentXp: number; maxXp: number; level: number };
     [GameEvents.HERO_LEVEL_UP]: { level: number; heroNode: Node; quiet?: boolean };
     [GameEvents.HERO_RESPAWN_STARTED]: { remainingSeconds: number };

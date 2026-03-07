@@ -120,8 +120,8 @@
     "_color": {
       "__type__": "cc.Color",
       "r": 255,
-      "g": 250,
-      "b": 240,
+      "g": 244,
+      "b": 228,
       "a": 255
     },
     "_useColorTemperature": false,
@@ -133,11 +133,11 @@
     "_illuminanceHDR": 65000,
     "_illuminance": 65000,
     "_illuminanceLDR": 1.6927083333333335,
-    "_shadowEnabled": false,
-    "_shadowPcf": 0,
+    "_shadowEnabled": true,
+    "_shadowPcf": 2,
     "_shadowBias": 0.00001,
     "_shadowNormalBias": 0,
-    "_shadowSaturation": 1,
+    "_shadowSaturation": 0.88,
     "_shadowDistance": 50,
     "_shadowInvisibleOcclusionRange": 200,
     "_csmLevel": 4,
@@ -340,32 +340,32 @@
     "__type__": "cc.AmbientInfo",
     "_skyColorHDR": {
       "__type__": "cc.Vec4",
-      "x": 0.2,
-      "y": 0.5,
-      "z": 0.8,
-      "w": 0.520833125
+      "x": 0.26,
+      "y": 0.4,
+      "z": 0.46,
+      "w": 0.46
     },
     "_skyColor": {
       "__type__": "cc.Vec4",
-      "x": 0.2,
-      "y": 0.5,
-      "z": 0.8,
-      "w": 0.520833125
+      "x": 0.26,
+      "y": 0.4,
+      "z": 0.46,
+      "w": 0.46
     },
-    "_skyIllumHDR": 20000,
-    "_skyIllum": 20000,
+    "_skyIllumHDR": 16000,
+    "_skyIllum": 16000,
     "_groundAlbedoHDR": {
       "__type__": "cc.Vec4",
-      "x": 0.2,
-      "y": 0.2,
-      "z": 0.2,
+      "x": 0.32,
+      "y": 0.29,
+      "z": 0.24,
       "w": 1
     },
     "_groundAlbedo": {
       "__type__": "cc.Vec4",
-      "x": 0.2,
-      "y": 0.2,
-      "z": 0.2,
+      "x": 0.32,
+      "y": 0.29,
+      "z": 0.24,
       "w": 1
     },
     "_skyColorLDR": {
@@ -386,7 +386,7 @@
   },
   {
     "__type__": "cc.ShadowsInfo",
-    "_enabled": false,
+    "_enabled": true,
     "_type": 0,
     "_normal": {
       "__type__": "cc.Vec3",
@@ -395,13 +395,13 @@
       "z": 0
     },
     "_distance": 0,
-    "_planeBias": 1,
+    "_planeBias": 0.05,
     "_shadowColor": {
       "__type__": "cc.Color",
-      "r": 76,
-      "g": 76,
-      "b": 76,
-      "a": 255
+      "r": 72,
+      "g": 72,
+      "b": 68,
+      "a": 166
     },
     "_maxReceived": 4,
     "_size": {
@@ -439,16 +439,16 @@
     "_type": 0,
     "_fogColor": {
       "__type__": "cc.Color",
-      "r": 200,
-      "g": 200,
-      "b": 200,
+      "r": 198,
+      "g": 202,
+      "b": 184,
       "a": 255
     },
-    "_enabled": false,
-    "_fogDensity": 0.3,
-    "_fogStart": 0.5,
-    "_fogEnd": 300,
-    "_fogAtten": 5,
+    "_enabled": true,
+    "_fogDensity": 0.18,
+    "_fogStart": 18,
+    "_fogEnd": 72,
+    "_fogAtten": 3.5,
     "_fogTop": 1.5,
     "_fogRange": 1.2,
     "_accurate": false

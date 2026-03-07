@@ -32,11 +32,11 @@ type BuffBadgeStat = keyof TowerFocusedBuffCounts;
 type BuffBadgeRef = {
     node: Node;
     bgGraphics: Graphics;
-    iconGraphics: Graphics;
     iconNode: Node;
+    iconGraphics: Graphics;
     countRootNode: Node;
-    countBg: Graphics;
     countBgNode: Node;
+    countBg: Graphics;
     countLabelNode: Node;
     countLabel: Label;
 };
@@ -105,6 +105,10 @@ export class HealthBar extends Component {
     @property
     public hideWhenOwnerDead: boolean = true;
 
+    /** 塔专属强化徽记是否允许在世界空间显示 */
+    @property
+    public showTowerFocusedBuffBadges: boolean = false;
+
     private _fgGraphics: Graphics | null = null;
     private _bgGraphics: Graphics | null = null;
     private _root: Node | null = null;
@@ -159,10 +163,10 @@ export class HealthBar extends Component {
         this.createVisuals();
         this.requestAnchorRefresh();
         // showOnlyWhenDamaged 模式下初始隐藏
-        if (this.showOnlyWhenDamaged && this._root) {
-            this._root.active = false;
+        if (this.showOnlyWhenDamaged) {
             this._hiddenByDamageRule = true;
         }
+        this.syncVisualVisibility(false);
     }
 
     protected onEnable(): void {
@@ -181,12 +185,10 @@ export class HealthBar extends Component {
             // showOnlyWhenDamaged 模式下重新启用时保持隐藏
             if (this.showOnlyWhenDamaged) {
                 this._hiddenByDamageRule = true;
-                this._root.active = false;
             } else {
-                // 先对齐位置；若尚未收到血量快照，则先隐藏，等待 updateHealth 再显示。
                 this.snapRootToOwner();
-                this._root.active = this._hasHealthSnapshot;
             }
+            this.syncVisualVisibility(this._hasHealthSnapshot || this.hasVisibleBuffBadges());
         }
     }
 
@@ -217,7 +219,7 @@ export class HealthBar extends Component {
         }
 
         if (this.hideWhenOwnerDead && !this.isOwnerAlive()) {
-            this._root.active = false;
+            this.syncVisualVisibility(false);
             return;
         }
 
@@ -226,13 +228,13 @@ export class HealthBar extends Component {
             this._damagedShowTimer -= dt;
             if (this._damagedShowTimer <= 0) {
                 this._hiddenByDamageRule = true;
-                this._root.active = false;
-                return;
             }
         }
 
-        // 被 showOnlyWhenDamaged 隐藏时不更新
-        if (this._hiddenByDamageRule) return;
+        if (!this.shouldKeepRootVisible()) {
+            this.syncVisualVisibility(false);
+            return;
+        }
 
         this.updateAnchorProbe(dt);
         this.updateRootTransform(dt);
@@ -306,22 +308,22 @@ export class HealthBar extends Component {
         const labelNode = new Node('NameLabel');
         root.addChild(labelNode);
         this._nameLabel = labelNode.addComponent(Label);
-        this._nameLabel.fontSize = 30;
-        this._nameLabel.lineHeight = 34;
+        this._nameLabel.fontSize = 24;
+        this._nameLabel.lineHeight = 28;
         this._nameLabel.isBold = true;
         this._nameLabel.string = '';
-        this._nameLabel.color = new Color(255, 238, 198, 255);
+        this._nameLabel.color = new Color(246, 232, 196, 238);
 
         // Outline
         const outline = labelNode.addComponent(LabelOutline);
         outline.color = new Color(18, 10, 4, 255);
-        outline.width = 3;
+        outline.width = 2;
 
         // Shadow
         const shadow = labelNode.addComponent(LabelShadow);
-        shadow.color = new Color(0, 0, 0, 200);
-        shadow.offset.set(2, -1);
-        shadow.blur = 2;
+        shadow.color = new Color(0, 0, 0, 140);
+        shadow.offset.set(1, -1);
+        shadow.blur = 1;
 
         // Focused tower buff badges (shown only when count > 0).
         const badgeRoot = new Node('BuffBadgeRoot');
@@ -337,13 +339,18 @@ export class HealthBar extends Component {
     public setName(name: string, level: number): void {
         if (!this._nameLabel) return;
         const levelText = Localization.instance.t('ui.common.level.short', { level });
-        this._nameLabel.string = `${name}  ${levelText}`;
+        this._nameLabel.string = `${name} ${levelText}`;
     }
 
     public setTowerFocusedBuffCounts(counts: TowerFocusedBuffCounts | null): void {
         if (!this._buffBadgeRoot || !this._buffBadges) return;
         if (!counts) {
+            this._buffBadgeCounts = { attack: 0, range: 0, speed: 0 };
+            for (const stat of HealthBar._buffStats) {
+                this._buffBadges[stat].node.active = false;
+            }
             this._buffBadgeRoot.active = false;
+            this.syncVisualVisibility(this._cachedOnScreen);
             return;
         }
 
@@ -353,6 +360,15 @@ export class HealthBar extends Component {
             speed: Math.max(0, Math.floor(counts.speed || 0)),
         };
         this._buffBadgeCounts = nextCounts;
+
+        if (!this.showTowerFocusedBuffBadges) {
+            for (const stat of HealthBar._buffStats) {
+                this._buffBadges[stat].node.active = false;
+            }
+            this._buffBadgeRoot.active = false;
+            this.syncVisualVisibility(this._cachedOnScreen);
+            return;
+        }
 
         let hasActive = false;
         for (const stat of HealthBar._buffStats) {
@@ -369,6 +385,10 @@ export class HealthBar extends Component {
         if (hasActive) {
             this.updateBuffBadgeLayout();
         }
+        if (hasActive && this._root && !this._root.active) {
+            this.snapRootToOwner();
+        }
+        this.syncVisualVisibility(this._cachedOnScreen);
     }
 
     public updateHealth(current: number, max: number): void {
@@ -385,9 +405,7 @@ export class HealthBar extends Component {
         const ratio = Math.max(0, Math.min(1, current / safeMax));
 
         if (this.hideWhenOwnerDead && ratio <= 0) {
-            if (this._root) {
-                this._root.active = false;
-            }
+            this.syncVisualVisibility(false);
             return;
         }
 
@@ -395,18 +413,17 @@ export class HealthBar extends Component {
         if (this.showOnlyWhenDamaged) {
             if (ratio < 1) {
                 this._damagedShowTimer = this.damagedShowDuration;
-                if (this._hiddenByDamageRule && this._root) {
-                    // 关键：先对齐位置，再激活，防止闪烁到场景原点
-                    this.snapRootToOwner();
-                    this._root.active = true;
+                if (this._hiddenByDamageRule) {
                     this._hiddenByDamageRule = false;
                 }
             }
-        } else if (this._root && !this._root.active) {
-            // 非“受伤才显示”模式下，拿到首个血量快照后再激活。
-            this.snapRootToOwner();
-            this._root.active = true;
         }
+
+        if (this.shouldKeepRootVisible() && this._root && !this._root.active) {
+            this.snapRootToOwner();
+        }
+        this.syncVisualVisibility(this._cachedOnScreen);
+
         const band = this.resolveHealthBand(ratio);
         const ratioChanged = Math.abs(ratio - this._lastRenderedRatio) > 0.001;
         const bandChanged = band !== this._lastRenderedBand;
@@ -477,7 +494,7 @@ export class HealthBar extends Component {
         this._fgGraphics.node.setPosition(-w / 2, -h / 2, 0);
         if (this._nameLabel && this._nameLabel.node?.isValid) {
             // 提升名字与血条间距，避免字体描边与血条重叠。
-            this._nameLabel.node.setPosition(0, h + 14, 0);
+            this._nameLabel.node.setPosition(0, h + 12, 0);
         }
         this.updateBuffBadgeLayout();
     }
@@ -493,39 +510,39 @@ export class HealthBar extends Component {
             badgeNode.addChild(iconNode);
             const iconGraphics = iconNode.addComponent(Graphics);
 
-            const countNode = new Node('Count');
-            badgeNode.addChild(countNode);
+            const countRootNode = new Node('Count');
+            badgeNode.addChild(countRootNode);
 
             const countBgNode = new Node('CountBg');
-            countNode.addChild(countBgNode);
+            countRootNode.addChild(countBgNode);
             const countBg = countBgNode.addComponent(Graphics);
 
             const countLabelNode = new Node('CountLabel');
-            countNode.addChild(countLabelNode);
+            countRootNode.addChild(countLabelNode);
             const countLabel = countLabelNode.addComponent(Label);
             const countLabelTransform = countLabelNode.addComponent(UITransform);
             countLabelTransform.setContentSize(24, 24);
             countLabel.string = '0';
-            countLabel.color = new Color(255, 246, 214, 255);
+            countLabel.color = new Color(44, 34, 24, 255);
             countLabel.isBold = true;
-            countLabel.useSystemFont = false;
+            countLabel.useSystemFont = true;
             countLabel.cacheMode = Label.CacheMode.CHAR;
             countLabel.enableWrapText = false;
             countLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
             countLabel.verticalAlign = Label.VerticalAlign.CENTER;
             countLabel.lineHeight = 16;
             const countOutline = countLabelNode.addComponent(LabelOutline);
-            countOutline.color = new Color(12, 10, 8, 255);
-            countOutline.width = 2;
+            countOutline.color = new Color(255, 252, 240, 140);
+            countOutline.width = 1;
 
             badges[stat] = {
                 node: badgeNode,
                 bgGraphics: bg,
-                iconGraphics,
                 iconNode,
-                countRootNode: countNode,
-                countBg,
+                iconGraphics,
+                countRootNode,
                 countBgNode,
+                countBg,
                 countLabelNode,
                 countLabel,
             };
@@ -537,116 +554,191 @@ export class HealthBar extends Component {
     private updateBuffBadgeLayout(): void {
         if (!this._buffBadgeRoot || !this._buffBadges) return;
 
-        const badgeSize = Math.round(Math.max(22, Math.min(30, this.height * 2.5)));
-        const spacing = Math.round(Math.max(5, badgeSize * 0.24));
-        const totalWidth = badgeSize * HealthBar._buffStats.length + spacing * 2;
-        const baseY = this.height + 42;
+        const activeStats = HealthBar._buffStats.filter(stat => this._buffBadgeCounts[stat] > 0);
+        if (activeStats.length === 0) {
+            this._buffBadgeRoot.active = false;
+            return;
+        }
+
+        const badgeSize = Math.round(Math.max(22, Math.min(28, this.height * 3.25)));
+        const spacing = Math.round(Math.max(7, badgeSize * 0.3));
+        const totalWidth =
+            badgeSize * activeStats.length + spacing * Math.max(0, activeStats.length - 1);
+        const baseY = this.shouldShowBarVisuals() ? this.height + 36 : 24;
         this._buffBadgeRoot.setPosition(0, baseY, 0);
 
-        for (let i = 0; i < HealthBar._buffStats.length; i++) {
-            const stat = HealthBar._buffStats[i];
+        for (const stat of HealthBar._buffStats) {
+            const badge = this._buffBadges[stat];
+            badge.node.active = activeStats.includes(stat);
+        }
+
+        for (let i = 0; i < activeStats.length; i++) {
+            const stat = activeStats[i];
             const badge = this._buffBadges[stat];
             const x = -totalWidth * 0.5 + badgeSize * 0.5 + i * (badgeSize + spacing);
             badge.node.setPosition(x, 0, 0);
 
             const bg = badge.bgGraphics;
             bg.clear();
-            bg.fillColor = this.getBadgeColor(stat, 236);
-            bg.roundRect(-badgeSize * 0.5, -badgeSize * 0.5, badgeSize, badgeSize, badgeSize * 0.3);
-            bg.fill();
-            bg.strokeColor = new Color(255, 244, 214, 188);
-            bg.lineWidth = 1.8;
+            bg.fillColor = this.getBadgeColor(stat, 226);
             bg.roundRect(
-                -badgeSize * 0.5 + 0.8,
-                -badgeSize * 0.5 + 0.8,
-                badgeSize - 1.6,
-                badgeSize - 1.6,
-                badgeSize * 0.28
+                -badgeSize * 0.5,
+                -badgeSize * 0.5,
+                badgeSize,
+                badgeSize,
+                badgeSize * 0.24
+            );
+            bg.fill();
+            bg.fillColor = new Color(255, 255, 255, 26);
+            bg.roundRect(
+                -badgeSize * 0.34,
+                badgeSize * 0.04,
+                badgeSize * 0.4,
+                badgeSize * 0.22,
+                badgeSize * 0.09
+            );
+            bg.fill();
+            bg.strokeColor = new Color(255, 247, 228, 184);
+            bg.lineWidth = 1.2;
+            bg.roundRect(
+                -badgeSize * 0.5 + 0.7,
+                -badgeSize * 0.5 + 0.7,
+                badgeSize - 1.4,
+                badgeSize - 1.4,
+                badgeSize * 0.2
             );
             bg.stroke();
 
-            badge.iconNode.setPosition(0, 1, 0);
-            this.drawBadgeIcon(badge.iconGraphics, stat, badgeSize * 0.54);
+            badge.iconNode.active = true;
+            badge.iconNode.setPosition(0, 0, 0);
+            this.drawBadgeIcon(badge.iconGraphics, stat, badgeSize * 0.68);
 
-            const countSize = Math.round(Math.max(13, badgeSize * 0.55));
-            const countX = Math.round(badgeSize * 0.32);
-            const countY = -Math.round(badgeSize * 0.32);
-            badge.countRootNode.setPosition(countX, countY, 0);
+            const countSize = Math.round(Math.max(13, badgeSize * 0.56));
+            badge.countRootNode.setPosition(
+                Math.round(badgeSize * 0.34),
+                Math.round(badgeSize * 0.34),
+                0
+            );
             badge.countBgNode.setPosition(0, 0, 0);
             badge.countLabelNode.setPosition(0, 0, 0);
-            badge.countLabelNode.setSiblingIndex(1);
             badge.countLabel.overflow = Label.Overflow.NONE;
-            badge.countLabel.fontSize = Math.round(Math.max(11, countSize * 0.72));
-            badge.countLabel.lineHeight = badge.countLabel.fontSize + 2;
-            badge.countLabel.node.getComponent(LabelOutline)!.width = Math.max(
-                1,
-                Math.round(countSize * 0.1)
+            badge.countLabel.color = new Color(56, 42, 26, 255);
+            badge.countLabel.fontSize = Math.round(
+                Math.max(
+                    9,
+                    Math.min(12, countSize * (this._buffBadgeCounts[stat] >= 10 ? 0.62 : 0.76))
+                )
             );
+            badge.countLabel.lineHeight = badge.countLabel.fontSize + 1;
+            const countOutline = badge.countLabel.node.getComponent(LabelOutline);
+            if (countOutline) {
+                countOutline.color = new Color(255, 252, 240, 140);
+                countOutline.width = 1;
+            }
             const labelTransform = badge.countLabelNode.getComponent(UITransform);
             if (labelTransform) {
                 labelTransform.setContentSize(countSize, countSize);
             }
 
+            badge.countBgNode.active = true;
             const countBg = badge.countBg;
             countBg.clear();
-            countBg.fillColor = new Color(26, 24, 30, 255);
+            countBg.fillColor = new Color(252, 246, 232, 252);
             countBg.circle(0, 0, countSize * 0.5);
             countBg.fill();
             countBg.strokeColor = this.getBadgeColor(stat, 255);
-            countBg.lineWidth = 1.6;
-            countBg.circle(0, 0, countSize * 0.5);
+            countBg.lineWidth = 1.5;
+            countBg.circle(0, 0, countSize * 0.5 - 0.5);
             countBg.stroke();
         }
     }
 
     private drawBadgeIcon(graphics: Graphics, stat: BuffBadgeStat, size: number): void {
         graphics.clear();
-        const s = Math.max(6, size);
-        const iconColor = new Color(255, 249, 229, 255);
+
+        const s = Math.max(8, size);
+        const iconColor = new Color(255, 250, 236, 255);
         graphics.strokeColor = iconColor;
         graphics.fillColor = iconColor;
-        graphics.lineWidth = Math.max(1.4, s * 0.1);
+        graphics.lineWidth = Math.max(2.2, s * 0.17);
         graphics.lineCap = Graphics.LineCap.ROUND;
         graphics.lineJoin = Graphics.LineJoin.ROUND;
 
         if (stat === 'attack') {
-            graphics.moveTo(-s * 0.28, -s * 0.22);
-            graphics.lineTo(s * 0.24, s * 0.22);
+            graphics.moveTo(-s * 0.18, s * 0.24);
+            graphics.lineTo(s * 0.18, -s * 0.12);
             graphics.stroke();
-            graphics.moveTo(s * 0.11, s * 0.22);
-            graphics.lineTo(s * 0.24, s * 0.22);
-            graphics.lineTo(s * 0.24, s * 0.09);
+            graphics.moveTo(s * 0.04, -s * 0.12);
+            graphics.lineTo(s * 0.22, -s * 0.3);
             graphics.stroke();
-            graphics.moveTo(-s * 0.22, s * 0.22);
-            graphics.lineTo(s * 0.22, -s * 0.24);
+            graphics.moveTo(-s * 0.24, s * 0.12);
+            graphics.lineTo(-s * 0.04, s * 0.32);
+            graphics.stroke();
+            graphics.moveTo(-s * 0.28, -s * 0.26);
+            graphics.lineTo(s * 0.06, 0);
             graphics.stroke();
             return;
         }
 
         if (stat === 'range') {
-            graphics.circle(0, 0, s * 0.3);
-            graphics.stroke();
-            graphics.circle(0, 0, s * 0.12);
-            graphics.stroke();
-            graphics.circle(0, 0, s * 0.05);
+            graphics.circle(0, 0, s * 0.1);
             graphics.fill();
+            graphics.circle(0, 0, s * 0.24);
+            graphics.stroke();
+            graphics.arc(0, 0, s * 0.4, Math.PI * 0.15, Math.PI * 0.85, false);
+            graphics.stroke();
             return;
         }
 
-        graphics.moveTo(-s * 0.06, s * 0.34);
-        graphics.lineTo(s * 0.11, s * 0.03);
-        graphics.lineTo(0, s * 0.03);
-        graphics.lineTo(s * 0.06, -s * 0.33);
-        graphics.lineTo(-s * 0.11, -s * 0.03);
-        graphics.lineTo(0, -s * 0.03);
-        graphics.close();
-        graphics.fill();
+        graphics.moveTo(-s * 0.24, s * 0.2);
+        graphics.lineTo(-s * 0.02, 0);
+        graphics.lineTo(-s * 0.24, -s * 0.2);
+        graphics.stroke();
+        graphics.moveTo(0, s * 0.2);
+        graphics.lineTo(s * 0.22, 0);
+        graphics.lineTo(0, -s * 0.2);
+        graphics.stroke();
     }
 
     private getBadgeColor(stat: BuffBadgeStat, alpha: number): Color {
-        if (stat === 'attack') return new Color(214, 84, 80, alpha);
-        if (stat === 'range') return new Color(78, 168, 214, alpha);
-        return new Color(221, 158, 64, alpha);
+        if (stat === 'attack') return new Color(205, 90, 84, alpha);
+        if (stat === 'range') return new Color(72, 142, 219, alpha);
+        return new Color(220, 168, 74, alpha);
+    }
+
+    private hasVisibleBuffBadges(): boolean {
+        if (!this.showTowerFocusedBuffBadges) return false;
+        return HealthBar._buffStats.some(stat => this._buffBadgeCounts[stat] > 0);
+    }
+
+    private shouldShowBarVisuals(): boolean {
+        return this._hasHealthSnapshot && (!this.showOnlyWhenDamaged || !this._hiddenByDamageRule);
+    }
+
+    private shouldKeepRootVisible(): boolean {
+        return this.shouldShowBarVisuals() || this.hasVisibleBuffBadges();
+    }
+
+    private syncVisualVisibility(rootAllowed: boolean): void {
+        if (!this._root) return;
+
+        const showBar = this.shouldShowBarVisuals();
+        const showBadges = this.hasVisibleBuffBadges();
+
+        if (this._bgGraphics?.node?.isValid) {
+            this._bgGraphics.node.active = showBar;
+        }
+        if (this._fgGraphics?.node?.isValid) {
+            this._fgGraphics.node.active = showBar;
+        }
+        if (this._nameLabel?.node?.isValid) {
+            this._nameLabel.node.active = showBar;
+        }
+        if (this._buffBadgeRoot?.isValid) {
+            this._buffBadgeRoot.active = showBadges;
+        }
+
+        this._root.active = rootAllowed && (showBar || showBadges);
     }
 
     private updateAnchorProbe(dt: number): void {
@@ -786,7 +878,7 @@ export class HealthBar extends Component {
             !Number.isFinite(worldZ) ||
             !Number.isFinite(offsetY)
         ) {
-            this._root.active = false;
+            this.syncVisualVisibility(false);
             return;
         }
         // 先进行 offscreen 检查，确认在屏幕内后再激活 root，
@@ -808,17 +900,18 @@ export class HealthBar extends Component {
                 );
             }
             if (!this._cachedOnScreen) {
-                if (this._root.active) this._root.active = false;
+                this.syncVisualVisibility(false);
                 return;
             }
         } else {
             this._cachedOnScreen = true;
         }
 
-        // offscreen 检查通过后，安全地激活 root
-        if (!this._root.active && !this._hiddenByDamageRule) {
-            this._root.active = true;
+        if (!this.shouldKeepRootVisible()) {
+            this.syncVisualVisibility(false);
+            return;
         }
+        this.syncVisualVisibility(true);
 
         if (
             Math.abs(worldX - this._lastOwnerX) < 0.0001 &&

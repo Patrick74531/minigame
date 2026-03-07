@@ -5,6 +5,8 @@ import { GameManager } from '../managers/GameManager';
 import { ServiceRegistry } from '../managers/ServiceRegistry';
 import { HeroWeaponManager } from '../../gameplay/weapons/HeroWeaponManager';
 import { UIResponsive } from '../../ui/UIResponsive';
+import { EventManager } from '../managers/EventManager';
+import { GameEvents } from '../../data/GameEvents';
 
 const { ccclass } = _decorator;
 const ARROW_LEFT = 37 as KeyCode;
@@ -24,6 +26,7 @@ export class PlayerInputAdapter extends Component {
     // Keyboard input state
     private _keyboardInput: Vec2 = new Vec2(0, 0);
     private _keysPressed: Set<KeyCode> = new Set();
+    private _hasReportedMovementStart: boolean = false;
 
     public setTarget(hero: Node | null, joystick: Joystick | null): void {
         this._hero = hero;
@@ -112,13 +115,25 @@ export class PlayerInputAdapter extends Component {
         const heroComp = this._hero.getComponent(Hero);
         if (!heroComp) return;
 
+        let activeInput = Vec2.ZERO;
+        let inputSource: 'keyboard' | 'touch' | null = null;
+
         // Prioritize keyboard input
         if (this.isDesktopKeyboardEnabled() && this._keyboardInput.lengthSqr() > 0.01) {
-            heroComp.setInput(this._keyboardInput);
+            activeInput = this._keyboardInput;
+            inputSource = 'keyboard';
         } else if (this._joystick) {
-            heroComp.setInput(this._joystick.inputVector);
-        } else {
-            heroComp.setInput(Vec2.ZERO);
+            activeInput = this._joystick.inputVector;
+            if (activeInput.lengthSqr() > 0.01) {
+                inputSource = 'touch';
+            }
+        }
+
+        heroComp.setInput(activeInput);
+
+        if (!this._hasReportedMovementStart && inputSource) {
+            this._hasReportedMovementStart = true;
+            this.eventManager.emit(GameEvents.PLAYER_STARTED_MOVING, { input: inputSource });
         }
     }
 
@@ -128,5 +143,9 @@ export class PlayerInputAdapter extends Component {
 
     private get gameManager(): GameManager {
         return ServiceRegistry.get<GameManager>('GameManager') ?? GameManager.instance;
+    }
+
+    private get eventManager(): EventManager {
+        return ServiceRegistry.get<EventManager>('EventManager') ?? EventManager.instance;
     }
 }

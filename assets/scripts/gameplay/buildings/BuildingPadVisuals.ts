@@ -16,6 +16,8 @@ export type BuildingPadVisualRefs = {
     costLabelNode: Node;
     coinIconNode: Node;
     functionIconNode: Node | null;
+    levelBadgeNode: Node | null;
+    levelBadgeLabel: Label | null;
 };
 
 type BuildingPadDisplayState = {
@@ -23,9 +25,19 @@ type BuildingPadDisplayState = {
     costLabelNode: Node | null;
     coinIconNode: Node | null;
     functionIconNode: Node | null;
+    levelBadgeNode: Node | null;
+    levelBadgeLabel: Label | null;
     requiredCoins: number;
     collectedCoins: number;
     progress: number;
+    currentLevel: number;
+    showLevelBadge: boolean;
+};
+
+type FunctionRowRefs = {
+    rowNode: Node;
+    levelBadgeNode: Node;
+    levelBadgeLabel: Label;
 };
 
 export class BuildingPadVisuals {
@@ -36,81 +48,83 @@ export class BuildingPadVisuals {
     ): BuildingPadVisualRefs {
         const visualRoot = new Node('VisualRoot');
         hostNode.addChild(visualRoot);
-        visualRoot.setPosition(0, 0.05, 0);
+        visualRoot.setPosition(0, 0.045, 0);
 
         const flatRoot = new Node('FlatRoot');
         visualRoot.addChild(flatRoot);
         flatRoot.setRotationFromEuler(-90, 0, 0);
         flatRoot.addComponent(RenderRoot2D);
-        flatRoot.setScale(0.009, 0.009, 0.009);
+        flatRoot.setScale(0.008, 0.008, 0.008);
 
         const ctx = flatRoot.addComponent(Graphics);
-        ctx.lineWidth = 5;
-        ctx.strokeColor = new Color(220, 242, 255, 255);
+        ctx.lineWidth = 3;
+        ctx.strokeColor = new Color(196, 218, 232, 170);
         ctx.lineJoin = Graphics.LineJoin.ROUND;
         ctx.lineCap = Graphics.LineCap.ROUND;
 
-        const w = 196;
-        const h = 196;
+        const w = 172;
+        const h = 172;
         this.drawDashedRectSimple(ctx, -w / 2, -h / 2, w, h, 14, 9);
 
         const contentNode = new Node('Content');
         flatRoot.addChild(contentNode);
-        contentNode.setPosition(0, -6, 0);
+        contentNode.setPosition(0, -8, 0);
 
         const iconKind = this.resolveIconKind(buildingTypeId);
         const hasFunctionIcon = iconKind !== null;
-        const costRowY = hasFunctionIcon ? -16 : 0;
+        const costRowY = hasFunctionIcon ? -18 : -2;
 
         const labelNode = new Node('CostLabel');
         contentNode.addChild(labelNode);
-        labelNode.setPosition(-18, costRowY, 0);
+        labelNode.setPosition(-14, costRowY, 0);
 
         const uiTransform = labelNode.addComponent(UITransform);
-        uiTransform.setContentSize(128, 64);
+        uiTransform.setContentSize(108, 54);
 
         const label = labelNode.addComponent(Label);
         label.string = `${requiredCoins}`;
-        label.fontSize = 56;
-        label.lineHeight = 60;
-        label.color = new Color(255, 236, 154, 255);
+        label.fontSize = 44;
+        label.lineHeight = 48;
+        label.color = new Color(248, 224, 132, 240);
         label.isBold = true;
         label.horizontalAlign = Label.HorizontalAlign.RIGHT;
         label.verticalAlign = Label.VerticalAlign.CENTER;
 
         const outline = labelNode.addComponent(LabelOutline);
-        outline.color = new Color(18, 12, 6, 255);
-        outline.width = 5;
+        outline.color = new Color(18, 12, 6, 220);
+        outline.width = 3;
 
         const shadow = labelNode.addComponent(LabelShadow);
-        shadow.color = new Color(0, 0, 0, 210);
-        shadow.offset.set(3, -2);
-        shadow.blur = 2;
+        shadow.color = new Color(0, 0, 0, 140);
+        shadow.offset.set(2, -1);
+        shadow.blur = 1;
 
         const coinNode = new Node('CoinInline');
         contentNode.addChild(coinNode);
-        coinNode.setPosition(48, costRowY, 0);
+        coinNode.setPosition(38, costRowY, 0);
 
-        coinNode.addComponent(UITransform).setContentSize(40, 40);
+        coinNode.addComponent(UITransform).setContentSize(34, 34);
         const coinG = coinNode.addComponent(Graphics);
-        coinG.fillColor = new Color(246, 198, 72, 255);
-        coinG.circle(0, 0, 17);
+        coinG.fillColor = new Color(236, 188, 72, 230);
+        coinG.circle(0, 0, 14);
         coinG.fill();
-        coinG.strokeColor = new Color(124, 70, 18, 255);
-        coinG.lineWidth = 3;
-        coinG.circle(0, 0, 17);
+        coinG.strokeColor = new Color(116, 68, 18, 220);
+        coinG.lineWidth = 2;
+        coinG.circle(0, 0, 14);
         coinG.stroke();
-        coinG.fillColor = new Color(255, 240, 156, 255);
-        coinG.circle(-3, 4, 5.4);
+        coinG.fillColor = new Color(255, 236, 156, 220);
+        coinG.circle(-2.5, 3.5, 4.3);
         coinG.fill();
 
-        const functionIconNode = this.createFunctionIcon(contentNode, iconKind);
+        const functionRow = this.createFunctionIcon(contentNode, iconKind);
 
         return {
             label,
             costLabelNode: labelNode,
             coinIconNode: coinNode,
-            functionIconNode,
+            functionIconNode: functionRow?.rowNode ?? null,
+            levelBadgeNode: functionRow?.levelBadgeNode ?? null,
+            levelBadgeLabel: functionRow?.levelBadgeLabel ?? null,
         };
     }
 
@@ -120,63 +134,156 @@ export class BuildingPadVisuals {
             costLabelNode,
             coinIconNode,
             functionIconNode,
+            levelBadgeNode,
+            levelBadgeLabel,
             requiredCoins,
             collectedCoins,
             progress,
+            currentLevel,
+            showLevelBadge,
         } = state;
 
         if (!label) return;
 
         const remaining = requiredCoins - collectedCoins;
         const hasFunctionIcon = !!functionIconNode;
-        const activeCostY = hasFunctionIcon ? -16 : 0;
-        const completeCostY = hasFunctionIcon ? -8 : 0;
+        const activeCostY = hasFunctionIcon ? -18 : -2;
+        const completeCostY = hasFunctionIcon ? -8 : -2;
+        const iconNode = functionIconNode?.getChildByName('FunctionIcon') ?? null;
+        const shouldShowLevelBadge =
+            !!functionIconNode &&
+            !!levelBadgeNode &&
+            showLevelBadge &&
+            currentLevel > 0 &&
+            remaining > 0;
 
         if (remaining <= 0) {
             label.string = BuildingText.constructingLabel();
-            label.fontSize = 30;
-            label.lineHeight = 36;
+            label.fontSize = 24;
+            label.lineHeight = 28;
             label.horizontalAlign = Label.HorizontalAlign.CENTER;
             if (costLabelNode) costLabelNode.setPosition(0, completeCostY, 0);
             if (coinIconNode) coinIconNode.active = false;
             if (functionIconNode) functionIconNode.active = false;
         } else {
             label.string = `${remaining}`;
-            label.fontSize = 56;
-            label.lineHeight = 60;
+            label.fontSize = 44;
+            label.lineHeight = 48;
             label.horizontalAlign = Label.HorizontalAlign.RIGHT;
-            if (costLabelNode) costLabelNode.setPosition(-18, activeCostY, 0);
+            if (costLabelNode) costLabelNode.setPosition(-14, activeCostY, 0);
             if (coinIconNode) coinIconNode.active = true;
             if (functionIconNode) functionIconNode.active = true;
         }
 
         if (progress >= 1) {
-            label.color = new Color(118, 255, 136, 255);
+            label.color = new Color(110, 240, 126, 240);
         } else if (progress >= 0.5) {
-            label.color = new Color(255, 236, 120, 255);
+            label.color = new Color(245, 228, 116, 238);
         } else {
-            label.color = new Color(255, 216, 82, 255);
+            label.color = new Color(244, 208, 88, 232);
+        }
+
+        if (iconNode?.isValid) {
+            iconNode.setPosition(shouldShowLevelBadge ? -22 : 0, 0, 0);
+            iconNode.setScale(
+                shouldShowLevelBadge ? 0.78 : 0.88,
+                shouldShowLevelBadge ? 0.78 : 0.88,
+                1
+            );
+        }
+        if (levelBadgeNode?.isValid) {
+            levelBadgeNode.active = shouldShowLevelBadge;
+            if (shouldShowLevelBadge) {
+                levelBadgeNode.setPosition(24, 0, 0);
+                const levelText = `${Math.max(1, Math.floor(currentLevel))}`;
+                if (levelBadgeLabel) {
+                    levelBadgeLabel.string = levelText;
+                    levelBadgeLabel.fontSize = levelText.length >= 2 ? 16 : 18;
+                    levelBadgeLabel.lineHeight = levelBadgeLabel.fontSize + 2;
+                }
+                this.drawLevelBadge(levelBadgeNode.getComponent(Graphics));
+            }
         }
     }
 
     private static createFunctionIcon(
         contentNode: Node,
         kind: BuildingPadIconKind | null
-    ): Node | null {
+    ): FunctionRowRefs | null {
         if (!kind) return null;
+        const rowNode = new Node('FunctionRow');
+        contentNode.addChild(rowNode);
+        rowNode.setPosition(0, 42, 0);
+        rowNode.addComponent(UITransform).setContentSize(72, 30);
+
         const iconNode = new Node('FunctionIcon');
-        contentNode.addChild(iconNode);
-        iconNode.setPosition(0, 50, 0);
+        rowNode.addChild(iconNode);
+        iconNode.setScale(0.88, 0.88, 1);
         BuildingPadIconFactory.createFunctionIcon(iconNode, kind);
-        return iconNode;
+
+        const levelBadgeNode = new Node('LevelBadge');
+        rowNode.addChild(levelBadgeNode);
+        levelBadgeNode.addComponent(UITransform).setContentSize(46, 26);
+        const levelBadgeBg = levelBadgeNode.addComponent(Graphics);
+        this.drawLevelBadge(levelBadgeBg);
+
+        const levelLabelNode = new Node('LevelLabel');
+        levelBadgeNode.addChild(levelLabelNode);
+        levelLabelNode.addComponent(UITransform).setContentSize(46, 26);
+        const levelBadgeLabel = levelLabelNode.addComponent(Label);
+        levelBadgeLabel.string = '1';
+        levelBadgeLabel.fontSize = 18;
+        levelBadgeLabel.lineHeight = 20;
+        levelBadgeLabel.isBold = true;
+        levelBadgeLabel.color = new Color(255, 244, 204, 255);
+        levelBadgeLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        levelBadgeLabel.verticalAlign = Label.VerticalAlign.CENTER;
+
+        const levelOutline = levelLabelNode.addComponent(LabelOutline);
+        levelOutline.color = new Color(26, 14, 6, 230);
+        levelOutline.width = 2;
+
+        const levelShadow = levelLabelNode.addComponent(LabelShadow);
+        levelShadow.color = new Color(0, 0, 0, 120);
+        levelShadow.offset.set(1, -1);
+        levelShadow.blur = 1;
+
+        levelBadgeNode.active = false;
+
+        return {
+            rowNode,
+            levelBadgeNode,
+            levelBadgeLabel,
+        };
     }
 
     private static resolveIconKind(buildingTypeId: string): BuildingPadIconKind | null {
-        if (buildingTypeId === 'tower') return 'tower';
+        if (
+            buildingTypeId === 'tower' ||
+            buildingTypeId === 'frost_tower' ||
+            buildingTypeId === 'lightning_tower'
+        ) {
+            return 'tower';
+        }
         if (buildingTypeId === 'farm') return 'farm';
         if (buildingTypeId === 'barracks') return 'barracks';
         if (buildingTypeId === 'wall') return 'wall';
         return null;
+    }
+
+    private static drawLevelBadge(graphics: Graphics | null): void {
+        if (!graphics) return;
+        graphics.clear();
+        graphics.fillColor = new Color(255, 255, 255, 244);
+        graphics.circle(0, 0, 13);
+        graphics.fill();
+        graphics.strokeColor = new Color(220, 184, 92, 236);
+        graphics.lineWidth = 2;
+        graphics.circle(0, 0, 12);
+        graphics.stroke();
+        graphics.fillColor = new Color(255, 218, 120, 40);
+        graphics.circle(-3.5, 4, 4);
+        graphics.fill();
     }
 
     private static drawDashedRectSimple(

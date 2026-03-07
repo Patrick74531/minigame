@@ -20,7 +20,7 @@ import { GameEvents } from '../../data/GameEvents';
 import { EffectFactory } from '../effects/EffectFactory';
 import { WeaponVFX } from '../weapons/WeaponVFX';
 import { GameConfig } from '../../data/GameConfig';
-import { HealthBar } from '../../ui/HealthBar';
+import { HealthBar, type TowerFocusedBuffCounts } from '../../ui/HealthBar';
 
 const { ccclass, property } = _decorator;
 type RouteLane = 'top' | 'mid' | 'bottom';
@@ -119,7 +119,20 @@ export class Tower extends Building {
 
     protected initialize(): void {
         super.initialize();
+        const healthBar = this.node.getComponent(HealthBar);
+        if (healthBar) {
+            healthBar.showTowerFocusedBuffBadges = true;
+        }
         this._focusedUpgradeCounts = { attack: 0, range: 0, speed: 0 };
+        this.syncFocusedUpgradeBadges();
+    }
+
+    protected onEnable(): void {
+        super.onEnable();
+        const healthBar = this.node.getComponent(HealthBar);
+        if (healthBar) {
+            healthBar.showTowerFocusedBuffBadges = true;
+        }
         this.syncFocusedUpgradeBadges();
     }
 
@@ -265,6 +278,44 @@ export class Tower extends Building {
         }
 
         this._focusedUpgradeCounts[stat] = (this._focusedUpgradeCounts[stat] ?? 0) + 1;
+        this.syncFocusedUpgradeBadges();
+    }
+
+    public getFocusedUpgradeCounts(): TowerFocusedBuffCounts {
+        return {
+            attack: Math.max(0, Math.floor(this._focusedUpgradeCounts.attack || 0)),
+            range: Math.max(0, Math.floor(this._focusedUpgradeCounts.range || 0)),
+            speed: Math.max(0, Math.floor(this._focusedUpgradeCounts.speed || 0)),
+        };
+    }
+
+    /**
+     * 仅供存档恢复使用。
+     * 要求在新创建的塔上调用，此时还未应用过任何定向强化。
+     */
+    public restoreFocusedUpgradeCounts(counts: Partial<TowerFocusedBuffCounts> | null): void {
+        this._focusedUpgradeCounts = { attack: 0, range: 0, speed: 0 };
+        const safeCounts = {
+            attack: Math.max(0, Math.floor(counts?.attack || 0)),
+            range: Math.max(0, Math.floor(counts?.range || 0)),
+            speed: Math.max(0, Math.floor(counts?.speed || 0)),
+        };
+
+        if (safeCounts.attack <= 0 && safeCounts.range <= 0 && safeCounts.speed <= 0) {
+            this.syncFocusedUpgradeBadges();
+            return;
+        }
+
+        for (let i = 0; i < safeCounts.attack; i++) {
+            this.applyFocusedUpgrade('attack');
+        }
+        for (let i = 0; i < safeCounts.range; i++) {
+            this.applyFocusedUpgrade('range');
+        }
+        for (let i = 0; i < safeCounts.speed; i++) {
+            this.applyFocusedUpgrade('speed');
+        }
+
         this.syncFocusedUpgradeBadges();
     }
 

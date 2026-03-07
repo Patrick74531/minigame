@@ -8,12 +8,19 @@ export interface WeaponSaveState {
     level: number;
 }
 
+export interface TowerFocusedUpgradeSaveState {
+    attack: number;
+    range: number;
+    speed: number;
+}
+
 export interface BuildingPadSaveState {
     padIndex: number;
     buildingTypeId: string;
     level: number;
     hpRatio: number;
     nextUpgradeCost: number;
+    towerFocusedUpgradeCounts?: TowerFocusedUpgradeSaveState | null;
 }
 
 export interface GameSaveDataV2 {
@@ -132,6 +139,35 @@ export class GameSaveManager {
             }
             if (!Array.isArray(v2.items)) {
                 v2.items = [];
+            }
+            if (!Array.isArray(v2.buildings)) {
+                v2.buildings = [];
+            } else {
+                for (const building of v2.buildings) {
+                    if (
+                        building &&
+                        typeof building === 'object' &&
+                        building.towerFocusedUpgradeCounts &&
+                        typeof building.towerFocusedUpgradeCounts === 'object'
+                    ) {
+                        building.towerFocusedUpgradeCounts = {
+                            attack: Math.max(
+                                0,
+                                Math.floor(building.towerFocusedUpgradeCounts.attack || 0)
+                            ),
+                            range: Math.max(
+                                0,
+                                Math.floor(building.towerFocusedUpgradeCounts.range || 0)
+                            ),
+                            speed: Math.max(
+                                0,
+                                Math.floor(building.towerFocusedUpgradeCounts.speed || 0)
+                            ),
+                        };
+                    } else if (building && typeof building === 'object') {
+                        building.towerFocusedUpgradeCounts = null;
+                    }
+                }
             }
             if (typeof v2.baseRevivalUsed !== 'boolean') {
                 v2.baseRevivalUsed = false;

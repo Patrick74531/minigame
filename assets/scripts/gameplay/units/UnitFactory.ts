@@ -25,6 +25,10 @@ import { GameConfig } from '../../data/GameConfig';
 import { HeroAnimationController } from './HeroAnimationController';
 import { HeroWeaponMountController } from './HeroWeaponMountController';
 import { AnimRootScaleLock } from '../visuals/AnimRootScaleLock';
+import {
+    GroundContactShadow,
+    type GroundContactShadowConfig,
+} from '../visuals/GroundContactShadow';
 import { SoldierGooseAnimator } from '../visuals/SoldierGooseAnimator';
 import { resolveHeroModelConfig } from './HeroModelConfig';
 import { WeaponType } from '../weapons/WeaponTypes';
@@ -176,6 +180,7 @@ export class UnitFactory {
         const speedMultiplier = options.speedMultiplier ?? 1;
 
         const resolvedSpawnType = options.spawnType ?? (isElite ? 'elite' : 'regular');
+        this.attachGroundShadow(node, this.resolveEnemyGroundShadowConfig(options, resolvedSpawnType));
 
         enemy.initStats({
             maxHp: GameConfig.ENEMY.BASE_HP * hpMultiplier,
@@ -264,6 +269,52 @@ export class UnitFactory {
         return Math.max(0.9, Math.min(2.6, radius));
     }
 
+    private static resolveEnemyGroundShadowConfig(
+        options: EnemySpawnOptions,
+        spawnType: 'regular' | 'elite' | 'boss'
+    ): GroundContactShadowConfig {
+        const modelPath = options.modelPath ?? '';
+        const scaleMultiplier = Math.max(0.65, options.scaleMultiplier ?? 1);
+
+        let sizeX = 1.18;
+        let sizeZ = 0.82;
+        let opacity = spawnType === 'elite' ? 0.24 : 0.22;
+
+        if (modelPath.indexOf('vehicle/Tank') === 0) {
+            sizeX = 1.88;
+            sizeZ = 1.38;
+            opacity = 0.28;
+        } else if (modelPath.indexOf('vehicle/Enemy_Turret') === 0) {
+            sizeX = 1.55;
+            sizeZ = 1.2;
+            opacity = 0.24;
+        } else if (modelPath.indexOf('vehicle/') === 0) {
+            sizeX = 1.45;
+            sizeZ = 1.02;
+            opacity = 0.24;
+        } else if (modelPath.indexOf('boss/Robot_Legs_Gun') === 0) {
+            sizeX = 2.05;
+            sizeZ = 1.48;
+            opacity = 0.3;
+        } else if (modelPath.indexOf('boss/') === 0 || spawnType === 'boss') {
+            sizeX = 2.25;
+            sizeZ = 1.62;
+            opacity = 0.32;
+        } else if (modelPath.indexOf('flying/') === 0) {
+            sizeX = 1.3;
+            sizeZ = 0.94;
+            opacity = 0.16;
+        }
+
+        const scaleBoost = Math.sqrt(scaleMultiplier);
+        return {
+            sizeX: sizeX * scaleBoost,
+            sizeZ: sizeZ * scaleBoost,
+            opacity,
+            groundY: 0.05,
+        };
+    }
+
     /**
      * 创建士兵
      */
@@ -300,6 +351,12 @@ export class UnitFactory {
         });
 
         this.attachSoldierGooseVisual(node);
+        this.attachGroundShadow(node, {
+            sizeX: 1.08,
+            sizeZ: 0.72,
+            opacity: 0.2,
+            groundY: 0.05,
+        });
 
         return node;
     }
@@ -345,6 +402,12 @@ export class UnitFactory {
         hb.updateHealth(hero.stats.currentHp, hero.stats.maxHp);
 
         this.attachHeroModel(node);
+        this.attachGroundShadow(node, {
+            sizeX: 1.28,
+            sizeZ: 0.84,
+            opacity: 0.24,
+            groundY: 0.055,
+        });
 
         return node;
     }
@@ -367,7 +430,7 @@ export class UnitFactory {
 
         if (!material) {
             material = new Material();
-            material.initialize({ effectName: 'builtin-unlit' });
+            material.initialize({ effectName: 'builtin-standard' });
             material.setProperty('mainColor', color);
             this._materials.set(colorKey, material);
         }
@@ -1066,6 +1129,12 @@ export class UnitFactory {
         for (const child of node.children) {
             this.applyLayerRecursive(child, layer);
         }
+    }
+
+    private static attachGroundShadow(node: Node, config: GroundContactShadowConfig): void {
+        const shadow =
+            node.getComponent(GroundContactShadow) ?? node.addComponent(GroundContactShadow);
+        shadow.configure(config);
     }
 
     private static attachSoldierGooseVisual(root: Node): void {

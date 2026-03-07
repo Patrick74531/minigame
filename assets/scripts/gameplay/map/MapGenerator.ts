@@ -91,9 +91,9 @@ export class MapGenerator extends Component {
 
     // Splatmap resolution (pixels)
     private static readonly SPLAT_SIZE = 256;
-    private static readonly LANE_HALF_WIDTH_NORM = 0.028;
-    private static readonly LANE_HALF_WIDTH_WIDE_NORM = 0.045;
-    private static readonly LANE_EDGE_SOFTNESS_NORM = 0.025;
+    private static readonly LANE_HALF_WIDTH_NORM = 0.032;
+    private static readonly LANE_HALF_WIDTH_WIDE_NORM = 0.052;
+    private static readonly LANE_EDGE_SOFTNESS_NORM = 0.014;
     private static readonly LANE_NOISE_PAD_NORM = 0.018;
 
     @property
@@ -251,7 +251,7 @@ export class MapGenerator extends Component {
             effectName: 'builtin-unlit',
             defines: { USE_TEXTURE: false },
         });
-        mat.setProperty('mainColor', new Color(98, 133, 75, 255)); // fallback grass
+        mat.setProperty('mainColor', new Color(112, 128, 88, 255)); // fallback grass
         renderer.material = mat;
         this._terrainMaterial = mat;
 
@@ -286,7 +286,7 @@ export class MapGenerator extends Component {
             console.error('[MapGenerator] Failed to load terrain-splat effect asset');
             // Fallback to unlit
             mat.initialize({ effectName: 'builtin-unlit', defines: { USE_TEXTURE: true } });
-            mat.setProperty('mainColor', new Color(98, 133, 75, 255));
+            mat.setProperty('mainColor', new Color(112, 128, 88, 255));
             renderer.material = mat;
             return;
         }
@@ -308,12 +308,15 @@ export class MapGenerator extends Component {
         mat.setProperty('splatMap', splatTex);
         mat.setProperty('grassTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
         mat.setProperty('dirtTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
+        mat.setProperty('grassTint', new Vec4(0.76, 0.84, 0.68, 1.0));
+        mat.setProperty('dirtTint', new Vec4(1.0, 0.92, 0.82, 1.0));
+        mat.setProperty('gradeParams', new Vec4(0.82, 1.08, 0.9, 0.08));
         mat.setProperty(
             'splatTexel',
             new Vec4(1 / MapGenerator.SPLAT_SIZE, 1 / MapGenerator.SPLAT_SIZE, 0, 0)
         );
-        mat.setProperty('lightDir', new Vec4(-0.35, 1.0, 0.25, 0));
-        mat.setProperty('lightingParams', new Vec4(0.62, 0.52, 2.4, 0.16));
+        mat.setProperty('lightDir', new Vec4(-0.22, 1.0, 0.38, 0));
+        mat.setProperty('lightingParams', new Vec4(0.56, 0.62, 2.7, 0.22));
 
         renderer.material = mat;
         this._terrainMaterial = mat;
@@ -403,7 +406,7 @@ export class MapGenerator extends Component {
                 const minDist = Math.min(dTop, dMid, dBot);
 
                 // Perlin-like noise for organic edges
-                const noiseVal = this.fbmNoise(nx * 18.0, nz * 18.0) * 0.018;
+                const noiseVal = this.fbmNoise(nx * 14.0, nz * 14.0) * 0.009;
                 const adjustedDist = minDist + noiseVal;
 
                 // Smoothstep: 0 at lane center, 1 at edge
@@ -668,7 +671,7 @@ export class MapGenerator extends Component {
         let material = this._colorMaterials.get(key);
         if (!material) {
             material = new Material();
-            material.initialize({ effectName: 'builtin-unlit' });
+            material.initialize({ effectName: 'builtin-standard' });
             material.setProperty('mainColor', color);
             this._colorMaterials.set(key, material);
         }

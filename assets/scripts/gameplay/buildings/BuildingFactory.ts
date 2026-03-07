@@ -7,6 +7,10 @@ import { ServiceRegistry } from '../../core/managers/ServiceRegistry';
 import { Base } from './Base';
 import { Spa } from './Spa';
 import { BuildingModelVisuals } from './BuildingModelVisuals';
+import {
+    GroundContactShadow,
+    type GroundContactShadowConfig,
+} from '../visuals/GroundContactShadow';
 
 /**
  * 建筑工厂
@@ -21,6 +25,12 @@ export class BuildingFactory {
         node.setPosition(x, 0, z); // 3D 坐标：Y=0 在地面
         node.setScale(0.45, 0.45, 0.45);
         parent.addChild(node);
+        this.attachGroundShadow(node, {
+            sizeX: 3.15,
+            sizeZ: 2.58,
+            opacity: 0.26,
+            groundY: 0.05,
+        });
         this.attachBarracksBarnVisual(node);
 
         const building = node.addComponent(Building);
@@ -70,6 +80,12 @@ export class BuildingFactory {
         });
         // Ensure Base.onLoad reads configured HP (avoid one-frame HUD mismatch at default 500).
         parent.addChild(node);
+        this.attachGroundShadow(node, {
+            sizeX: 4.55,
+            sizeZ: 3.8,
+            opacity: 0.3,
+            groundY: 0.055,
+        });
 
         this.attachBaseModelAsync(node);
 
@@ -92,7 +108,7 @@ export class BuildingFactory {
 
         if (!material) {
             material = new Material();
-            material.initialize({ effectName: 'builtin-unlit' });
+            material.initialize({ effectName: 'builtin-standard' });
             material.setProperty('mainColor', color);
             this._materials.set(colorKey, material);
         }
@@ -114,6 +130,12 @@ export class BuildingFactory {
         node.setPosition(x, 0, z);
         node.setScale(0.8, 0.8, 0.8); // Adjusted scale for model
         parent.addChild(node);
+        this.attachGroundShadow(node, {
+            sizeX: 1.72,
+            sizeZ: 1.34,
+            opacity: 0.22,
+            groundY: 0.05,
+        });
 
         this.attachRifleTowerModelAsync(node);
 
@@ -162,6 +184,12 @@ export class BuildingFactory {
         const scale = frostConfig?.visual?.scale || { x: 0.52, y: 1.02, z: 0.52 };
         node.setScale(scale.x, scale.y, scale.z);
         parent.addChild(node);
+        this.attachGroundShadow(node, {
+            sizeX: 1.64,
+            sizeZ: 1.3,
+            opacity: 0.22,
+            groundY: 0.05,
+        });
         this.attachFrostTowerSunflowerVisual(node);
 
         const tower = node.addComponent(Tower);
@@ -234,6 +262,7 @@ export class BuildingFactory {
             node.setRotationFromEuler(0, angle, 0);
         }
         parent.addChild(node);
+        this.attachGroundShadow(node, this.resolveBuildingGroundShadowConfig(buildingId, scale));
 
         // 2. Component Logic
         if (config.role === 'barracks' || config.role === 'building') {
@@ -385,6 +414,42 @@ export class BuildingFactory {
      */
     public static clearCache(): void {
         this._materials.clear();
+    }
+
+    private static resolveBuildingGroundShadowConfig(
+        buildingId: string,
+        scale: { x: number; y: number; z: number }
+    ): GroundContactShadowConfig {
+        switch (buildingId) {
+            case 'base':
+                return { sizeX: 4.55, sizeZ: 3.8, opacity: 0.3, groundY: 0.055 };
+            case 'barracks':
+                return { sizeX: 3.15, sizeZ: 2.58, opacity: 0.26, groundY: 0.05 };
+            case 'spa':
+                return { sizeX: 3.25, sizeZ: 3.05, opacity: 0.24, groundY: 0.05 };
+            case 'farm':
+                return { sizeX: 2.7, sizeZ: 2.1, opacity: 0.22, groundY: 0.05 };
+            case 'wall':
+                return { sizeX: 1.02, sizeZ: 0.72, opacity: 0.18, groundY: 0.045 };
+            case 'tower':
+            case 'lightning_tower':
+                return { sizeX: 1.72, sizeZ: 1.34, opacity: 0.22, groundY: 0.05 };
+            case 'frost_tower':
+                return { sizeX: 1.64, sizeZ: 1.3, opacity: 0.22, groundY: 0.05 };
+            default:
+                return {
+                    sizeX: Math.max(1.0, Math.abs(scale.x) * 2.5),
+                    sizeZ: Math.max(0.9, Math.abs(scale.z) * 2.1),
+                    opacity: 0.22,
+                    groundY: 0.05,
+                };
+        }
+    }
+
+    private static attachGroundShadow(node: Node, config: GroundContactShadowConfig): void {
+        const shadow =
+            node.getComponent(GroundContactShadow) ?? node.addComponent(GroundContactShadow);
+        shadow.configure(config);
     }
 
     private static get buildingRegistry(): BuildingRegistry {

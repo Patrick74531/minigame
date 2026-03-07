@@ -83,6 +83,8 @@ export class BuildingPad extends BaseComponent {
     private _costLabelNode: Node | null = null;
     private _coinIconNode: Node | null = null;
     private _functionIconNode: Node | null = null;
+    private _levelBadgeNode: Node | null = null;
+    private _levelBadgeLabel: Label | null = null;
     private _heroInRange: boolean = false;
     private _heroNode: Node | null = null;
     private _padMaterial: Material | null = null;
@@ -328,6 +330,8 @@ export class BuildingPad extends BaseComponent {
         this._costLabelNode = refs.costLabelNode;
         this._coinIconNode = refs.coinIconNode;
         this._functionIconNode = refs.functionIconNode;
+        this._levelBadgeNode = refs.levelBadgeNode;
+        this._levelBadgeLabel = refs.levelBadgeLabel;
     }
 
     private updateDisplay(): void {
@@ -336,9 +340,13 @@ export class BuildingPad extends BaseComponent {
             costLabelNode: this._costLabelNode,
             coinIconNode: this._coinIconNode,
             functionIconNode: this._functionIconNode,
+            levelBadgeNode: this._levelBadgeNode,
+            levelBadgeLabel: this._levelBadgeLabel,
             requiredCoins: this.requiredCoins,
             collectedCoins: this._collectedCoins,
             progress: this.progress,
+            currentLevel: this.resolveCurrentDisplayLevel(),
+            showLevelBadge: this._state === BuildingPadState.UPGRADING && !!this._associatedBuilding,
         });
     }
 
@@ -810,6 +818,14 @@ export class BuildingPad extends BaseComponent {
         }
 
         return 40;
+    }
+
+    private resolveCurrentDisplayLevel(): number {
+        const level = this._associatedBuilding?.level;
+        if (!Number.isFinite(level) || !level || level < 1) {
+            return 0;
+        }
+        return Math.floor(level);
     }
 
     private get eventManager(): EventManager {

@@ -3,6 +3,7 @@ import type { BuildingPadSaveState } from '../../core/managers/GameSaveManager';
 import { BuildingPad, BuildingPadState } from './BuildingPad';
 import { BuildingFactory } from './BuildingFactory';
 import { Building, BuildingType } from './Building';
+import { Tower } from './Tower';
 import { BuildingPadPlacement } from './BuildingPadPlacement';
 import { EventManager } from '../../core/managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
@@ -660,6 +661,7 @@ export class BuildingManager {
                 level: building.level,
                 hpRatio: Math.max(0, building.currentHp / Math.max(1, building.maxHp)),
                 nextUpgradeCost: pad.nextUpgradeCost,
+                towerFocusedUpgradeCounts: this.resolveTowerFocusedUpgradeCountsForSave(building),
             });
         }
         return states;
@@ -897,6 +899,10 @@ export class BuildingManager {
             }
 
             if (state.level > 1) building.restoreToLevel(state.level);
+            const restoredTower = building.node.getComponent(Tower);
+            if (restoredTower) {
+                restoredTower.restoreFocusedUpgradeCounts(state.towerFocusedUpgradeCounts ?? null);
+            }
             building.currentHp = Math.max(1, Math.floor(state.hpRatio * building.maxHp));
             building.node.active = true;
 
@@ -934,6 +940,25 @@ export class BuildingManager {
         }
 
         this.refreshUpgradePadVisibilityGate();
+    }
+
+    private resolveTowerFocusedUpgradeCountsForSave(
+        building: Building
+    ): BuildingPadSaveState['towerFocusedUpgradeCounts'] {
+        if (!building || !building.node || !building.node.isValid) return null;
+        if (!BuildingManager.TOWER_BUILDING_TYPES.has(building.buildingType)) {
+            return null;
+        }
+
+        const tower = building.node.getComponent(Tower);
+        if (!tower) return null;
+
+        const counts = tower.getFocusedUpgradeCounts();
+        if (counts.attack <= 0 && counts.range <= 0 && counts.speed <= 0) {
+            return null;
+        }
+
+        return counts;
     }
 
     private restoreActiveNonBaseBuildingsToFullHealth(): void {

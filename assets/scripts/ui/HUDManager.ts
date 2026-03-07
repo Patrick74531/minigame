@@ -168,6 +168,7 @@ export class HUDManager {
         this.eventManager.on(GameEvents.COIN_CHANGED, this.onCoinChanged, this);
         this.eventManager.on(GameEvents.WEAPON_PICKED, this.onWeaponPicked, this);
         this.eventManager.on(GameEvents.TOWER_PADS_EXPANDED, this.onTowerPadsExpanded, this);
+        this.eventManager.on(GameEvents.PLAYER_STARTED_MOVING, this.onPlayerStartedMoving, this);
         this.eventManager.on(GameEvents.LANGUAGE_CHANGED, this.onLanguageChanged, this);
     }
 
@@ -579,6 +580,10 @@ export class HUDManager {
     private onLanguageChanged(): void {
         console.log('[HUDManager] onLanguageChanged');
         this.refreshAllText();
+    }
+
+    private onPlayerStartedMoving(): void {
+        this._statusModule.dismissDesktopMoveHint();
     }
 
     /**

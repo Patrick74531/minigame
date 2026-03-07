@@ -16,6 +16,9 @@ interface HasOffset {
 }
 
 export class ScreenShake {
+    private static readonly INTENSITY_SCALE = 0.35;
+    private static readonly MAX_INTENSITY = 0.08;
+    private static readonly MAX_DURATION = 0.12;
     private static _cameraNode: Node | null = null;
     private static _shaking: boolean = false;
     private static _elapsed: number = 0;
@@ -47,10 +50,13 @@ export class ScreenShake {
             return;
         }
 
-        this._intensity = intensity;
-        this._duration = duration;
+        this._intensity = Math.min(
+            ScreenShake.MAX_INTENSITY,
+            Math.max(0, intensity * ScreenShake.INTENSITY_SCALE)
+        );
+        this._duration = Math.min(ScreenShake.MAX_DURATION, Math.max(0, duration));
         this._elapsed = 0;
-        this._shaking = true;
+        this._shaking = this._intensity > 0.0001 && this._duration > 0.0001;
 
         if (this._follow) {
             this._originalOffset.set(this._follow.offset);
@@ -88,8 +94,8 @@ export class ScreenShake {
 
         // 随机抖动偏移
         const dx = (Math.random() - 0.5) * 2 * amp;
-        const dy = (Math.random() - 0.5) * 2 * amp * 0.5;
-        const dz = (Math.random() - 0.5) * 2 * amp;
+        const dy = 0;
+        const dz = (Math.random() - 0.5) * 2 * amp * 0.65;
 
         if (this._follow) {
             this._follow.offset.set(
