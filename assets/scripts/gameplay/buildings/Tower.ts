@@ -371,7 +371,7 @@ export class Tower extends Building {
 
     private shoot(target: Node): void {
         // Attack Animation (Squash and Stretch)
-        const initialScale = this.node.scale.clone();
+        const initialScale = this.getVisualRestScale();
         const squashScale = new Vec3(
             initialScale.x * 1.15,
             initialScale.y * 0.82,

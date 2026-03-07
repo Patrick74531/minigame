@@ -219,14 +219,7 @@ export class Building extends BaseComponent implements IAttackable {
 
     private resolveVisualGrowthRatioFromLevel1(): number {
         if (!this._baseNodeScale) return 1;
-
-        const isTower =
-            this.buildingType === BuildingType.TOWER ||
-            this.buildingType === BuildingType.FROST_TOWER ||
-            this.buildingType === BuildingType.LIGHTNING_TOWER;
-        const level1Factor = isTower
-            ? Building.TOWER_SCALE_INITIAL
-            : Building.BUILDING_SCALE_INITIAL;
+        const level1Factor = this.resolveLevelScaleFactor(1);
 
         const baseAvg =
             (Math.abs(this._baseNodeScale.x) +
@@ -245,6 +238,34 @@ export class Building extends BaseComponent implements IAttackable {
         const currentFactor = currentAvg / baseAvg;
         const ratio = currentFactor / Math.max(0.0001, level1Factor);
         return Math.max(1, ratio);
+    }
+
+    protected resolveLevelScaleFactor(level: number = this.level): number {
+        const isTower =
+            this.buildingType === BuildingType.TOWER ||
+            this.buildingType === BuildingType.FROST_TOWER ||
+            this.buildingType === BuildingType.LIGHTNING_TOWER;
+        const initial = isTower ? Building.TOWER_SCALE_INITIAL : Building.BUILDING_SCALE_INITIAL;
+        const n = Math.max(0, Math.floor(level) - 1);
+        const stepPerLevel =
+            (Building.BUILDING_SCALE_MAX - initial) / Building.BUILDING_SCALE_LEVELS_TO_MAX;
+        return Math.min(Building.BUILDING_SCALE_MAX, initial + n * stepPerLevel);
+    }
+
+    protected getVisualRestScale(out?: Vec3): Vec3 {
+        const target = out ?? new Vec3();
+        if (!this._baseNodeScale) {
+            target.set(this.node.scale.x, this.node.scale.y, this.node.scale.z);
+            return target;
+        }
+
+        const factor = this.resolveLevelScaleFactor();
+        target.set(
+            this._baseNodeScale.x * factor,
+            this._baseNodeScale.y * factor,
+            this._baseNodeScale.z * factor
+        );
+        return target;
     }
 
     private updateHealthBarName(): void {
@@ -468,21 +489,7 @@ export class Building extends BaseComponent implements IAttackable {
     }
 
     private applyLevelScale(): void {
-        if (!this._baseNodeScale) return;
-        const isTower =
-            this.buildingType === BuildingType.TOWER ||
-            this.buildingType === BuildingType.FROST_TOWER ||
-            this.buildingType === BuildingType.LIGHTNING_TOWER;
-        const initial = isTower ? Building.TOWER_SCALE_INITIAL : Building.BUILDING_SCALE_INITIAL;
-        const n = Math.max(0, this.level - 1);
-        const stepPerLevel =
-            (Building.BUILDING_SCALE_MAX - initial) / Building.BUILDING_SCALE_LEVELS_TO_MAX;
-        const factor = Math.min(Building.BUILDING_SCALE_MAX, initial + n * stepPerLevel);
-        this.node.setScale(
-            this._baseNodeScale.x * factor,
-            this._baseNodeScale.y * factor,
-            this._baseNodeScale.z * factor
-        );
+        this.node.setScale(this.getVisualRestScale());
         this.updateHealthBarOffset();
     }
 
