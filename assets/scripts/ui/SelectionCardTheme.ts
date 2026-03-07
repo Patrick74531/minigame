@@ -31,6 +31,8 @@ export type AdButtonOptions = {
     width?: number;
     height?: number;
     fontSize?: number;
+    subtitle?: string;
+    subtitleFontSize?: number;
 };
 
 export type GrantToken = {
@@ -69,10 +71,13 @@ export class SelectionCardTheme {
     ): Node | null {
         if (!this.isTikTokRuntime()) return null;
 
-        const BTN_W = Math.round(Math.max(220, options?.width ?? 280));
-        const BTN_H = Math.round(Math.max(46, options?.height ?? 52));
-        const RADIUS = 14;
-        const fontSize = Math.max(16, options?.fontSize ?? 18);
+        const BTN_W = Math.round(Math.max(228, options?.width ?? 280));
+        const subtitle = options?.subtitle?.trim() ?? '';
+        const hasSubtitle = subtitle.length > 0;
+        const BTN_H = Math.round(Math.max(hasSubtitle ? 78 : 60, options?.height ?? 60));
+        const RADIUS = Math.round(Math.max(16, BTN_H * 0.32));
+        const fontSize = Math.max(16, options?.fontSize ?? 17);
+        const subtitleFontSize = Math.max(10, options?.subtitleFontSize ?? 11);
 
         const btn = new Node('AdButton');
         btn.layer = parent.layer;
@@ -80,62 +85,143 @@ export class SelectionCardTheme {
         btn.addComponent(UITransform).setContentSize(BTN_W, BTN_H);
         btn.setPosition(pos.x, pos.y, 0);
 
-        // 按钮背景
-        const g = btn.addComponent(Graphics);
-        const baseColor = new Color(46, 196, 88, 255);
-        g.fillColor = baseColor;
-        g.roundRect(-BTN_W / 2, -BTN_H / 2, BTN_W, BTN_H, RADIUS);
-        g.fill();
-        // 内发光边框
-        g.strokeColor = new Color(140, 255, 170, 200);
-        g.lineWidth = 2;
-        g.roundRect(-BTN_W / 2 + 1, -BTN_H / 2 + 1, BTN_W - 2, BTN_H - 2, RADIUS - 1);
-        g.stroke();
-        // 外边框
-        g.strokeColor = new Color(20, 80, 40, 220);
-        g.lineWidth = 2.5;
-        g.roundRect(-BTN_W / 2, -BTN_H / 2, BTN_W, BTN_H, RADIUS);
-        g.stroke();
+        const haloNode = new Node('AdHalo');
+        haloNode.layer = btn.layer;
+        btn.addChild(haloNode);
+        haloNode.addComponent(UITransform).setContentSize(BTN_W + 20, BTN_H + 18);
+        const haloOpacity = haloNode.addComponent(UIOpacity);
+        haloOpacity.opacity = 82;
+        const haloGraphics = haloNode.addComponent(Graphics);
+        this.drawAdButtonHalo(haloGraphics, BTN_W, BTN_H, RADIUS);
 
-        // 广告图标 ▶
-        const iconNode = new Node('AdIcon');
+        const bgNode = new Node('AdSurface');
+        bgNode.layer = btn.layer;
+        btn.addChild(bgNode);
+        bgNode.addComponent(UITransform).setContentSize(BTN_W, BTN_H);
+        const bgGraphics = bgNode.addComponent(Graphics);
+        this.drawAdButtonSurface(bgGraphics, BTN_W, BTN_H, RADIUS);
+
+        const iconNode = new Node('AdIconBadge');
         iconNode.layer = btn.layer;
         btn.addChild(iconNode);
-        iconNode.addComponent(UITransform).setContentSize(30, 30);
-        iconNode.setPosition(-BTN_W / 2 + 28, 0, 0);
-        const iconLabel = iconNode.addComponent(Label);
+        const iconSize = Math.round(Math.max(34, BTN_H * 0.62));
+        iconNode.addComponent(UITransform).setContentSize(iconSize, iconSize);
+        iconNode.setPosition(-BTN_W / 2 + iconSize * 0.58 + 12, 0, 0);
+        const iconGraphics = iconNode.addComponent(Graphics);
+        this.drawAdButtonIcon(iconGraphics, iconSize);
+
+        const iconLabelNode = new Node('AdIconLabel');
+        iconLabelNode.layer = iconNode.layer;
+        iconNode.addChild(iconLabelNode);
+        iconLabelNode.addComponent(UITransform).setContentSize(iconSize, iconSize);
+        const iconLabel = iconLabelNode.addComponent(Label);
         iconLabel.string = '▶';
         iconLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         iconLabel.verticalAlign = Label.VerticalAlign.CENTER;
         this.applyLabelTheme(iconLabel, {
-            fontSize: Math.max(16, fontSize - 1),
-            lineHeight: Math.max(20, fontSize + 2),
-            color: new Color(255, 255, 255, 255),
+            fontSize: Math.max(16, fontSize + 1),
+            lineHeight: Math.max(20, fontSize + 4),
+            color: new Color(22, 84, 51, 255),
+            bold: true,
             outlineWidth: 0,
         });
 
-        // 按钮文字
-        const labelNode = new Node('AdLabel');
-        labelNode.layer = btn.layer;
-        btn.addChild(labelNode);
-        labelNode.addComponent(UITransform).setContentSize(BTN_W - 60, BTN_H - 8);
-        labelNode.setPosition(12, 0, 0);
-        const label = labelNode.addComponent(Label);
+        const tagNode = new Node('AdTag');
+        tagNode.layer = btn.layer;
+        btn.addChild(tagNode);
+        const tagW = 34;
+        const tagH = 18;
+        tagNode.addComponent(UITransform).setContentSize(tagW, tagH);
+        tagNode.setPosition(BTN_W / 2 - tagW * 0.5 - 12, BTN_H / 2 - tagH * 0.5 - 8, 0);
+        const tagGraphics = tagNode.addComponent(Graphics);
+        this.drawAdButtonTag(tagGraphics, tagW, tagH);
+        const tagLabelNode = new Node('AdTagLabel');
+        tagLabelNode.layer = tagNode.layer;
+        tagNode.addChild(tagLabelNode);
+        tagLabelNode.addComponent(UITransform).setContentSize(tagW - 6, tagH - 2);
+        const tagLabel = tagLabelNode.addComponent(Label);
+        tagLabel.string = 'AD';
+        tagLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        tagLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this.applyLabelTheme(tagLabel, {
+            fontSize: 10,
+            lineHeight: 12,
+            color: new Color(22, 84, 51, 255),
+            bold: true,
+            outlineWidth: 0,
+        });
+
+        const cueNode = new Node('AdCue');
+        cueNode.layer = btn.layer;
+        btn.addChild(cueNode);
+        const cueSize = 18;
+        cueNode.addComponent(UITransform).setContentSize(cueSize, cueSize);
+        cueNode.setPosition(BTN_W / 2 - 24, hasSubtitle ? -3 : -1, 0);
+        const cueGraphics = cueNode.addComponent(Graphics);
+        this.drawAdButtonCue(cueGraphics, cueSize, new Color(255, 238, 188, 220));
+
+        const contentLeft = -BTN_W * 0.5 + iconSize + 18;
+        const contentRight = BTN_W * 0.5 - 42;
+        const contentWidth = Math.max(110, Math.round(contentRight - contentLeft));
+        const contentCenterX = Math.round((contentLeft + contentRight) * 0.5);
+        const titleY = hasSubtitle ? Math.round(BTN_H * 0.16) : -1;
+        const dividerY = hasSubtitle ? -2 : -BTN_H * 0.18;
+        const subtitleY = Math.round(-BTN_H * 0.22);
+
+        const titleNode = new Node('AdTitle');
+        titleNode.layer = btn.layer;
+        btn.addChild(titleNode);
+        titleNode.addComponent(UITransform).setContentSize(contentWidth, Math.round(BTN_H * 0.3));
+        titleNode.setPosition(contentCenterX, titleY, 0);
+        const label = titleNode.addComponent(Label);
         label.string = text;
-        label.horizontalAlign = Label.HorizontalAlign.CENTER;
+        label.horizontalAlign = Label.HorizontalAlign.LEFT;
         label.verticalAlign = Label.VerticalAlign.CENTER;
         label.overflow = Label.Overflow.SHRINK;
         label.enableWrapText = false;
         this.applyLabelTheme(label, {
             fontSize,
             lineHeight: Math.max(22, fontSize + 4),
-            color: new Color(255, 255, 255, 255),
+            color: new Color(248, 255, 238, 255),
             bold: true,
-            outlineColor: new Color(10, 60, 24, 255),
+            outlineColor: new Color(10, 62, 34, 255),
             outlineWidth: 2,
+            hAlign: Label.HorizontalAlign.LEFT,
             shadowColor: new Color(0, 0, 0, 120),
             shadowOffsetY: -1,
         });
+
+        if (hasSubtitle) {
+            const dividerNode = new Node('AdDivider');
+            dividerNode.layer = btn.layer;
+            btn.addChild(dividerNode);
+            dividerNode.addComponent(UITransform).setContentSize(contentWidth, 4);
+            dividerNode.setPosition(contentCenterX, dividerY, 0);
+            const dividerGraphics = dividerNode.addComponent(Graphics);
+            this.drawAdButtonDivider(dividerGraphics, contentWidth);
+
+            const subtitleNode = new Node('AdSubtitle');
+            subtitleNode.layer = btn.layer;
+            btn.addChild(subtitleNode);
+            subtitleNode
+                .addComponent(UITransform)
+                .setContentSize(contentWidth, Math.round(BTN_H * 0.22));
+            subtitleNode.setPosition(contentCenterX, subtitleY, 0);
+            const subtitleLabel = subtitleNode.addComponent(Label);
+            subtitleLabel.string = subtitle;
+            subtitleLabel.horizontalAlign = Label.HorizontalAlign.LEFT;
+            subtitleLabel.verticalAlign = Label.VerticalAlign.CENTER;
+            subtitleLabel.overflow = Label.Overflow.SHRINK;
+            subtitleLabel.enableWrapText = false;
+            this.applyLabelTheme(subtitleLabel, {
+                fontSize: subtitleFontSize,
+                lineHeight: subtitleFontSize + 4,
+                color: new Color(228, 251, 208, 236),
+                outlineColor: new Color(10, 62, 34, 255),
+                outlineWidth: 1,
+                hAlign: Label.HorizontalAlign.LEFT,
+            });
+        }
 
         // 按钮交互：允许重复点击（广告取消后可再次尝试）
         let tapping = false;
@@ -163,6 +249,25 @@ export class SelectionCardTheme {
                 .start();
         });
 
+        tween(haloNode)
+            .repeatForever(
+                tween()
+                    .to(
+                        0.9,
+                        { scale: new Vec3(1.05, 1.08, 1) },
+                        { easing: 'sineInOut' }
+                    )
+                    .to(0.9, { scale: new Vec3(0.98, 1, 1) }, { easing: 'sineInOut' })
+            )
+            .start();
+        tween(haloOpacity)
+            .repeatForever(
+                tween()
+                    .to(0.9, { opacity: 48 }, { easing: 'sineInOut' })
+                    .to(0.9, { opacity: 92 }, { easing: 'sineInOut' })
+            )
+            .start();
+
         // 入场动画
         btn.setScale(0, 0, 1);
         tween(btn)
@@ -172,6 +277,150 @@ export class SelectionCardTheme {
             .start();
 
         return btn;
+    }
+
+    private static drawAdButtonHalo(g: Graphics, width: number, height: number, radius: number): void {
+        g.clear();
+        g.fillColor = new Color(131, 255, 173, 110);
+        g.roundRect(
+            -width * 0.5 - 6,
+            -height * 0.5 - 4,
+            width + 12,
+            height + 8,
+            radius + 8
+        );
+        g.fill();
+    }
+
+    private static drawAdButtonSurface(
+        g: Graphics,
+        width: number,
+        height: number,
+        radius: number
+    ): void {
+        g.clear();
+
+        g.fillColor = new Color(7, 34, 22, 148);
+        g.roundRect(-width * 0.5, -height * 0.5 - 3, width, height, radius);
+        g.fill();
+
+        g.fillColor = new Color(16, 92, 56, 255);
+        g.roundRect(-width * 0.5, -height * 0.5, width, height, radius);
+        g.fill();
+
+        g.fillColor = new Color(34, 187, 104, 255);
+        g.roundRect(
+            -width * 0.5 + 2,
+            -height * 0.5 + 3,
+            width - 4,
+            height - 6,
+            Math.max(10, radius - 2)
+        );
+        g.fill();
+
+        const lowerBandHeight = Math.max(16, Math.round(height * 0.38));
+        g.fillColor = new Color(12, 121, 66, 150);
+        g.roundRect(
+            -width * 0.5 + 2,
+            -height * 0.5 + 3,
+            width - 4,
+            lowerBandHeight,
+            Math.max(10, radius - 4)
+        );
+        g.fill();
+
+        const sheenInset = 8;
+        const sheenHeight = Math.max(14, Math.round(height * 0.34));
+        g.fillColor = new Color(190, 255, 214, 56);
+        g.roundRect(
+            -width * 0.5 + sheenInset,
+            Math.round(height * 0.02),
+            width - sheenInset * 2,
+            sheenHeight,
+            Math.max(10, radius - 7)
+        );
+        g.fill();
+
+        g.strokeColor = new Color(226, 255, 214, 214);
+        g.lineWidth = 2;
+        g.roundRect(
+            -width * 0.5 + 1,
+            -height * 0.5 + 1,
+            width - 2,
+            height - 2,
+            Math.max(10, radius - 1)
+        );
+        g.stroke();
+
+        g.strokeColor = new Color(255, 220, 126, 146);
+        g.lineWidth = 1.5;
+        g.moveTo(-width * 0.32, -height * 0.18);
+        g.lineTo(width * 0.34, -height * 0.18);
+        g.stroke();
+    }
+
+    private static drawAdButtonDivider(g: Graphics, width: number): void {
+        g.clear();
+        g.strokeColor = new Color(244, 231, 158, 190);
+        g.lineWidth = 1.8;
+        g.moveTo(-width * 0.5, 0);
+        g.lineTo(width * 0.5, 0);
+        g.stroke();
+    }
+
+    private static drawAdButtonIcon(g: Graphics, size: number): void {
+        const radius = Math.max(10, Math.round(size * 0.28));
+        g.clear();
+        g.fillColor = new Color(255, 208, 96, 255);
+        g.roundRect(-size * 0.5, -size * 0.5, size, size, radius);
+        g.fill();
+
+        g.fillColor = new Color(255, 243, 188, 92);
+        g.roundRect(
+            -size * 0.5 + 3,
+            Math.round(size * 0.02),
+            size - 6,
+            Math.round(size * 0.3),
+            Math.max(8, radius - 4)
+        );
+        g.fill();
+
+        g.strokeColor = new Color(255, 249, 220, 232);
+        g.lineWidth = 1.6;
+        g.roundRect(-size * 0.5 + 1, -size * 0.5 + 1, size - 2, size - 2, Math.max(8, radius - 1));
+        g.stroke();
+    }
+
+    private static drawAdButtonTag(g: Graphics, width: number, height: number): void {
+        const radius = Math.max(8, Math.round(height * 0.48));
+        g.clear();
+        g.fillColor = new Color(255, 234, 166, 236);
+        g.roundRect(-width * 0.5, -height * 0.5, width, height, radius);
+        g.fill();
+        g.strokeColor = new Color(255, 249, 214, 220);
+        g.lineWidth = 1.2;
+        g.roundRect(
+            -width * 0.5 + 0.6,
+            -height * 0.5 + 0.6,
+            width - 1.2,
+            height - 1.2,
+            Math.max(6, radius - 1)
+        );
+        g.stroke();
+    }
+
+    private static drawAdButtonCue(g: Graphics, size: number, color: Color): void {
+        g.clear();
+        g.strokeColor = color;
+        g.lineWidth = 2.4;
+        g.moveTo(-size * 0.22, -size * 0.26);
+        g.lineTo(-size * 0.02, 0);
+        g.lineTo(-size * 0.22, size * 0.26);
+        g.stroke();
+        g.moveTo(size * 0.02, -size * 0.26);
+        g.lineTo(size * 0.22, 0);
+        g.lineTo(size * 0.02, size * 0.26);
+        g.stroke();
     }
 
     public static drawOverlayMask(bg: Graphics, width: number, height: number): void {

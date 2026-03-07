@@ -89,8 +89,10 @@ export class MapGenerator extends Component {
     private static readonly GRASS_DARK_COLOR = new Vec4(116 / 255, 164 / 255, 99 / 255, 1);
     private static readonly GRASS_ACCENT_COLOR = new Vec4(129 / 255, 176 / 255, 106 / 255, 1);
     private static readonly GRASS_VARIATION = new Vec4(3.2, 7.5, 0.14, 0.07);
-    private static readonly GRASS_VARIATION_CONSTRAINED = new Vec4(2.2, 4.6, 0.09, 0.035);
-    private static readonly GRASS_TILING_CONSTRAINED_SCALE = 0.8;
+    private static readonly GRASS_VARIATION_CONSTRAINED = new Vec4(2.9, 6.3, 0.12, 0.055);
+    private static readonly GRASS_TILING_CONSTRAINED_SCALE = 0.92;
+    private static readonly TERRAIN_LIGHTING = new Vec4(0.62, 0.52, 2.4, 0.16);
+    private static readonly TERRAIN_LIGHTING_CONSTRAINED = new Vec4(0.6, 0.58, 2.85, 0.2);
 
     // Splatmap resolution (pixels)
     private static readonly SPLAT_SIZE = 256;
@@ -323,6 +325,9 @@ export class MapGenerator extends Component {
         const grassVariation = useConstrainedMode
             ? MapGenerator.GRASS_VARIATION_CONSTRAINED
             : MapGenerator.GRASS_VARIATION;
+        const lightingParams = useConstrainedMode
+            ? MapGenerator.TERRAIN_LIGHTING_CONSTRAINED
+            : MapGenerator.TERRAIN_LIGHTING;
         mat.setProperty('dirtTex', dirtTex);
         mat.setProperty('splatMap', splatTex);
         mat.setProperty('grassMainColor', MapGenerator.GRASS_MAIN_COLOR);
@@ -334,7 +339,7 @@ export class MapGenerator extends Component {
         mat.setProperty('dirtTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
         mat.setProperty('splatTexel', new Vec4(1 / splatSize, 1 / splatSize, 0, 0));
         mat.setProperty('lightDir', new Vec4(-0.35, 1.0, 0.25, 0));
-        mat.setProperty('lightingParams', new Vec4(0.62, 0.52, 2.4, 0.16));
+        mat.setProperty('lightingParams', lightingParams);
 
         renderer.material = mat;
         this._terrainMaterial = mat;
@@ -1042,8 +1047,8 @@ export class MapGenerator extends Component {
         };
         const grassScatterTarget = 0;
         const grassPatchTarget = Math.max(
-            useConstrainedMode ? 72 : 150,
-            Math.round(320 * density * (useConstrainedMode ? 0.26 : 1))
+            useConstrainedMode ? 96 : 150,
+            Math.round(320 * density * (useConstrainedMode ? 0.34 : 1))
         );
         const buildingZones = this.getNatureBuildingExclusionZones();
         const lanePolylines = this.getLanePolylinesNormalized();

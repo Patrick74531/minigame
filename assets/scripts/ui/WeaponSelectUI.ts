@@ -226,11 +226,16 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         const cardTopY = usePortraitTriangle
             ? cardContainerY + (triangleTopY + CARD_HEIGHT * 0.5) * cardScale
             : cardContainerY + (-20 + CARD_HEIGHT * 0.5) * cardScale;
-        const titleToCardGap = titleBottomY - cardTopY;
-        const adBtnY = Math.round(cardTopY + (titleToCardGap > 80 ? titleToCardGap * 0.5 : 40));
+        const adBtnHeight = isPortraitTikTok ? 82 : 78;
+        const adBtnHalfH = adBtnHeight * 0.5;
+        const adBtnMinY = cardTopY + adBtnHalfH + (isPortraitTikTok ? 12 : 10);
+        const adBtnMaxY = titleBottomY - adBtnHalfH - (isPortraitTikTok ? 10 : 8);
+        const adBtnY = Math.round(
+            adBtnMaxY > adBtnMinY ? (adBtnMinY + adBtnMaxY) * 0.5 : adBtnMinY
+        );
         const adBtnWidth = Math.round(
             Math.max(
-                260,
+                276,
                 Math.min(
                     viewport.width - padding.left - padding.right - 24,
                     (CARD_WIDTH * 2 + CARD_GAP) * cardScale
@@ -239,13 +244,15 @@ export class WeaponSelectUI extends Singleton<WeaponSelectUI>() {
         );
         SelectionCardTheme.createAdButton(
             this._rootNode!,
-            Localization.instance.t('ui.ad.unlock_run_all_weapons'),
+            Localization.instance.t('ui.ad.get_all_weapons'),
             { x: 0, y: adBtnY },
             () => this.onAdButtonTapped(),
             {
                 width: adBtnWidth,
-                height: 56,
-                fontSize: 15,
+                height: adBtnHeight,
+                fontSize: 16,
+                subtitle: Localization.instance.t('ui.ad.unlock_run_all_weapons'),
+                subtitleFontSize: 11,
             }
         );
     }

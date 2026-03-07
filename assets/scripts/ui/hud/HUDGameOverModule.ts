@@ -56,6 +56,8 @@ export class HUDGameOverModule implements HUDModule {
     private _revivalMessageLabel: Label | null = null;
     private _revivalRebuildBtnNode: Node | null = null;
     private _revivalRebuildBtnBg: Graphics | null = null;
+    private _revivalRebuildBtnIconBg: Graphics | null = null;
+    private _revivalRebuildBtnIconLabel: Label | null = null;
     private _revivalRebuildBtnLabel: Label | null = null;
     private _revivalGiveUpBtnNode: Node | null = null;
     private _revivalGiveUpBtnBg: Graphics | null = null;
@@ -115,6 +117,8 @@ export class HUDGameOverModule implements HUDModule {
         this._revivalMessageLabel = null;
         this._revivalRebuildBtnNode = null;
         this._revivalRebuildBtnBg = null;
+        this._revivalRebuildBtnIconBg = null;
+        this._revivalRebuildBtnIconLabel = null;
         this._revivalRebuildBtnLabel = null;
         this._revivalGiveUpBtnNode = null;
         this._revivalGiveUpBtnBg = null;
@@ -979,9 +983,28 @@ export class HUDGameOverModule implements HUDModule {
         this._revivalRebuildBtnNode = rebuildBtn;
         this.drawRevivalButton(this._revivalRebuildBtnBg, rebuildBtnW, rebuildBtnH, true);
 
+        const rebuildIconNode = new Node('RebuildIcon');
+        rebuildBtn.addChild(rebuildIconNode);
+        rebuildIconNode.addComponent(UITransform).setContentSize(28, 28);
+        this._revivalRebuildBtnIconBg = rebuildIconNode.addComponent(Graphics);
+        this.drawRevivalPrimaryIcon(this._revivalRebuildBtnIconBg, 28);
+
+        const rebuildIconLabelNode = new Node('RebuildIconLabel');
+        rebuildIconNode.addChild(rebuildIconLabelNode);
+        rebuildIconLabelNode.addComponent(UITransform).setContentSize(28, 28);
+        this._revivalRebuildBtnIconLabel = rebuildIconLabelNode.addComponent(Label);
+        this._revivalRebuildBtnIconLabel.string = '▶';
+        this._revivalRebuildBtnIconLabel.fontSize = 18;
+        this._revivalRebuildBtnIconLabel.lineHeight = 20;
+        this._revivalRebuildBtnIconLabel.isBold = true;
+        this._revivalRebuildBtnIconLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
+        this._revivalRebuildBtnIconLabel.verticalAlign = Label.VerticalAlign.CENTER;
+        this._revivalRebuildBtnIconLabel.color = new Color(22, 84, 51, 255);
+
         const rebuildLblNode = new Node('RebuildLabel');
         rebuildBtn.addChild(rebuildLblNode);
         rebuildLblNode.addComponent(UITransform).setContentSize(rebuildBtnW - 16, rebuildBtnH - 8);
+        rebuildLblNode.setPosition(12, 0, 0);
         this._revivalRebuildBtnLabel = rebuildLblNode.addComponent(Label);
         this._revivalRebuildBtnLabel.fontSize = 24;
         this._revivalRebuildBtnLabel.lineHeight = 32;
@@ -989,7 +1012,7 @@ export class HUDGameOverModule implements HUDModule {
         this._revivalRebuildBtnLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
         this._revivalRebuildBtnLabel.verticalAlign = Label.VerticalAlign.CENTER;
         this._revivalRebuildBtnLabel.overflow = Label.Overflow.SHRINK;
-        this._revivalRebuildBtnLabel.color = new Color(20, 10, 0, 255);
+        this._revivalRebuildBtnLabel.color = new Color(246, 255, 238, 255);
         this._revivalRebuildBtnLabel.string = '';
 
         rebuildBtn.on(
@@ -1138,10 +1161,28 @@ export class HUDGameOverModule implements HUDModule {
             if (this._revivalRebuildBtnBg) {
                 this.drawRevivalButton(this._revivalRebuildBtnBg, rebuildBtnW, btnH, true);
             }
+            const rebuildIconNode = this._revivalRebuildBtnNode.getChildByName('RebuildIcon');
+            const iconSize = Math.round(Math.max(24, Math.min(30, btnH * 0.54)));
+            rebuildIconNode?.getComponent(UITransform)?.setContentSize(iconSize, iconSize);
+            rebuildIconNode?.setPosition(-rebuildBtnW * 0.5 + iconSize * 0.5 + 14, 0, 0);
+            if (this._revivalRebuildBtnIconBg) {
+                this.drawRevivalPrimaryIcon(this._revivalRebuildBtnIconBg, iconSize);
+            }
+            if (this._revivalRebuildBtnIconLabel) {
+                this._revivalRebuildBtnIconLabel.node
+                    .getComponent(UITransform)
+                    ?.setContentSize(iconSize, iconSize);
+                this._revivalRebuildBtnIconLabel.fontSize = Math.max(
+                    14,
+                    Math.min(18, Math.round(iconSize * 0.62))
+                );
+                this._revivalRebuildBtnIconLabel.lineHeight = this._revivalRebuildBtnIconLabel.fontSize + 2;
+            }
             this._revivalRebuildBtnLabel?.node
                 .getComponent(UITransform)
-                ?.setContentSize(rebuildBtnW - 12, btnH - 6);
+                ?.setContentSize(rebuildBtnW - iconSize - 30, btnH - 6);
             if (this._revivalRebuildBtnLabel) {
+                this._revivalRebuildBtnLabel.node.setPosition(Math.round(iconSize * 0.28) + 8, 0, 0);
                 this._revivalRebuildBtnLabel.fontSize = Math.max(
                     isTikTokPortrait ? 15 : 18,
                     Math.min(24, Math.round(btnH * 0.42))
@@ -1184,12 +1225,69 @@ export class HUDGameOverModule implements HUDModule {
     private drawRevivalButton(bg: Graphics, w: number, h: number, isPrimary: boolean): void {
         const r = Math.max(8, Math.round(h * 0.25));
         bg.clear();
-        bg.fillColor = isPrimary ? new Color(72, 200, 96, 255) : new Color(120, 60, 60, 200);
+        if (isPrimary) {
+            bg.fillColor = new Color(7, 34, 22, 136);
+            bg.roundRect(-w / 2, -h / 2 - 2, w, h, r);
+            bg.fill();
+
+            bg.fillColor = new Color(16, 92, 56, 255);
+            bg.roundRect(-w / 2, -h / 2, w, h, r);
+            bg.fill();
+
+            bg.fillColor = new Color(34, 187, 104, 255);
+            bg.roundRect(-w / 2 + 2, -h / 2 + 2, w - 4, h - 4, Math.max(8, r - 2));
+            bg.fill();
+
+            bg.fillColor = new Color(190, 255, 214, 48);
+            bg.roundRect(
+                -w / 2 + 8,
+                Math.round(h * 0.02),
+                w - 16,
+                Math.max(12, Math.round(h * 0.28)),
+                Math.max(8, r - 5)
+            );
+            bg.fill();
+
+            bg.strokeColor = new Color(226, 255, 214, 210);
+            bg.lineWidth = 2;
+            bg.roundRect(-w / 2 + 1, -h / 2 + 1, w - 2, h - 2, Math.max(8, r - 1));
+            bg.stroke();
+
+            bg.strokeColor = new Color(255, 220, 126, 140);
+            bg.lineWidth = 1.4;
+            bg.moveTo(-w * 0.22, -h * 0.18);
+            bg.lineTo(w * 0.28, -h * 0.18);
+            bg.stroke();
+            return;
+        }
+
+        bg.fillColor = new Color(120, 60, 60, 200);
         bg.roundRect(-w / 2, -h / 2, w, h, r);
         bg.fill();
-        bg.strokeColor = isPrimary ? new Color(200, 255, 200, 200) : new Color(200, 140, 140, 160);
+        bg.strokeColor = new Color(200, 140, 140, 160);
         bg.lineWidth = 2;
         bg.roundRect(-w / 2, -h / 2, w, h, r);
+        bg.stroke();
+    }
+
+    private drawRevivalPrimaryIcon(bg: Graphics, size: number): void {
+        const r = Math.max(8, Math.round(size * 0.3));
+        bg.clear();
+        bg.fillColor = new Color(255, 208, 96, 255);
+        bg.roundRect(-size / 2, -size / 2, size, size, r);
+        bg.fill();
+        bg.fillColor = new Color(255, 243, 188, 92);
+        bg.roundRect(
+            -size / 2 + 2.5,
+            Math.round(size * 0.02),
+            size - 5,
+            Math.round(size * 0.28),
+            Math.max(6, r - 3)
+        );
+        bg.fill();
+        bg.strokeColor = new Color(255, 249, 220, 230);
+        bg.lineWidth = 1.3;
+        bg.roundRect(-size / 2 + 1, -size / 2 + 1, size - 2, size - 2, Math.max(6, r - 1));
         bg.stroke();
     }
 }
