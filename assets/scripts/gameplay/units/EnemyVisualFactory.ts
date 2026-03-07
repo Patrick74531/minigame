@@ -90,8 +90,13 @@ function attachEnemyFlyingVisual(root: Node, options?: EnemyVisualSelectionOptio
 
 export function resolveEnemyAttackTypeByModelPath(modelPath: string): EnemyAttackType {
     if (modelPath.indexOf('vehicle/') === 0) return 'ram';
-    if (modelPath.indexOf('flying/') === 0) return 'ranged';
+    if (isEnemyAirUnitModelPath(modelPath)) return 'ranged';
     return 'standard';
+}
+
+export function isEnemyAirUnitModelPath(modelPath: string): boolean {
+    const normalized = normalizeEnemyModelPath(modelPath);
+    return normalized.indexOf('flying/') === 0;
 }
 
 export function resolveEnemyProjectileStyleByModelPath(
@@ -114,18 +119,58 @@ export function resolveEnemyVisualScaleByModelPath(modelPath: string): number {
     if (modelPath.indexOf('boss/') === 0) {
         return 4.5;
     }
-    if (modelPath.indexOf('flying/') === 0 || modelPath.indexOf('Rover') !== -1) {
+    if (isEnemyAirUnitModelPath(modelPath) || modelPath.indexOf('Rover') !== -1) {
         return 0.45;
     }
     return 0.9;
 }
 
 function resolveEnemyModelYOffsetByModelPath(modelPath: string): number {
-    if (modelPath.indexOf('flying/') === 0) {
+    const normalized = normalizeEnemyModelPath(modelPath);
+
+    // Only the spaceship set is intentionally hovering.
+    if (isEnemyAirUnitModelPath(normalized)) {
         return 0.3;
     }
-    if (modelPath.indexOf('Robot_Flying') !== -1) {
-        return 0.28;
+    if (normalized.indexOf('vehicle/Tank') === 0) {
+        return -0.01;
     }
-    return 0.04;
+    if (normalized.indexOf('vehicle/Enemy_Turret') === 0) {
+        return -0.008;
+    }
+    if (normalized.indexOf('vehicle/Enemy_Rover') === 0) {
+        return -0.006;
+    }
+    if (normalized.indexOf('vehicle/Enemy_RoundRover') === 0) {
+        return -0.006;
+    }
+    if (normalized.indexOf('vehicle/Enemy_Truck') === 0) {
+        return -0.01;
+    }
+    if (normalized.indexOf('vehicle/') === 0) {
+        return -0.008;
+    }
+    if (normalized.indexOf('boss/Robot_Flying') === 0) {
+        return 0.014;
+    }
+    if (normalized.indexOf('boss/Robot_Legs_Gun') === 0) {
+        return 0.016;
+    }
+    if (normalized.indexOf('boss/Robot_Large') === 0) {
+        return 0.018;
+    }
+    if (normalized.indexOf('boss/Mech') === 0) {
+        return 0.012;
+    }
+    if (normalized.indexOf('boss/') === 0) {
+        return 0.016;
+    }
+    return 0.01;
+}
+
+function normalizeEnemyModelPath(modelPath: string): string {
+    if (modelPath.indexOf('enemies/') === 0) {
+        return modelPath.slice('enemies/'.length);
+    }
+    return modelPath;
 }

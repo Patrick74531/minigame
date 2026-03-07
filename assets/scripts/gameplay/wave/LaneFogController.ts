@@ -69,9 +69,9 @@ const LANE_OUTER_WIDTH_MAX_RATIO = 0.42;
 const LANE_INNER_TO_OUTER_RATIO = 0.58;
 const LANE_MIN_OUTER_WIDTH = 7.6;
 const LANE_MIN_INNER_WIDTH = 3.8;
-const ALPHA_NOISE_LOW = 0.24;
-const ALPHA_NOISE_HIGH = 0.8;
-const MOTE_STRENGTH = 0.2;
+const ALPHA_NOISE_LOW = 0.36;
+const ALPHA_NOISE_HIGH = 0.86;
+const MOTE_STRENGTH = 0.08;
 const BASE_CLEAR_RADIUS = 11.2;
 const BASE_CLEAR_FEATHER = 4.8;
 
@@ -81,7 +81,7 @@ const FOG_LAYER_SPECS: ReadonlyArray<FogLayerSpec> = [
         name: 'ground',
         y: 0.16,
         technique: 0,
-        opacityScale: 1.0,
+        opacityScale: 0.72,
         widthScale: 1.0,
         flowScale: 1.0,
         noiseScale: 1.0,
@@ -92,7 +92,7 @@ const FOG_LAYER_SPECS: ReadonlyArray<FogLayerSpec> = [
         name: 'midVolume',
         y: 1.55,
         technique: 1,
-        opacityScale: 0.62,
+        opacityScale: 0.28,
         widthScale: 1.18,
         flowScale: 0.84,
         noiseScale: 1.22,
@@ -103,7 +103,7 @@ const FOG_LAYER_SPECS: ReadonlyArray<FogLayerSpec> = [
         name: 'highVolume',
         y: 3.0,
         technique: 1,
-        opacityScale: 0.44,
+        opacityScale: 0.14,
         widthScale: 1.38,
         flowScale: 0.72,
         noiseScale: 1.36,
@@ -454,18 +454,18 @@ export class LaneFogController {
     }
 
     private resolveLaneBaseOpacity(lane: RouteLane): number {
-        if (lane === 'mid') return 0.55;
-        return 0.6;
+        if (lane === 'mid') return 0.36;
+        return 0.4;
     }
 
     private resolveLaneTint(lane: RouteLane): Color {
         if (lane === 'top') {
-            return new Color(212, 232, 240, 255);
+            return new Color(188, 202, 210, 255);
         }
         if (lane === 'bottom') {
-            return new Color(208, 226, 236, 255);
+            return new Color(184, 198, 206, 255);
         }
-        return new Color(216, 234, 242, 255);
+        return new Color(190, 204, 212, 255);
     }
 
     private buildFogPath(lane: RouteLane): Array<{ x: number; z: number }> {

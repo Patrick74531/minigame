@@ -57,14 +57,12 @@ export class BuildingPadVisuals {
         flatRoot.setScale(0.008, 0.008, 0.008);
 
         const ctx = flatRoot.addComponent(Graphics);
-        ctx.lineWidth = 3;
-        ctx.strokeColor = new Color(196, 218, 232, 170);
         ctx.lineJoin = Graphics.LineJoin.ROUND;
         ctx.lineCap = Graphics.LineCap.ROUND;
 
         const w = 172;
         const h = 172;
-        this.drawDashedRectSimple(ctx, -w / 2, -h / 2, w, h, 14, 9);
+        this.drawPadOutline(ctx, -w / 2, -h / 2, w, h);
 
         const contentNode = new Node('Content');
         flatRoot.addChild(contentNode);
@@ -284,6 +282,71 @@ export class BuildingPadVisuals {
         graphics.fillColor = new Color(255, 218, 120, 40);
         graphics.circle(-3.5, 4, 4);
         graphics.fill();
+    }
+
+    private static drawPadOutline(
+        ctx: Graphics,
+        x: number,
+        y: number,
+        w: number,
+        h: number
+    ): void {
+        ctx.lineWidth = 12;
+        ctx.strokeColor = new Color(12, 18, 12, 164);
+        this.drawDashedRectSimple(ctx, x, y, w, h, 24, 4);
+
+        ctx.lineWidth = 7;
+        ctx.strokeColor = new Color(255, 255, 255, 252);
+        this.drawDashedRectSimple(ctx, x, y, w, h, 24, 4);
+
+        ctx.lineWidth = 3.5;
+        ctx.strokeColor = new Color(255, 246, 214, 255);
+        this.drawDashedRectSimple(ctx, x, y, w, h, 16, 8);
+
+        this.drawPadCornerAccent(ctx, x, y, w, h);
+    }
+
+    private static drawPadCornerAccent(
+        ctx: Graphics,
+        x: number,
+        y: number,
+        w: number,
+        h: number
+    ): void {
+        const accentLen = Math.min(26, Math.min(w, h) * 0.18);
+        const inset = 7;
+
+        ctx.lineWidth = 9;
+        ctx.strokeColor = new Color(30, 22, 8, 132);
+        this.strokeCornerBracket(ctx, x + inset, y + inset, accentLen, false, false);
+        this.strokeCornerBracket(ctx, x + w - inset, y + inset, accentLen, true, false);
+        this.strokeCornerBracket(ctx, x + inset, y + h - inset, accentLen, false, true);
+        this.strokeCornerBracket(ctx, x + w - inset, y + h - inset, accentLen, true, true);
+
+        ctx.lineWidth = 5;
+        ctx.strokeColor = new Color(255, 248, 226, 255);
+        this.strokeCornerBracket(ctx, x + inset, y + inset, accentLen, false, false);
+        this.strokeCornerBracket(ctx, x + w - inset, y + inset, accentLen, true, false);
+        this.strokeCornerBracket(ctx, x + inset, y + h - inset, accentLen, false, true);
+        this.strokeCornerBracket(ctx, x + w - inset, y + h - inset, accentLen, true, true);
+    }
+
+    private static strokeCornerBracket(
+        ctx: Graphics,
+        cornerX: number,
+        cornerY: number,
+        len: number,
+        flipX: boolean,
+        flipY: boolean
+    ): void {
+        const dirX = flipX ? -1 : 1;
+        const dirY = flipY ? -1 : 1;
+        ctx.moveTo(cornerX, cornerY);
+        ctx.lineTo(cornerX + dirX * len, cornerY);
+        ctx.stroke();
+        ctx.moveTo(cornerX, cornerY);
+        ctx.lineTo(cornerX, cornerY + dirY * len);
+        ctx.stroke();
     }
 
     private static drawDashedRectSimple(

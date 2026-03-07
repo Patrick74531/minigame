@@ -32,7 +32,7 @@ import {
 import { SoldierGooseAnimator } from '../visuals/SoldierGooseAnimator';
 import { resolveHeroModelConfig } from './HeroModelConfig';
 import { WeaponType } from '../weapons/WeaponTypes';
-import { attachEnemyVisual } from './EnemyVisualFactory';
+import { attachEnemyVisual, isEnemyAirUnitModelPath } from './EnemyVisualFactory';
 import type { EnemyAttackType, EnemyVisualVariant } from './EnemyVisualTypes';
 import { findChildByName, findRightHandBone, pathBaseName } from './UnitFactoryHeroSearch';
 
@@ -275,35 +275,95 @@ export class UnitFactory {
     ): GroundContactShadowConfig {
         const modelPath = options.modelPath ?? '';
         const scaleMultiplier = Math.max(0.65, options.scaleMultiplier ?? 1);
+        const isAirUnit = isEnemyAirUnitModelPath(modelPath);
 
         let sizeX = 1.18;
         let sizeZ = 0.82;
-        let opacity = spawnType === 'elite' ? 0.24 : 0.22;
+        let opacity = spawnType === 'elite' ? 0.38 : 0.34;
+        let groundY = 0.016;
+        let innerFade = 0.0;
+        let outerFade = 0.68;
 
-        if (modelPath.indexOf('vehicle/Tank') === 0) {
-            sizeX = 1.88;
-            sizeZ = 1.38;
-            opacity = 0.28;
-        } else if (modelPath.indexOf('vehicle/Enemy_Turret') === 0) {
-            sizeX = 1.55;
-            sizeZ = 1.2;
-            opacity = 0.24;
-        } else if (modelPath.indexOf('vehicle/') === 0) {
-            sizeX = 1.45;
-            sizeZ = 1.02;
-            opacity = 0.24;
-        } else if (modelPath.indexOf('boss/Robot_Legs_Gun') === 0) {
-            sizeX = 2.05;
-            sizeZ = 1.48;
-            opacity = 0.3;
-        } else if (modelPath.indexOf('boss/') === 0 || spawnType === 'boss') {
-            sizeX = 2.25;
-            sizeZ = 1.62;
-            opacity = 0.32;
-        } else if (modelPath.indexOf('flying/') === 0) {
+        if (isAirUnit) {
             sizeX = 1.3;
             sizeZ = 0.94;
             opacity = 0.16;
+            groundY = 0.05;
+            innerFade = 0.1;
+            outerFade = 0.96;
+        } else if (modelPath.indexOf('vehicle/Tank') === 0) {
+            sizeX = 1.68;
+            sizeZ = 1.18;
+            opacity = 0.46;
+            groundY = 0.012;
+            innerFade = 0.0;
+            outerFade = 0.62;
+        } else if (modelPath.indexOf('vehicle/Enemy_Turret') === 0) {
+            sizeX = 1.42;
+            sizeZ = 1.08;
+            opacity = 0.42;
+            groundY = 0.012;
+            innerFade = 0.0;
+            outerFade = 0.64;
+        } else if (modelPath.indexOf('vehicle/Enemy_Truck') === 0) {
+            sizeX = 1.38;
+            sizeZ = 0.98;
+            opacity = 0.4;
+            groundY = 0.012;
+            innerFade = 0.0;
+            outerFade = 0.63;
+        } else if (
+            modelPath.indexOf('vehicle/Enemy_Rover') === 0 ||
+            modelPath.indexOf('vehicle/Enemy_RoundRover') === 0
+        ) {
+            sizeX = 1.16;
+            sizeZ = 0.82;
+            opacity = 0.38;
+            groundY = 0.011;
+            innerFade = 0.0;
+            outerFade = 0.6;
+        } else if (modelPath.indexOf('vehicle/') === 0) {
+            sizeX = 1.24;
+            sizeZ = 0.9;
+            opacity = 0.38;
+            groundY = 0.012;
+            innerFade = 0.0;
+            outerFade = 0.62;
+        } else if (modelPath.indexOf('boss/Robot_Flying') === 0) {
+            sizeX = 1.76;
+            sizeZ = 1.22;
+            opacity = 0.42;
+            groundY = 0.016;
+            innerFade = 0.0;
+            outerFade = 0.68;
+        } else if (modelPath.indexOf('boss/Robot_Legs_Gun') === 0) {
+            sizeX = 1.92;
+            sizeZ = 1.36;
+            opacity = 0.45;
+            groundY = 0.016;
+            innerFade = 0.0;
+            outerFade = 0.68;
+        } else if (modelPath.indexOf('boss/Robot_Large') === 0) {
+            sizeX = 2.14;
+            sizeZ = 1.52;
+            opacity = 0.46;
+            groundY = 0.017;
+            innerFade = 0.0;
+            outerFade = 0.7;
+        } else if (modelPath.indexOf('boss/Mech') === 0) {
+            sizeX = 1.86;
+            sizeZ = 1.32;
+            opacity = 0.42;
+            groundY = 0.015;
+            innerFade = 0.0;
+            outerFade = 0.66;
+        } else if (modelPath.indexOf('boss/') === 0 || spawnType === 'boss') {
+            sizeX = 2.08;
+            sizeZ = 1.48;
+            opacity = 0.44;
+            groundY = 0.016;
+            innerFade = 0.0;
+            outerFade = 0.68;
         }
 
         const scaleBoost = Math.sqrt(scaleMultiplier);
@@ -311,7 +371,9 @@ export class UnitFactory {
             sizeX: sizeX * scaleBoost,
             sizeZ: sizeZ * scaleBoost,
             opacity,
-            groundY: 0.05,
+            groundY,
+            innerFade,
+            outerFade,
         };
     }
 

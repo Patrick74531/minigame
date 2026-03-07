@@ -22,11 +22,11 @@ CCEffect %{
       properties:
         fogTexA: { value: white }
         fogTexB: { value: white }
-        tintColor: { value: [0.84, 0.9, 0.92, 1.0], editor: { type: color } }
+        tintColor: { value: [0.74, 0.79, 0.82, 1.0], editor: { type: color } }
         flowA: { value: [0.19, 0.17, 0.010, 0.004] }
         flowB: { value: [0.37, 0.31, -0.007, 0.005] }
         laneWidth: { value: [5.4, 10.8, 1.8, 0.0] }
-        alphaParams: { value: [0.58, 0.26, 0.80, 0.18] }
+        alphaParams: { value: [0.36, 0.36, 0.86, 0.08] }
         noiseParams: { value: [0.72, 0.18, 1.35, 0.09] }
         baseMask: { value: [0.0, 0.0, 11.2, 4.8] }
         lanePointCount: { value: 2.0 }
@@ -60,11 +60,11 @@ CCEffect %{
       properties:
         fogTexA: { value: white }
         fogTexB: { value: white }
-        tintColor: { value: [0.84, 0.9, 0.92, 1.0], editor: { type: color } }
+        tintColor: { value: [0.74, 0.79, 0.82, 1.0], editor: { type: color } }
         flowA: { value: [0.19, 0.17, 0.010, 0.004] }
         flowB: { value: [0.37, 0.31, -0.007, 0.005] }
         laneWidth: { value: [5.4, 10.8, 1.8, 0.0] }
-        alphaParams: { value: [0.58, 0.26, 0.80, 0.18] }
+        alphaParams: { value: [0.36, 0.36, 0.86, 0.08] }
         noiseParams: { value: [0.72, 0.18, 1.35, 0.09] }
         baseMask: { value: [0.0, 0.0, 11.2, 4.8] }
         lanePointCount: { value: 2.0 }

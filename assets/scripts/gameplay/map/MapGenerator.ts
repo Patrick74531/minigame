@@ -95,6 +95,14 @@ export class MapGenerator extends Component {
     private static readonly LANE_HALF_WIDTH_WIDE_NORM = 0.052;
     private static readonly LANE_EDGE_SOFTNESS_NORM = 0.014;
     private static readonly LANE_NOISE_PAD_NORM = 0.018;
+    private static readonly LANE_JUNCTION_WIDTH_BOOST_NORM = 0.028;
+    private static readonly LANE_JUNCTION_EDGE_BOOST_NORM = 0.009;
+    private static readonly LANE_BASE_JUNCTION_RADIUS_NORM = 0.115;
+    private static readonly LANE_BASE_JUNCTION_FEATHER_NORM = 0.038;
+    private static readonly LANE_BASE_SHOULDER_RADIUS_NORM = 0.074;
+    private static readonly LANE_BASE_SHOULDER_FEATHER_NORM = 0.026;
+    private static readonly LANE_ENEMY_JUNCTION_RADIUS_NORM = 0.084;
+    private static readonly LANE_ENEMY_JUNCTION_FEATHER_NORM = 0.03;
 
     @property
     public mapWidth: number = 28;
@@ -302,21 +310,22 @@ export class MapGenerator extends Component {
         }
 
         // Tiling: reduce tiling for more natural look (less repeated pattern)
-        const tilesAcross = Math.max(this.mapWidth, this.mapHeight) / 4;
+        const grassTilesAcross = Math.max(this.mapWidth, this.mapHeight) / 3.25;
+        const dirtTilesAcross = Math.max(this.mapWidth, this.mapHeight) / 3.0;
         mat.setProperty('grassTex', grassTex);
         mat.setProperty('dirtTex', dirtTex);
         mat.setProperty('splatMap', splatTex);
-        mat.setProperty('grassTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
-        mat.setProperty('dirtTiling', new Vec4(tilesAcross, tilesAcross, 0, 0));
-        mat.setProperty('grassTint', new Vec4(0.76, 0.84, 0.68, 1.0));
-        mat.setProperty('dirtTint', new Vec4(1.0, 0.92, 0.82, 1.0));
-        mat.setProperty('gradeParams', new Vec4(0.82, 1.08, 0.9, 0.08));
+        mat.setProperty('grassTiling', new Vec4(grassTilesAcross, grassTilesAcross, 0, 0));
+        mat.setProperty('dirtTiling', new Vec4(dirtTilesAcross, dirtTilesAcross, 0, 0));
+        mat.setProperty('grassTint', new Vec4(0.92, 0.97, 0.87, 1.0));
+        mat.setProperty('dirtTint', new Vec4(0.98, 0.93, 0.86, 1.0));
+        mat.setProperty('gradeParams', new Vec4(0.92, 1.04, 0.98, 0.04));
         mat.setProperty(
             'splatTexel',
             new Vec4(1 / MapGenerator.SPLAT_SIZE, 1 / MapGenerator.SPLAT_SIZE, 0, 0)
         );
         mat.setProperty('lightDir', new Vec4(-0.22, 1.0, 0.38, 0));
-        mat.setProperty('lightingParams', new Vec4(0.56, 0.62, 2.7, 0.22));
+        mat.setProperty('lightingParams', new Vec4(0.62, 0.5, 2.2, 0.16));
 
         renderer.material = mat;
         this._terrainMaterial = mat;
@@ -384,6 +393,33 @@ export class MapGenerator extends Component {
         const laneHalfWidthWide = MapGenerator.LANE_HALF_WIDTH_WIDE_NORM;
         // Smoothstep transition width
         const edgeSoftness = MapGenerator.LANE_EDGE_SOFTNESS_NORM;
+        const baseShoulder = {
+            x: baseNx + (midLane[1].x - baseNx) * 0.22,
+            z: baseNz + (midLane[1].z - baseNz) * 0.22,
+        };
+        const junctionBlobs = [
+            {
+                x: baseNx,
+                z: baseNz,
+                radius: MapGenerator.LANE_BASE_JUNCTION_RADIUS_NORM,
+                feather: MapGenerator.LANE_BASE_JUNCTION_FEATHER_NORM,
+                noiseOffset: 17.3,
+            },
+            {
+                x: baseShoulder.x,
+                z: baseShoulder.z,
+                radius: MapGenerator.LANE_BASE_SHOULDER_RADIUS_NORM,
+                feather: MapGenerator.LANE_BASE_SHOULDER_FEATHER_NORM,
+                noiseOffset: 43.9,
+            },
+            {
+                x: enemyNx,
+                z: enemyNz,
+                radius: MapGenerator.LANE_ENEMY_JUNCTION_RADIUS_NORM,
+                feather: MapGenerator.LANE_ENEMY_JUNCTION_FEATHER_NORM,
+                noiseOffset: 71.6,
+            },
+        ];
 
         for (let py = 0; py < S; py++) {
             for (let px = 0; px < S; px++) {
@@ -391,33 +427,54 @@ export class MapGenerator extends Component {
                 const nx = (px + 0.5) / S;
                 const nz = (py + 0.5) / S;
 
-                // Distance to each lane (polyline distance)
-                // Top and Bot lanes are wider now
-                const dTop = Math.max(
-                    0,
-                    this.distToPolyline(nx, nz, topLane) - (laneHalfWidthWide - laneHalfWidth)
-                );
-                const dMid = this.distToPolyline(nx, nz, midLane);
-                const dBot = Math.max(
-                    0,
-                    this.distToPolyline(nx, nz, botLane) - (laneHalfWidthWide - laneHalfWidth)
-                );
-
-                const minDist = Math.min(dTop, dMid, dBot);
-
                 // Perlin-like noise for organic edges
                 const noiseVal = this.fbmNoise(nx * 14.0, nz * 14.0) * 0.009;
-                const adjustedDist = minDist + noiseVal;
 
-                // Smoothstep: 0 at lane center, 1 at edge
-                const t = this.smoothstep(
-                    laneHalfWidth - edgeSoftness,
-                    laneHalfWidth + edgeSoftness,
-                    adjustedDist
+                let junctionMask = 0;
+                let junctionBoost = 0;
+                for (const blob of junctionBlobs) {
+                    const blobNoise =
+                        this.fbmNoise(
+                            nx * 9.0 + blob.noiseOffset,
+                            nz * 9.0 - blob.noiseOffset * 0.63
+                        ) * 0.006;
+                    const blobDist = Math.hypot(nx - blob.x, nz - blob.z) + blobNoise;
+                    const blobMask = this.radialMask(blobDist, blob.radius, blob.feather);
+                    junctionMask = Math.max(junctionMask, blobMask);
+                    junctionBoost = Math.max(junctionBoost, blobMask);
+                }
+
+                const localEdgeSoftness =
+                    edgeSoftness +
+                    junctionBoost * MapGenerator.LANE_JUNCTION_EDGE_BOOST_NORM;
+                const localLaneHalfWidth =
+                    laneHalfWidth +
+                    junctionBoost * MapGenerator.LANE_JUNCTION_WIDTH_BOOST_NORM;
+                const localLaneHalfWidthWide =
+                    laneHalfWidthWide +
+                    junctionBoost * MapGenerator.LANE_JUNCTION_WIDTH_BOOST_NORM * 0.82;
+
+                const topMask = this.laneMaskFromDistance(
+                    this.distToPolyline(nx, nz, topLane) + noiseVal,
+                    localLaneHalfWidthWide,
+                    localEdgeSoftness
+                );
+                const midMask = this.laneMaskFromDistance(
+                    this.distToPolyline(nx, nz, midLane) + noiseVal,
+                    localLaneHalfWidth,
+                    localEdgeSoftness
+                );
+                const botMask = this.laneMaskFromDistance(
+                    this.distToPolyline(nx, nz, botLane) + noiseVal,
+                    localLaneHalfWidthWide,
+                    localEdgeSoftness
                 );
 
-                // mask: 1 = dirt (inside lane), 0 = grass (outside)
-                const mask = 1.0 - t;
+                const laneMask = this.unionMask01(
+                    this.unionMask01(topMask, midMask),
+                    botMask
+                );
+                const mask = this.unionMask01(laneMask, junctionMask);
                 const byte = Math.floor(Math.max(0, Math.min(1, mask)) * 255);
 
                 const idx = (py * S + px) * 4;
@@ -460,6 +517,32 @@ export class MapGenerator extends Component {
             texAny.setWrapMode(clamp, clamp);
         }
         return tex;
+    }
+
+    private laneMaskFromDistance(distance: number, halfWidth: number, feather: number): number {
+        return (
+            1.0 -
+            this.smoothstep(
+                halfWidth - feather,
+                halfWidth + feather,
+                distance
+            )
+        );
+    }
+
+    private radialMask(distance: number, radius: number, feather: number): number {
+        return (
+            1.0 -
+            this.smoothstep(
+                Math.max(0, radius - feather),
+                radius + feather,
+                distance
+            )
+        );
+    }
+
+    private unionMask01(a: number, b: number): number {
+        return a + b - a * b;
     }
 
     /** Distance from point (px,pz) to a polyline defined by an array of points */

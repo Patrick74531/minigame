@@ -14,6 +14,7 @@ import {
     tween,
     Tween,
     Vec3,
+    Mat4,
 } from 'cc';
 import { GameConfig } from '../../data/GameConfig';
 import { Enemy } from '../units/Enemy';
@@ -57,6 +58,9 @@ export class EnemyFlyingAnimator extends Component {
     private _clipAttack: string = '';
 
     private _currentState: number = -1;
+    private static readonly _tmpInvRootWorld = new Mat4();
+    private static readonly _tmpWorldPoint = new Vec3();
+    private static readonly _tmpRootPoint = new Vec3();
 
     protected start(): void {
         this._enemy = this.node.getComponent(Enemy);
@@ -154,18 +158,40 @@ export class EnemyFlyingAnimator extends Component {
 
     private estimateNodeGroundOffset(root: Node): number {
         let minLocalY = Number.POSITIVE_INFINITY;
+        Mat4.invert(EnemyFlyingAnimator._tmpInvRootWorld, root.worldMatrix);
 
         const renderers = root.getComponentsInChildren(MeshRenderer);
         for (const renderer of renderers) {
             const mesh = (renderer as unknown as { mesh?: any }).mesh;
             if (!mesh) continue;
 
-            const rawMinY = mesh?.struct?.minPosition?.y ?? mesh?._struct?.minPosition?.y;
-            if (typeof rawMinY !== 'number' || !Number.isFinite(rawMinY)) continue;
+            const rawMin = mesh?.struct?.minPosition ?? mesh?._struct?.minPosition;
+            const rawMax = mesh?.struct?.maxPosition ?? mesh?._struct?.maxPosition;
+            if (!rawMin || !rawMax) continue;
 
-            const sampled = this.sampleRendererMinYRelativeToRoot(renderer.node, root, rawMinY);
-            if (sampled < minLocalY) {
-                minLocalY = sampled;
+            const xs = [rawMin.x, rawMax.x];
+            const ys = [rawMin.y, rawMax.y];
+            const zs = [rawMin.z, rawMax.z];
+
+            for (const x of xs) {
+                for (const y of ys) {
+                    for (const z of zs) {
+                        EnemyFlyingAnimator._tmpWorldPoint.set(x, y, z);
+                        Vec3.transformMat4(
+                            EnemyFlyingAnimator._tmpWorldPoint,
+                            EnemyFlyingAnimator._tmpWorldPoint,
+                            renderer.node.worldMatrix
+                        );
+                        Vec3.transformMat4(
+                            EnemyFlyingAnimator._tmpRootPoint,
+                            EnemyFlyingAnimator._tmpWorldPoint,
+                            EnemyFlyingAnimator._tmpInvRootWorld
+                        );
+                        if (EnemyFlyingAnimator._tmpRootPoint.y < minLocalY) {
+                            minLocalY = EnemyFlyingAnimator._tmpRootPoint.y;
+                        }
+                    }
+                }
             }
         }
 
@@ -174,21 +200,6 @@ export class EnemyFlyingAnimator extends Component {
         }
 
         return -minLocalY;
-    }
-
-    private sampleRendererMinYRelativeToRoot(node: Node, root: Node, localMinY: number): number {
-        let y = localMinY;
-        let cur: Node | null = node;
-
-        while (cur && cur !== root) {
-            y = cur.position.y + y * cur.scale.y;
-            cur = cur.parent;
-        }
-
-        if (cur === root) {
-            return root.position.y + y * root.scale.y;
-        }
-        return y;
     }
 
     // ⚠️ 【重要，请勿修改】此方法名被 Patch Z 依赖，请勿重命名。
