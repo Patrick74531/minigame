@@ -25,6 +25,9 @@ import { Hero } from '../../gameplay/units/Hero';
 import { EventManager } from '../managers/EventManager';
 import { GameEvents } from '../../data/GameEvents';
 
+const RESUME_AFTER_RELOAD_KEY = '__gvr_resume_after_reload_v1';
+const RESUME_AFTER_RELOAD_MAX_AGE_MS = 2 * 60 * 1000;
+
 export type StartContext = {
     mapGenerator: MapGenerator | null;
     waveLoop: WaveLoop | null;
@@ -49,9 +52,21 @@ export class GameStartFlow {
 
     public static run(ctx: StartContext): void {
         const game = this.gameManager;
+        const resumeReason = this.consumePendingResumeAfterReloadReason();
 
         // If homepage is requested (default true) and not already playing
         if (ctx.showHomePage !== false) {
+            if (resumeReason) {
+                const saveData = ctx.saveData ?? GameSaveManager.instance.load();
+                if (saveData) {
+                    console.log(
+                        `[GameStartFlow] Auto-continue after forced reload (${resumeReason}).`
+                    );
+                    const continueCtx = { ...ctx, saveData };
+                    this._showLoadingScreen(continueCtx);
+                    return;
+                }
+            }
             this.showHomePage(ctx);
             return;
         }
@@ -202,6 +217,32 @@ export class GameStartFlow {
     private static isTikTokRuntime(): boolean {
         const g = globalThis as unknown as { __GVR_PLATFORM__?: unknown; tt?: unknown };
         return g.__GVR_PLATFORM__ === 'tiktok' || typeof g.tt !== 'undefined';
+    }
+
+    private static consumePendingResumeAfterReloadReason(): string | null {
+        try {
+            const raw = globalThis.sessionStorage?.getItem(RESUME_AFTER_RELOAD_KEY);
+            if (!raw) return null;
+            globalThis.sessionStorage?.removeItem(RESUME_AFTER_RELOAD_KEY);
+
+            const parsed = JSON.parse(raw) as { reason?: unknown; ts?: unknown } | null;
+            if (!parsed || typeof parsed !== 'object') return null;
+
+            const ts =
+                typeof parsed.ts === 'number'
+                    ? parsed.ts
+                    : typeof parsed.ts === 'string'
+                      ? Number(parsed.ts)
+                      : NaN;
+            if (!Number.isFinite(ts)) return null;
+            if (Date.now() - ts > RESUME_AFTER_RELOAD_MAX_AGE_MS) return null;
+
+            return typeof parsed.reason === 'string' && parsed.reason.length > 0
+                ? parsed.reason
+                : 'reload';
+        } catch {
+            return null;
+        }
     }
 
     // Refactored actual start logic (Map generation, Spawning)
